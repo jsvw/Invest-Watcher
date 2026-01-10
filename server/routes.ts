@@ -6,6 +6,7 @@ import { z } from "zod";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
 import OpenAI from "openai";
+import { importInvestmentData } from "./seed_data";
 
 // Initialize OpenAI client for insights
 const openai = new OpenAI({
@@ -141,6 +142,7 @@ export async function registerRoutes(
   });
 
   await seedDatabase();
+  await importInvestmentData();
 
   return httpServer;
 }
