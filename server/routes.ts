@@ -138,6 +138,9 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error generating insights:", error);
       res.status(500).json({ message: "Failed to generate insights" });
+    }
+  });
+
   await seedDatabase();
   // removed importInvestmentData() call to prevent duplicates on restart
 

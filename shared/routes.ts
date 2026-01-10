@@ -1,5 +1,15 @@
 import { z } from 'zod';
-import { insertPlatformSchema, insertInvestmentSchema, insertValuationSchema, platforms, investments, valuations } from './schema';
+import { 
+  insertPlatformSchema, 
+  insertInvestmentSchema, 
+  insertValuationSchema, 
+  platforms, 
+  investments, 
+  valuations,
+  type InsertPlatform,
+  type InsertInvestment,
+  type InsertValuation 
+} from './schema';
 
 // ============================================
 // SHARED ERROR SCHEMAS
@@ -110,3 +120,11 @@ export function buildUrl(path: string, params?: Record<string, string | number>)
   }
   return url;
 }
+
+export type NoteInput = z.infer<typeof api.platforms.create.input>;
+export type NoteResponse = z.infer<typeof api.platforms.create.responses[201]>;
+export type ValidationError = z.infer<typeof errorSchemas.validation>;
+export type NotFoundError = z.infer<typeof errorSchemas.notFound>;
+export type InternalError = z.infer<typeof errorSchemas.internal>;
+
+export { type InsertPlatform, type InsertInvestment, type InsertValuation };
