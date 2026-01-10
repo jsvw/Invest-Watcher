@@ -175,20 +175,32 @@ export default function PlatformDetails() {
             <Card>
               <CardContent className="p-0">
                 <div className="rounded-md border">
-                  <div className="grid grid-cols-3 p-4 bg-muted/50 font-medium text-sm">
+                  <div className="grid grid-cols-4 p-4 bg-muted/50 font-medium text-sm">
                     <div>Date</div>
                     <div>Amount</div>
                     <div>Notes</div>
+                    <div className="text-right">Actions</div>
                   </div>
                   <div className="divide-y">
                     {investments?.length === 0 ? (
                        <div className="p-8 text-center text-muted-foreground">No investments recorded yet.</div>
                     ) : (
                       investments?.map((inv) => (
-                        <div key={inv.id} className="grid grid-cols-3 p-4 text-sm hover:bg-muted/30 transition-colors">
+                        <div key={inv.id} className="grid grid-cols-4 p-4 text-sm hover:bg-muted/30 transition-colors items-center">
                           <div className="text-muted-foreground">{format(new Date(inv.date), 'MMM dd, yyyy')}</div>
                           <div className="font-medium">${Number(inv.amount).toLocaleString()}</div>
-                          <div className="text-muted-foreground">{inv.notes || "-"}</div>
+                          <div className="text-muted-foreground truncate">{inv.notes || "-"}</div>
+                          <div className="flex justify-end">
+                            <AddTransactionDialog 
+                              platformId={id} 
+                              type="investment" 
+                              mode="edit" 
+                              initialData={{
+                                ...inv,
+                                date: new Date(inv.date).toISOString().split('T')[0]
+                              }} 
+                            />
+                          </div>
                         </div>
                       ))
                     )}
@@ -202,18 +214,30 @@ export default function PlatformDetails() {
              <Card>
               <CardContent className="p-0">
                 <div className="rounded-md border">
-                  <div className="grid grid-cols-2 p-4 bg-muted/50 font-medium text-sm">
+                  <div className="grid grid-cols-3 p-4 bg-muted/50 font-medium text-sm">
                     <div>Date</div>
                     <div>Recorded Value</div>
+                    <div className="text-right">Actions</div>
                   </div>
                   <div className="divide-y">
                      {valuations?.length === 0 ? (
                        <div className="p-8 text-center text-muted-foreground">No valuations recorded yet.</div>
                     ) : (
                       valuations?.map((v) => (
-                        <div key={v.id} className="grid grid-cols-2 p-4 text-sm hover:bg-muted/30 transition-colors">
+                        <div key={v.id} className="grid grid-cols-3 p-4 text-sm hover:bg-muted/30 transition-colors items-center">
                           <div className="text-muted-foreground">{format(new Date(v.date), 'MMM dd, yyyy')}</div>
                           <div className="font-medium">${Number(v.value).toLocaleString()}</div>
+                          <div className="flex justify-end">
+                            <AddTransactionDialog 
+                              platformId={id} 
+                              type="valuation" 
+                              mode="edit" 
+                              initialData={{
+                                ...v,
+                                date: new Date(v.date).toISOString().split('T')[0]
+                              }} 
+                            />
+                          </div>
                         </div>
                       ))
                     )}

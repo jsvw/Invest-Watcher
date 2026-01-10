@@ -22,11 +22,13 @@ export interface IStorage {
   // Investments
   getInvestments(platformId: number): Promise<Investment[]>;
   createInvestment(investment: InsertInvestment): Promise<Investment>;
+  updateInvestment(id: number, investment: Partial<InsertInvestment>): Promise<Investment>;
   getAllInvestments(): Promise<Investment[]>; // For aggregate calculations
 
   // Valuations
   getValuations(platformId: number): Promise<Valuation[]>;
   createValuation(valuation: InsertValuation): Promise<Valuation>;
+  updateValuation(id: number, valuation: Partial<InsertValuation>): Promise<Valuation>;
   getLatestValuations(): Promise<Map<number, number>>; // Map platformId -> value
 }
 
@@ -85,6 +87,15 @@ export class DatabaseStorage implements IStorage {
     return newInvestment;
   }
 
+  async updateInvestment(id: number, investment: Partial<InsertInvestment>): Promise<Investment> {
+    const [updated] = await db.update(investments)
+      .set(investment)
+      .where(eq(investments.id, id))
+      .returning();
+    if (!updated) throw new Error("Investment not found");
+    return updated;
+  }
+
   async getAllInvestments(): Promise<Investment[]> {
     return await db.select().from(investments);
   }
@@ -98,6 +109,15 @@ export class DatabaseStorage implements IStorage {
   async createValuation(valuation: InsertValuation): Promise<Valuation> {
     const [newValuation] = await db.insert(valuations).values(valuation).returning();
     return newValuation;
+  }
+
+  async updateValuation(id: number, valuation: Partial<InsertValuation>): Promise<Valuation> {
+    const [updated] = await db.update(valuations)
+      .set(valuation)
+      .where(eq(valuations.id, id))
+      .returning();
+    if (!updated) throw new Error("Valuation not found");
+    return updated;
   }
 
   async getLatestValuations(): Promise<Map<number, number>> {

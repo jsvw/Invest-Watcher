@@ -75,6 +75,22 @@ export async function registerRoutes(
     }
   });
 
+  app.patch('/api/investments/:id', async (req, res) => {
+    try {
+      const input = api.investments.update.input.parse(req.body);
+      const investment = await storage.updateInvestment(Number(req.params.id), input);
+      res.json(investment);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      res.status(404).json({ message: "Investment not found" });
+    }
+  });
+
   // --- Valuations ---
   app.get(api.valuations.list.path, async (req, res) => {
     const valuations = await storage.getValuations(Number(req.params.platformId));
@@ -94,6 +110,22 @@ export async function registerRoutes(
         });
       }
       throw err;
+    }
+  });
+
+  app.patch('/api/valuations/:id', async (req, res) => {
+    try {
+      const input = api.valuations.update.input.parse(req.body);
+      const valuation = await storage.updateValuation(Number(req.params.id), input);
+      res.json(valuation);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      res.status(404).json({ message: "Valuation not found" });
     }
   });
 

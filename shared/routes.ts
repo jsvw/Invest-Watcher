@@ -74,6 +74,16 @@ export const api = {
         400: errorSchemas.validation,
       },
     },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/investments/:id',
+      input: insertInvestmentSchema.partial(),
+      responses: {
+        200: z.custom<typeof investments.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
   },
   valuations: {
     list: {
@@ -90,6 +100,16 @@ export const api = {
       responses: {
         201: z.custom<typeof valuations.$inferSelect>(),
         400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/valuations/:id',
+      input: insertValuationSchema.partial(),
+      responses: {
+        200: z.custom<typeof valuations.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
       },
     },
   },

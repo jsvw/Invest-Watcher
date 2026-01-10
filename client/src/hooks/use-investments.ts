@@ -58,3 +58,42 @@ export function useCreateInvestment() {
     },
   });
 }
+
+export function useUpdateInvestment() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, ...data }: Partial<InsertInvestment> & { id: number }) => {
+      const res = await fetch(api.investments.update.path.replace(':id', String(id)), {
+        method: api.investments.update.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) {
+        if (res.status === 400) {
+          const error = api.investments.update.responses[400].parse(await res.json());
+          throw new Error(error.message);
+        }
+        throw new Error("Failed to update investment");
+      }
+      return api.investments.update.responses[200].parse(await res.json());
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [api.investments.list.path, data.platformId] });
+      queryClient.invalidateQueries({ queryKey: [api.platforms.list.path] }); // Refresh totals
+      toast({
+        title: "Success",
+        description: "Investment updated successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
