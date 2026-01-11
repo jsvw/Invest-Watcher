@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, ReferenceLine } from "recharts";
+import { ComposedChart, Scatter, Line, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
 import { formatCurrency } from "@/lib/currency";
 import { format } from "date-fns";
 import { useMemo } from "react";
@@ -36,9 +36,9 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
     }
   });
 
-  const { chartData, assetColors, averageReturn } = useMemo(() => {
+  const { chartData, weeklyAverages } = useMemo(() => {
     if (!bubbleData || bubbleData.length === 0) {
-      return { chartData: [], assetColors: {}, averageReturn: 0 };
+      return { chartData: [], weeklyAverages: [] };
     }
 
     const uniqueAssets = Array.from(new Set(bubbleData.map(d => d.assetName)));
@@ -55,10 +55,22 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
       fill: colors[d.assetName]
     }));
 
-    // Calculate average return
-    const avg = bubbleData.reduce((sum, d) => sum + d.percentReturn, 0) / bubbleData.length;
+    // Group by rounded week and calculate averages
+    const weekBuckets: Record<number, number[]> = {};
+    bubbleData.forEach(d => {
+      const week = Math.round(d.weeksFromInvestment);
+      if (!weekBuckets[week]) weekBuckets[week] = [];
+      weekBuckets[week].push(d.percentReturn);
+    });
 
-    return { chartData: data, assetColors: colors, averageReturn: Math.round(avg * 100) / 100 };
+    const avgData = Object.entries(weekBuckets)
+      .map(([week, returns]) => ({
+        x: Number(week),
+        avgReturn: Math.round((returns.reduce((a, b) => a + b, 0) / returns.length) * 100) / 100
+      }))
+      .sort((a, b) => a.x - b.x);
+
+    return { chartData: data, weeklyAverages: avgData };
   }, [bubbleData]);
 
   if (isLoading) {
@@ -99,7 +111,7 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
-          <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+          <ComposedChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis 
               type="number"
@@ -129,6 +141,16 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
               content={({ active, payload }) => {
                 if (!active || !payload || !payload.length) return null;
                 const data = payload[0].payload;
+                if (data.avgReturn !== undefined) {
+                  return (
+                    <div className="bg-popover border rounded-lg p-2 shadow-lg">
+                      <p className="text-sm font-medium">Week {data.x} Average</p>
+                      <p className={data.avgReturn >= 0 ? "text-green-600" : "text-red-600"}>
+                        {data.avgReturn >= 0 ? '+' : ''}{data.avgReturn}%
+                      </p>
+                    </div>
+                  );
+                }
                 return (
                   <div className="bg-popover border rounded-lg p-3 shadow-lg">
                     <p className="font-medium">{data.assetName}</p>
@@ -144,23 +166,21 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
                 );
               }}
             />
-            <ReferenceLine 
-              y={averageReturn} 
-              stroke="hsl(var(--primary))" 
-              strokeDasharray="5 5"
+            <Line 
+              data={weeklyAverages}
+              type="monotone"
+              dataKey="avgReturn"
+              stroke="hsl(var(--primary))"
               strokeWidth={2}
-              label={{ 
-                value: `Avg: ${averageReturn >= 0 ? '+' : ''}${averageReturn}%`, 
-                position: 'right',
-                className: 'fill-primary text-xs font-medium'
-              }}
+              dot={{ fill: 'hsl(var(--primary))', r: 4 }}
+              name="Weekly Average"
             />
             <Scatter data={chartData} dataKey="y">
               {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.fill} fillOpacity={0.8} stroke={entry.fill} strokeWidth={1} />
               ))}
             </Scatter>
-          </ScatterChart>
+          </ComposedChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>
