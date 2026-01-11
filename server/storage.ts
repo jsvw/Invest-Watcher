@@ -187,7 +187,9 @@ export class DatabaseStorage implements IStorage {
     const now = Date.now();
     return allAssets.map(asset => {
       const latestVal = latestValuationMap.get(asset.id);
-      const investedAmount = Number(asset.investedAmount);
+      const userInvested = Number(asset.investedAmount);
+      const bonus = Number(asset.bonusAmount || 0);
+      const totalInvested = userInvested + bonus; // Total working capital
       let currentValue: number;
       let profitLoss: number | undefined;
       let effectiveStatus = asset.status;
@@ -197,26 +199,26 @@ export class DatabaseStorage implements IStorage {
       
       if (asset.status === "exited" && asset.exitPrice) {
         currentValue = Number(asset.exitPrice);
-        profitLoss = currentValue - investedAmount;
+        profitLoss = currentValue - totalInvested;
       } else if (isMatured && asset.annualYield && asset.acquisitionDate) {
         // Calculate full term yield for matured assets
         const acquisitionTime = new Date(asset.acquisitionDate).getTime();
         const exitTime = new Date(asset.exitDate!).getTime();
         const yearsElapsed = (exitTime - acquisitionTime) / (365 * 24 * 60 * 60 * 1000);
-        const accumulatedYield = investedAmount * (Number(asset.annualYield) / 100) * yearsElapsed;
-        currentValue = investedAmount + accumulatedYield;
+        const accumulatedYield = totalInvested * (Number(asset.annualYield) / 100) * yearsElapsed;
+        currentValue = totalInvested + accumulatedYield;
         profitLoss = accumulatedYield;
         effectiveStatus = "matured";
       } else if (latestVal !== undefined) {
         currentValue = latestVal;
-        profitLoss = currentValue - investedAmount;
+        profitLoss = currentValue - totalInvested;
       } else if (asset.annualYield && asset.acquisitionDate) {
         const yearsElapsed = (now - new Date(asset.acquisitionDate).getTime()) / (365 * 24 * 60 * 60 * 1000);
-        const accumulatedYield = investedAmount * (Number(asset.annualYield) / 100) * yearsElapsed;
-        currentValue = investedAmount + accumulatedYield;
+        const accumulatedYield = totalInvested * (Number(asset.annualYield) / 100) * yearsElapsed;
+        currentValue = totalInvested + accumulatedYield;
         profitLoss = accumulatedYield;
       } else {
-        currentValue = investedAmount;
+        currentValue = totalInvested;
       }
       
       return {
@@ -237,23 +239,25 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(assetValuations.date))
       .limit(1);
 
-    const investedAmount = Number(asset.investedAmount);
+    const userInvested = Number(asset.investedAmount);
+    const bonus = Number(asset.bonusAmount || 0);
+    const totalInvested = userInvested + bonus;
     let currentValue: number;
     let profitLoss: number | undefined;
 
     if (asset.status === "exited" && asset.exitPrice) {
       currentValue = Number(asset.exitPrice);
-      profitLoss = currentValue - investedAmount;
+      profitLoss = currentValue - totalInvested;
     } else if (latestValuation) {
       currentValue = Number(latestValuation.value);
-      profitLoss = currentValue - investedAmount;
+      profitLoss = currentValue - totalInvested;
     } else if (asset.annualYield && asset.acquisitionDate) {
       const yearsElapsed = (Date.now() - new Date(asset.acquisitionDate).getTime()) / (365 * 24 * 60 * 60 * 1000);
-      const accumulatedYield = investedAmount * (Number(asset.annualYield) / 100) * yearsElapsed;
-      currentValue = investedAmount + accumulatedYield;
+      const accumulatedYield = totalInvested * (Number(asset.annualYield) / 100) * yearsElapsed;
+      currentValue = totalInvested + accumulatedYield;
       profitLoss = accumulatedYield;
     } else {
-      currentValue = investedAmount;
+      currentValue = totalInvested;
     }
 
     return {
@@ -357,7 +361,9 @@ export class DatabaseStorage implements IStorage {
       const assetValues = allAssets.map(asset => {
         const acquisitionTime = new Date(asset.acquisitionDate).getTime();
         const exitTime = asset.exitDate ? new Date(asset.exitDate).getTime() : null;
-        const investedAmount = Number(asset.investedAmount);
+        const userInvested = Number(asset.investedAmount);
+        const bonus = Number(asset.bonusAmount || 0);
+        const totalInvested = userInvested + bonus;
         
         let value = 0;
         
@@ -373,7 +379,7 @@ export class DatabaseStorage implements IStorage {
           if (relevantVals.length > 0) {
             value = Number(relevantVals[relevantVals.length - 1].value);
           } else {
-            value = investedAmount; // Use invested amount if no valuation yet
+            value = totalInvested; // Use total invested if no valuation yet
           }
           // If exited with a price, use that after exit date
           if (exitTime && dateTime >= exitTime && asset.exitPrice) {
@@ -391,12 +397,12 @@ export class DatabaseStorage implements IStorage {
           // Asset has exited/matured - calculate full term yield
           else if (exitTime && dateTime >= exitTime) {
             const yearsElapsed = (exitTime - acquisitionTime) / (365 * 24 * 60 * 60 * 1000);
-            value = investedAmount + (investedAmount * (annualYield / 100) * yearsElapsed);
+            value = totalInvested + (totalInvested * (annualYield / 100) * yearsElapsed);
           }
           // Asset is active at this date - calculate yield up to this point
           else {
             const yearsElapsed = (dateTime - acquisitionTime) / (365 * 24 * 60 * 60 * 1000);
-            value = investedAmount + (investedAmount * (annualYield / 100) * yearsElapsed);
+            value = totalInvested + (totalInvested * (annualYield / 100) * yearsElapsed);
           }
         }
         

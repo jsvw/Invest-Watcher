@@ -42,7 +42,8 @@ export const assets = pgTable("assets", {
   platformId: integer("platform_id").notNull().references(() => platforms.id),
   name: text("name").notNull(),
   description: text("description"),
-  investedAmount: numeric("invested_amount").notNull(), // Amount invested in this asset
+  investedAmount: numeric("invested_amount").notNull(), // Amount invested by user
+  bonusAmount: numeric("bonus_amount"), // Free bonus received on top of investment
   annualYield: numeric("annual_yield"), // For asset_returns mode: expected annual yield %
   acquisitionDate: timestamp("acquisition_date").notNull(),
   expectedExitDate: timestamp("expected_exit_date"), // Maturity date for the investment

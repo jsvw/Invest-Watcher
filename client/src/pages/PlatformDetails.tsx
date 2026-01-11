@@ -97,11 +97,13 @@ export default function PlatformDetails() {
       // Skip if no yield or fully exited
       if (!asset.annualYield || asset.status === "exited") continue;
       
-      const investedAmount = Number(asset.investedAmount) || 0;
+      const userInvested = Number(asset.investedAmount) || 0;
+      const bonus = Number((asset as any).bonusAmount) || 0;
+      const totalInvested = userInvested + bonus;
       const annualYield = Number(asset.annualYield) || 0;
       
-      // Simple monthly yield: invested × (yield/100) / 12
-      const monthlyYield = (investedAmount * (annualYield / 100)) / 12;
+      // Simple monthly yield: totalInvested × (yield/100) / 12
+      const monthlyYield = (totalInvested * (annualYield / 100)) / 12;
       total += monthlyYield;
     }
     
@@ -356,8 +358,13 @@ export default function PlatformDetails() {
                             </div>
                             <div className="font-medium">
                               {((platform as any).currency || "USD") === "USD" ? "$" : ""}
-                              {Number(asset.investedAmount).toLocaleString()}
+                              {(Number(asset.investedAmount) + Number((asset as any).bonusAmount || 0)).toLocaleString()}
                               {((platform as any).currency || "USD") !== "USD" ? ` ${(platform as any).currency}` : ""}
+                              {(asset as any).bonusAmount && Number((asset as any).bonusAmount) > 0 && (
+                                <span className="text-xs text-muted-foreground ml-1">
+                                  (+{Number((asset as any).bonusAmount).toLocaleString()} bonus)
+                                </span>
+                              )}
                             </div>
                             {platformMode === "asset_returns" && (
                               <div className="text-muted-foreground">

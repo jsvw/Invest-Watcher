@@ -13,6 +13,7 @@ interface AssetFormData {
   name: string;
   description: string;
   investedAmount: string;
+  bonusAmount: string;
   annualYield: string;
   acquisitionDate: string;
   exitDate: string;
@@ -45,6 +46,7 @@ export function AddAssetDialog({ platformId, mode, editAsset }: AddAssetDialogPr
       name: editAsset?.name || "",
       description: editAsset?.description || "",
       investedAmount: editAsset?.investedAmount || "",
+      bonusAmount: (editAsset as any)?.bonusAmount || "",
       annualYield: editAsset?.annualYield || "",
       acquisitionDate: editAsset?.acquisitionDate 
         ? new Date(editAsset.acquisitionDate).toISOString().split('T')[0]
@@ -60,6 +62,7 @@ export function AddAssetDialog({ platformId, mode, editAsset }: AddAssetDialogPr
       name: data.name || "",
       platformId,
       investedAmount: data.investedAmount || "0",
+      bonusAmount: data.bonusAmount || null,
       annualYield: data.annualYield || null,
       description: data.description || null,
       acquisitionDate: data.acquisitionDate,
@@ -129,7 +132,7 @@ export function AddAssetDialog({ platformId, mode, editAsset }: AddAssetDialogPr
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="investedAmount">Invested Amount</Label>
+            <Label htmlFor="investedAmount">Your Investment</Label>
             <Input 
               id="investedAmount" 
               type="number" 
@@ -139,6 +142,20 @@ export function AddAssetDialog({ platformId, mode, editAsset }: AddAssetDialogPr
               data-testid="input-asset-invested"
             />
           </div>
+
+          {mode === "asset_returns" && (
+            <div className="space-y-2">
+              <Label htmlFor="bonusAmount">Bonus (Optional)</Label>
+              <Input 
+                id="bonusAmount" 
+                type="number" 
+                step="0.01"
+                {...form.register("bonusAmount")} 
+                placeholder="Free money on top of investment" 
+                data-testid="input-asset-bonus"
+              />
+            </div>
+          )}
 
           {mode === "asset_returns" && (
             <div className="space-y-2">
