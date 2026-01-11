@@ -3,18 +3,30 @@ import { StatCard } from "@/components/StatCard";
 import { usePlatforms } from "@/hooks/use-platforms";
 import { useGenerateInsight } from "@/hooks/use-insights";
 import { Wallet, TrendingUp, DollarSign, BrainCircuit, RefreshCcw } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { api, buildUrl } from "@shared/routes";
+import { format } from "date-fns";
 
 export default function Dashboard() {
-  const { data: platforms, isLoading } = usePlatforms();
+  const { data: platforms, isLoading: isPlatformsLoading } = usePlatforms();
   const { mutate: generateInsight, data: insightData, isPending: isInsightLoading } = useGenerateInsight();
 
-  if (isLoading) {
+  const { data: history, isLoading: isHistoryLoading } = useQuery({
+    queryKey: [api.portfolio.history.path],
+    queryFn: async () => {
+      const res = await fetch(api.portfolio.history.path, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch history");
+      return await res.json();
+    }
+  });
+
+  if (isPlatformsLoading || isHistoryLoading) {
     return (
       <Layout>
         <div className="space-y-8">
@@ -91,33 +103,69 @@ export default function Dashboard() {
         </div>
 
         {/* AI Insight Section */}
-        {(insightData || isInsightLoading) && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/20 dark:to-purple-900/20 p-6 rounded-2xl border border-indigo-100 dark:border-indigo-900/50"
-          >
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-indigo-100 dark:bg-indigo-900 rounded-xl">
-                <BrainCircuit className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-              </div>
-              <div className="space-y-2 flex-1">
-                <h3 className="text-lg font-semibold text-indigo-900 dark:text-indigo-100">AI Portfolio Analysis</h3>
-                {isInsightLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-full bg-indigo-200/50 dark:bg-indigo-800/50" />
-                    <Skeleton className="h-4 w-3/4 bg-indigo-200/50 dark:bg-indigo-800/50" />
-                  </div>
-                ) : (
-                  <div className="prose prose-sm text-indigo-800 dark:text-indigo-200 max-w-none">
-                     {/* Safe render of markdown/text content */}
-                     {insightData?.insight.split('\n').map((line, i) => <p key={i}>{line}</p>)}
-                  </div>
-                )}
-              </div>
+        {/* ... existing code ... */}
+
+        {/* Portfolio Performance History */}
+        <Card className="shadow-md">
+          <CardHeader>
+            <CardTitle>Portfolio Performance</CardTitle>
+            <CardDescription>Invested amount vs. current valuation over time</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[400px] w-full">
+              {history && history.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={history}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                    <XAxis 
+                      dataKey="date" 
+                      stroke="hsl(var(--muted-foreground))" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false} 
+                      tickFormatter={(date) => format(new Date(date), 'MMM yy')}
+                    />
+                    <YAxis 
+                      stroke="hsl(var(--muted-foreground))" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false} 
+                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                      formatter={(value: number) => [`$${value.toLocaleString()}`, ""]}
+                      labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
+                    />
+                    <Legend verticalAlign="top" height={36}/>
+                    <Line 
+                      type="monotone" 
+                      dataKey="value" 
+                      name="Current Value"
+                      stroke="hsl(var(--primary))" 
+                      strokeWidth={3}
+                      dot={false}
+                      activeDot={{ r: 6 }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="invested" 
+                      name="Total Invested"
+                      stroke="#8884d8" 
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  No portfolio history available.
+                </div>
+              )}
             </div>
-          </motion.div>
-        )}
+          </CardContent>
+        </Card>
 
         {/* Charts Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

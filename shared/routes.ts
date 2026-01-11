@@ -124,6 +124,19 @@ export const api = {
       },
     },
   },
+  portfolio: {
+    history: {
+      method: 'GET' as const,
+      path: '/api/portfolio/history',
+      responses: {
+        200: z.array(z.object({
+          date: z.string(),
+          value: z.number(),
+          invested: z.number()
+        })),
+      },
+    },
+  },
 };
 
 // ============================================

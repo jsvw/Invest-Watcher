@@ -1,7 +1,10 @@
 import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
+import { db } from "./db";
+import { valuations } from "@shared/schema";
 import { api } from "@shared/routes";
+import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
@@ -156,12 +159,11 @@ export async function registerRoutes(
       const userPrompt = prompt || "Give me a summary of my portfolio performance and any recommendations.";
 
       const response = await openai.chat.completions.create({
-        model: "gpt-5.1",
+        model: "gpt-4o",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
         ],
-        max_completion_tokens: 1000,
       });
 
       const insight = response.choices[0]?.message?.content || "Could not generate insights at this time.";
@@ -170,6 +172,51 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error generating insights:", error);
       res.status(500).json({ message: "Failed to generate insights" });
+    }
+  });
+
+  app.get(api.portfolio.history.path, async (_req, res) => {
+    try {
+      const allInvestments = await storage.getAllInvestments();
+      const allValuations = await db.select().from(valuations).orderBy(desc(valuations.date));
+      
+      // Get all unique dates from both investments and valuations
+      const dates = new Set<string>();
+      allInvestments.forEach(inv => dates.add(new Date(inv.date).toISOString().split('T')[0]));
+      allValuations.forEach(val => dates.add(new Date(val.date).toISOString().split('T')[0]));
+      
+      const sortedDates = Array.from(dates).sort();
+      const history = sortedDates.map(date => {
+        const dateObj = new Date(date);
+        
+        // Sum investments up to this date
+        const invested = allInvestments
+          .filter(inv => new Date(inv.date) <= dateObj)
+          .reduce((sum, inv) => sum + Number(inv.amount), 0);
+          
+        // Get latest valuation for each platform up to this date
+        const platformLatestValuations = new Map<number, number>();
+        // Process valuations in chronological order to find the latest for each platform by the target date
+        [...allValuations]
+          .reverse() // Sort to chronological
+          .filter(val => new Date(val.date) <= dateObj)
+          .forEach(val => {
+            platformLatestValuations.set(val.platformId, Number(val.value));
+          });
+          
+        const totalValue = Array.from(platformLatestValuations.values()).reduce((sum, val) => sum + val, 0);
+        
+        return {
+          date,
+          value: totalValue,
+          invested
+        };
+      });
+      
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching portfolio history:", error);
+      res.status(500).json({ message: "Failed to fetch portfolio history" });
     }
   });
 
