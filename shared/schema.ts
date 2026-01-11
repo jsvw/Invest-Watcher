@@ -7,8 +7,18 @@ import { z } from "zod";
 // "asset_returns" - Individual assets with invested amount + annual yield (real estate, loans)
 // "item_valuations" - Individual items with periodic valuation updates (collectibles, crypto)
 
+// === USERS TABLE ===
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(), // bcrypt hashed, never store plain passwords
+  name: text("name"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === TABLE DEFINITIONS ===
 export const platforms = pgTable("platforms", {
+  userId: integer("user_id").references(() => users.id),
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
@@ -65,6 +75,7 @@ export const assetValuations = pgTable("asset_valuations", {
 });
 
 // === BASE SCHEMAS ===
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertPlatformSchema = createInsertSchema(platforms).omit({ id: true, createdAt: true });
 export const insertInvestmentSchema = createInsertSchema(investments).omit({ id: true, createdAt: true });
 export const insertValuationSchema = createInsertSchema(valuations).omit({ id: true, createdAt: true });
@@ -74,12 +85,14 @@ export const insertAssetValuationSchema = createInsertSchema(assetValuations).om
 // === EXPLICIT API CONTRACT TYPES ===
 
 // Base types
+export type User = typeof users.$inferSelect;
 export type Platform = typeof platforms.$inferSelect;
 export type Investment = typeof investments.$inferSelect;
 export type Valuation = typeof valuations.$inferSelect;
 export type Asset = typeof assets.$inferSelect;
 export type AssetValuation = typeof assetValuations.$inferSelect;
 
+export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertPlatform = z.infer<typeof insertPlatformSchema>;
 export type InsertInvestment = z.infer<typeof insertInvestmentSchema>;
 export type InsertValuation = z.infer<typeof insertValuationSchema>;
