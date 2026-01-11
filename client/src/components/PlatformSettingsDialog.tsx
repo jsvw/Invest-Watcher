@@ -9,6 +9,7 @@ import { useState } from "react";
 import { Settings, Trash2 } from "lucide-react";
 import { useLocation } from "wouter";
 import type { Platform } from "@shared/schema";
+import { PlatformIconPicker } from "./PlatformIconPicker";
 
 interface PlatformFormData {
   name: string;
@@ -16,6 +17,7 @@ interface PlatformFormData {
   category: string;
   currency: string;
   color: string;
+  icon: string;
 }
 
 const CATEGORIES = ["Crypto", "Stock", "Bank", "Real Estate", "Retirement", "Other"];
@@ -48,6 +50,7 @@ export function PlatformSettingsDialog({ platform }: PlatformSettingsDialogProps
       category: platform.category || "Other",
       currency: (platform as any).currency || "USD",
       color: platform.color || "#3b82f6",
+      icon: (platform as any).icon || "",
     },
   });
 
@@ -159,6 +162,15 @@ export function PlatformSettingsDialog({ platform }: PlatformSettingsDialogProps
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Icon</Label>
+            <PlatformIconPicker 
+              value={form.watch("icon")} 
+              onChange={(val) => form.setValue("icon", val)}
+              color={form.watch("color")}
+            />
           </div>
 
           <div className="pt-4 flex justify-between">
