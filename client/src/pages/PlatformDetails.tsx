@@ -59,10 +59,12 @@ export default function PlatformDetails() {
   ];
 
   // Stats calculation
-  const platformTotalInvested = investments?.reduce((sum, inv) => sum + Number(inv.amount), 0) || 0;
-  const platformCurrentValue = valuations && valuations.length > 0 
-    ? Number([...valuations].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0].value) 
-    : 0;
+  const statsData = history && history.length > 0 
+    ? history[history.length - 1] 
+    : { value: 0, invested: 0 };
+
+  const platformTotalInvested = statsData.invested;
+  const platformCurrentValue = statsData.value;
 
   if (isPlatformLoading || isInvestmentsLoading || isValuationsLoading || isHistoryLoading) {
     return (

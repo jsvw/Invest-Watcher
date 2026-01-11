@@ -68,8 +68,12 @@ export default function Dashboard() {
   }
 
   // Calculate Aggregates
-  const totalValue = platforms?.reduce((acc, p) => acc + (Number(p.currentValue) || 0), 0) || 0;
-  const totalInvested = platforms?.reduce((acc, p) => acc + (Number(p.totalInvested) || 0), 0) || 0;
+  const statsData = history && history.length > 0 
+    ? history[history.length - 1] 
+    : { value: 0, invested: 0 };
+
+  const totalValue = statsData.value;
+  const totalInvested = statsData.invested;
   const netProfit = totalValue - totalInvested;
   const roi = totalInvested > 0 ? (netProfit / totalInvested) * 100 : 0;
 
