@@ -320,6 +320,74 @@ export async function registerRoutes(
       const platformAssets = await db.select().from(assets)
         .where(eq(assets.platformId, platformId));
 
+      // Helper function to normalize asset names for matching
+      const normalizeName = (name: string): string => {
+        return name
+          .toLowerCase()
+          .trim()
+          .replace(/\s+/g, ' ')           // Collapse multiple spaces
+          .replace(/[^\w\s]/g, '')        // Remove special characters
+          .replace(/\s/g, '');            // Remove all spaces for comparison
+      };
+
+      // Simple Levenshtein distance for fuzzy matching
+      const levenshteinDistance = (a: string, b: string): number => {
+        const matrix: number[][] = [];
+        for (let i = 0; i <= b.length; i++) {
+          matrix[i] = [i];
+        }
+        for (let j = 0; j <= a.length; j++) {
+          matrix[0][j] = j;
+        }
+        for (let i = 1; i <= b.length; i++) {
+          for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) {
+              matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+              matrix[i][j] = Math.min(
+                matrix[i - 1][j - 1] + 1,
+                matrix[i][j - 1] + 1,
+                matrix[i - 1][j] + 1
+              );
+            }
+          }
+        }
+        return matrix[b.length][a.length];
+      };
+
+      // Find best matching asset with fuzzy matching
+      const findMatchingAsset = (csvName: string) => {
+        const normalizedCsvName = normalizeName(csvName);
+        
+        // First try exact match after normalization
+        const exactMatch = platformAssets.find(a => 
+          normalizeName(a.name) === normalizedCsvName
+        );
+        if (exactMatch) return { asset: exactMatch, matchType: 'exact' };
+
+        // Try fuzzy matching - find the closest match
+        let bestMatch: typeof platformAssets[0] | null = null;
+        let bestDistance = Infinity;
+        
+        for (const asset of platformAssets) {
+          const normalizedAssetName = normalizeName(asset.name);
+          const distance = levenshteinDistance(normalizedCsvName, normalizedAssetName);
+          
+          // Calculate similarity ratio (0 to 1, higher is better)
+          const maxLength = Math.max(normalizedCsvName.length, normalizedAssetName.length);
+          const similarity = maxLength > 0 ? 1 - (distance / maxLength) : 0;
+          
+          // Accept matches with 80%+ similarity
+          if (similarity >= 0.8 && distance < bestDistance) {
+            bestDistance = distance;
+            bestMatch = asset;
+          }
+        }
+        
+        if (bestMatch) return { asset: bestMatch, matchType: 'fuzzy' };
+        return null;
+      };
+
       const results = {
         success: 0,
         failed: 0,
@@ -381,16 +449,16 @@ export async function registerRoutes(
           date = new Date(); // Default to today
         }
 
-        // Match asset by name (case-insensitive)
-        const matchedAsset = platformAssets.find(a => 
-          a.name.toLowerCase().trim() === assetName.toLowerCase().trim()
-        );
+        // Match asset by name with fuzzy matching
+        const matchResult = findMatchingAsset(assetName);
 
-        if (!matchedAsset) {
+        if (!matchResult) {
           results.failed++;
           results.errors.push({ row: rowNum, assetName, error: 'Asset not found in platform' });
           continue;
         }
+        
+        const matchedAsset = matchResult.asset;
 
         try {
           // Create the valuation
