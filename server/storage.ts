@@ -35,20 +35,29 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   async getPlatforms(): Promise<PlatformResponse[]> {
     const allPlatforms = await db.select().from(platforms);
-    const latestValuations = await this.getLatestValuations();
-    const allInvestments = await this.getAllInvestments();
+    const allValuations = await db.select().from(valuations).orderBy(desc(valuations.date));
+    const allInvestments = await db.select().from(investments);
+
+    const latestValuationMap = new Map<number, any>();
+    for (const val of allValuations) {
+      if (!latestValuationMap.has(val.platformId)) {
+        latestValuationMap.set(val.platformId, val);
+      }
+    }
 
     return allPlatforms.map(platform => {
-      const currentVal = latestValuations.get(platform.id) || 0;
+      const latestVal = latestValuationMap.get(platform.id);
       const totalInvested = allInvestments
         .filter(inv => inv.platformId === platform.id)
         .reduce((sum, inv) => sum + Number(inv.amount), 0);
       
-      return {
+      const response: PlatformResponse = {
         ...platform,
-        currentValue: Number(currentVal),
-        totalInvested: Number(totalInvested)
+        currentValue: latestVal ? Number(latestVal.value) : 0,
+        totalInvested: Number(totalInvested),
+        lastValuationDate: latestVal ? latestVal.date : null,
       };
+      return response;
     });
   }
 
@@ -56,19 +65,23 @@ export class DatabaseStorage implements IStorage {
     const [platform] = await db.select().from(platforms).where(eq(platforms.id, id));
     if (!platform) return undefined;
 
-    const latestValuations = await this.getLatestValuations();
-    const allInvestments = await this.getAllInvestments();
+    const [latestValuation] = await db
+      .select()
+      .from(valuations)
+      .where(eq(valuations.platformId, id))
+      .orderBy(desc(valuations.date))
+      .limit(1);
 
-    const currentVal = latestValuations.get(platform.id) || 0;
-    const totalInvested = allInvestments
-      .filter(inv => inv.platformId === platform.id)
-      .reduce((sum, inv) => sum + Number(inv.amount), 0);
+    const allInvestments = await db.select().from(investments).where(eq(investments.platformId, id));
+    const totalInvested = allInvestments.reduce((sum, inv) => sum + Number(inv.amount), 0);
 
-    return {
+    const response: PlatformResponse = {
       ...platform,
-      currentValue: Number(currentVal),
-      totalInvested: Number(totalInvested)
+      currentValue: latestValuation ? Number(latestValuation.value) : 0,
+      totalInvested: Number(totalInvested),
+      lastValuationDate: latestValuation ? latestValuation.date : null,
     };
+    return response;
   }
 
   async createPlatform(platform: InsertPlatform): Promise<Platform> {

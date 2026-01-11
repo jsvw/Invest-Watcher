@@ -55,6 +55,7 @@ export type UpdatePlatformRequest = Partial<InsertPlatform>;
 export type PlatformResponse = Platform & {
   currentValue?: number; // Calculated on the fly or fetched from latest valuation
   totalInvested?: number; // Sum of investments
+  lastValuationDate?: string | Date | null; // Date of the latest valuation
 };
 
 export type DashboardStats = {

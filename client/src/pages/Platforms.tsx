@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
 import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 export default function Platforms() {
   const { data: platforms, isLoading } = usePlatforms();
@@ -60,11 +61,15 @@ export default function Platforms() {
                         </div>
                       </div>
                       
-                      {platform.description && (
+                      {(platform as any).lastValuationDate ? (
                         <p className="text-sm text-muted-foreground line-clamp-2 pt-2 border-t border-border/50">
-                          {platform.description}
+                          Last valuation: {format(new Date((platform as any).lastValuationDate), 'MMM dd, yyyy')}
                         </p>
-                      )}
+                      ) : (platform as any).description ? (
+                        <p className="text-sm text-muted-foreground line-clamp-2 pt-2 border-t border-border/50">
+                          {(platform as any).description}
+                        </p>
+                      ) : null}
                     </CardContent>
                   </Card>
                 </div>
