@@ -2,7 +2,7 @@ import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { valuations } from "@shared/schema";
+import { valuations, insertAssetSchema, insertAssetValuationSchema } from "@shared/schema";
 import { api } from "@shared/routes";
 import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
@@ -129,6 +129,119 @@ export async function registerRoutes(
         });
       }
       res.status(404).json({ message: "Valuation not found" });
+    }
+  });
+
+  // --- Assets (for asset_returns and item_valuations platform modes) ---
+  app.get('/api/platforms/:platformId/assets', async (req, res) => {
+    try {
+      const assets = await storage.getAssets(Number(req.params.platformId));
+      res.json(assets);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch assets" });
+    }
+  });
+
+  app.get('/api/assets/:id', async (req, res) => {
+    try {
+      const asset = await storage.getAsset(Number(req.params.id));
+      if (!asset) {
+        return res.status(404).json({ message: "Asset not found" });
+      }
+      res.json(asset);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch asset" });
+    }
+  });
+
+  app.post('/api/assets', async (req, res) => {
+    try {
+      const input = insertAssetSchema.parse(req.body);
+      const asset = await storage.createAsset(input);
+      res.status(201).json(asset);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      res.status(500).json({ message: "Failed to create asset" });
+    }
+  });
+
+  app.patch('/api/assets/:id', async (req, res) => {
+    try {
+      const input = insertAssetSchema.partial().parse(req.body);
+      const asset = await storage.updateAsset(Number(req.params.id), input);
+      res.json(asset);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      res.status(404).json({ message: "Asset not found" });
+    }
+  });
+
+  app.post('/api/assets/:id/exit', async (req, res) => {
+    try {
+      const { exitDate, exitPrice } = req.body;
+      if (!exitDate || !exitPrice) {
+        return res.status(400).json({ message: "exitDate and exitPrice are required" });
+      }
+      const asset = await storage.exitAsset(
+        Number(req.params.id),
+        new Date(exitDate),
+        exitPrice
+      );
+      res.json(asset);
+    } catch (error) {
+      res.status(404).json({ message: "Asset not found" });
+    }
+  });
+
+  // --- Asset Valuations ---
+  app.get('/api/assets/:assetId/valuations', async (req, res) => {
+    try {
+      const valuations = await storage.getAssetValuations(Number(req.params.assetId));
+      res.json(valuations);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch asset valuations" });
+    }
+  });
+
+  app.post('/api/asset-valuations', async (req, res) => {
+    try {
+      const input = insertAssetValuationSchema.parse(req.body);
+      const valuation = await storage.createAssetValuation(input);
+      res.status(201).json(valuation);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      res.status(500).json({ message: "Failed to create asset valuation" });
+    }
+  });
+
+  app.patch('/api/asset-valuations/:id', async (req, res) => {
+    try {
+      const input = insertAssetValuationSchema.partial().parse(req.body);
+      const valuation = await storage.updateAssetValuation(Number(req.params.id), input);
+      res.json(valuation);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      res.status(404).json({ message: "Asset valuation not found" });
     }
   });
 

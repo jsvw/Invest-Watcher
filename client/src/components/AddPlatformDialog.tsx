@@ -11,7 +11,7 @@ import { useState } from "react";
 import { Plus } from "lucide-react";
 import type { InsertPlatform } from "@shared/routes";
 
-const categories = ["Crypto", "Stock", "Real Estate", "Bank", "Commodities", "Other"];
+const categories = ["Crypto", "Stock", "Real Estate", "Bank", "Commodities", "Loans", "Other"];
 const colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#6366f1"];
 const currencies = [
   { value: "USD", label: "USD ($)" },
@@ -21,6 +21,11 @@ const currencies = [
   { value: "CAD", label: "CAD ($)" },
   { value: "AUD", label: "AUD ($)" },
   { value: "BRL", label: "BRL (R$)" },
+];
+const platformModes = [
+  { value: "standard", label: "Standard", description: "Track platform-level investments and valuations" },
+  { value: "asset_returns", label: "Assets with Returns", description: "Individual assets with invested amount and annual yield (real estate, loans)" },
+  { value: "item_valuations", label: "Items with Valuations", description: "Individual items with periodic valuation updates (collectibles, crypto)" },
 ];
 
 export function AddPlatformDialog() {
@@ -35,6 +40,7 @@ export function AddPlatformDialog() {
       category: "Stock",
       color: "#3b82f6",
       currency: "USD",
+      platformMode: "standard",
     },
   });
 
@@ -99,6 +105,30 @@ export function AddPlatformDialog() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="platformMode">Tracking Mode</Label>
+            <Select 
+              onValueChange={(value) => form.setValue("platformMode", value)}
+              defaultValue={form.getValues("platformMode")}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select tracking mode" />
+              </SelectTrigger>
+              <SelectContent>
+                {platformModes.map((mode) => (
+                  <SelectItem key={mode.value} value={mode.value}>
+                    <div className="flex flex-col">
+                      <span>{mode.label}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {platformModes.find(m => m.value === form.watch("platformMode"))?.description}
+            </p>
           </div>
 
           <div className="space-y-2">

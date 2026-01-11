@@ -3,13 +3,20 @@ import {
   platforms,
   investments,
   valuations,
+  assets,
+  assetValuations,
   type Platform,
   type InsertPlatform,
   type Investment,
   type InsertInvestment,
   type Valuation,
   type InsertValuation,
-  type PlatformResponse
+  type Asset,
+  type InsertAsset,
+  type AssetValuation,
+  type InsertAssetValuation,
+  type PlatformResponse,
+  type AssetResponse
 } from "@shared/schema";
 import { eq, desc, sql } from "drizzle-orm";
 
@@ -30,6 +37,18 @@ export interface IStorage {
   createValuation(valuation: InsertValuation): Promise<Valuation>;
   updateValuation(id: number, valuation: Partial<InsertValuation>): Promise<Valuation>;
   getLatestValuations(): Promise<Map<number, number>>; // Map platformId -> value
+
+  // Assets
+  getAssets(platformId: number): Promise<AssetResponse[]>;
+  getAsset(id: number): Promise<AssetResponse | undefined>;
+  createAsset(asset: InsertAsset): Promise<Asset>;
+  updateAsset(id: number, asset: Partial<InsertAsset>): Promise<Asset>;
+  exitAsset(id: number, exitDate: Date, exitPrice: string): Promise<Asset>;
+
+  // Asset Valuations
+  getAssetValuations(assetId: number): Promise<AssetValuation[]>;
+  createAssetValuation(valuation: InsertAssetValuation): Promise<AssetValuation>;
+  updateAssetValuation(id: number, valuation: Partial<InsertAssetValuation>): Promise<AssetValuation>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -134,9 +153,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLatestValuations(): Promise<Map<number, number>> {
-    // This is a bit complex in SQL, so we'll fetch all and process in memory for simplicity in MVP
-    // or use a distinct on query. Let's do a simple query for now.
-    // For a robust solution, we'd use a subquery/window function.
     const allValuations = await db.select().from(valuations).orderBy(desc(valuations.date));
     const latestMap = new Map<number, number>();
     
@@ -146,6 +162,114 @@ export class DatabaseStorage implements IStorage {
       }
     }
     return latestMap;
+  }
+
+  // === ASSETS ===
+  async getAssets(platformId: number): Promise<AssetResponse[]> {
+    const allAssets = await db.select().from(assets)
+      .where(eq(assets.platformId, platformId))
+      .orderBy(desc(assets.acquisitionDate));
+    
+    const allAssetValuations = await db.select().from(assetValuations)
+      .orderBy(desc(assetValuations.date));
+    
+    const latestValuationMap = new Map<number, number>();
+    for (const val of allAssetValuations) {
+      if (!latestValuationMap.has(val.assetId)) {
+        latestValuationMap.set(val.assetId, Number(val.value));
+      }
+    }
+
+    return allAssets.map(asset => {
+      const latestVal = latestValuationMap.get(asset.id);
+      const investedAmount = Number(asset.investedAmount);
+      let currentValue = latestVal ?? investedAmount;
+      let profitLoss: number | undefined;
+      
+      if (asset.status === "exited" && asset.exitPrice) {
+        currentValue = Number(asset.exitPrice);
+        profitLoss = currentValue - investedAmount;
+      }
+      
+      return {
+        ...asset,
+        currentValue,
+        profitLoss
+      };
+    });
+  }
+
+  async getAsset(id: number): Promise<AssetResponse | undefined> {
+    const [asset] = await db.select().from(assets).where(eq(assets.id, id));
+    if (!asset) return undefined;
+
+    const [latestValuation] = await db.select().from(assetValuations)
+      .where(eq(assetValuations.assetId, id))
+      .orderBy(desc(assetValuations.date))
+      .limit(1);
+
+    const investedAmount = Number(asset.investedAmount);
+    let currentValue = latestValuation ? Number(latestValuation.value) : investedAmount;
+    let profitLoss: number | undefined;
+
+    if (asset.status === "exited" && asset.exitPrice) {
+      currentValue = Number(asset.exitPrice);
+      profitLoss = currentValue - investedAmount;
+    }
+
+    return {
+      ...asset,
+      currentValue,
+      profitLoss
+    };
+  }
+
+  async createAsset(asset: InsertAsset): Promise<Asset> {
+    const [newAsset] = await db.insert(assets).values(asset).returning();
+    return newAsset;
+  }
+
+  async updateAsset(id: number, asset: Partial<InsertAsset>): Promise<Asset> {
+    const [updated] = await db.update(assets)
+      .set(asset)
+      .where(eq(assets.id, id))
+      .returning();
+    if (!updated) throw new Error("Asset not found");
+    return updated;
+  }
+
+  async exitAsset(id: number, exitDate: Date, exitPrice: string): Promise<Asset> {
+    const [updated] = await db.update(assets)
+      .set({
+        status: "exited",
+        exitDate,
+        exitPrice
+      })
+      .where(eq(assets.id, id))
+      .returning();
+    if (!updated) throw new Error("Asset not found");
+    return updated;
+  }
+
+  // === ASSET VALUATIONS ===
+  async getAssetValuations(assetId: number): Promise<AssetValuation[]> {
+    return await db.select().from(assetValuations)
+      .where(eq(assetValuations.assetId, assetId))
+      .orderBy(desc(assetValuations.date));
+  }
+
+  async createAssetValuation(valuation: InsertAssetValuation): Promise<AssetValuation> {
+    const [newValuation] = await db.insert(assetValuations).values(valuation).returning();
+    return newValuation;
+  }
+
+  async updateAssetValuation(id: number, valuation: Partial<InsertAssetValuation>): Promise<AssetValuation> {
+    const [updated] = await db.update(assetValuations)
+      .set(valuation)
+      .where(eq(assetValuations.id, id))
+      .returning();
+    if (!updated) throw new Error("Asset valuation not found");
+    return updated;
   }
 }
 

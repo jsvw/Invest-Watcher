@@ -3,11 +3,13 @@ import { AddTransactionDialog } from "@/components/AddTransactionDialog";
 import { usePlatform, usePlatforms } from "@/hooks/use-platforms";
 import { useInvestments } from "@/hooks/use-investments";
 import { useValuations } from "@/hooks/use-valuations";
+import { useAssets } from "@/hooks/use-assets";
 import { useRoute } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, TrendingUp, History, DollarSign } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, TrendingUp, History, DollarSign, Package, CheckCircle } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend } from "recharts";
@@ -15,6 +17,10 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AddAssetDialog } from "@/components/AddAssetDialog";
+import { AssetExitDialog } from "@/components/AssetExitDialog";
+import { AssetValuationDialog } from "@/components/AssetValuationDialog";
+import type { Asset } from "@shared/schema";
 
 export default function PlatformDetails() {
   const [, params] = useRoute("/platforms/:id");
@@ -27,6 +33,9 @@ export default function PlatformDetails() {
   const { data: platform, isLoading: isPlatformLoading } = usePlatform(id);
   const { data: investments, isLoading: isInvestmentsLoading } = useInvestments(id);
   const { data: valuations, isLoading: isValuationsLoading } = useValuations(id);
+  
+  const platformMode = (platform as any)?.platformMode || "standard";
+  const { data: assets, isLoading: isAssetsLoading } = useAssets(id);
 
   const { data: history, isLoading: isHistoryLoading } = useQuery({
     queryKey: [api.portfolio.history.path, id, range, specificYear, specificMonth],
@@ -66,7 +75,7 @@ export default function PlatformDetails() {
   const platformTotalInvested = statsData.invested;
   const platformCurrentValue = statsData.value;
 
-  if (isPlatformLoading || isInvestmentsLoading || isValuationsLoading || isHistoryLoading) {
+  if (isPlatformLoading || isInvestmentsLoading || isValuationsLoading || isHistoryLoading || isAssetsLoading) {
     return (
       <Layout>
         <div className="space-y-6">
@@ -109,13 +118,30 @@ export default function PlatformDetails() {
                </div>
                <div>
                  <h1 className="text-3xl font-bold font-display tracking-tight">{platform.name}</h1>
-                 <p className="text-muted-foreground">{platform.category} • {(platform as any).currency || "USD"} • {platform.description}</p>
+                 <p className="text-muted-foreground">
+                   {platform.category} • {(platform as any).currency || "USD"} 
+                   {platformMode !== "standard" && (
+                     <> • <Badge variant="outline" className="ml-1 text-xs">
+                       {platformMode === "asset_returns" ? "Asset Tracking" : "Item Tracking"}
+                     </Badge></>
+                   )}
+                   {platform.description && ` • ${platform.description}`}
+                 </p>
                </div>
             </div>
             
             <div className="flex gap-2">
-              <AddTransactionDialog platformId={id} type="investment" />
-              <AddTransactionDialog platformId={id} type="valuation" />
+              {platformMode === "standard" ? (
+                <>
+                  <AddTransactionDialog platformId={id} type="investment" />
+                  <AddTransactionDialog platformId={id} type="valuation" />
+                </>
+              ) : (
+                <AddAssetDialog 
+                  platformId={id} 
+                  mode={platformMode as "asset_returns" | "item_valuations"} 
+                />
+              )}
             </div>
           </div>
         </div>
@@ -149,12 +175,121 @@ export default function PlatformDetails() {
         </div>
 
         {/* Main Content Tabs */}
-        <Tabs defaultValue="chart" className="space-y-6">
+        <Tabs defaultValue={platformMode !== "standard" ? "assets" : "chart"} className="space-y-6">
           <TabsList>
+            {platformMode !== "standard" && (
+              <TabsTrigger value="assets" className="gap-2"><Package className="h-4 w-4" /> Assets</TabsTrigger>
+            )}
             <TabsTrigger value="chart" className="gap-2"><TrendingUp className="h-4 w-4" /> Performance</TabsTrigger>
-            <TabsTrigger value="investments" className="gap-2"><DollarSign className="h-4 w-4" /> Investment History</TabsTrigger>
-            <TabsTrigger value="valuations" className="gap-2"><History className="h-4 w-4" /> Valuation History</TabsTrigger>
+            {platformMode === "standard" && (
+              <>
+                <TabsTrigger value="investments" className="gap-2"><DollarSign className="h-4 w-4" /> Investment History</TabsTrigger>
+                <TabsTrigger value="valuations" className="gap-2"><History className="h-4 w-4" /> Valuation History</TabsTrigger>
+              </>
+            )}
           </TabsList>
+
+          {/* Assets Tab for non-standard modes */}
+          {platformMode !== "standard" && (
+            <TabsContent value="assets" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <CardTitle>{platformMode === "asset_returns" ? "Assets" : "Items"}</CardTitle>
+                    <CardDescription>
+                      {platformMode === "asset_returns" 
+                        ? "Track individual investments with their returns" 
+                        : "Track items with periodic valuations"
+                      }
+                    </CardDescription>
+                  </div>
+                  <AddAssetDialog 
+                    platformId={id} 
+                    mode={platformMode as "asset_returns" | "item_valuations"} 
+                  />
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="rounded-md border">
+                    <div className={`grid ${platformMode === "asset_returns" ? "grid-cols-6" : "grid-cols-5"} p-4 bg-muted/50 font-medium text-sm`}>
+                      <div>Name</div>
+                      <div>Invested</div>
+                      {platformMode === "asset_returns" && <div>Yield</div>}
+                      <div>Current Value</div>
+                      <div>Status</div>
+                      <div className="text-right">Actions</div>
+                    </div>
+                    <div className="divide-y">
+                      {!assets || assets.length === 0 ? (
+                        <div className="p-8 text-center text-muted-foreground">
+                          No {platformMode === "asset_returns" ? "assets" : "items"} recorded yet.
+                        </div>
+                      ) : (
+                        assets.map((asset) => (
+                          <div 
+                            key={asset.id} 
+                            className={`grid ${platformMode === "asset_returns" ? "grid-cols-6" : "grid-cols-5"} p-4 text-sm hover:bg-muted/30 transition-colors items-center`}
+                            data-testid={`row-asset-${asset.id}`}
+                          >
+                            <div>
+                              <div className="font-medium">{asset.name}</div>
+                              {asset.description && (
+                                <div className="text-xs text-muted-foreground">{asset.description}</div>
+                              )}
+                            </div>
+                            <div className="font-medium">
+                              {((platform as any).currency || "USD") === "USD" ? "$" : ""}
+                              {Number(asset.investedAmount).toLocaleString()}
+                              {((platform as any).currency || "USD") !== "USD" ? ` ${(platform as any).currency}` : ""}
+                            </div>
+                            {platformMode === "asset_returns" && (
+                              <div className="text-muted-foreground">
+                                {asset.annualYield ? `${asset.annualYield}%` : "-"}
+                              </div>
+                            )}
+                            <div className="font-medium">
+                              {((platform as any).currency || "USD") === "USD" ? "$" : ""}
+                              {(asset.currentValue || Number(asset.investedAmount)).toLocaleString()}
+                              {((platform as any).currency || "USD") !== "USD" ? ` ${(platform as any).currency}` : ""}
+                            </div>
+                            <div>
+                              {asset.status === "exited" ? (
+                                <Badge variant="secondary" className="gap-1">
+                                  <CheckCircle className="h-3 w-3" /> Exited
+                                  {asset.profitLoss !== undefined && (
+                                    <span className={asset.profitLoss >= 0 ? "text-green-600" : "text-red-600"}>
+                                      ({asset.profitLoss >= 0 ? "+" : ""}{((platform as any).currency || "USD") === "USD" ? "$" : ""}
+                                      {asset.profitLoss.toLocaleString()})
+                                    </span>
+                                  )}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline">Active</Badge>
+                              )}
+                            </div>
+                            <div className="flex justify-end gap-1">
+                              {asset.status !== "exited" && (
+                                <>
+                                  {platformMode === "item_valuations" && (
+                                    <AssetValuationDialog asset={asset as unknown as Asset} platformId={id} />
+                                  )}
+                                  <AssetExitDialog asset={asset as unknown as Asset} platformId={id} />
+                                  <AddAssetDialog 
+                                    platformId={id} 
+                                    mode={platformMode as "asset_returns" | "item_valuations"}
+                                    editAsset={asset as unknown as Asset}
+                                  />
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
 
           <TabsContent value="chart" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
             <Card>

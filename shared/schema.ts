@@ -2,6 +2,11 @@ import { pgTable, text, serial, integer, boolean, timestamp, numeric, doublePrec
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// === PLATFORM MODES ===
+// "standard" - Platform-level investments & valuations (current behavior)
+// "asset_returns" - Individual assets with invested amount + annual yield (real estate, loans)
+// "item_valuations" - Individual items with periodic valuation updates (collectibles, crypto)
+
 // === TABLE DEFINITIONS ===
 export const platforms = pgTable("platforms", {
   id: serial("id").primaryKey(),
@@ -10,6 +15,7 @@ export const platforms = pgTable("platforms", {
   category: text("category").notNull(), // e.g., 'Crypto', 'Stock', 'Bank', 'Real Estate'
   color: text("color").notNull().default("#3b82f6"), // For chart visualization
   currency: text("currency").notNull().default("USD"), // e.g., 'USD', 'EUR', 'GBP'
+  platformMode: text("platform_mode").notNull().default("standard"), // 'standard', 'asset_returns', 'item_valuations'
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -30,10 +36,36 @@ export const valuations = pgTable("valuations", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// === ASSET TRACKING (for asset_returns and item_valuations modes) ===
+export const assets = pgTable("assets", {
+  id: serial("id").primaryKey(),
+  platformId: integer("platform_id").notNull().references(() => platforms.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  investedAmount: numeric("invested_amount").notNull(), // Amount invested in this asset
+  annualYield: numeric("annual_yield"), // For asset_returns mode: expected annual yield %
+  acquisitionDate: timestamp("acquisition_date").notNull(),
+  status: text("status").notNull().default("active"), // 'active' or 'exited'
+  exitDate: timestamp("exit_date"), // When the asset was sold
+  exitPrice: numeric("exit_price"), // Sale price when exited
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const assetValuations = pgTable("asset_valuations", {
+  id: serial("id").primaryKey(),
+  assetId: integer("asset_id").notNull().references(() => assets.id),
+  value: numeric("value").notNull(),
+  date: timestamp("date").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === BASE SCHEMAS ===
 export const insertPlatformSchema = createInsertSchema(platforms).omit({ id: true, createdAt: true });
 export const insertInvestmentSchema = createInsertSchema(investments).omit({ id: true, createdAt: true });
 export const insertValuationSchema = createInsertSchema(valuations).omit({ id: true, createdAt: true });
+export const insertAssetSchema = createInsertSchema(assets).omit({ id: true, createdAt: true });
+export const insertAssetValuationSchema = createInsertSchema(assetValuations).omit({ id: true, createdAt: true });
 
 // === EXPLICIT API CONTRACT TYPES ===
 
@@ -41,22 +73,35 @@ export const insertValuationSchema = createInsertSchema(valuations).omit({ id: t
 export type Platform = typeof platforms.$inferSelect;
 export type Investment = typeof investments.$inferSelect;
 export type Valuation = typeof valuations.$inferSelect;
+export type Asset = typeof assets.$inferSelect;
+export type AssetValuation = typeof assetValuations.$inferSelect;
 
 export type InsertPlatform = z.infer<typeof insertPlatformSchema>;
 export type InsertInvestment = z.infer<typeof insertInvestmentSchema>;
 export type InsertValuation = z.infer<typeof insertValuationSchema>;
+export type InsertAsset = z.infer<typeof insertAssetSchema>;
+export type InsertAssetValuation = z.infer<typeof insertAssetValuationSchema>;
 
 // Request types
 export type CreatePlatformRequest = InsertPlatform;
 export type CreateInvestmentRequest = InsertInvestment;
 export type CreateValuationRequest = InsertValuation;
+export type CreateAssetRequest = InsertAsset;
+export type CreateAssetValuationRequest = InsertAssetValuation;
 export type UpdatePlatformRequest = Partial<InsertPlatform>;
+export type UpdateAssetRequest = Partial<InsertAsset>;
+export type ExitAssetRequest = { exitDate: string | Date; exitPrice: string };
 
 // Response types
 export type PlatformResponse = Platform & {
   currentValue?: number; // Calculated on the fly or fetched from latest valuation
   totalInvested?: number; // Sum of investments
   lastValuationDate?: string | Date | null; // Date of the latest valuation
+};
+
+export type AssetResponse = Asset & {
+  currentValue?: number; // Latest valuation or invested amount if no valuations
+  profitLoss?: number; // For exited assets: exitPrice - investedAmount
 };
 
 export type DashboardStats = {
