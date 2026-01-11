@@ -291,9 +291,10 @@ export async function registerRoutes(
 
   // --- CSV Import for Asset Valuations ---
   app.post('/api/platforms/:platformId/asset-valuations/import', upload.single('file'), async (req, res) => {
+    const file = req.file;
+    
     try {
       const platformId = Number(req.params.platformId);
-      const file = req.file;
       
       if (!file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -301,7 +302,6 @@ export async function registerRoutes(
 
       // Read and parse CSV file
       const fileContent = fs.readFileSync(file.path, 'utf-8');
-      fs.unlinkSync(file.path); // Clean up temp file
       
       const parseResult = Papa.parse(fileContent, {
         header: true,
@@ -348,8 +348,19 @@ export async function registerRoutes(
           continue;
         }
 
-        // Parse value - remove currency symbols and commas
-        const cleanValue = valueStr.replace(/[^0-9.,\-]/g, '').replace(',', '.');
+        // Parse value - remove currency symbols and handle number formats
+        // Supports both European (1.234,56) and US (1,234.56) formats
+        let cleanValue = valueStr.replace(/[^0-9.,\-]/g, '');
+        // If there's both comma and dot, determine format by which comes last
+        const lastComma = cleanValue.lastIndexOf(',');
+        const lastDot = cleanValue.lastIndexOf('.');
+        if (lastComma > lastDot) {
+          // European format: 1.234,56 -> 1234.56
+          cleanValue = cleanValue.replace(/\./g, '').replace(',', '.');
+        } else {
+          // US format or no decimal: 1,234.56 -> 1234.56
+          cleanValue = cleanValue.replace(/,/g, '');
+        }
         const value = parseFloat(cleanValue);
         if (isNaN(value)) {
           results.failed++;
@@ -403,6 +414,15 @@ export async function registerRoutes(
     } catch (error) {
       console.error("CSV import error:", error);
       res.status(500).json({ message: "Failed to import CSV" });
+    } finally {
+      // Clean up temp file
+      if (file && fs.existsSync(file.path)) {
+        try {
+          fs.unlinkSync(file.path);
+        } catch (e) {
+          console.error("Failed to clean up temp file:", e);
+        }
+      }
     }
   });
 

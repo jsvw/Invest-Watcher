@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AddAssetDialog } from "@/components/AddAssetDialog";
 import { AssetExitDialog } from "@/components/AssetExitDialog";
 import { AssetValuationDialog } from "@/components/AssetValuationDialog";
+import { AssetValuationImportDialog } from "@/components/AssetValuationImportDialog";
 import type { Asset } from "@shared/schema";
 
 function AssetActionsMenu({ asset, platformId, platformMode }: { asset: Asset; platformId: number; platformMode: "asset_returns" | "item_valuations" }) {
@@ -369,10 +370,15 @@ export default function PlatformDetails() {
                       }
                     </CardDescription>
                   </div>
-                  <AddAssetDialog 
-                    platformId={id} 
-                    mode={platformMode as "asset_returns" | "item_valuations"} 
-                  />
+                  <div className="flex gap-2 flex-wrap">
+                    {platformMode === "item_valuations" && (
+                      <AssetValuationImportDialog platformId={id} />
+                    )}
+                    <AddAssetDialog 
+                      platformId={id} 
+                      mode={platformMode as "asset_returns" | "item_valuations"} 
+                    />
+                  </div>
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="rounded-md border">
