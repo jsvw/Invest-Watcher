@@ -42,9 +42,11 @@ export const assets = pgTable("assets", {
   platformId: integer("platform_id").notNull().references(() => platforms.id),
   name: text("name").notNull(),
   description: text("description"),
-  investedAmount: numeric("invested_amount").notNull(), // Amount invested by user
+  investedAmount: numeric("invested_amount").notNull(), // Amount invested by user (or total for item_valuations)
   bonusAmount: numeric("bonus_amount"), // Free bonus received on top of investment
   annualYield: numeric("annual_yield"), // For asset_returns mode: expected annual yield %
+  quantity: numeric("quantity"), // For item_valuations mode: number of items
+  pricePerUnit: numeric("price_per_unit"), // For item_valuations mode: price per item
   acquisitionDate: timestamp("acquisition_date").notNull(),
   expectedExitDate: timestamp("expected_exit_date"), // Maturity date for the investment
   status: text("status").notNull().default("active"), // 'active' or 'exited'

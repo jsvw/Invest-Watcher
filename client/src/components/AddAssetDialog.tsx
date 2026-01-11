@@ -15,6 +15,8 @@ interface AssetFormData {
   investedAmount: string;
   bonusAmount: string;
   annualYield: string;
+  quantity: string;
+  pricePerUnit: string;
   acquisitionDate: string;
   exitDate: string;
 }
@@ -53,6 +55,8 @@ export function AddAssetDialog({ platformId, mode, editAsset, open: controlledOp
       investedAmount: editAsset?.investedAmount || "",
       bonusAmount: (editAsset as any)?.bonusAmount || "",
       annualYield: editAsset?.annualYield || "",
+      quantity: (editAsset as any)?.quantity || "",
+      pricePerUnit: (editAsset as any)?.pricePerUnit || "",
       acquisitionDate: editAsset?.acquisitionDate 
         ? new Date(editAsset.acquisitionDate).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0],
@@ -71,6 +75,8 @@ export function AddAssetDialog({ platformId, mode, editAsset, open: controlledOp
         investedAmount: editAsset.investedAmount || "",
         bonusAmount: (editAsset as any).bonusAmount || "",
         annualYield: editAsset.annualYield || "",
+        quantity: (editAsset as any).quantity || "",
+        pricePerUnit: (editAsset as any).pricePerUnit || "",
         acquisitionDate: editAsset.acquisitionDate 
           ? new Date(editAsset.acquisitionDate).toISOString().split('T')[0]
           : new Date().toISOString().split('T')[0],
@@ -81,13 +87,28 @@ export function AddAssetDialog({ platformId, mode, editAsset, open: controlledOp
     }
   }, [open, isEdit, editAsset, form, platformId]);
 
+  // Watch quantity and pricePerUnit to calculate total
+  const quantity = form.watch("quantity");
+  const pricePerUnit = form.watch("pricePerUnit");
+  const calculatedTotal = mode === "item_valuations" && quantity && pricePerUnit 
+    ? (Number(quantity) * Number(pricePerUnit)).toFixed(2) 
+    : null;
+
   const onSubmit = (data: AssetFormData) => {
+    // For item_valuations, calculate investedAmount from quantity * pricePerUnit
+    let finalInvestedAmount = data.investedAmount || "0";
+    if (mode === "item_valuations" && data.quantity && data.pricePerUnit) {
+      finalInvestedAmount = (Number(data.quantity) * Number(data.pricePerUnit)).toString();
+    }
+
     const payload = {
       name: data.name || "",
       platformId,
-      investedAmount: data.investedAmount || "0",
+      investedAmount: finalInvestedAmount,
       bonusAmount: data.bonusAmount || null,
       annualYield: data.annualYield || null,
+      quantity: mode === "item_valuations" ? (data.quantity || null) : null,
+      pricePerUnit: mode === "item_valuations" ? (data.pricePerUnit || null) : null,
       description: data.description || null,
       acquisitionDate: data.acquisitionDate,
       exitDate: data.exitDate || null,
@@ -159,17 +180,51 @@ export function AddAssetDialog({ platformId, mode, editAsset, open: controlledOp
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="investedAmount">Your Investment</Label>
-            <Input 
-              id="investedAmount" 
-              type="number" 
-              step="0.01"
-              {...form.register("investedAmount")} 
-              placeholder="0.00" 
-              data-testid="input-asset-invested"
-            />
-          </div>
+          {mode === "item_valuations" ? (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="quantity">Amount/Quantity</Label>
+                  <Input 
+                    id="quantity" 
+                    type="number" 
+                    step="0.0001"
+                    {...form.register("quantity")} 
+                    placeholder="e.g. 10" 
+                    data-testid="input-asset-quantity"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pricePerUnit">Price per Unit</Label>
+                  <Input 
+                    id="pricePerUnit" 
+                    type="number" 
+                    step="0.01"
+                    {...form.register("pricePerUnit")} 
+                    placeholder="0.00" 
+                    data-testid="input-asset-price-per-unit"
+                  />
+                </div>
+              </div>
+              {calculatedTotal && (
+                <div className="text-sm text-muted-foreground">
+                  Total Investment: <strong>${calculatedTotal}</strong>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="investedAmount">Your Investment</Label>
+              <Input 
+                id="investedAmount" 
+                type="number" 
+                step="0.01"
+                {...form.register("investedAmount")} 
+                placeholder="0.00" 
+                data-testid="input-asset-invested"
+              />
+            </div>
+          )}
 
           {mode === "asset_returns" && (
             <div className="space-y-2">
