@@ -11,6 +11,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
+import { Link } from "wouter";
 import { format } from "date-fns";
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -306,13 +307,13 @@ export default function Dashboard() {
                      const percent = invested > 0 ? (gain / invested) * 100 : 0;
                      
                      return (
-                       <div key={platform.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors">
+                       <Link key={platform.id} href={`/platforms/${platform.id}`} className="flex items-center justify-between p-4 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer group">
                          <div className="flex items-center gap-4">
-                           <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold" style={{ backgroundColor: platform.color }}>
+                           <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold group-hover:scale-110 transition-transform" style={{ backgroundColor: platform.color }}>
                              {platform.name.charAt(0)}
                            </div>
                            <div>
-                             <h4 className="font-semibold">{platform.name}</h4>
+                             <h4 className="font-semibold group-hover:text-primary transition-colors">{platform.name}</h4>
                              <p className="text-xs text-muted-foreground">{platform.category}</p>
                            </div>
                          </div>
@@ -322,7 +323,7 @@ export default function Dashboard() {
                              {gain >= 0 ? "+" : ""}{percent.toFixed(2)}%
                            </div>
                          </div>
-                       </div>
+                       </Link>
                      )
                    })}
                  </div>
