@@ -5,22 +5,26 @@ import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
 import { useExitAsset } from "@/hooks/use-assets";
 import { useState } from "react";
-import { LogOut } from "lucide-react";
+import { LogOut, Pencil } from "lucide-react";
 import type { Asset } from "@shared/schema";
 
 interface AssetExitDialogProps {
   asset: Asset;
   platformId: number;
+  mode?: "exit" | "edit";
 }
 
-export function AssetExitDialog({ asset, platformId }: AssetExitDialogProps) {
+export function AssetExitDialog({ asset, platformId, mode = "exit" }: AssetExitDialogProps) {
   const [open, setOpen] = useState(false);
   const exitMutation = useExitAsset(platformId);
+  const isEdit = mode === "edit";
 
   const form = useForm({
     defaultValues: {
-      exitDate: new Date().toISOString().split('T')[0],
-      exitPrice: "",
+      exitDate: isEdit && asset.exitDate 
+        ? new Date(asset.exitDate).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0],
+      exitPrice: isEdit && asset.exitPrice ? String(asset.exitPrice) : "",
     },
   });
 
@@ -39,16 +43,22 @@ export function AssetExitDialog({ asset, platformId }: AssetExitDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="gap-1 text-orange-600 border-orange-200 hover:bg-orange-50" data-testid={`button-exit-asset-${asset.id}`}>
-          <LogOut className="h-3 w-3" /> Exit
-        </Button>
+        {isEdit ? (
+          <Button size="sm" variant="outline" className="gap-1" data-testid={`button-edit-exit-${asset.id}`}>
+            <Pencil className="h-3 w-3" /> Edit Exit
+          </Button>
+        ) : (
+          <Button size="sm" variant="outline" className="gap-1 text-orange-600 border-orange-200 hover:bg-orange-50" data-testid={`button-exit-asset-${asset.id}`}>
+            <LogOut className="h-3 w-3" /> Exit
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle>Mark as Exited (Sold)</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Exit Details" : "Mark as Exited (Sold)"}</DialogTitle>
         </DialogHeader>
         <div className="text-sm text-muted-foreground mb-4">
-          Recording the sale of: <strong>{asset.name}</strong>
+          {isEdit ? "Editing exit details for:" : "Recording the sale of:"} <strong>{asset.name}</strong>
         </div>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">

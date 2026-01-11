@@ -407,21 +407,20 @@ export default function PlatformDetails() {
                               )}
                             </div>
                             <div className="flex justify-end gap-1">
-                              {asset.status !== "exited" && (
-                                <>
-                                  {platformMode === "item_valuations" && (
-                                    <AssetValuationDialog asset={asset as unknown as Asset} platformId={id} />
-                                  )}
-                                  {asset.status === "active" && (
-                                    <AssetExitDialog asset={asset as unknown as Asset} platformId={id} />
-                                  )}
-                                  <AddAssetDialog 
-                                    platformId={id} 
-                                    mode={platformMode as "asset_returns" | "item_valuations"}
-                                    editAsset={asset as unknown as Asset}
-                                  />
-                                </>
+                              {platformMode === "item_valuations" && asset.status === "active" && (
+                                <AssetValuationDialog asset={asset as unknown as Asset} platformId={id} />
                               )}
+                              {asset.status === "active" && (
+                                <AssetExitDialog asset={asset as unknown as Asset} platformId={id} />
+                              )}
+                              {(asset.status === "matured" || asset.status === "exited") && (
+                                <AssetExitDialog asset={asset as unknown as Asset} platformId={id} mode="edit" />
+                              )}
+                              <AddAssetDialog 
+                                platformId={id} 
+                                mode={platformMode as "asset_returns" | "item_valuations"}
+                                editAsset={asset as unknown as Asset}
+                              />
                             </div>
                           </div>
                         ))
