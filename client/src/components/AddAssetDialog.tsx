@@ -3,9 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
-import { useCreateAsset, useUpdateAsset } from "@/hooks/use-assets";
+import { useCreateAsset, useUpdateAsset, useDeleteAsset } from "@/hooks/use-assets";
 import { useState } from "react";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import type { Asset } from "@shared/schema";
 
 interface AssetFormData {
@@ -28,7 +28,16 @@ export function AddAssetDialog({ platformId, mode, editAsset }: AddAssetDialogPr
   const [open, setOpen] = useState(false);
   const createMutation = useCreateAsset(platformId);
   const updateMutation = useUpdateAsset(platformId);
+  const deleteMutation = useDeleteAsset(platformId);
   const isEdit = !!editAsset;
+
+  const handleDelete = () => {
+    if (editAsset && confirm("Are you sure you want to delete this asset? This action cannot be undone.")) {
+      deleteMutation.mutate(editAsset.id, {
+        onSuccess: () => setOpen(false),
+      });
+    }
+  };
 
   const form = useForm<AssetFormData>({
     defaultValues: {
@@ -167,11 +176,27 @@ export function AddAssetDialog({ platformId, mode, editAsset }: AddAssetDialogPr
             </div>
           )}
 
-          <div className="pt-4 flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={isPending} data-testid="button-submit-asset">
-              {isPending ? "Saving..." : isEdit ? "Save Changes" : "Add"}
-            </Button>
+          <div className="pt-4 flex justify-between">
+            {isEdit ? (
+              <Button 
+                type="button" 
+                variant="destructive" 
+                onClick={handleDelete}
+                disabled={deleteMutation.isPending}
+                data-testid="button-delete-asset"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              </Button>
+            ) : (
+              <div />
+            )}
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button type="submit" disabled={isPending} data-testid="button-submit-asset">
+                {isPending ? "Saving..." : isEdit ? "Save Changes" : "Add"}
+              </Button>
+            </div>
           </div>
         </form>
       </DialogContent>
