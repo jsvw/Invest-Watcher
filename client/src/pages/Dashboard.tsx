@@ -28,7 +28,7 @@ export default function Dashboard() {
   const currency = user?.currency || "EUR";
   const { data: platforms, isLoading: isPlatformsLoading } = usePlatforms();
   const { mutate: generateInsight, data: insightData, isPending: isInsightLoading } = useGenerateInsight();
-  const [range, setRange] = useState("year");
+  const [range, setRange] = useState("all");
   const [specificYear, setSpecificYear] = useState<string | null>(null);
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
   const [excludedPlatforms, setExcludedPlatforms] = useState<number[]>([]);
