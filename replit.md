@@ -31,10 +31,20 @@ Preferred communication style: Simple, everyday language.
 - **Validation**: Zod schemas with drizzle-zod integration
 
 ### Data Model
-The application tracks three main entities:
-1. **Platforms**: Investment sources (e.g., "Coinbase", "Fidelity", "Chase Bank")
-2. **Investments**: Individual deposit/contribution records tied to platforms
-3. **Valuations**: Point-in-time value snapshots for each platform
+The application tracks five main entities:
+1. **Platforms**: Investment sources with configurable tracking modes
+2. **Investments**: Individual deposit/contribution records tied to platforms (standard mode)
+3. **Valuations**: Point-in-time value snapshots for each platform (standard mode)
+4. **Assets**: Individual investment items within a platform (asset_returns/item_valuations modes)
+5. **AssetValuations**: Point-in-time value snapshots for individual assets
+
+### Platform Tracking Modes
+Platforms support three tracking modes selected during creation:
+- **standard**: Traditional platform-level tracking with investments and valuations
+- **asset_returns**: Track individual assets with invested amounts and annual yields (ideal for real estate, loans)
+- **item_valuations**: Track items with periodic valuation updates (ideal for collectibles, specific crypto holdings)
+
+Each platform has its own currency setting and can operate independently with different tracking methodologies.
 
 ### API Contract Pattern
 The project uses a typed API contract pattern where:
