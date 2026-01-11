@@ -141,6 +141,74 @@ export async function registerRoutes(
     }
   });
 
+  // --- Withdrawals ---
+  app.get(api.withdrawals.list.path, requireAuth, async (req, res) => {
+    const userId = getAuthenticatedUserId(req)!;
+    const platformId = Number(req.params.platformId);
+    const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+    if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+    
+    const withdrawals = await storage.getWithdrawals(platformId);
+    res.json(withdrawals);
+  });
+
+  app.post(api.withdrawals.create.path, requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const input = api.withdrawals.create.input.parse(req.body);
+      const isOwner = await storage.verifyPlatformOwnership(input.platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+      
+      const withdrawal = await storage.createWithdrawal(input);
+      res.status(201).json(withdrawal);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      throw err;
+    }
+  });
+
+  app.patch('/api/withdrawals/:id', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = await storage.getWithdrawalPlatformId(Number(req.params.id));
+      if (!platformId) return res.status(404).json({ message: "Withdrawal not found" });
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Withdrawal not found" });
+      
+      const input = api.withdrawals.update.input.parse(req.body);
+      const withdrawal = await storage.updateWithdrawal(Number(req.params.id), input);
+      res.json(withdrawal);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      res.status(404).json({ message: "Withdrawal not found" });
+    }
+  });
+
+  app.delete('/api/withdrawals/:id', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = await storage.getWithdrawalPlatformId(Number(req.params.id));
+      if (!platformId) return res.status(404).json({ message: "Withdrawal not found" });
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Withdrawal not found" });
+      
+      await storage.deleteWithdrawal(Number(req.params.id));
+      res.status(204).send();
+    } catch (err) {
+      res.status(404).json({ message: "Withdrawal not found" });
+    }
+  });
+
   // --- Valuations ---
   app.get(api.valuations.list.path, requireAuth, async (req, res) => {
     const userId = getAuthenticatedUserId(req)!;

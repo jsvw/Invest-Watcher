@@ -40,6 +40,15 @@ export const investments = pgTable("investments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const withdrawals = pgTable("withdrawals", {
+  id: serial("id").primaryKey(),
+  platformId: integer("platform_id").notNull().references(() => platforms.id),
+  amount: numeric("amount").notNull(),
+  date: timestamp("date").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const valuations = pgTable("valuations", {
   id: serial("id").primaryKey(),
   platformId: integer("platform_id").notNull().references(() => platforms.id),
@@ -80,6 +89,7 @@ export const assetValuations = pgTable("asset_valuations", {
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertPlatformSchema = createInsertSchema(platforms).omit({ id: true, createdAt: true });
 export const insertInvestmentSchema = createInsertSchema(investments).omit({ id: true, createdAt: true });
+export const insertWithdrawalSchema = createInsertSchema(withdrawals).omit({ id: true, createdAt: true });
 export const insertValuationSchema = createInsertSchema(valuations).omit({ id: true, createdAt: true });
 export const insertAssetSchema = createInsertSchema(assets).omit({ id: true, createdAt: true });
 export const insertAssetValuationSchema = createInsertSchema(assetValuations).omit({ id: true, createdAt: true });
@@ -90,6 +100,7 @@ export const insertAssetValuationSchema = createInsertSchema(assetValuations).om
 export type User = typeof users.$inferSelect;
 export type Platform = typeof platforms.$inferSelect;
 export type Investment = typeof investments.$inferSelect;
+export type Withdrawal = typeof withdrawals.$inferSelect;
 export type Valuation = typeof valuations.$inferSelect;
 export type Asset = typeof assets.$inferSelect;
 export type AssetValuation = typeof assetValuations.$inferSelect;
@@ -97,6 +108,7 @@ export type AssetValuation = typeof assetValuations.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertPlatform = z.infer<typeof insertPlatformSchema>;
 export type InsertInvestment = z.infer<typeof insertInvestmentSchema>;
+export type InsertWithdrawal = z.infer<typeof insertWithdrawalSchema>;
 export type InsertValuation = z.infer<typeof insertValuationSchema>;
 export type InsertAsset = z.infer<typeof insertAssetSchema>;
 export type InsertAssetValuation = z.infer<typeof insertAssetValuationSchema>;

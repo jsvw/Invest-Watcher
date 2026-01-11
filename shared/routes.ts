@@ -2,12 +2,15 @@ import { z } from 'zod';
 import { 
   insertPlatformSchema, 
   insertInvestmentSchema, 
+  insertWithdrawalSchema,
   insertValuationSchema, 
   platforms, 
   investments, 
+  withdrawals,
   valuations,
   type InsertPlatform,
   type InsertInvestment,
+  type InsertWithdrawal,
   type InsertValuation 
 } from './schema';
 
@@ -81,6 +84,42 @@ export const api = {
       responses: {
         200: z.custom<typeof investments.$inferSelect>(),
         400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+  withdrawals: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/platforms/:platformId/withdrawals',
+      responses: {
+        200: z.array(z.custom<typeof withdrawals.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/withdrawals',
+      input: insertWithdrawalSchema,
+      responses: {
+        201: z.custom<typeof withdrawals.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PATCH' as const,
+      path: '/api/withdrawals/:id',
+      input: insertWithdrawalSchema.partial(),
+      responses: {
+        200: z.custom<typeof withdrawals.$inferSelect>(),
+        400: errorSchemas.validation,
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/withdrawals/:id',
+      responses: {
+        204: z.undefined(),
         404: errorSchemas.notFound,
       },
     },
@@ -160,4 +199,4 @@ export type ValidationError = z.infer<typeof errorSchemas.validation>;
 export type NotFoundError = z.infer<typeof errorSchemas.notFound>;
 export type InternalError = z.infer<typeof errorSchemas.internal>;
 
-export { type InsertPlatform, type InsertInvestment, type InsertValuation };
+export { type InsertPlatform, type InsertInvestment, type InsertWithdrawal, type InsertValuation };

@@ -11,15 +11,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertInvestmentSchema, insertValuationSchema } from "@shared/schema";
+import { insertInvestmentSchema, insertValuationSchema, insertWithdrawalSchema } from "@shared/schema";
 import { useCreateInvestment, useUpdateInvestment } from "@/hooks/use-investments";
 import { useCreateValuation, useUpdateValuation } from "@/hooks/use-valuations";
+import { useCreateWithdrawal, useUpdateWithdrawal } from "@/hooks/use-withdrawals";
 import { useState, useEffect } from "react";
-import { PlusCircle, RefreshCw, Pencil } from "lucide-react";
+import { PlusCircle, RefreshCw, Pencil, ArrowDownCircle } from "lucide-react";
 import { z } from "zod";
 
 // Schemas with coercion for strings -> numbers
 const investmentFormSchema = insertInvestmentSchema.extend({
+  amount: z.coerce.number().min(0.01, "Amount must be greater than 0"),
+  date: z.coerce.date().transform(d => d.toISOString().split('T')[0]),
+});
+
+const withdrawalFormSchema = insertWithdrawalSchema.extend({
   amount: z.coerce.number().min(0.01, "Amount must be greater than 0"),
   date: z.coerce.date().transform(d => d.toISOString().split('T')[0]),
 });
@@ -31,7 +37,7 @@ const valuationFormSchema = insertValuationSchema.extend({
 
 interface Props {
   platformId: number;
-  type: "investment" | "valuation";
+  type: "investment" | "valuation" | "withdrawal";
   initialData?: any;
   mode?: "add" | "edit";
 }

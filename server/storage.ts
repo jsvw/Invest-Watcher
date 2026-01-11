@@ -2,6 +2,7 @@ import { db } from "./db";
 import {
   platforms,
   investments,
+  withdrawals,
   valuations,
   assets,
   assetValuations,
@@ -9,6 +10,8 @@ import {
   type InsertPlatform,
   type Investment,
   type InsertInvestment,
+  type Withdrawal,
+  type InsertWithdrawal,
   type Valuation,
   type InsertValuation,
   type Asset,
@@ -38,6 +41,14 @@ export interface IStorage {
   createInvestment(investment: InsertInvestment): Promise<Investment>;
   updateInvestment(id: number, investment: Partial<InsertInvestment>): Promise<Investment>;
   getInvestmentPlatformId(investmentId: number): Promise<number | null>;
+
+  // Withdrawals (require platform ownership verification in routes)
+  getWithdrawals(platformId: number): Promise<Withdrawal[]>;
+  getAllWithdrawalsForUser(userId: number): Promise<Withdrawal[]>;
+  createWithdrawal(withdrawal: InsertWithdrawal): Promise<Withdrawal>;
+  updateWithdrawal(id: number, withdrawal: Partial<InsertWithdrawal>): Promise<Withdrawal>;
+  deleteWithdrawal(id: number): Promise<void>;
+  getWithdrawalPlatformId(withdrawalId: number): Promise<number | null>;
 
   // Valuations (require platform ownership verification in routes)
   getValuations(platformId: number): Promise<Valuation[]>;
@@ -141,6 +152,7 @@ export class DatabaseStorage implements IStorage {
       name: row.name,
       category: row.category,
       color: row.color,
+      icon: row.icon,
       description: row.description,
       currency: row.currency,
       platformMode: row.platform_mode,
@@ -184,6 +196,7 @@ export class DatabaseStorage implements IStorage {
       name: row.name,
       category: row.category,
       color: row.color,
+      icon: row.icon,
       description: row.description,
       currency: row.currency,
       platformMode: row.platform_mode,
@@ -259,6 +272,56 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(investments.date));
     
     return result;
+  }
+
+  // Withdrawal methods
+  async getWithdrawals(platformId: number): Promise<Withdrawal[]> {
+    return await db.select()
+      .from(withdrawals)
+      .where(eq(withdrawals.platformId, platformId))
+      .orderBy(desc(withdrawals.date));
+  }
+
+  async getAllWithdrawalsForUser(userId: number): Promise<Withdrawal[]> {
+    const result = await db.select({
+      id: withdrawals.id,
+      platformId: withdrawals.platformId,
+      amount: withdrawals.amount,
+      date: withdrawals.date,
+      notes: withdrawals.notes,
+      createdAt: withdrawals.createdAt,
+    })
+      .from(withdrawals)
+      .innerJoin(platforms, eq(withdrawals.platformId, platforms.id))
+      .where(eq(platforms.userId, userId))
+      .orderBy(desc(withdrawals.date));
+    
+    return result;
+  }
+
+  async createWithdrawal(withdrawal: InsertWithdrawal): Promise<Withdrawal> {
+    const [newWithdrawal] = await db.insert(withdrawals).values(withdrawal).returning();
+    return newWithdrawal;
+  }
+
+  async updateWithdrawal(id: number, withdrawal: Partial<InsertWithdrawal>): Promise<Withdrawal> {
+    const [updated] = await db.update(withdrawals)
+      .set(withdrawal)
+      .where(eq(withdrawals.id, id))
+      .returning();
+    if (!updated) throw new Error("Withdrawal not found");
+    return updated;
+  }
+
+  async deleteWithdrawal(id: number): Promise<void> {
+    await db.delete(withdrawals).where(eq(withdrawals.id, id));
+  }
+
+  async getWithdrawalPlatformId(withdrawalId: number): Promise<number | null> {
+    const [withdrawal] = await db.select({ platformId: withdrawals.platformId })
+      .from(withdrawals)
+      .where(eq(withdrawals.id, withdrawalId));
+    return withdrawal?.platformId ?? null;
   }
 
   async getAllValuationsForUser(userId: number): Promise<Valuation[]> {
