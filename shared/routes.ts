@@ -15,6 +15,21 @@ import {
 } from './schema';
 
 // ============================================
+// API INPUT SCHEMAS (with string to date coercion)
+// ============================================
+const apiInvestmentSchema = insertInvestmentSchema.extend({
+  date: z.coerce.date(),
+});
+
+const apiWithdrawalSchema = insertWithdrawalSchema.extend({
+  date: z.coerce.date(),
+});
+
+const apiValuationSchema = insertValuationSchema.extend({
+  date: z.coerce.date(),
+});
+
+// ============================================
 // SHARED ERROR SCHEMAS
 // ============================================
 export const errorSchemas = {
@@ -71,7 +86,7 @@ export const api = {
     create: {
       method: 'POST' as const,
       path: '/api/investments',
-      input: insertInvestmentSchema,
+      input: apiInvestmentSchema,
       responses: {
         201: z.custom<typeof investments.$inferSelect>(),
         400: errorSchemas.validation,
@@ -80,7 +95,7 @@ export const api = {
     update: {
       method: 'PATCH' as const,
       path: '/api/investments/:id',
-      input: insertInvestmentSchema.partial(),
+      input: apiInvestmentSchema.partial(),
       responses: {
         200: z.custom<typeof investments.$inferSelect>(),
         400: errorSchemas.validation,
@@ -99,7 +114,7 @@ export const api = {
     create: {
       method: 'POST' as const,
       path: '/api/withdrawals',
-      input: insertWithdrawalSchema,
+      input: apiWithdrawalSchema,
       responses: {
         201: z.custom<typeof withdrawals.$inferSelect>(),
         400: errorSchemas.validation,
@@ -108,7 +123,7 @@ export const api = {
     update: {
       method: 'PATCH' as const,
       path: '/api/withdrawals/:id',
-      input: insertWithdrawalSchema.partial(),
+      input: apiWithdrawalSchema.partial(),
       responses: {
         200: z.custom<typeof withdrawals.$inferSelect>(),
         400: errorSchemas.validation,
@@ -135,7 +150,7 @@ export const api = {
     create: {
       method: 'POST' as const,
       path: '/api/valuations',
-      input: insertValuationSchema,
+      input: apiValuationSchema,
       responses: {
         201: z.custom<typeof valuations.$inferSelect>(),
         400: errorSchemas.validation,
@@ -144,7 +159,7 @@ export const api = {
     update: {
       method: 'PATCH' as const,
       path: '/api/valuations/:id',
-      input: insertValuationSchema.partial(),
+      input: apiValuationSchema.partial(),
       responses: {
         200: z.custom<typeof valuations.$inferSelect>(),
         400: errorSchemas.validation,
