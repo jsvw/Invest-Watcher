@@ -32,6 +32,7 @@ export default function Dashboard() {
   const [specificYear, setSpecificYear] = useState<string | null>(null);
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
   const [excludedPlatforms, setExcludedPlatforms] = useState<number[]>([]);
+  const [chartView, setChartView] = useState<"overview" | "profit" | "monthly">("overview");
 
   const { data: history, isLoading: isHistoryLoading } = useQuery({
     queryKey: [api.portfolio.history.path, range, specificYear, specificMonth, excludedPlatforms],
@@ -349,6 +350,13 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+            <Tabs value={chartView} onValueChange={(v) => setChartView(v as any)} className="mb-4">
+              <TabsList>
+                <TabsTrigger value="overview" data-testid="tab-chart-overview">Value Overview</TabsTrigger>
+                <TabsTrigger value="profit" data-testid="tab-chart-profit">Profit/Loss</TabsTrigger>
+                <TabsTrigger value="monthly" data-testid="tab-chart-monthly">Monthly Growth</TabsTrigger>
+              </TabsList>
+            </Tabs>
             <div className="h-[400px] w-full">
               {history && history.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -366,36 +374,40 @@ export default function Dashboard() {
                       axisLine={false} 
                       tickFormatter={(date) => format(new Date(date), 'MMM yy')}
                     />
-                    <YAxis 
-                      yAxisId="left"
-                      stroke="hsl(var(--muted-foreground))" 
-                      fontSize={12} 
-                      tickLine={false} 
-                      axisLine={false} 
-                      tickFormatter={(value) => `${getCurrencySymbol(currency)}${(value / 1000).toFixed(0)}k`}
-                    />
-                    <YAxis 
-                      yAxisId="monthly"
-                      orientation="right"
-                      stroke="#f59e0b" 
-                      fontSize={12} 
-                      tickLine={false} 
-                      axisLine={false} 
-                      tickFormatter={(value) => `${value >= 0 ? '+' : ''}${getCurrencySymbol(currency)}${(value / 1000).toFixed(1)}k`}
-                    />
-                    <YAxis 
-                      yAxisId="right"
-                      orientation="right"
-                      stroke="#10b981" 
-                      fontSize={12} 
-                      tickLine={false} 
-                      axisLine={false} 
-                      tickFormatter={(value) => `${value >= 0 ? '+' : ''}${getCurrencySymbol(currency)}${(value / 1000).toFixed(0)}k`}
-                    />
+                    {chartView === "overview" && (
+                      <YAxis 
+                        yAxisId="left"
+                        stroke="hsl(var(--muted-foreground))" 
+                        fontSize={12} 
+                        tickLine={false} 
+                        axisLine={false} 
+                        tickFormatter={(value) => `${getCurrencySymbol(currency)}${(value / 1000).toFixed(0)}k`}
+                      />
+                    )}
+                    {chartView === "profit" && (
+                      <YAxis 
+                        yAxisId="right"
+                        stroke="#10b981" 
+                        fontSize={12} 
+                        tickLine={false} 
+                        axisLine={false} 
+                        tickFormatter={(value) => `${value >= 0 ? '+' : ''}${getCurrencySymbol(currency)}${(value / 1000).toFixed(0)}k`}
+                      />
+                    )}
+                    {chartView === "monthly" && (
+                      <YAxis 
+                        yAxisId="monthly"
+                        stroke="#f59e0b" 
+                        fontSize={12} 
+                        tickLine={false} 
+                        axisLine={false} 
+                        tickFormatter={(value) => `${value >= 0 ? '+' : ''}${getCurrencySymbol(currency)}${(value / 1000).toFixed(1)}k`}
+                      />
+                    )}
                     <Tooltip 
                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                       formatter={(value: number, name: string) => [
-                        name === "Profit/Loss" || name === "Monthly Change"
+                        name === "Profit/Loss" || name === "Monthly Growth"
                           ? `${value >= 0 ? '+' : ''}${formatCurrency(value, currency)}`
                           : formatCurrency(value, currency), 
                         ""
@@ -403,46 +415,54 @@ export default function Dashboard() {
                       labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
                     />
                     <Legend verticalAlign="top" height={36}/>
-                    <Line 
-                      type="monotone" 
-                      dataKey="value" 
-                      name="Current Value"
-                      yAxisId="left"
-                      stroke="hsl(var(--primary))" 
-                      strokeWidth={3}
-                      dot={false}
-                      activeDot={{ r: 6 }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="invested" 
-                      name="Total Invested"
-                      yAxisId="left"
-                      stroke="#8884d8" 
-                      strokeWidth={2}
-                      strokeDasharray="5 5"
-                      dot={false}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="gain" 
-                      name="Profit/Loss"
-                      yAxisId="right"
-                      stroke="#10b981" 
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4, fill: "#10b981" }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="monthlyChange" 
-                      name="Monthly Change"
-                      yAxisId="monthly"
-                      stroke="#f59e0b" 
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4, fill: "#f59e0b" }}
-                    />
+                    {chartView === "overview" && (
+                      <>
+                        <Line 
+                          type="monotone" 
+                          dataKey="value" 
+                          name="Current Value"
+                          yAxisId="left"
+                          stroke="hsl(var(--primary))" 
+                          strokeWidth={3}
+                          dot={false}
+                          activeDot={{ r: 6 }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="invested" 
+                          name="Total Invested"
+                          yAxisId="left"
+                          stroke="#8884d8" 
+                          strokeWidth={2}
+                          strokeDasharray="5 5"
+                          dot={false}
+                        />
+                      </>
+                    )}
+                    {chartView === "profit" && (
+                      <Line 
+                        type="monotone" 
+                        dataKey="gain" 
+                        name="Profit/Loss"
+                        yAxisId="right"
+                        stroke="#10b981" 
+                        strokeWidth={3}
+                        dot={false}
+                        activeDot={{ r: 6, fill: "#10b981" }}
+                      />
+                    )}
+                    {chartView === "monthly" && (
+                      <Line 
+                        type="monotone" 
+                        dataKey="monthlyChange" 
+                        name="Monthly Growth"
+                        yAxisId="monthly"
+                        stroke="#f59e0b" 
+                        strokeWidth={3}
+                        dot={false}
+                        activeDot={{ r: 6, fill: "#f59e0b" }}
+                      />
+                    )}
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
