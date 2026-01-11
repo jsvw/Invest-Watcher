@@ -175,17 +175,32 @@ export async function registerRoutes(
     }
   });
 
-  app.get(api.portfolio.history.path, async (_req, res) => {
+  app.get(api.portfolio.history.path, async (req, res) => {
     try {
+      const range = req.query.range as string || 'year';
       const allInvestments = await storage.getAllInvestments();
       const allValuations = await db.select().from(valuations).orderBy(desc(valuations.date));
       
-      // Get all unique dates from both investments and valuations
       const dates = new Set<string>();
       allInvestments.forEach(inv => dates.add(new Date(inv.date).toISOString().split('T')[0]));
       allValuations.forEach(val => dates.add(new Date(val.date).toISOString().split('T')[0]));
       
-      const sortedDates = Array.from(dates).sort();
+      let sortedDates = Array.from(dates).sort();
+      
+      // Apply date filtering based on range
+      const now = new Date();
+      let startDate: Date | null = null;
+      
+      if (range === '7d') startDate = new Date(now.setDate(now.getDate() - 7));
+      else if (range === '30d') startDate = new Date(now.setDate(now.getDate() - 30));
+      else if (range === 'month') startDate = new Date(now.setMonth(now.getMonth() - 1));
+      else if (range === 'quarter') startDate = new Date(now.setMonth(now.getMonth() - 3));
+      else if (range === 'year') startDate = new Date(now.setFullYear(now.getFullYear() - 1));
+
+      if (startDate) {
+        sortedDates = sortedDates.filter(d => new Date(d) >= startDate!);
+      }
+
       const history = sortedDates.map(date => {
         const dateObj = new Date(date);
         

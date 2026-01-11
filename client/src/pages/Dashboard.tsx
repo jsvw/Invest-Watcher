@@ -12,15 +12,18 @@ import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { format } from "date-fns";
+import { useState } from "react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Dashboard() {
   const { data: platforms, isLoading: isPlatformsLoading } = usePlatforms();
   const { mutate: generateInsight, data: insightData, isPending: isInsightLoading } = useGenerateInsight();
+  const [range, setRange] = useState("year");
 
   const { data: history, isLoading: isHistoryLoading } = useQuery({
-    queryKey: [api.portfolio.history.path],
+    queryKey: [api.portfolio.history.path, range],
     queryFn: async () => {
-      const res = await fetch(api.portfolio.history.path, { credentials: "include" });
+      const res = await fetch(`${api.portfolio.history.path}?range=${range}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch history");
       return await res.json();
     }
@@ -107,9 +110,21 @@ export default function Dashboard() {
 
         {/* Portfolio Performance History */}
         <Card className="shadow-md">
-          <CardHeader>
-            <CardTitle>Portfolio Performance</CardTitle>
-            <CardDescription>Invested amount vs. current valuation over time</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
+            <div>
+              <CardTitle>Portfolio Performance</CardTitle>
+              <CardDescription>Invested amount vs. current valuation over time</CardDescription>
+            </div>
+            <Tabs value={range} onValueChange={setRange} className="w-auto">
+              <TabsList>
+                <TabsTrigger value="7d">7D</TabsTrigger>
+                <TabsTrigger value="30d">30D</TabsTrigger>
+                <TabsTrigger value="month">1M</TabsTrigger>
+                <TabsTrigger value="quarter">3M</TabsTrigger>
+                <TabsTrigger value="year">1Y</TabsTrigger>
+                <TabsTrigger value="all">ALL</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </CardHeader>
           <CardContent>
             <div className="h-[400px] w-full">
