@@ -10,6 +10,7 @@ import { useCreatePlatform } from "@/hooks/use-platforms";
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import type { InsertPlatform } from "@shared/routes";
+import { PlatformIconPicker } from "./PlatformIconPicker";
 
 const categories = ["Crypto", "Stock", "Real Estate", "Bank", "Commodities", "Loans", "Other"];
 const colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#6366f1"];
@@ -39,6 +40,7 @@ export function AddPlatformDialog() {
       description: "",
       category: "Stock",
       color: "#3b82f6",
+      icon: "",
       currency: "USD",
       platformMode: "standard",
     },
@@ -137,7 +139,7 @@ export function AddPlatformDialog() {
           </div>
 
           <div className="space-y-2">
-            <Label>Color Code</Label>
+            <Label>Color</Label>
             <div className="flex gap-2 flex-wrap">
               {colors.map((color) => (
                 <button
@@ -151,6 +153,15 @@ export function AddPlatformDialog() {
                 />
               ))}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Icon</Label>
+            <PlatformIconPicker 
+              value={form.watch("icon")} 
+              onChange={(val) => form.setValue("icon", val)}
+              color={form.watch("color")}
+            />
           </div>
 
           <div className="pt-4 flex justify-end gap-2">

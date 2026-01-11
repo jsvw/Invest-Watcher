@@ -5,7 +5,7 @@ import { useGenerateInsight } from "@/hooks/use-insights";
 import { useAuth } from "@/App";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 import { Wallet, TrendingUp, DollarSign, BrainCircuit, RefreshCcw, Check } from "lucide-react";
-import { SiBinance, SiCoinbase, SiEthereum, SiBitcoin, SiRobinhood, SiPaypal, SiStripe, SiRevolut, SiWise } from "react-icons/si";
+import { getIconById } from "@/components/PlatformIconPicker";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -31,20 +31,6 @@ export default function Dashboard() {
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
   const [excludedPlatforms, setExcludedPlatforms] = useState<number[]>([]);
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
-
-  const getPlatformIcon = (name: string) => {
-    const lowerName = name.toLowerCase();
-    if (lowerName.includes('binance')) return SiBinance;
-    if (lowerName.includes('coinbase')) return SiCoinbase;
-    if (lowerName.includes('ethereum') || lowerName.includes('eth')) return SiEthereum;
-    if (lowerName.includes('bitcoin') || lowerName.includes('btc')) return SiBitcoin;
-    if (lowerName.includes('robinhood')) return SiRobinhood;
-    if (lowerName.includes('paypal')) return SiPaypal;
-    if (lowerName.includes('stripe')) return SiStripe;
-    if (lowerName.includes('revolut')) return SiRevolut;
-    if (lowerName.includes('wise') || lowerName.includes('transferwise')) return SiWise;
-    return null;
-  };
 
   const togglePlatform = (platformId: number) => {
     setExcludedPlatforms(prev => 
@@ -213,7 +199,8 @@ export default function Dashboard() {
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm text-muted-foreground mr-2">Filter:</span>
           {platforms?.map((platform) => {
-            const IconComponent = getPlatformIcon(platform.name);
+            const iconInfo = getIconById(platform.icon);
+            const IconComponent = iconInfo?.icon;
             const isExcluded = excludedPlatforms.includes(platform.id);
             return (
               <UITooltip key={platform.id}>
