@@ -1,6 +1,7 @@
 import express, { type Express } from "express";
 import fs from "fs";
 import path from "path";
+import compression from "compression";
 
 export function serveStatic(app: Express) {
   const distPath = path.resolve(__dirname, "public");
@@ -10,10 +11,17 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  app.use(compression());
 
-  // fall through to index.html if the file doesn't exist
+  app.use(express.static(distPath, {
+    maxAge: '1y',
+    etag: true,
+    immutable: true,
+    index: false,
+  }));
+
   app.use("*", (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

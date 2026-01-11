@@ -4,14 +4,23 @@ import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
-import Dashboard from "@/pages/Dashboard";
-import Platforms from "@/pages/Platforms";
-import PlatformDetails from "@/pages/PlatformDetails";
-import Analytics from "@/pages/Analytics";
 import AuthPage from "@/pages/AuthPage";
-import Settings from "@/pages/Settings";
-import { useEffect, createContext, useContext } from "react";
+import { lazy, Suspense, useEffect, createContext, useContext } from "react";
 import { Loader2 } from "lucide-react";
+
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Platforms = lazy(() => import("@/pages/Platforms"));
+const PlatformDetails = lazy(() => import("@/pages/PlatformDetails"));
+const Analytics = lazy(() => import("@/pages/Analytics"));
+const Settings = lazy(() => import("@/pages/Settings"));
+
+function PageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
 
 interface User {
   id: number;
@@ -84,7 +93,11 @@ function ProtectedRoute({ component: Component, ...rest }: { component: React.Co
   }
 
   if (!user) return null;
-  return <Component {...rest} />;
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <Component {...rest} />
+    </Suspense>
+  );
 }
 
 function Router() {

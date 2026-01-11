@@ -112,81 +112,86 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPlatforms(userId: number): Promise<PlatformResponse[]> {
-    const allPlatforms = await db.select().from(platforms).where(eq(platforms.userId, userId));
-    const platformIds = allPlatforms.map(p => p.id);
-    
-    if (platformIds.length === 0) return [];
-    
-    // Use SQL-level filtering with JOIN to only get user's valuations
-    const userValuations = await db.select({
-      id: valuations.id,
-      platformId: valuations.platformId,
-      value: valuations.value,
-      date: valuations.date,
-      createdAt: valuations.createdAt,
-    })
-      .from(valuations)
-      .innerJoin(platforms, eq(valuations.platformId, platforms.id))
-      .where(eq(platforms.userId, userId))
-      .orderBy(desc(valuations.date));
-    
-    // Use SQL-level filtering with JOIN to only get user's investments
-    const userInvestments = await db.select({
-      id: investments.id,
-      platformId: investments.platformId,
-      amount: investments.amount,
-      date: investments.date,
-      notes: investments.notes,
-      createdAt: investments.createdAt,
-    })
-      .from(investments)
-      .innerJoin(platforms, eq(investments.platformId, platforms.id))
-      .where(eq(platforms.userId, userId));
+    const result = await db.execute(sql`
+      SELECT 
+        p.*,
+        COALESCE(lv.value, 0) as current_value,
+        COALESCE(inv_totals.total_invested, 0) as total_invested,
+        lv.date as last_valuation_date
+      FROM platforms p
+      LEFT JOIN LATERAL (
+        SELECT v.value, v.date 
+        FROM valuations v 
+        WHERE v.platform_id = p.id 
+        ORDER BY v.date DESC 
+        LIMIT 1
+      ) lv ON true
+      LEFT JOIN (
+        SELECT platform_id, SUM(amount::numeric) as total_invested 
+        FROM investments 
+        GROUP BY platform_id
+      ) inv_totals ON inv_totals.platform_id = p.id
+      WHERE p.user_id = ${userId}
+      ORDER BY p.name
+    `);
 
-    const latestValuationMap = new Map<number, any>();
-    for (const val of userValuations) {
-      if (!latestValuationMap.has(val.platformId)) {
-        latestValuationMap.set(val.platformId, val);
-      }
-    }
-
-    return allPlatforms.map(platform => {
-      const latestVal = latestValuationMap.get(platform.id);
-      const totalInvested = userInvestments
-        .filter(inv => inv.platformId === platform.id)
-        .reduce((sum, inv) => sum + Number(inv.amount), 0);
-      
-      const response: PlatformResponse = {
-        ...platform,
-        currentValue: latestVal ? Number(latestVal.value) : 0,
-        totalInvested: Number(totalInvested),
-        lastValuationDate: latestVal ? latestVal.date : null,
-      };
-      return response;
-    });
+    return result.rows.map((row: any) => ({
+      id: row.id,
+      userId: row.user_id,
+      name: row.name,
+      category: row.category,
+      color: row.color,
+      description: row.description,
+      currency: row.currency,
+      platformMode: row.platform_mode,
+      createdAt: row.created_at,
+      currentValue: Number(row.current_value) || 0,
+      totalInvested: Number(row.total_invested) || 0,
+      lastValuationDate: row.last_valuation_date || null,
+    }));
   }
 
   async getPlatform(id: number, userId: number): Promise<PlatformResponse | undefined> {
-    const [platform] = await db.select().from(platforms).where(and(eq(platforms.id, id), eq(platforms.userId, userId)));
-    if (!platform) return undefined;
+    const result = await db.execute(sql`
+      SELECT 
+        p.*,
+        COALESCE(lv.value, 0) as current_value,
+        COALESCE(inv_totals.total_invested, 0) as total_invested,
+        lv.date as last_valuation_date
+      FROM platforms p
+      LEFT JOIN LATERAL (
+        SELECT v.value, v.date 
+        FROM valuations v 
+        WHERE v.platform_id = p.id 
+        ORDER BY v.date DESC 
+        LIMIT 1
+      ) lv ON true
+      LEFT JOIN (
+        SELECT platform_id, SUM(amount::numeric) as total_invested 
+        FROM investments 
+        WHERE platform_id = ${id}
+        GROUP BY platform_id
+      ) inv_totals ON inv_totals.platform_id = p.id
+      WHERE p.id = ${id} AND p.user_id = ${userId}
+    `);
 
-    const [latestValuation] = await db
-      .select()
-      .from(valuations)
-      .where(eq(valuations.platformId, id))
-      .orderBy(desc(valuations.date))
-      .limit(1);
-
-    const allInvestments = await db.select().from(investments).where(eq(investments.platformId, id));
-    const totalInvested = allInvestments.reduce((sum, inv) => sum + Number(inv.amount), 0);
-
-    const response: PlatformResponse = {
-      ...platform,
-      currentValue: latestValuation ? Number(latestValuation.value) : 0,
-      totalInvested: Number(totalInvested),
-      lastValuationDate: latestValuation ? latestValuation.date : null,
+    if (result.rows.length === 0) return undefined;
+    
+    const row: any = result.rows[0];
+    return {
+      id: row.id,
+      userId: row.user_id,
+      name: row.name,
+      category: row.category,
+      color: row.color,
+      description: row.description,
+      currency: row.currency,
+      platformMode: row.platform_mode,
+      createdAt: row.created_at,
+      currentValue: Number(row.current_value) || 0,
+      totalInvested: Number(row.total_invested) || 0,
+      lastValuationDate: row.last_valuation_date || null,
     };
-    return response;
   }
 
   async createPlatform(platform: InsertPlatform, userId: number): Promise<Platform> {
