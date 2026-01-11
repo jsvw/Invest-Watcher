@@ -161,7 +161,7 @@ export default function Dashboard() {
               const momChange = current.value - previous.value;
               if (previous.value === 0) return "New";
               const percent = (momChange / previous.value) * 100;
-              return `${Math.abs(percent).toFixed(1)}%`;
+              return `${Math.abs(percent).toFixed(1)}% (${formatCurrency(Math.abs(momChange), currency)})`;
             })()}
             icon={TrendingUp}
             className={(() => {
