@@ -210,7 +210,8 @@ export default function PlatformDetails() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="rounded-md border">
-                    <div className={`grid ${platformMode === "asset_returns" ? "grid-cols-6" : "grid-cols-5"} p-4 bg-muted/50 font-medium text-sm`}>
+                    <div className={`grid ${platformMode === "asset_returns" ? "grid-cols-7" : "grid-cols-6"} p-4 bg-muted/50 font-medium text-sm`}>
+                      <div>Investment Date</div>
                       <div>Name</div>
                       <div>Invested</div>
                       {platformMode === "asset_returns" && <div>Yield</div>}
@@ -227,9 +228,12 @@ export default function PlatformDetails() {
                         assets.map((asset) => (
                           <div 
                             key={asset.id} 
-                            className={`grid ${platformMode === "asset_returns" ? "grid-cols-6" : "grid-cols-5"} p-4 text-sm hover:bg-muted/30 transition-colors items-center`}
+                            className={`grid ${platformMode === "asset_returns" ? "grid-cols-7" : "grid-cols-6"} p-4 text-sm hover:bg-muted/30 transition-colors items-center`}
                             data-testid={`row-asset-${asset.id}`}
                           >
+                            <div className="text-muted-foreground">
+                              {asset.acquisitionDate ? format(new Date(asset.acquisitionDate), 'MMM dd, yyyy') : '-'}
+                            </div>
                             <div>
                               <div className="font-medium">{asset.name}</div>
                               {asset.description && (
