@@ -1,9 +1,13 @@
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { usePlatforms } from "@/hooks/use-platforms";
+import { useAuth } from "@/App";
+import { formatCurrency } from "@/lib/currency";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
 export default function Analytics() {
+  const { user } = useAuth();
+  const currency = user?.currency || "EUR";
   const { data: platforms } = usePlatforms();
 
   const pieData = platforms?.reduce((acc: any[], platform) => {
@@ -57,7 +61,7 @@ export default function Analytics() {
                       ))}
                     </Pie>
                     <Tooltip 
-                      formatter={(value: number) => `$${value.toLocaleString()}`}
+                      formatter={(value: number) => formatCurrency(value, currency)}
                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                     />
                   </PieChart>
@@ -68,7 +72,7 @@ export default function Analytics() {
                   <div key={entry.name} className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
                     <span className="text-sm font-medium">{entry.name}</span>
-                    <span className="text-xs text-muted-foreground ml-auto">${entry.value.toLocaleString()}</span>
+                    <span className="text-xs text-muted-foreground ml-auto">{formatCurrency(entry.value, currency)}</span>
                   </div>
                 ))}
               </div>
@@ -95,7 +99,7 @@ export default function Analytics() {
                        tickLine={false} 
                      />
                      <Tooltip 
-                        formatter={(value: number) => `$${value.toLocaleString()}`}
+                        formatter={(value: number) => formatCurrency(value, currency)}
                         cursor={{ fill: "hsl(var(--muted)/0.2)" }}
                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                      />

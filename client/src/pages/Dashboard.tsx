@@ -2,6 +2,8 @@ import { Layout } from "@/components/Layout";
 import { StatCard } from "@/components/StatCard";
 import { usePlatforms } from "@/hooks/use-platforms";
 import { useGenerateInsight } from "@/hooks/use-insights";
+import { useAuth } from "@/App";
+import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 import { Wallet, TrendingUp, DollarSign, BrainCircuit, RefreshCcw } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -18,6 +20,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const currency = user?.currency || "EUR";
   const { data: platforms, isLoading: isPlatformsLoading } = usePlatforms();
   const { mutate: generateInsight, data: insightData, isPending: isInsightLoading } = useGenerateInsight();
   const [range, setRange] = useState("year");
@@ -114,21 +118,21 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <StatCard 
             title="Total Portfolio Value" 
-            value={`$${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} 
+            value={formatCurrency(totalValue, currency)} 
             icon={Wallet} 
             className="border-l-primary"
             data-testid="stat-total-value"
           />
           <StatCard 
             title="Total Invested" 
-            value={`$${totalInvested.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} 
+            value={formatCurrency(totalInvested, currency)} 
             icon={DollarSign}
             className="border-l-secondary"
             data-testid="stat-total-invested"
           />
           <StatCard 
             title="Net Profit / Loss" 
-            value={`$${Math.abs(netProfit).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} 
+            value={formatCurrency(Math.abs(netProfit), currency)} 
             trend={netProfit >= 0 ? "up" : "down"}
             trendValue={`${roi.toFixed(2)}%`}
             icon={TrendingUp}
@@ -141,18 +145,14 @@ export default function Dashboard() {
               if (!history || history.length < 1) return "N/A";
               const current = history[history.length - 1];
               
-              // If we have at least 2 points in the current data, use the second to last one as "previous"
               if (history.length >= 2) {
                 const previous = history[history.length - 2];
                 const currentProfit = current.value - current.invested;
                 const previousProfit = previous.value - previous.invested;
                 const momChange = currentProfit - previousProfit;
-                return `$${Math.abs(momChange).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+                return formatCurrency(Math.abs(momChange), currency);
               }
               
-              // If we only have 1 point (likely due to filtering a specific month), 
-              // we can't calculate MoM from the current history slice alone.
-              // For now, we'll return "N/A" or "0.00" if no change is detectable.
               return "N/A";
             })()} 
             trend={(() => {
@@ -281,11 +281,11 @@ export default function Dashboard() {
                       fontSize={12} 
                       tickLine={false} 
                       axisLine={false} 
-                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                      tickFormatter={(value) => `${getCurrencySymbol(currency)}${(value / 1000).toFixed(0)}k`}
                     />
                     <Tooltip 
                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                      formatter={(value: number) => [`$${value.toLocaleString()}`, ""]}
+                      formatter={(value: number) => [formatCurrency(value, currency), ""]}
                       labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
                     />
                     <Legend verticalAlign="top" height={36}/>
@@ -344,7 +344,7 @@ export default function Dashboard() {
                       ))}
                     </Pie>
                     <Tooltip 
-                      formatter={(value: number) => `$${value.toLocaleString()}`}
+                      formatter={(value: number) => formatCurrency(value, currency)}
                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                     />
                   </PieChart>
@@ -388,7 +388,7 @@ export default function Dashboard() {
                            </div>
                          </div>
                          <div className="text-right">
-                           <div className="font-bold">${val.toLocaleString()}</div>
+                           <div className="font-bold">{formatCurrency(val, currency)}</div>
                            <div className={cn("text-xs font-medium", gain >= 0 ? "text-emerald-600" : "text-rose-600")}>
                              {gain >= 0 ? "+" : ""}{percent.toFixed(2)}%
                            </div>

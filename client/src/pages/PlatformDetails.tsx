@@ -5,6 +5,8 @@ import { usePlatform, usePlatforms } from "@/hooks/use-platforms";
 import { useInvestments } from "@/hooks/use-investments";
 import { useValuations } from "@/hooks/use-valuations";
 import { useAssets } from "@/hooks/use-assets";
+import { useAuth } from "@/App";
+import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 import { useRoute } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -90,6 +92,8 @@ function AssetActionsMenu({ asset, platformId, platformMode }: { asset: Asset; p
 }
 
 export default function PlatformDetails() {
+  const { user } = useAuth();
+  const currency = user?.currency || "EUR";
   const [, params] = useRoute("/platforms/:id");
   const id = Number(params?.id);
   const [range, setRange] = useState("year");
@@ -298,9 +302,7 @@ export default function PlatformDetails() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold font-display">
-                {((platform as any).currency || "USD") === "USD" ? "$" : ""}
-                {platformCurrentValue.toLocaleString()}
-                {((platform as any).currency || "USD") !== "USD" ? ` ${(platform as any).currency}` : ""}
+                {formatCurrency(platformCurrentValue, currency)}
               </div>
             </CardContent>
           </Card>
@@ -310,9 +312,7 @@ export default function PlatformDetails() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold font-display text-muted-foreground">
-                {((platform as any).currency || "USD") === "USD" ? "$" : ""}
-                {platformTotalInvested.toLocaleString()}
-                {((platform as any).currency || "USD") !== "USD" ? ` ${(platform as any).currency}` : ""}
+                {formatCurrency(platformTotalInvested, currency)}
               </div>
             </CardContent>
           </Card>
@@ -323,9 +323,7 @@ export default function PlatformDetails() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold font-display text-green-600">
-                  +{((platform as any).currency || "USD") === "USD" ? "$" : ""}
-                  {monthlyIncrease.toLocaleString()}
-                  {((platform as any).currency || "USD") !== "USD" ? ` ${(platform as any).currency}` : ""}
+                  +{formatCurrency(monthlyIncrease, currency)}
                 </div>
               </CardContent>
             </Card>
@@ -350,7 +348,7 @@ export default function PlatformDetails() {
               {assetPerformance && assetPerformance.length > 0 && (
                 <AggregatedPerformancePanel 
                   assetPerformance={assetPerformance}
-                  currency={(platform as any).currency || "USD"}
+                  currency={currency}
                 />
               )}
 
@@ -450,7 +448,7 @@ export default function PlatformDetails() {
                               <AssetValuationHoverCard 
                                 assetId={asset.id} 
                                 assetName={asset.name}
-                                currency={(platform as any).currency || "USD"}
+                                currency={currency}
                               >
                                 <div className="font-medium cursor-pointer hover:underline">{asset.name}</div>
                               </AssetValuationHoverCard>
@@ -459,12 +457,10 @@ export default function PlatformDetails() {
                               )}
                             </div>
                             <div className="font-medium">
-                              {((platform as any).currency || "USD") === "USD" ? "$" : ""}
-                              {(Number(asset.investedAmount) + Number((asset as any).bonusAmount || 0)).toLocaleString()}
-                              {((platform as any).currency || "USD") !== "USD" ? ` ${(platform as any).currency}` : ""}
+                              {formatCurrency(Number(asset.investedAmount) + Number((asset as any).bonusAmount || 0), currency)}
                               {(asset as any).bonusAmount && Number((asset as any).bonusAmount) > 0 && (
                                 <span className="text-xs text-muted-foreground ml-1">
-                                  (+{Number((asset as any).bonusAmount).toLocaleString()} bonus)
+                                  (+{formatCurrency((asset as any).bonusAmount, currency)} bonus)
                                 </span>
                               )}
                             </div>
@@ -474,9 +470,7 @@ export default function PlatformDetails() {
                               </div>
                             )}
                             <div className="font-medium">
-                              {((platform as any).currency || "USD") === "USD" ? "$" : ""}
-                              {(asset.currentValue || Number(asset.investedAmount)).toLocaleString()}
-                              {((platform as any).currency || "USD") !== "USD" ? ` ${(platform as any).currency}` : ""}
+                              {formatCurrency(asset.currentValue || Number(asset.investedAmount), currency)}
                             </div>
                             <div>
                               {asset.status === "exited" ? (
@@ -485,8 +479,7 @@ export default function PlatformDetails() {
                                     <CheckCircle className="h-3 w-3" /> Exited
                                     {asset.profitLoss !== undefined && (
                                       <span className={asset.profitLoss >= 0 ? "text-green-600" : "text-red-600"}>
-                                        ({asset.profitLoss >= 0 ? "+" : ""}{((platform as any).currency || "USD") === "USD" ? "$" : ""}
-                                        {asset.profitLoss.toLocaleString()})
+                                        ({asset.profitLoss >= 0 ? "+" : ""}{formatCurrency(asset.profitLoss, currency)})
                                       </span>
                                     )}
                                   </Badge>
@@ -508,8 +501,7 @@ export default function PlatformDetails() {
                                   </Badge>
                                   {asset.profitLoss !== undefined && asset.profitLoss > 0 && (
                                     <span className="text-xs text-green-600">
-                                      +{((platform as any).currency || "USD") === "USD" ? "$" : ""}
-                                      {asset.profitLoss.toLocaleString()} earned
+                                      +{formatCurrency(asset.profitLoss, currency)} earned
                                     </span>
                                   )}
                                 </div>
@@ -518,8 +510,7 @@ export default function PlatformDetails() {
                                   <Badge variant="outline">Active</Badge>
                                   {asset.profitLoss !== undefined && asset.profitLoss > 0 && (
                                     <span className="text-xs text-green-600">
-                                      +{((platform as any).currency || "USD") === "USD" ? "$" : ""}
-                                      {asset.profitLoss.toLocaleString()} earned
+                                      +{formatCurrency(asset.profitLoss, currency)} earned
                                     </span>
                                   )}
                                 </div>
@@ -625,11 +616,11 @@ export default function PlatformDetails() {
                           fontSize={12} 
                           tickLine={false} 
                           axisLine={false} 
-                          tickFormatter={(value) => `$${value.toLocaleString()}`}
+                          tickFormatter={(value) => formatCurrency(value, currency)}
                         />
                         <Tooltip 
                           contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                          formatter={(value: number) => [`$${value.toLocaleString()}`, ""]}
+                          formatter={(value: number) => [formatCurrency(value, currency), ""]}
                           labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
                         />
                         <Legend verticalAlign="top" height={36}/>
@@ -680,7 +671,7 @@ export default function PlatformDetails() {
                       investments?.map((inv) => (
                         <div key={inv.id} className="grid grid-cols-4 p-4 text-sm hover:bg-muted/30 transition-colors items-center">
                           <div className="text-muted-foreground">{format(new Date(inv.date), 'MMM dd, yyyy')}</div>
-                          <div className="font-medium">${Number(inv.amount).toLocaleString()}</div>
+                          <div className="font-medium">{formatCurrency(inv.amount, currency)}</div>
                           <div className="text-muted-foreground truncate">{inv.notes || "-"}</div>
                           <div className="flex justify-end">
                             <AddTransactionDialog 
@@ -718,7 +709,7 @@ export default function PlatformDetails() {
                       valuations?.map((v) => (
                         <div key={v.id} className="grid grid-cols-3 p-4 text-sm hover:bg-muted/30 transition-colors items-center">
                           <div className="text-muted-foreground">{format(new Date(v.date), 'MMM dd, yyyy')}</div>
-                          <div className="font-medium">${Number(v.value).toLocaleString()}</div>
+                          <div className="font-medium">{formatCurrency(v.value, currency)}</div>
                           <div className="flex justify-end">
                             <AddTransactionDialog 
                               platformId={id} 

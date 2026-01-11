@@ -1,6 +1,8 @@
 import { Layout } from "@/components/Layout";
 import { AddPlatformDialog } from "@/components/AddPlatformDialog";
 import { usePlatforms } from "@/hooks/use-platforms";
+import { useAuth } from "@/App";
+import { formatCurrency } from "@/lib/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "wouter";
@@ -9,6 +11,8 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
 export default function Platforms() {
+  const { user } = useAuth();
+  const currency = user?.currency || "EUR";
   const { data: platforms, isLoading } = usePlatforms();
 
   return (
@@ -50,17 +54,13 @@ export default function Platforms() {
                         <div>
                           <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Current Value</p>
                           <p className="text-xl font-bold font-display mt-1">
-                            {((platform as any).currency || "USD") === "USD" ? "$" : ""}
-                            {Number(platform.currentValue || 0).toLocaleString()}
-                            {((platform as any).currency || "USD") !== "USD" ? ` ${(platform as any).currency}` : ""}
+                            {formatCurrency(platform.currentValue || 0, currency)}
                           </p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Invested</p>
                           <p className="text-xl font-bold font-display mt-1 text-muted-foreground">
-                            {((platform as any).currency || "USD") === "USD" ? "$" : ""}
-                            {Number(platform.totalInvested || 0).toLocaleString()}
-                            {((platform as any).currency || "USD") !== "USD" ? ` ${(platform as any).currency}` : ""}
+                            {formatCurrency(platform.totalInvested || 0, currency)}
                           </p>
                         </div>
                       </div>
