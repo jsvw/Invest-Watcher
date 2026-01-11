@@ -90,38 +90,18 @@ export default function PlatformDetails() {
   const monthlyIncrease = (() => {
     if (platformMode !== "asset_returns" || !assets || assets.length === 0) return 0;
     
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    const daysInMonth = monthEnd.getDate();
-    
     let total = 0;
     
     for (const asset of assets) {
+      // Skip if no yield or fully exited
       if (!asset.annualYield || asset.status === "exited") continue;
       
-      const investedAmount = Number(asset.investedAmount);
-      const annualYield = Number(asset.annualYield);
-      const acquisitionDate = new Date(asset.acquisitionDate);
-      const exitDate = asset.exitDate ? new Date(asset.exitDate) : null;
+      const investedAmount = Number(asset.investedAmount) || 0;
+      const annualYield = Number(asset.annualYield) || 0;
       
-      // Asset acquired after this month ends - skip
-      if (acquisitionDate > monthEnd) continue;
-      
-      // Asset exited before this month started - skip
-      if (exitDate && exitDate < monthStart) continue;
-      
-      // Calculate active days this month
-      const effectiveStart = acquisitionDate > monthStart ? acquisitionDate : monthStart;
-      const effectiveEnd = exitDate && exitDate < now ? exitDate : now < monthEnd ? now : monthEnd;
-      
-      const activeDays = Math.max(0, Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (24 * 60 * 60 * 1000)) + 1);
-      
-      // Monthly yield prorated by active days
+      // Simple monthly yield: invested × (yield/100) / 12
       const monthlyYield = (investedAmount * (annualYield / 100)) / 12;
-      const proratedYield = monthlyYield * (activeDays / daysInMonth);
-      
-      total += proratedYield;
+      total += monthlyYield;
     }
     
     return Math.round(total * 100) / 100;
