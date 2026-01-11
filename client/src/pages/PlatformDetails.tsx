@@ -109,7 +109,7 @@ export default function PlatformDetails() {
                </div>
                <div>
                  <h1 className="text-3xl font-bold font-display tracking-tight">{platform.name}</h1>
-                 <p className="text-muted-foreground">{platform.category} • {platform.description}</p>
+                 <p className="text-muted-foreground">{platform.category} • {(platform as any).currency || "USD"} • {platform.description}</p>
                </div>
             </div>
             
@@ -128,7 +128,9 @@ export default function PlatformDetails() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold font-display">
-                ${platformCurrentValue.toLocaleString()}
+                {((platform as any).currency || "USD") === "USD" ? "$" : ""}
+                {platformCurrentValue.toLocaleString()}
+                {((platform as any).currency || "USD") !== "USD" ? ` ${(platform as any).currency}` : ""}
               </div>
             </CardContent>
           </Card>
@@ -138,7 +140,9 @@ export default function PlatformDetails() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold font-display text-muted-foreground">
-                ${platformTotalInvested.toLocaleString()}
+                {((platform as any).currency || "USD") === "USD" ? "$" : ""}
+                {platformTotalInvested.toLocaleString()}
+                {((platform as any).currency || "USD") !== "USD" ? ` ${(platform as any).currency}` : ""}
               </div>
             </CardContent>
           </Card>

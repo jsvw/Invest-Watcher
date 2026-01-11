@@ -38,7 +38,7 @@ export default function Platforms() {
                       <div>
                         <CardTitle className="text-xl font-bold">{platform.name}</CardTitle>
                         <span className="inline-block mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-                          {platform.category}
+                          {platform.category} • {(platform as any).currency || "USD"}
                         </span>
                       </div>
                       <div className="p-2 bg-muted rounded-full group-hover:bg-primary group-hover:text-white transition-colors">
@@ -50,13 +50,17 @@ export default function Platforms() {
                         <div>
                           <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Current Value</p>
                           <p className="text-xl font-bold font-display mt-1">
-                            ${Number(platform.currentValue || 0).toLocaleString()}
+                            {((platform as any).currency || "USD") === "USD" ? "$" : ""}
+                            {Number(platform.currentValue || 0).toLocaleString()}
+                            {((platform as any).currency || "USD") !== "USD" ? ` ${(platform as any).currency}` : ""}
                           </p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Invested</p>
                           <p className="text-xl font-bold font-display mt-1 text-muted-foreground">
-                            ${Number(platform.totalInvested || 0).toLocaleString()}
+                            {((platform as any).currency || "USD") === "USD" ? "$" : ""}
+                            {Number(platform.totalInvested || 0).toLocaleString()}
+                            {((platform as any).currency || "USD") !== "USD" ? ` ${(platform as any).currency}` : ""}
                           </p>
                         </div>
                       </div>

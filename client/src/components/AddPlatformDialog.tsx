@@ -13,6 +13,15 @@ import type { InsertPlatform } from "@shared/routes";
 
 const categories = ["Crypto", "Stock", "Real Estate", "Bank", "Commodities", "Other"];
 const colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#6366f1"];
+const currencies = [
+  { value: "USD", label: "USD ($)" },
+  { value: "EUR", label: "EUR (€)" },
+  { value: "GBP", label: "GBP (£)" },
+  { value: "JPY", label: "JPY (¥)" },
+  { value: "CAD", label: "CAD ($)" },
+  { value: "AUD", label: "AUD ($)" },
+  { value: "BRL", label: "BRL (R$)" },
+];
 
 export function AddPlatformDialog() {
   const [open, setOpen] = useState(false);
@@ -25,6 +34,7 @@ export function AddPlatformDialog() {
       description: "",
       category: "Stock",
       color: "#3b82f6",
+      currency: "USD",
     },
   });
 
@@ -69,6 +79,23 @@ export function AddPlatformDialog() {
               <SelectContent>
                 {categories.map((cat) => (
                   <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="currency">Currency</Label>
+            <Select 
+              onValueChange={(value) => form.setValue("currency", value)}
+              defaultValue={form.getValues("currency")}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select currency" />
+              </SelectTrigger>
+              <SelectContent>
+                {currencies.map((curr) => (
+                  <SelectItem key={curr.value} value={curr.value}>{curr.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
