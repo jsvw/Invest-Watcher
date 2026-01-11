@@ -27,8 +27,10 @@ const loginSchema = z.object({
 });
 
 export function setupAuth(app: Express) {
-  // Trust proxy for Replit's reverse proxy
+  // Trust proxy for Replit's reverse proxy (required for secure cookies)
   app.set("trust proxy", 1);
+  
+  const isProduction = process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT === "1";
   
   app.use(
     session({
@@ -40,10 +42,10 @@ export function setupAuth(app: Express) {
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: process.env.NODE_ENV === "production",
+        secure: isProduction,
         httpOnly: true,
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-        sameSite: "lax",
+        sameSite: isProduction ? "none" : "lax",
       },
     })
   );
