@@ -27,6 +27,9 @@ const loginSchema = z.object({
 });
 
 export function setupAuth(app: Express) {
+  // Trust proxy for Replit's reverse proxy
+  app.set("trust proxy", 1);
+  
   app.use(
     session({
       store: new PgSession({
