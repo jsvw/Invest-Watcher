@@ -335,10 +335,10 @@ export default function PlatformDetails() {
                     <div className="relative">
                       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
-                        placeholder="Filter by name..."
+                        placeholder="Filter..."
                         value={assetNameFilter}
                         onChange={(e) => setAssetNameFilter(e.target.value)}
-                        className="pl-8 w-48"
+                        className="pl-8 w-32"
                         data-testid="input-filter-name"
                       />
                     </div>
