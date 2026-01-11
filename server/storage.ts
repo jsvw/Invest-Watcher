@@ -343,7 +343,7 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getAssetPerformanceHistory(platformId: number): Promise<{ date: string; assets: { id: number; name: string; value: number }[] }[]> {
+  async getAssetPerformanceHistory(platformId: number): Promise<{ date: string; assets: { id: number; name: string; key: string; value: number }[] }[]> {
     // Get platform to determine mode
     const [platform] = await db.select().from(platforms).where(eq(platforms.id, platformId));
     if (!platform) return [];
@@ -373,7 +373,7 @@ export class DatabaseStorage implements IStorage {
     }, now);
 
     // Generate monthly data points
-    const dataPoints: { date: string; assets: { id: number; name: string; value: number }[] }[] = [];
+    const dataPoints: { date: string; assets: { id: number; name: string; key: string; value: number }[] }[] = [];
     const currentDate = new Date(earliestDate);
     currentDate.setDate(1); // Start from first of month
 
@@ -394,6 +394,10 @@ export class DatabaseStorage implements IStorage {
         if (dateTime < acquisitionTime) {
           value = 0;
         }
+        // Exited assets don't count towards current portfolio total after exit
+        else if (exitTime && dateTime >= exitTime) {
+          value = 0;
+        }
         // For item_valuations mode, use recorded valuations
         else if (platform.platformMode === "item_valuations") {
           const vals = allValuations[asset.id] || [];
@@ -404,29 +408,12 @@ export class DatabaseStorage implements IStorage {
           } else {
             value = totalInvested; // Use total invested if no valuation yet
           }
-          // If exited with a price, use that after exit date
-          if (exitTime && dateTime >= exitTime && asset.exitPrice) {
-            value = Number(asset.exitPrice);
-          }
         }
         // For asset_returns mode, calculate using yield
         else {
           const annualYield = asset.annualYield ? Number(asset.annualYield) : 0;
-          
-          // Asset has exited with explicit price
-          if (exitTime && dateTime >= exitTime && asset.exitPrice) {
-            value = Number(asset.exitPrice);
-          }
-          // Asset has exited/matured - calculate full term yield
-          else if (exitTime && dateTime >= exitTime) {
-            const yearsElapsed = (exitTime - acquisitionTime) / (365 * 24 * 60 * 60 * 1000);
-            value = totalInvested + (totalInvested * (annualYield / 100) * yearsElapsed);
-          }
-          // Asset is active at this date - calculate yield up to this point
-          else {
-            const yearsElapsed = (dateTime - acquisitionTime) / (365 * 24 * 60 * 60 * 1000);
-            value = totalInvested + (totalInvested * (annualYield / 100) * yearsElapsed);
-          }
+          const yearsElapsed = (dateTime - acquisitionTime) / (365 * 24 * 60 * 60 * 1000);
+          value = totalInvested + (totalInvested * (annualYield / 100) * yearsElapsed);
         }
         
         return {
