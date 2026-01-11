@@ -723,42 +723,29 @@ export class DatabaseStorage implements IStorage {
       // Skip if no invested basis (would cause division by zero)
       if (investedBasis <= 0) continue;
 
-      // Get all valuations for this asset
+      // Get all valuations for this asset ordered by date
       const vals = await db.select().from(assetValuations)
         .where(eq(assetValuations.assetId, asset.id))
         .orderBy(assetValuations.date);
 
+      if (vals.length === 0) continue;
+
       // Find earliest date (first valuation date is the investment date)
-      const investmentDate = vals.length > 0 ? new Date(vals[0].date) : new Date();
-
-      for (const val of vals) {
-        const currentValue = Number(val.value);
-        const percentReturn = ((currentValue - investedBasis) / investedBasis) * 100;
-        const valDate = new Date(val.date);
-        const weeksFromInvestment = Math.round((valDate.getTime() - investmentDate.getTime()) / msPerWeek * 10) / 10;
-        
-        bubbleData.push({
-          assetId: asset.id,
-          assetName: asset.name,
-          date: val.date.toISOString().split('T')[0],
-          weeksFromInvestment,
-          percentReturn: Math.round(percentReturn * 100) / 100,
-          investedBasis,
-          currentValue
-        });
-      }
-
-      // Also add current value point (today) using latest valuation or invested basis
-      const latestValue = vals.length > 0 ? Number(vals[vals.length - 1].value) : investedBasis;
-      const todayReturn = ((latestValue - investedBasis) / investedBasis) * 100;
-      const weeksFromInvestmentToday = Math.round((new Date().getTime() - investmentDate.getTime()) / msPerWeek * 10) / 10;
+      const investmentDate = new Date(vals[0].date);
+      
+      // Only use the latest valuation
+      const latestVal = vals[vals.length - 1];
+      const latestValue = Number(latestVal.value);
+      const percentReturn = ((latestValue - investedBasis) / investedBasis) * 100;
+      const valDate = new Date(latestVal.date);
+      const weeksFromInvestment = Math.round((valDate.getTime() - investmentDate.getTime()) / msPerWeek * 10) / 10;
       
       bubbleData.push({
         assetId: asset.id,
         assetName: asset.name,
-        date: new Date().toISOString().split('T')[0],
-        weeksFromInvestment: weeksFromInvestmentToday,
-        percentReturn: Math.round(todayReturn * 100) / 100,
+        date: latestVal.date.toISOString().split('T')[0],
+        weeksFromInvestment,
+        percentReturn: Math.round(percentReturn * 100) / 100,
         investedBasis,
         currentValue: latestValue
       });
