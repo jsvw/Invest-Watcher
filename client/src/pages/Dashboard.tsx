@@ -352,7 +352,11 @@ export default function Dashboard() {
             <div className="h-[400px] w-full">
               {history && history.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={history.map((h: any) => ({ ...h, gain: h.value - h.invested }))}>
+                  <LineChart data={history.map((h: any, i: number, arr: any[]) => ({ 
+                    ...h, 
+                    gain: h.value - h.invested,
+                    monthlyChange: i === 0 ? 0 : h.value - arr[i - 1].value
+                  }))}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                     <XAxis 
                       dataKey="date" 
@@ -371,6 +375,15 @@ export default function Dashboard() {
                       tickFormatter={(value) => `${getCurrencySymbol(currency)}${(value / 1000).toFixed(0)}k`}
                     />
                     <YAxis 
+                      yAxisId="monthly"
+                      orientation="left"
+                      stroke="#f59e0b" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false} 
+                      tickFormatter={(value) => `${value >= 0 ? '+' : ''}${getCurrencySymbol(currency)}${(value / 1000).toFixed(1)}k`}
+                    />
+                    <YAxis 
                       yAxisId="right"
                       orientation="right"
                       stroke="#10b981" 
@@ -382,7 +395,7 @@ export default function Dashboard() {
                     <Tooltip 
                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                       formatter={(value: number, name: string) => [
-                        name === "Profit/Loss" 
+                        name === "Profit/Loss" || name === "Monthly Change"
                           ? `${value >= 0 ? '+' : ''}${formatCurrency(value, currency)}`
                           : formatCurrency(value, currency), 
                         ""
@@ -419,6 +432,16 @@ export default function Dashboard() {
                       strokeWidth={2}
                       dot={false}
                       activeDot={{ r: 4, fill: "#10b981" }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="monthlyChange" 
+                      name="Monthly Change"
+                      yAxisId="monthly"
+                      stroke="#f59e0b" 
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4, fill: "#f59e0b" }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
