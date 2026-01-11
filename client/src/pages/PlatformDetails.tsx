@@ -280,8 +280,9 @@ export default function PlatformDetails() {
                </div>
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <AddTransactionDialog platformId={id} type="investment" />
+              <AddTransactionDialog platformId={id} type="withdrawal" />
               <AddTransactionDialog platformId={id} type="valuation" />
               {platformMode !== "standard" && (
                 <AddAssetDialog 
