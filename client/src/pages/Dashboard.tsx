@@ -221,12 +221,12 @@ export default function Dashboard() {
                   <button
                     onClick={() => togglePlatform(platform.id)}
                     className={cn(
-                      "w-10 h-10 rounded-full flex items-center justify-center transition-all relative",
+                      "w-10 h-10 rounded-full flex items-center justify-center transition-all relative border-2",
                       isExcluded 
-                        ? "opacity-30 grayscale bg-muted" 
-                        : "opacity-100 hover:scale-110"
+                        ? "opacity-50 border-muted-foreground/30" 
+                        : "opacity-100 hover:scale-110 border-transparent"
                     )}
-                    style={{ backgroundColor: isExcluded ? undefined : platform.color }}
+                    style={{ backgroundColor: platform.color }}
                     data-testid={`platform-icon-${platform.id}`}
                   >
                     {IconComponent ? (
