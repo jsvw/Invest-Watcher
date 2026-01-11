@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
+import { ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, ReferenceLine } from "recharts";
 import { formatCurrency } from "@/lib/currency";
 import { format } from "date-fns";
 import { useMemo } from "react";
@@ -36,9 +36,9 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
     }
   });
 
-  const { chartData, assetColors } = useMemo(() => {
+  const { chartData, assetColors, averageReturn } = useMemo(() => {
     if (!bubbleData || bubbleData.length === 0) {
-      return { chartData: [], assetColors: {} };
+      return { chartData: [], assetColors: {}, averageReturn: 0 };
     }
 
     const uniqueAssets = Array.from(new Set(bubbleData.map(d => d.assetName)));
@@ -55,7 +55,10 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
       fill: colors[d.assetName]
     }));
 
-    return { chartData: data, assetColors: colors };
+    // Calculate average return
+    const avg = bubbleData.reduce((sum, d) => sum + d.percentReturn, 0) / bubbleData.length;
+
+    return { chartData: data, assetColors: colors, averageReturn: Math.round(avg * 100) / 100 };
   }, [bubbleData]);
 
   if (isLoading) {
@@ -139,6 +142,17 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
                     </div>
                   </div>
                 );
+              }}
+            />
+            <ReferenceLine 
+              y={averageReturn} 
+              stroke="hsl(var(--primary))" 
+              strokeDasharray="5 5"
+              strokeWidth={2}
+              label={{ 
+                value: `Avg: ${averageReturn >= 0 ? '+' : ''}${averageReturn}%`, 
+                position: 'right',
+                className: 'fill-primary text-xs font-medium'
               }}
             />
             <Scatter data={chartData} dataKey="y">
