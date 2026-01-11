@@ -376,7 +376,7 @@ export default function Dashboard() {
                     />
                     <YAxis 
                       yAxisId="monthly"
-                      orientation="left"
+                      orientation="right"
                       stroke="#f59e0b" 
                       fontSize={12} 
                       tickLine={false} 
