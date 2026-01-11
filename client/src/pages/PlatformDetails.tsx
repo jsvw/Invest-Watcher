@@ -239,8 +239,8 @@ export default function PlatformDetails() {
                             labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
                           />
                           <Legend />
-                          {assets && assets.slice(0, 10).map((asset, idx) => {
-                            const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00c49f', '#ffbb28', '#ff8042', '#a4de6c', '#d0ed57'];
+                          {assets && assets.map((asset, idx) => {
+                            const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00c49f', '#ffbb28', '#ff8042', '#a4de6c', '#d0ed57', '#8dd1e1', '#a28fd0', '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#dfe6e9', '#fab1a0', '#74b9ff', '#55efc4', '#81ecec'];
                             return (
                               <Line 
                                 key={asset.id}
