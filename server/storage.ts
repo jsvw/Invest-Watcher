@@ -112,6 +112,27 @@ export class DatabaseStorage implements IStorage {
     return newPlatform;
   }
 
+  async updatePlatform(id: number, platform: Partial<InsertPlatform>): Promise<Platform> {
+    const [updated] = await db.update(platforms)
+      .set(platform)
+      .where(eq(platforms.id, id))
+      .returning();
+    if (!updated) throw new Error("Platform not found");
+    return updated;
+  }
+
+  async deletePlatform(id: number): Promise<void> {
+    // Delete all related data first
+    const platformAssets = await db.select().from(assets).where(eq(assets.platformId, id));
+    for (const asset of platformAssets) {
+      await db.delete(assetValuations).where(eq(assetValuations.assetId, asset.id));
+    }
+    await db.delete(assets).where(eq(assets.platformId, id));
+    await db.delete(valuations).where(eq(valuations.platformId, id));
+    await db.delete(investments).where(eq(investments.platformId, id));
+    await db.delete(platforms).where(eq(platforms.id, id));
+  }
+
   async getInvestments(platformId: number): Promise<Investment[]> {
     return await db.select().from(investments)
       .where(eq(investments.platformId, platformId))

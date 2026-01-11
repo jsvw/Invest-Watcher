@@ -64,3 +64,65 @@ export function useCreatePlatform() {
     },
   });
 }
+
+export function useUpdatePlatform() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertPlatform> }) => {
+      const res = await fetch(`/api/platforms/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to update platform");
+      return await res.json();
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: [api.platforms.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.platforms.get.path, variables.id] });
+      toast({
+        title: "Success",
+        description: "Platform updated successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useDeletePlatform() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/platforms/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to delete platform");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.platforms.list.path] });
+      toast({
+        title: "Success",
+        description: "Platform deleted successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}

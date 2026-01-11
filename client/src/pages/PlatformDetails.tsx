@@ -1,5 +1,6 @@
 import { Layout } from "@/components/Layout";
 import { AddTransactionDialog } from "@/components/AddTransactionDialog";
+import { PlatformSettingsDialog } from "@/components/PlatformSettingsDialog";
 import { usePlatform, usePlatforms } from "@/hooks/use-platforms";
 import { useInvestments } from "@/hooks/use-investments";
 import { useValuations } from "@/hooks/use-valuations";
@@ -174,6 +175,7 @@ export default function PlatformDetails() {
                   mode={platformMode as "asset_returns" | "item_valuations"} 
                 />
               )}
+              <PlatformSettingsDialog platform={platform} />
             </div>
           </div>
         </div>

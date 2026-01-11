@@ -55,6 +55,24 @@ export async function registerRoutes(
     res.json(platform);
   });
 
+  app.patch('/api/platforms/:id', async (req, res) => {
+    try {
+      const platform = await storage.updatePlatform(Number(req.params.id), req.body);
+      res.json(platform);
+    } catch (err) {
+      res.status(404).json({ message: "Platform not found" });
+    }
+  });
+
+  app.delete('/api/platforms/:id', async (req, res) => {
+    try {
+      await storage.deletePlatform(Number(req.params.id));
+      res.status(204).send();
+    } catch (err) {
+      res.status(404).json({ message: "Platform not found" });
+    }
+  });
+
   // --- Investments ---
   app.get(api.investments.list.path, async (req, res) => {
     const investments = await storage.getInvestments(Number(req.params.platformId));
