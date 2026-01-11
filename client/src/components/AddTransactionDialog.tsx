@@ -26,7 +26,7 @@ const investmentFormSchema = insertInvestmentSchema.extend({
 const withdrawalFormSchema = insertWithdrawalSchema.extend({
   amount: z.coerce.number().min(0.01, "Amount must be greater than 0"),
   date: z.coerce.date().transform(d => d.toISOString().split('T')[0]),
-  currentValue: z.coerce.number().min(0, "Current value cannot be negative"),
+  currentValue: z.coerce.number().min(0, "Current value cannot be negative").optional(),
 });
 
 const valuationFormSchema = insertValuationSchema.extend({
