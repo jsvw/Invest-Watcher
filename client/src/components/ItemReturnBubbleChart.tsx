@@ -36,9 +36,9 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
     }
   });
 
-  const { chartData, weeklyAverages } = useMemo(() => {
+  const { chartData, monthlyAverages } = useMemo(() => {
     if (!bubbleData || bubbleData.length === 0) {
-      return { chartData: [], weeklyAverages: [] };
+      return { chartData: [], monthlyAverages: [] };
     }
 
     const uniqueAssets = Array.from(new Set(bubbleData.map(d => d.assetName)));
@@ -55,22 +55,22 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
       fill: colors[d.assetName]
     }));
 
-    // Group by rounded week and calculate averages
-    const weekBuckets: Record<number, number[]> = {};
+    // Group by month (4 weeks = 1 month) and calculate averages
+    const monthBuckets: Record<number, number[]> = {};
     bubbleData.forEach(d => {
-      const week = Math.round(d.weeksFromInvestment);
-      if (!weekBuckets[week]) weekBuckets[week] = [];
-      weekBuckets[week].push(d.percentReturn);
+      const month = Math.round(d.weeksFromInvestment / 4);
+      if (!monthBuckets[month]) monthBuckets[month] = [];
+      monthBuckets[month].push(d.percentReturn);
     });
 
-    const avgData = Object.entries(weekBuckets)
-      .map(([week, returns]) => ({
-        x: Number(week),
+    const avgData = Object.entries(monthBuckets)
+      .map(([month, returns]) => ({
+        x: Number(month) * 4, // Convert back to weeks for x-axis
         avgReturn: Math.round((returns.reduce((a, b) => a + b, 0) / returns.length) * 100) / 100
       }))
       .sort((a, b) => a.x - b.x);
 
-    return { chartData: data, weeklyAverages: avgData };
+    return { chartData: data, monthlyAverages: avgData };
   }, [bubbleData]);
 
   if (isLoading) {
@@ -144,7 +144,7 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
                 if (data.avgReturn !== undefined) {
                   return (
                     <div className="bg-popover border rounded-lg p-2 shadow-lg">
-                      <p className="text-sm font-medium">Week {data.x} Average</p>
+                      <p className="text-sm font-medium">Month {Math.round(data.x / 4)} Average</p>
                       <p className={data.avgReturn >= 0 ? "text-green-600" : "text-red-600"}>
                         {data.avgReturn >= 0 ? '+' : ''}{data.avgReturn}%
                       </p>
@@ -167,13 +167,13 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
               }}
             />
             <Line 
-              data={weeklyAverages}
+              data={monthlyAverages}
               type="monotone"
               dataKey="avgReturn"
               stroke="hsl(var(--primary))"
               strokeWidth={2}
               dot={{ fill: 'hsl(var(--primary))', r: 4 }}
-              name="Weekly Average"
+              name="Monthly Average"
             />
             <Scatter data={chartData} dataKey="y">
               {chartData.map((entry, index) => (
