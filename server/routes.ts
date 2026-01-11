@@ -197,6 +197,15 @@ export async function registerRoutes(
     }
   });
 
+  app.delete('/api/assets/:id', async (req, res) => {
+    try {
+      await storage.deleteAsset(Number(req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(404).json({ message: "Asset not found" });
+    }
+  });
+
   app.post('/api/assets/:id/exit', async (req, res) => {
     try {
       const { exitDate, exitPrice } = req.body;

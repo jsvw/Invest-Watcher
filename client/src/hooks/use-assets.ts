@@ -79,6 +79,26 @@ export function useUpdateAsset(platformId: number) {
   });
 }
 
+export function useDeleteAsset(platformId: number) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/assets/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/platforms', platformId, 'assets'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/platforms'] });
+      toast({ title: "Success", description: "Asset deleted successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+}
+
 export function useExitAsset(platformId: number) {
   const queryClient = useQueryClient();
   const { toast } = useToast();

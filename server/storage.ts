@@ -43,6 +43,7 @@ export interface IStorage {
   getAsset(id: number): Promise<AssetResponse | undefined>;
   createAsset(asset: InsertAsset): Promise<Asset>;
   updateAsset(id: number, asset: Partial<InsertAsset>): Promise<Asset>;
+  deleteAsset(id: number): Promise<void>;
   exitAsset(id: number, exitDate: Date, exitPrice: string): Promise<Asset>;
 
   // Asset Valuations
@@ -274,6 +275,11 @@ export class DatabaseStorage implements IStorage {
       .returning();
     if (!updated) throw new Error("Asset not found");
     return updated;
+  }
+
+  async deleteAsset(id: number): Promise<void> {
+    await db.delete(assetValuations).where(eq(assetValuations.assetId, id));
+    await db.delete(assets).where(eq(assets.id, id));
   }
 
   async exitAsset(id: number, exitDate: Date, exitPrice: string): Promise<Asset> {

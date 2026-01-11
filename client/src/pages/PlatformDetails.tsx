@@ -3,13 +3,14 @@ import { AddTransactionDialog } from "@/components/AddTransactionDialog";
 import { usePlatform, usePlatforms } from "@/hooks/use-platforms";
 import { useInvestments } from "@/hooks/use-investments";
 import { useValuations } from "@/hooks/use-valuations";
-import { useAssets } from "@/hooks/use-assets";
+import { useAssets, useDeleteAsset } from "@/hooks/use-assets";
 import { useRoute } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, TrendingUp, History, DollarSign, Package, CheckCircle } from "lucide-react";
+import { ArrowLeft, TrendingUp, History, DollarSign, Package, CheckCircle, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend } from "recharts";
@@ -36,6 +37,7 @@ export default function PlatformDetails() {
   
   const platformMode = (platform as any)?.platformMode || "standard";
   const { data: assets, isLoading: isAssetsLoading } = useAssets(id);
+  const deleteMutation = useDeleteAsset(id);
 
   const { data: history, isLoading: isHistoryLoading } = useQuery({
     queryKey: [api.portfolio.history.path, id, range, specificYear, specificMonth],
@@ -415,6 +417,19 @@ export default function PlatformDetails() {
                                     mode={platformMode as "asset_returns" | "item_valuations"}
                                     editAsset={asset as unknown as Asset}
                                   />
+                                  <Button 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => {
+                                      if (confirm("Are you sure you want to delete this asset?")) {
+                                        deleteMutation.mutate(asset.id);
+                                      }
+                                    }}
+                                    data-testid={`button-delete-asset-${asset.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
                                 </>
                               )}
                             </div>
