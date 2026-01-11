@@ -32,7 +32,7 @@ export default function Dashboard() {
   const [specificYear, setSpecificYear] = useState<string | null>(null);
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
   const [excludedPlatforms, setExcludedPlatforms] = useState<number[]>([]);
-  const [chartView, setChartView] = useState<"overview" | "profit" | "monthly">("overview");
+  const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
 
   const { data: history, isLoading: isHistoryLoading } = useQuery({
     queryKey: [api.portfolio.history.path, range, specificYear, specificMonth, excludedPlatforms],
@@ -355,6 +355,7 @@ export default function Dashboard() {
                 <TabsTrigger value="overview" data-testid="tab-chart-overview">Value Overview</TabsTrigger>
                 <TabsTrigger value="profit" data-testid="tab-chart-profit">Profit/Loss</TabsTrigger>
                 <TabsTrigger value="monthly" data-testid="tab-chart-monthly">Monthly Growth</TabsTrigger>
+                <TabsTrigger value="all" data-testid="tab-chart-all">All</TabsTrigger>
               </TabsList>
             </Tabs>
             <div className="h-[400px] w-full">
@@ -374,7 +375,7 @@ export default function Dashboard() {
                       axisLine={false} 
                       tickFormatter={(date) => format(new Date(date), 'MMM yy')}
                     />
-                    {chartView === "overview" && (
+                    {(chartView === "overview" || chartView === "all") && (
                       <YAxis 
                         yAxisId="left"
                         stroke="hsl(var(--muted-foreground))" 
@@ -384,9 +385,10 @@ export default function Dashboard() {
                         tickFormatter={(value) => `${getCurrencySymbol(currency)}${(value / 1000).toFixed(0)}k`}
                       />
                     )}
-                    {chartView === "profit" && (
+                    {(chartView === "profit" || chartView === "all") && (
                       <YAxis 
                         yAxisId="right"
+                        orientation="right"
                         stroke="#10b981" 
                         fontSize={12} 
                         tickLine={false} 
@@ -394,9 +396,10 @@ export default function Dashboard() {
                         tickFormatter={(value) => `${value >= 0 ? '+' : ''}${getCurrencySymbol(currency)}${(value / 1000).toFixed(0)}k`}
                       />
                     )}
-                    {chartView === "monthly" && (
+                    {(chartView === "monthly" || chartView === "all") && (
                       <YAxis 
                         yAxisId="monthly"
+                        orientation="right"
                         stroke="#f59e0b" 
                         fontSize={12} 
                         tickLine={false} 
@@ -415,7 +418,7 @@ export default function Dashboard() {
                       labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
                     />
                     <Legend verticalAlign="top" height={36}/>
-                    {chartView === "overview" && (
+                    {(chartView === "overview" || chartView === "all") && (
                       <>
                         <Line 
                           type="monotone" 
@@ -439,28 +442,28 @@ export default function Dashboard() {
                         />
                       </>
                     )}
-                    {chartView === "profit" && (
+                    {(chartView === "profit" || chartView === "all") && (
                       <Line 
                         type="monotone" 
                         dataKey="gain" 
                         name="Profit/Loss"
                         yAxisId="right"
                         stroke="#10b981" 
-                        strokeWidth={3}
+                        strokeWidth={chartView === "all" ? 2 : 3}
                         dot={false}
-                        activeDot={{ r: 6, fill: "#10b981" }}
+                        activeDot={{ r: 4, fill: "#10b981" }}
                       />
                     )}
-                    {chartView === "monthly" && (
+                    {(chartView === "monthly" || chartView === "all") && (
                       <Line 
                         type="monotone" 
                         dataKey="monthlyChange" 
                         name="Monthly Growth"
                         yAxisId="monthly"
                         stroke="#f59e0b" 
-                        strokeWidth={3}
+                        strokeWidth={chartView === "all" ? 2 : 3}
                         dot={false}
-                        activeDot={{ r: 6, fill: "#f59e0b" }}
+                        activeDot={{ r: 4, fill: "#f59e0b" }}
                       />
                     )}
                   </LineChart>
