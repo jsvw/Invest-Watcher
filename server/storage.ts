@@ -51,7 +51,7 @@ export interface IStorage {
   updateAssetValuation(id: number, valuation: Partial<InsertAssetValuation>): Promise<AssetValuation>;
 
   // Asset Performance History
-  getAssetPerformanceHistory(platformId: number): Promise<{ date: string; assets: { id: number; name: string; value: number }[] }[]>;
+  getAssetPerformanceHistory(platformId: number): Promise<{ date: string; assets: { id: number; name: string; key: string; value: number }[] }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -397,6 +397,7 @@ export class DatabaseStorage implements IStorage {
         return {
           id: asset.id,
           name: asset.name,
+          key: `${asset.name} #${asset.id}`,
           value: Math.round(value * 100) / 100
         };
       });

@@ -64,7 +64,7 @@ export default function PlatformDetails() {
     queryFn: async () => {
       const res = await fetch(`/api/platforms/${id}/asset-performance`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch asset performance");
-      return await res.json() as { date: string; assets: { id: number; name: string; value: number }[] }[];
+      return await res.json() as { date: string; assets: { id: number; name: string; key: string; value: number }[] }[];
     },
     enabled: platformMode !== "standard"
   });
@@ -217,7 +217,7 @@ export default function PlatformDetails() {
                           data={assetPerformance.map(point => {
                             const obj: Record<string, any> = { date: point.date };
                             point.assets.forEach(a => {
-                              obj[a.name] = a.value;
+                              obj[a.key] = a.value;
                             });
                             return obj;
                           })}
@@ -238,20 +238,25 @@ export default function PlatformDetails() {
                             ]}
                             labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
                           />
-                          <Legend />
-                          {assets && assets.map((asset, idx) => {
+                          <Legend wrapperStyle={{ fontSize: '10px' }} />
+                          {(() => {
                             const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00c49f', '#ffbb28', '#ff8042', '#a4de6c', '#d0ed57', '#8dd1e1', '#a28fd0', '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#dfe6e9', '#fab1a0', '#74b9ff', '#55efc4', '#81ecec'];
-                            return (
+                            // Get unique asset keys from performance data
+                            const assetKeys = new Set<string>();
+                            assetPerformance.forEach(point => {
+                              point.assets.forEach(a => assetKeys.add(a.key));
+                            });
+                            return Array.from(assetKeys).map((key, idx) => (
                               <Line 
-                                key={asset.id}
+                                key={key}
                                 type="monotone" 
-                                dataKey={asset.name}
+                                dataKey={key}
                                 stroke={colors[idx % colors.length]}
                                 strokeWidth={2}
                                 dot={false}
                               />
-                            );
-                          })}
+                            ));
+                          })()}
                         </LineChart>
                       </ResponsiveContainer>
                     </div>
