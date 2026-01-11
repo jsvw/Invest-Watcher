@@ -8,14 +8,40 @@ import Dashboard from "@/pages/Dashboard";
 import Platforms from "@/pages/Platforms";
 import PlatformDetails from "@/pages/PlatformDetails";
 import Analytics from "@/pages/Analytics";
+import Landing from "@/pages/Landing";
+import { useLocation } from "wouter";
+import { useEffect } from "react";
+
+function ProtectedRoute({ component: Component, ...rest }: { component: React.ComponentType<any>, [key: string]: any }) {
+  const [location, setLocation] = useLocation();
+  const isAuthenticated = sessionStorage.getItem("app_authenticated") === "true";
+
+  useEffect(() => {
+    if (!isAuthenticated && location !== "/landing") {
+      setLocation("/landing");
+    }
+  }, [isAuthenticated, location, setLocation]);
+
+  if (!isAuthenticated) return null;
+  return <Component {...rest} />;
+}
 
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/platforms" component={Platforms} />
-      <Route path="/platforms/:id" component={PlatformDetails} />
-      <Route path="/analytics" component={Analytics} />
+      <Route path="/landing" component={Landing} />
+      <Route path="/">
+        {(params) => <ProtectedRoute component={Dashboard} {...params} />}
+      </Route>
+      <Route path="/platforms">
+        {(params) => <ProtectedRoute component={Platforms} {...params} />}
+      </Route>
+      <Route path="/platforms/:id">
+        {(params) => <ProtectedRoute component={PlatformDetails} {...params} />}
+      </Route>
+      <Route path="/analytics">
+        {(params) => <ProtectedRoute component={Analytics} {...params} />}
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );
