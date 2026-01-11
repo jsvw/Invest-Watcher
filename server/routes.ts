@@ -642,63 +642,21 @@ export async function registerRoutes(
         if (!isOwner) return res.json([]);
       }
       
-      // Get user platforms to check modes
-      const userPlatforms = await storage.getPlatforms(userId);
-      const filteredPlatforms = platformId 
-        ? userPlatforms.filter(p => p.id === platformId)
-        : userPlatforms;
+      // Use user-scoped storage methods
+      const userInvestments = await storage.getAllInvestmentsForUser(userId);
+      const userValuations = await storage.getAllValuationsForUser(userId);
       
-      // Separate platforms by mode
-      const standardPlatformIds = filteredPlatforms.filter(p => p.platformMode === 'standard').map(p => p.id);
-      const assetBasedPlatforms = filteredPlatforms.filter(p => p.platformMode === 'asset_returns' || p.platformMode === 'item_valuations');
+      const filteredInvestments = platformId 
+        ? userInvestments.filter(inv => inv.platformId === platformId)
+        : userInvestments;
       
-      // Use user-scoped storage methods for standard platforms
-      const allUserInvestments = await storage.getAllInvestmentsForUser(userId);
-      const allUserValuations = await storage.getAllValuationsForUser(userId);
+      const filteredValuations = platformId
+        ? userValuations.filter(val => val.platformId === platformId)
+        : userValuations;
       
-      const filteredInvestments = allUserInvestments.filter(inv => standardPlatformIds.includes(inv.platformId));
-      const filteredValuations = allUserValuations.filter(val => standardPlatformIds.includes(val.platformId));
-      
-      // Collect all assets for asset-based platforms
-      const allAssets: { platformId: number; platformMode: string; id: number; name: string; investedAmount: string; bonusAmount: string | null; annualYield: string | null; acquisitionDate: Date; status: string; exitDate: Date | null; exitPrice: string | null }[] = [];
-      const allAssetValuations: { assetId: number; value: string; date: Date }[] = [];
-      
-      for (const platform of assetBasedPlatforms) {
-        const assets = await storage.getAssets(platform.id);
-        for (const asset of assets) {
-          allAssets.push({
-            platformId: platform.id,
-            platformMode: platform.platformMode,
-            id: asset.id,
-            name: asset.name,
-            investedAmount: String(asset.investedAmount),
-            bonusAmount: asset.bonusAmount ? String(asset.bonusAmount) : null,
-            annualYield: asset.annualYield ? String(asset.annualYield) : null,
-            acquisitionDate: asset.acquisitionDate instanceof Date ? asset.acquisitionDate : new Date(asset.acquisitionDate),
-            status: asset.status,
-            exitDate: asset.exitDate ? (asset.exitDate instanceof Date ? asset.exitDate : new Date(asset.exitDate)) : null,
-            exitPrice: asset.exitPrice ? String(asset.exitPrice) : null
-          });
-          
-          if (platform.platformMode === 'item_valuations') {
-            const assetVals = await storage.getAssetValuations(asset.id);
-            for (const av of assetVals) {
-              allAssetValuations.push({
-                assetId: asset.id,
-                value: String(av.value),
-                date: av.date instanceof Date ? av.date : new Date(av.date)
-              });
-            }
-          }
-        }
-      }
-      
-      // Collect all dates
       const dates = new Set<string>();
       filteredInvestments.forEach(inv => dates.add(new Date(inv.date).toISOString().split('T')[0]));
       filteredValuations.forEach(val => dates.add(new Date(val.date).toISOString().split('T')[0]));
-      allAssets.forEach(asset => dates.add(asset.acquisitionDate.toISOString().split('T')[0]));
-      allAssetValuations.forEach(av => dates.add(av.date.toISOString().split('T')[0]));
       
       let sortedDates = Array.from(dates).sort();
       
@@ -742,64 +700,27 @@ export async function registerRoutes(
       const history = sortedDates.map(date => {
         const dateObj = new Date(date);
         
-        // Sum standard platform investments up to this date
-        let invested = filteredInvestments
+        // Sum investments up to this date
+        const invested = filteredInvestments
           .filter(inv => new Date(inv.date) <= dateObj)
           .reduce((sum, inv) => sum + Number(inv.amount), 0);
           
-        // Get latest valuation for each standard platform up to this date
+        // Get latest valuation for each platform up to this date
         const platformLatestValuations = new Map<number, number>();
+        // Process valuations in chronological order to find the latest for each platform by the target date
         [...filteredValuations]
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          .reverse() // Sort to chronological
           .filter(val => new Date(val.date) <= dateObj)
           .forEach(val => {
             platformLatestValuations.set(val.platformId, Number(val.value));
           });
           
-        let totalValue = Array.from(platformLatestValuations.values()).reduce((sum, val) => sum + val, 0);
-        
-        // Add asset-based platform values
-        for (const asset of allAssets) {
-          // Only include assets acquired by this date
-          if (asset.acquisitionDate > dateObj) continue;
-          
-          const userInvested = Number(asset.investedAmount);
-          const bonus = asset.bonusAmount ? Number(asset.bonusAmount) : 0;
-          const totalAssetInvested = userInvested + bonus;
-          
-          // Add to invested total (user portion only, not bonus)
-          invested += userInvested;
-          
-          // Calculate value based on platform mode
-          if (asset.status === 'exited' && asset.exitDate && asset.exitDate <= dateObj) {
-            // Asset was exited by this date
-            totalValue += Number(asset.exitPrice);
-          } else if (asset.platformMode === 'item_valuations') {
-            // Use latest asset valuation up to this date
-            const assetVals = allAssetValuations
-              .filter(av => av.assetId === asset.id && av.date <= dateObj)
-              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            
-            if (assetVals.length > 0) {
-              totalValue += Number(assetVals[0].value);
-            } else {
-              totalValue += totalAssetInvested;
-            }
-          } else if (asset.platformMode === 'asset_returns') {
-            // Calculate yield-based value
-            const yearsElapsed = (dateObj.getTime() - asset.acquisitionDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
-            const annualYield = asset.annualYield ? Number(asset.annualYield) : 0;
-            const accumulatedYield = totalAssetInvested * (annualYield / 100) * yearsElapsed;
-            totalValue += totalAssetInvested + accumulatedYield;
-          } else {
-            totalValue += totalAssetInvested;
-          }
-        }
+        const totalValue = Array.from(platformLatestValuations.values()).reduce((sum, val) => sum + val, 0);
         
         return {
           date,
-          value: Math.round(totalValue * 100) / 100,
-          invested: Math.round(invested * 100) / 100
+          value: totalValue,
+          invested
         };
       });
       
