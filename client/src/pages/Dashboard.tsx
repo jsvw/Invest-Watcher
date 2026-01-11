@@ -206,6 +206,7 @@ export default function Dashboard() {
               <UITooltip key={platform.id}>
                 <TooltipTrigger asChild>
                   <button
+                    type="button"
                     onClick={() => togglePlatform(platform.id)}
                     className={cn(
                       "w-10 h-10 rounded-full flex items-center justify-center transition-all relative border-2",
