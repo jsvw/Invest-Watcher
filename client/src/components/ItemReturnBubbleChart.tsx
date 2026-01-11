@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell } from "recharts";
+import { ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
 import { formatCurrency } from "@/lib/currency";
 import { format } from "date-fns";
 import { useMemo } from "react";
@@ -35,9 +35,9 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
     }
   });
 
-  const { chartData, assetColors, assets } = useMemo(() => {
+  const { chartData, assetColors } = useMemo(() => {
     if (!bubbleData || bubbleData.length === 0) {
-      return { chartData: [], assetColors: {}, assets: [] };
+      return { chartData: [], assetColors: {} };
     }
 
     const uniqueAssets = Array.from(new Set(bubbleData.map(d => d.assetName)));
@@ -54,7 +54,7 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
       fill: colors[d.assetName]
     }));
 
-    return { chartData: data, assetColors: colors, assets: uniqueAssets };
+    return { chartData: data, assetColors: colors };
   }, [bubbleData]);
 
   if (isLoading) {
@@ -116,7 +116,7 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
             <ZAxis 
               type="number"
               dataKey="z"
-              range={[50, 400]}
+              range={[100, 800]}
               name="Invested"
             />
             <Tooltip 
@@ -139,25 +139,9 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
                 );
               }}
             />
-            <Legend 
-              verticalAlign="top"
-              content={() => (
-                <div className="flex flex-wrap gap-3 justify-center mb-2">
-                  {assets.map(name => (
-                    <div key={name} className="flex items-center gap-1.5 text-sm">
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: assetColors[name] }}
-                      />
-                      <span>{name}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            />
             <Scatter data={chartData} dataKey="y">
               {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.fill} fillOpacity={0.7} />
+                <Cell key={`cell-${index}`} fill={entry.fill} fillOpacity={0.8} stroke={entry.fill} strokeWidth={1} />
               ))}
             </Scatter>
           </ScatterChart>
