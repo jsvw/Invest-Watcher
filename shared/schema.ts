@@ -35,6 +35,7 @@ export const investments = pgTable("investments", {
   id: serial("id").primaryKey(),
   platformId: integer("platform_id").notNull().references(() => platforms.id),
   amount: numeric("amount").notNull(), // Stored as numeric for precision, but might need coercion
+  bonusAmount: numeric("bonus_amount"), // Free bonus received on top of investment
   date: timestamp("date").notNull(),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
