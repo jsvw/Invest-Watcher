@@ -1,0 +1,115 @@
+Investment date	Name	Invested	Description	Amount of splints	Value
+7/6/2024	Albert Willem, feat. P. B. the Elder, Children's Games, 2022	€ 50.00	Art	1	€ 50.00
+7/6/2024	Choi Myoung Young, Conditional Planes 22-602, 2022	€ 50.00	Art	1	€ 50.00
+7/6/2024	Nike, Air Jordan 4 Travis Scott Purple F&F	€ 50.00	Kleding	1	€ 50.00
+7/7/2024	Audi R8 V10	€ 50.00	Auto's	1	€ 50.00
+7/7/2024	Britt Boutros-Ghali, Portfolio Part  2	€ 50.00	Art	1	€ 50.00
+7/14/2024	De Bethune DB25 Starry Varius,  DB25VTIS3	€ 50.00	Watch	1	€ 50.00
+7/14/2024	Glenfarclas Pagoda, Reserve Trilogy, 43 to 59 years old	€ 50.00	Whisky	1	€ 50.00
+7/16/2024	Móyòsóré Martins, How I See It  (Triptych), 2023	€ 100.00	Art	2	€ 50.00
+7/23/2024	Charizard 1. Edition  Shadowless Basis-Set mit PSA 10 graded Autogramm	€ 50.00	Pokemon	1	€ 50.00
+7/23/2024	Jean-Michel Basquiat, Odours of Punt, 2024	€ 50.00	Art	1	€ 50.00
+7/23/2024	Raghav Babbar, Chitrakaar (Self Portrait), 2023	€ 50.00	Art	1	€ 50.00
+7/26/2024	Jannis Kounellis, Untitled, 1983	€ 50.00	Art	1	€ 50.00
+7/26/2024	Shohei Ohtani 2018 Bowman Chrome Atomic Refractor CRASO 100/100 Rookie	€ 50.00	Baseball	1	€ 89.43
+7/30/2024	Duncan Robert McCormick, Floating Flamingo, 2023	€ 50.00	Art	1	€ 50.00
+7/31/2024	Elitsa Ristova, Cheri, 2024	€ 50.00	Art	1	€ 50.00
+8/10/2024	KAWS, Companion Chair (Grey), 2019	€ 50.00	 Meubilair 	1	€ 50.00
+8/20/2024	LeBron James 2005 SP Game Used By the Letter E 4/5 BGS 9	€ 50.00	 Baseball 	1	€ 50.00
+8/20/2024	Raghav Babbar, Time for Work, 2023	€ 50.00	 Art 	1	€ 50.00
+8/24/2024	Ksenia Pasyura, You Better Escape, 2024	€ 50.00	 Art 	1	€ 50.00
+8/27/2024	Bas Armagnac Domaine de Tourné 1974 & Domaine de Sancin 1984 (one cask each)	€ 50.00	 Whisky 	1	€ 50.00
+8/27/2024	Elitsa Ristova, No Heaven No Skies, 2020	€ 50.00	 Art 	1	€ 50.00
+9/3/2024	Choi Myoung Young, Conditional Planes 22-601	€ 50.00	 Art 	1	€ 50.00
+9/3/2024	Damien Hirst, The Secrets (H-14) - full collection	€ 50.00	 Art 	1	€ 50.00
+9/10/2024	1988 Porsche 911 (930) 3.2 SC Targa in Guards Red	€ 50.00	 Auto's 	1	€ 50.00
+9/10/2024	Raghav Babbar, South Beach, Miami (Self Portrait), 2024	€ 50.00	 Art 	1	€ 50.00
+9/12/2024	Violin Luigi Cardi, 1884, Verona	€ 50.00	 Muziek 	1	€ 50.00
+9/13/2024	Charizard 1. Edition 1999 - Vertical Collection (PSA 1 - 10, 12 cards, German)	€ 50.00	 Pokemon 	1	€ 50.00
+9/17/2024	Jon Merz, Nymphée 2023, Pneuma 2023 & Sur la tombe du poisson pousse des fleurs 2023	€ 50.00	 Art 	1	€ 50.00
+9/20/2024	Duncan Robert McCormick, NY View, 2022	€ 50.00	 Art 	1	€ 50.00
+9/24/2024	Shohei Ohtani 2016 Epoch HNF Season Achievements Letter Patch I 6/6 PSA 9	€ 50.00	 Baseball 	1	€ 50.00
+9/25/2024	Duncan Robert McCormick, Summer Lawn, 2024	€ 50.00	 Art 	1	€ 50.00
+9/30/2024	Ksenia Pasyura, Ceremony, 2023	€ 50.00	 Art 	1	€ 50.00
+10/1/2024	Gregory de la Haba, 4 paintings from the "Easy Suite" series 2024 & 3 paintings from the “Everything is Made of Light” series 2023	€ 50.00	 Art 	1	€ 50.00
+10/18/2024	Winston Branch, Untitled, 2023	€ 50.00	 Art 	1	€ 50.00
+10/22/2024	Jean-Michel Basquiat, Boxer Rebellion, 1982/2018	€ 50.00	 Art 	1	€ 50.00
+10/25/2024	2001 TVR Tuscan	€ 50.00	 Auto's 	1	€ 50.00
+10/25/2024	Duncan Robert McCormick, First we paint Manhattan (Berlin from Fischerinsel 1), 2024	€ 50.00	 Art 	1	€ 50.00
+10/25/2024	Gregory de la Haba, 4 paintings from the "Easy Suite" series 2024 & 2 paintings from the “Everything is Made of Light” series 2023	€ 50.00	 Art 	1	€ 50.00
+10/31/2024	Fika Leon, Study of Faces 1 and 2, 2024	€ 50.00	 Art 	1	€ 50.00
+11/5/2024	Fika Leon, Study of Face 3 and 4, 2024	€ 50.00	 Art 	1	€ 50.00
+11/8/2024	Philip Tsiaras, "Cut Tulips," 1995 – ("Topologies" series)	€ 50.00	 Art 	1	€ 50.00
+11/15/2024	Winston Branch, Green Eyes in Blue Light, 2000	€ 50.00	 Art 	1	€ 50.00
+11/19/2024	Banksy, Love Rat (signed), 2004	€ 50.00	 Art 	1	€ 50.00
+11/22/2024	Henry Hudson, 3 paintings from the "At Some Point In Time" series, 2024	€ 50.00	 Art 	1	€ 50.00
+11/22/2024	Nike SB Dunk Low Yellow Lobster (1-of-36)	€ 50.00	 Kleding 	1	€ 50.00
+11/26/2024	Damien Hirst, Visions Blossom, 2021 (Original Painting)	€ 50.00	 Art 	1	€ 50.00
+11/26/2024	Jayson Tatum 2017 Immaculate Rookie Patch Auto LogoTag 2/3 with 5-Color BGS 9	€ 50.00	 Baseball 	1	€ 50.00
+11/29/2024	Nike SB Dunk High FLOM (1-of-24) by Futura	€ 50.00	 Kleding 	1	€ 50.00
+11/29/2024	Philip Tsiaras, "Desert Storm," 1991 – ("Topologies" series)	€ 50.00	 Art 	1	€ 50.00
+12/11/2024	Kenny Scharf, Kamo, 2020	€ 50.00	 Art 	1	€ 50.00
+12/17/2024	Gustavo Nazareno, Ochún, 2024	€ 50.00	 Art 	1	€ 56.06
+12/20/2024	Cooper, Listening (2022) and Peacock at Holland Park (2024)	€ 50.00	 Art 	1	€ 50.00
+12/20/2024	Thomas Dillon, Portfolio, 2023	€ 50.00	 Art 	1	€ 50.00
+12/27/2024	Choi Myoung Young, Conditional Planes 23-12, 2023	€ 50.00	 Art 	1	€ 50.00
+12/27/2024	Shohei Ohtani 2020 Prizm Black Finite 1of1 PSA7	€ 50.00	 Baseball 	1	€ 50.00
+1/7/2025	Raghav Babbar, A Lone Winter Night, 2024	€ 50.00	 Art 	1	€ 50.00
+1/10/2025	Nike SB Dunk Low Paris	€ 50.00	 Kleding 	1	€ 50.00
+1/10/2025	Ryo Kato, Portfolio of 10 Paintings, 2021 to 2024	€ 50.00	 Art 	1	€ 50.00
+1/14/2025	George Morton-Clark, I Swear the Puppet Did It & Drunk Text, 2024	€ 50.00	 Art 	1	€ 50.00
+1/14/2025	Lamar Jackson 2018 National Treasures Rookie Patch Auto Stars and Stripes Acetate 8/15 (Jersey Number)	€ 50.00	 Baseball 	1	€ 50.00
+1/17/2025	Britt Boutros-Ghali, Portfolio (5 Paintings), 2024	€ 50.00	 Art 	1	€ 50.00
+1/24/2025	Britt Boutros-Ghali, Portfolio (4 Paintings), 2024	€ 50.00	 Art 	1	€ 50.00
+1/24/2025	Móyòsóré Martins, What If 2022 & Now and Then II 2023	€ 50.00	 Art 	1	€ 50.00
+1/24/2025	Nike x Louis Vuitton Air Force 1 Set (4 Sneakers) & Jacket	€ 50.00	 Kleding 	1	€ 50.00
+1/31/2025	Nike x Louis Vuitton Air Force 1 Set - Part 2	€ 50.00	 Kleding 	1	€ 50.00
+1/31/2025	Sealed Pokémon EX Team Rocket Returns Booster Display	€ 50.00	 Pokemon 	1	€ 50.00
+2/4/2025	Patrick Mahomes II 2018 Flawless Star Swatch Auto Patch Sapphire 1of3	€ 50.00	 Baseball 	1	€ 50.00
+2/6/2025	George Condo, Women are Beautiful, 2024	€ 50.00	 Art 	1	€ 50.00
+2/18/2025	RIMOWA x Rick Owens Set (4 bags)	€ 50.00	 Kleding 	1	€ 50.00
+2/21/2025	Zevs, Swimming Pools: Monet (Amoco) & Monet (Shell), 2025	€ 50.00	 Art 	1	€ 50.00
+2/28/2025	Nike Dunk Low ‘Virgil Abloh x Futura’ UNC (1 of 8)	€ 50.00	 Kleding 	1	€ 50.00
+2/28/2025	Touils, Cherry Rain on the Fushimi River, 2024	€ 50.00	 Art 	1	€ 50.00
+3/5/2025	Louis Vuitton Supreme Skateboard Trunk (1-of-10)	€ 50.00	 Kleding 	1	€ 50.00
+3/7/2025	Zevs, Swimming Pools: Monet (PetroChina) & Monet (Total), 2025	€ 50.00	 Art 	1	€ 50.00
+3/10/2025	Anthony James, 24” Dodecahedron (Jet Black), 2022	€ 50.00	 Meubilair 	1	€ 50.00
+3/15/2025	David Hockney, Untitled No. 516, 2010	€ 50.00	 Art 	1	€ 50.00
+3/20/2025	Tracey Emin, These Feelings Were True, Full Set of 8	€ 50.00	 Art 	1	€ 50.00
+4/11/2025	Touils, The Old Bridge in the Autumn Forest, 2023	€ 50.00	Art	1	€ 50.00
+4/16/2025	Sealed Pokémon Expedition Base Set Display	€ 50.00	 Pokemon 	1	€ 50.00
+4/18/2025	Damien Hirst, End of Days, 2003	€ 50.00	 Art 	1	€ 50.00
+4/22/2025	Peyton Manning 1998 E-X2001 Essential Credentials Now Rookie 54of54 (best Peyton rookie design) BGS 8.5	€ 50.00	 Baseball 	1	€ 50.00
+5/2/2025	Zevs, Four Seasons (Summer) & Four Seasons (Autumn), 2025	€ 50.00	 Art 	1	€ 50.00
+5/6/2025	Gustavo Nazareno, Portfolio of Two Works, 2025	€ 50.00	 Art 	1	€ 50.00
+5/14/2025	Kylian Mbappe Panini Donruss FIFA Kaboom Black 1of1	€ 50.00	 Baseball 	1	€ 50.00
+5/16/2025	Maria Kreyn, Orchid, 2023	€ 50.00	 Art 	1	€ 50.00
+5/16/2025	Nike Mag „Back To The Future“ 2016	€ 200.00	 Kleding 	4	€ 50.00
+5/16/2025	Rudolf Stingel, Untitled, 2009	€ 50.00	 Art 	1	€ 50.00
+5/25/2025	Larry Bird 2004 Exquisite Titleists Jersey Auto 2of3 PSA 9 + 10 Auto	€ 50.00	 Baseball 	1	€ 50.00
+5/27/2025	Katherine Bernhardt, Pepsi, 2019	€ 50.00	 Art 	1	€ 50.00
+6/10/2025	Mario Carreño, Colonial Patio, 1943	€ 50.00	 Art 	1	€ 50.00
+6/17/2025	David Hockney, No. 18, The Yosemite Suite, 2010	€ 50.00	 Art 	1	€ 50.00
+6/20/2025	Anthony Daley, Earth Reverb, 2022	€ 50.00	 Art 	1	€ 50.00
+6/24/2025	Kenny Scharf, Gee, 2019	€ 50.00	 Kleding 	1	€ 50.00
+6/24/2025	Kobe Bryant 1999-00 UD Game Jersey Super Patch 1of25 UD1 BGS 8.5	€ 50.00	 Baseball 	1	€ 50.00
+6/25/2025	Sealed Base Set 1st Edition Italian Booster Box	€ 50.00	 Pokemon 	1	€ 50.00
+6/27/2025	Winston Branch, Untitled, 1993	€ 50.00	 Art 	1	€ 50.00
+6/30/2025	Tracey Emin, I Did Not Say... (3 of 3), 2012	€ 50.00	 Art 	1	€ 50.00
+7/10/2025	Patrick Mahomes 2017 Immaculate Rooke Patch Auto Nameplate Nobility 4of7 BGS 8.5 + 10 Auto	€ 50.00	 Baseball 	1	€ 50.00
+7/12/2025	Touils, Al Fateh Masjid, Bahrain, 2025	€ 50.00	 Art 	1	€ 50.00
+7/15/2025	Jason Boyd Kinsella, Jodie, 2023	€ 50.00	 Art 	1	€ 50.00
+7/20/2025	Touils, Katara Masjid, Doha, 2025	€ 50.00	 Art 	1	€ 50.00
+7/28/2025	Mario & Luigi Pikachu (8 cards all PSA 10)	€ 50.00	 Pokemon 	1	€ 50.00
+8/20/2025	Lamine Yamal 2023 Topps Inception Marks of Excellence Rookie Purple /10 PSA 9 + 10	€ 50.00	 Baseball 	1	€ 50.00
+8/26/2025	Pokémon Legendary Collection Display	€ 50.00	 Pokemon 	1	€ 50.00
+8/29/2025	Ángeles Agrela, Valeria, 2021	€ 50.00	 Art 	1	€ 50.00
+8/31/2025	Feng Xiao-Min, Composition N°20.05.13, 2013	€ 50.00	 Art 	1	€ 50.00
+9/2/2025	Kobe Bryant 2007 UD Chronology Timeless Memories 1/99 PSA 8 + 10 Auto	€ 50.00	 Baseball 	1	€ 50.00
+9/3/2025	Pokémon Munch The Scream PSA 10 Set	€ 50.00	 Pokemon 	1	€ 50.00
+9/3/2025	Pieter Obels, Chasing a Feeling, 2024	€ 50.00	 Art 	1	€ 50.00
+9/9/2025	Tom Brady 2022 TriFroce Triple Prime Patch 1of1 BGS 9.5	€ 50.00	 Baseball 	1	€ 50.00
+9/9/2025	Amanda Watt, Hockney’s View, 2022	€ 50.00	 Art 	1	€ 50.00
+9/10/2025	Pokémon Roaring Skies 12 Booster Boxes	€ 50.00	 Pokemon 	1	€ 50.00
+9/12/2025	Damien Hirst, Dead Head III, 2009	€ 100.00	 Art 	2	€ 50.00
+5/1/2026	Josh Sperling, Untitled (Tondo 1), 2017	€ 50.00	 Art 	1	€ 50.00
