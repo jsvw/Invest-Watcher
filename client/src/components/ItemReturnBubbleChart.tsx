@@ -126,7 +126,6 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
               type="number"
               dataKey="y"
               name="Return"
-              unit="%"
               className="text-xs fill-muted-foreground"
               tickFormatter={(val) => `${val > 0 ? '+' : ''}${val}%`}
             />
