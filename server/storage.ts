@@ -49,6 +49,9 @@ export interface IStorage {
   getAssetValuations(assetId: number): Promise<AssetValuation[]>;
   createAssetValuation(valuation: InsertAssetValuation): Promise<AssetValuation>;
   updateAssetValuation(id: number, valuation: Partial<InsertAssetValuation>): Promise<AssetValuation>;
+
+  // Asset Performance History
+  getAssetPerformanceHistory(platformId: number): Promise<{ date: string; assets: { id: number; name: string; value: number }[] }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -305,6 +308,72 @@ export class DatabaseStorage implements IStorage {
       .returning();
     if (!updated) throw new Error("Asset valuation not found");
     return updated;
+  }
+
+  async getAssetPerformanceHistory(platformId: number): Promise<{ date: string; assets: { id: number; name: string; value: number }[] }[]> {
+    const allAssets = await db.select().from(assets)
+      .where(eq(assets.platformId, platformId))
+      .orderBy(desc(assets.acquisitionDate));
+    
+    if (allAssets.length === 0) return [];
+
+    // Find date range: earliest acquisition to today
+    const now = new Date();
+    const earliestDate = allAssets.reduce((min, a) => {
+      const d = new Date(a.acquisitionDate);
+      return d < min ? d : min;
+    }, now);
+
+    // Generate monthly data points
+    const dataPoints: { date: string; assets: { id: number; name: string; value: number }[] }[] = [];
+    const currentDate = new Date(earliestDate);
+    currentDate.setDate(1); // Start from first of month
+
+    while (currentDate <= now) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      const dateTime = currentDate.getTime();
+      
+      const assetValues = allAssets.map(asset => {
+        const acquisitionTime = new Date(asset.acquisitionDate).getTime();
+        const exitTime = asset.exitDate ? new Date(asset.exitDate).getTime() : null;
+        const investedAmount = Number(asset.investedAmount);
+        const annualYield = asset.annualYield ? Number(asset.annualYield) : 0;
+        
+        let value = 0;
+        
+        // Asset not yet acquired at this date
+        if (dateTime < acquisitionTime) {
+          value = 0;
+        }
+        // Asset has exited and this date is after exit
+        else if (exitTime && dateTime >= exitTime) {
+          // Calculate full term value
+          const yearsElapsed = (exitTime - acquisitionTime) / (365 * 24 * 60 * 60 * 1000);
+          value = investedAmount + (investedAmount * (annualYield / 100) * yearsElapsed);
+        }
+        // Asset is active at this date - calculate yield up to this point
+        else {
+          const yearsElapsed = (dateTime - acquisitionTime) / (365 * 24 * 60 * 60 * 1000);
+          value = investedAmount + (investedAmount * (annualYield / 100) * yearsElapsed);
+        }
+        
+        return {
+          id: asset.id,
+          name: asset.name,
+          value: Math.round(value * 100) / 100
+        };
+      });
+
+      dataPoints.push({
+        date: dateStr,
+        assets: assetValues.filter(a => a.value > 0)
+      });
+
+      // Move to next month
+      currentDate.setMonth(currentDate.getMonth() + 1);
+    }
+
+    return dataPoints;
   }
 }
 

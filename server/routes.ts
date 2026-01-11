@@ -245,6 +245,16 @@ export async function registerRoutes(
     }
   });
 
+  // --- Asset Performance History ---
+  app.get('/api/platforms/:platformId/asset-performance', async (req, res) => {
+    try {
+      const history = await storage.getAssetPerformanceHistory(Number(req.params.platformId));
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch asset performance history" });
+    }
+  });
+
   // --- Insights ---
   app.post(api.insights.generate.path, async (req, res) => {
     try {
