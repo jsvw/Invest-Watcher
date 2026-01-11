@@ -353,13 +353,13 @@ export default function PlatformDetails() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="rounded-md border">
-                    <div className={`grid ${platformMode === "asset_returns" ? "grid-cols-8" : "grid-cols-6"} p-4 bg-muted/50 font-medium text-sm`}>
-                      <div>Investment Date</div>
-                      {platformMode === "asset_returns" && <div>Exit Date</div>}
+                    <div className={`grid ${platformMode === "asset_returns" ? "grid-cols-[1fr_1fr_1.5fr_1fr_0.5fr_1fr_0.5fr_1.5fr]" : "grid-cols-[1fr_1.5fr_1fr_1fr_0.5fr_1.5fr]"} p-4 bg-muted/50 font-medium text-sm`}>
+                      <div>Date</div>
+                      {platformMode === "asset_returns" && <div>Exit</div>}
                       <div>Name</div>
                       <div>Invested</div>
                       {platformMode === "asset_returns" && <div>Yield</div>}
-                      <div>Current Value</div>
+                      <div>Value</div>
                       <div>Status</div>
                       <div className="text-right">Actions</div>
                     </div>
@@ -376,7 +376,7 @@ export default function PlatformDetails() {
                         filteredAssets.map((asset) => (
                           <div 
                             key={asset.id} 
-                            className={`grid ${platformMode === "asset_returns" ? "grid-cols-8" : "grid-cols-6"} p-4 text-sm hover:bg-muted/30 transition-colors items-center`}
+                            className={`grid ${platformMode === "asset_returns" ? "grid-cols-[1fr_1fr_1.5fr_1fr_0.5fr_1fr_0.5fr_1.5fr]" : "grid-cols-[1fr_1.5fr_1fr_1fr_0.5fr_1.5fr]"} p-4 text-sm hover:bg-muted/30 transition-colors items-center`}
                             data-testid={`row-asset-${asset.id}`}
                           >
                             <div className="text-muted-foreground">
