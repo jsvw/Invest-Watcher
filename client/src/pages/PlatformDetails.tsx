@@ -480,15 +480,27 @@ export default function PlatformDetails() {
                             </div>
                             <div>
                               {asset.status === "exited" ? (
-                                <Badge variant="secondary" className="gap-1">
-                                  <CheckCircle className="h-3 w-3" /> Exited
-                                  {asset.profitLoss !== undefined && (
-                                    <span className={asset.profitLoss >= 0 ? "text-green-600" : "text-red-600"}>
-                                      ({asset.profitLoss >= 0 ? "+" : ""}{((platform as any).currency || "USD") === "USD" ? "$" : ""}
-                                      {asset.profitLoss.toLocaleString()})
+                                <div className="flex flex-col gap-1">
+                                  <Badge variant="secondary" className="gap-1">
+                                    <CheckCircle className="h-3 w-3" /> Exited
+                                    {asset.profitLoss !== undefined && (
+                                      <span className={asset.profitLoss >= 0 ? "text-green-600" : "text-red-600"}>
+                                        ({asset.profitLoss >= 0 ? "+" : ""}{((platform as any).currency || "USD") === "USD" ? "$" : ""}
+                                        {asset.profitLoss.toLocaleString()})
+                                      </span>
+                                    )}
+                                  </Badge>
+                                  {asset.exitDate && asset.acquisitionDate && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {(() => {
+                                        const years = (new Date(asset.exitDate).getTime() - new Date(asset.acquisitionDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+                                        return years < 1 
+                                          ? `${Math.round(years * 12)} months` 
+                                          : `${years.toFixed(1)} years`;
+                                      })()}
                                     </span>
                                   )}
-                                </Badge>
+                                </div>
                               ) : asset.status === "matured" ? (
                                 <div className="flex flex-col gap-1">
                                   <Badge className="gap-1 bg-green-600">
