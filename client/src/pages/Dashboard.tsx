@@ -164,9 +164,10 @@ export default function Dashboard() {
               const twoMonthsAgo = history[history.length - 3];
               const currentMoM = current.value - previous.value;
               const previousMoM = previous.value - twoMonthsAgo.value;
-              if (previousMoM === 0) return "New";
-              const changePercent = ((currentMoM - previousMoM) / Math.abs(previousMoM)) * 100;
-              return `${Math.abs(changePercent).toFixed(1)}%`;
+              const growthDiff = currentMoM - previousMoM;
+              const growthPercent = previous.value > 0 ? (currentMoM / previous.value) * 100 : 0;
+              const diffSign = growthDiff >= 0 ? "+" : "";
+              return `${growthPercent.toFixed(1)}% | ${diffSign}${formatCurrency(growthDiff, currency)}`;
             })()}
             icon={TrendingUp}
             className={(() => {
