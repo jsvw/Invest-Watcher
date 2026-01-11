@@ -412,7 +412,9 @@ export default function PlatformDetails() {
                                   {platformMode === "item_valuations" && (
                                     <AssetValuationDialog asset={asset as unknown as Asset} platformId={id} />
                                   )}
-                                  <AssetExitDialog asset={asset as unknown as Asset} platformId={id} />
+                                  {asset.status === "active" && (
+                                    <AssetExitDialog asset={asset as unknown as Asset} platformId={id} />
+                                  )}
                                   <AddAssetDialog 
                                     platformId={id} 
                                     mode={platformMode as "asset_returns" | "item_valuations"}
