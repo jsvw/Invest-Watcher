@@ -149,13 +149,11 @@ export default function Dashboard() {
               return formatCurrency(currentMoM, currency);
             })()} 
             trend={(() => {
-              if (!history || history.length < 3) return undefined;
+              if (!history || history.length < 2) return undefined;
               const current = history[history.length - 1];
               const previous = history[history.length - 2];
-              const twoMonthsAgo = history[history.length - 3];
               const currentMoM = current.value - previous.value;
-              const previousMoM = previous.value - twoMonthsAgo.value;
-              return (currentMoM - previousMoM) >= 0 ? "up" : "down";
+              return currentMoM >= 0 ? "up" : "down";
             })()}
             trendValue={(() => {
               if (!history || history.length < 3) return "";
@@ -171,13 +169,11 @@ export default function Dashboard() {
             })()}
             icon={TrendingUp}
             className={(() => {
-              if (!history || history.length < 3) return "border-l-muted";
+              if (!history || history.length < 2) return "border-l-muted";
               const current = history[history.length - 1];
               const previous = history[history.length - 2];
-              const twoMonthsAgo = history[history.length - 3];
               const currentMoM = current.value - previous.value;
-              const previousMoM = previous.value - twoMonthsAgo.value;
-              return (currentMoM - previousMoM) >= 0 ? "border-l-emerald-500" : "border-l-rose-500";
+              return currentMoM >= 0 ? "border-l-emerald-500" : "border-l-rose-500";
             })()}
             data-testid="stat-mom-profit"
           />
