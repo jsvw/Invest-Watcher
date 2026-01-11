@@ -8,6 +8,7 @@ import { eq, desc, and, ilike } from "drizzle-orm";
 import { z } from "zod";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import OpenAI from "openai";
 import { importInvestmentData } from "./seed_data";
 import multer from "multer";
@@ -34,6 +35,9 @@ export async function registerRoutes(
   // Register AI integration routes
   registerChatRoutes(app);
   registerImageRoutes(app);
+  
+  // Register object storage routes for file uploads
+  registerObjectStorageRoutes(app);
 
   // --- Platforms (protected) ---
   app.get(api.platforms.list.path, requireAuth, async (req, res) => {

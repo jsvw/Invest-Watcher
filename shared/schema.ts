@@ -26,6 +26,7 @@ export const platforms = pgTable("platforms", {
   category: text("category").notNull(), // e.g., 'Crypto', 'Stock', 'Bank', 'Real Estate'
   color: text("color").notNull().default("#3b82f6"), // For chart visualization
   icon: text("icon"), // Icon identifier for the platform (e.g., 'binance', 'coinbase', 'bank', etc.)
+  customIconUrl: text("custom_icon_url"), // URL for custom uploaded icon image
   currency: text("currency").notNull().default("USD"), // e.g., 'USD', 'EUR', 'GBP'
   platformMode: text("platform_mode").notNull().default("standard"), // 'standard', 'asset_returns', 'item_valuations'
   createdAt: timestamp("created_at").defaultNow(),
