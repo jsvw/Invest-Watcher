@@ -265,6 +265,45 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/portfolio/available-filters', async (req, res) => {
+    try {
+      const platformId = req.query.platformId ? Number(req.query.platformId) : null;
+      const allInvestments = await storage.getAllInvestments();
+      const allValuations = await db.select().from(valuations);
+      
+      const filteredInvestments = platformId 
+        ? allInvestments.filter(inv => inv.platformId === platformId)
+        : allInvestments;
+      
+      const filteredValuations = platformId
+        ? allValuations.filter(val => val.platformId === platformId)
+        : allValuations;
+
+      const dates = new Set<string>();
+      filteredInvestments.forEach(inv => dates.add(new Date(inv.date).toISOString().split('T')[0]));
+      filteredValuations.forEach(val => dates.add(new Date(val.date).toISOString().split('T')[0]));
+      
+      const sortedDates = Array.from(dates).sort();
+      const years = new Set<string>();
+      const months = new Set<string>(); // Format: YYYY-MM
+
+      sortedDates.forEach(d => {
+        const dt = new Date(d);
+        const year = dt.getFullYear().toString();
+        const month = (dt.getMonth() + 1).toString().padStart(2, '0');
+        years.add(year);
+        months.add(`${year}-${month}`);
+      });
+
+      res.json({
+        years: Array.from(years).sort().reverse(),
+        months: Array.from(months).sort().reverse()
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch available filters" });
+    }
+  });
+
   await seedDatabase();
   // removed importInvestmentData() call to prevent duplicates on restart
 

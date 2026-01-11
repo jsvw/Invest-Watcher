@@ -36,23 +36,23 @@ export default function Dashboard() {
     }
   });
 
-  // Generate available years and months from platforms data if possible, or just standard ones
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 5 }, (_, i) => (currentYear - i).toString());
-  const months = [
-    { value: "01", label: "January" },
-    { value: "02", label: "February" },
-    { value: "03", label: "March" },
-    { value: "04", label: "April" },
-    { value: "05", label: "May" },
-    { value: "06", label: "June" },
-    { value: "07", label: "July" },
-    { value: "08", label: "August" },
-    { value: "09", label: "September" },
-    { value: "10", label: "October" },
-    { value: "11", label: "November" },
-    { value: "12", label: "December" },
-  ];
+  const { data: availableFilters } = useQuery({
+    queryKey: ['/api/portfolio/available-filters'],
+    queryFn: async () => {
+      const res = await fetch('/api/portfolio/available-filters', { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch filters");
+      return await res.json();
+    }
+  });
+
+  const years = availableFilters?.years || [];
+  const monthsData = availableFilters?.months?.map((m: string) => {
+    const [y, mm] = m.split('-');
+    const monthName = new Date(parseInt(y), parseInt(mm) - 1).toLocaleString('default', { month: 'long' });
+    return { value: mm, label: monthName, year: y };
+  }) || [];
+
+  const currentYear = years[0] || new Date().getFullYear().toString();
 
   if (isPlatformsLoading || isHistoryLoading) {
     return (
@@ -151,7 +151,7 @@ export default function Dashboard() {
                     <SelectValue placeholder="Year" />
                   </SelectTrigger>
                   <SelectContent>
-                    {years.map(y => (
+                    {years.map((y: string) => (
                       <SelectItem key={y} value={y}>{y}</SelectItem>
                     ))}
                   </SelectContent>
@@ -159,12 +159,12 @@ export default function Dashboard() {
               )}
               {range === "month" && (
                 <div className="flex gap-2">
-                  <Select value={specificYear || currentYear.toString()} onValueChange={(val) => setSpecificYear(val)}>
+                  <Select value={specificYear || currentYear} onValueChange={(val) => setSpecificYear(val)}>
                     <SelectTrigger className="w-[100px] h-9">
                       <SelectValue placeholder="Year" />
                     </SelectTrigger>
                     <SelectContent>
-                      {years.map(y => (
+                      {years.map((y: string) => (
                         <SelectItem key={y} value={y}>{y}</SelectItem>
                       ))}
                     </SelectContent>
@@ -174,8 +174,8 @@ export default function Dashboard() {
                       <SelectValue placeholder="Month" />
                     </SelectTrigger>
                     <SelectContent>
-                      {months.map(m => (
-                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                      {monthsData.filter((m: any) => m.year === (specificYear || currentYear)).map((m: any) => (
+                        <SelectItem key={`${m.year}-${m.value}`} value={m.value}>{m.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
