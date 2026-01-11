@@ -218,11 +218,14 @@ export async function registerRoutes(
         const parts = range.split('-');
         const year = parseInt(parts[1]);
         const month = parseInt(parts[2]) - 1;
-        startDate = new Date(year, month, 1);
+        
+        // Start date is now 1 month earlier to include the previous month for MoM comparison
+        const prevMonthStartDate = new Date(year, month - 1, 1);
         const endDate = new Date(year, month + 1, 0, 23, 59, 59);
+        
         sortedDates = sortedDates.filter(d => {
           const dt = new Date(d);
-          return dt >= startDate! && dt <= endDate;
+          return dt >= prevMonthStartDate && dt <= endDate;
         });
         startDate = null; // Prevent further filtering
       }

@@ -138,21 +138,33 @@ export default function Dashboard() {
           <StatCard 
             title="MoM Performance" 
             value={(() => {
-              if (!history || history.length < 2) return "N/A";
+              if (!history || history.length < 1) return "N/A";
               const current = history[history.length - 1];
-              const previous = history[history.length - 2];
-              const currentProfit = current.value - current.invested;
-              const previousProfit = previous.value - previous.invested;
-              const momChange = currentProfit - previousProfit;
-              return `$${Math.abs(momChange).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+              
+              // If we have at least 2 points in the current data, use the second to last one as "previous"
+              if (history.length >= 2) {
+                const previous = history[history.length - 2];
+                const currentProfit = current.value - current.invested;
+                const previousProfit = previous.value - previous.invested;
+                const momChange = currentProfit - previousProfit;
+                return `$${Math.abs(momChange).toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+              }
+              
+              // If we only have 1 point (likely due to filtering a specific month), 
+              // we can't calculate MoM from the current history slice alone.
+              // For now, we'll return "N/A" or "0.00" if no change is detectable.
+              return "N/A";
             })()} 
             trend={(() => {
-              if (!history || history.length < 2) return undefined;
-              const current = history[history.length - 1];
-              const previous = history[history.length - 2];
-              const currentProfit = current.value - current.invested;
-              const previousProfit = previous.value - previous.invested;
-              return (currentProfit - previousProfit) >= 0 ? "up" : "down";
+              if (!history || history.length < 1) return undefined;
+              if (history.length >= 2) {
+                const current = history[history.length - 1];
+                const previous = history[history.length - 2];
+                const currentProfit = current.value - current.invested;
+                const previousProfit = previous.value - previous.invested;
+                return (currentProfit - previousProfit) >= 0 ? "up" : "down";
+              }
+              return undefined;
             })()}
             trendValue={(() => {
               if (!history || history.length < 2) return "";
@@ -168,11 +180,14 @@ export default function Dashboard() {
             })()}
             icon={TrendingUp}
             className={(() => {
-              if (!history || history.length < 2) return "border-l-muted";
-              const current = history[history.length - 1];
-              const previous = history[history.length - 2];
-              const change = (current.value - current.invested) - (previous.value - previous.invested);
-              return change >= 0 ? "border-l-emerald-500" : "border-l-rose-500";
+              if (!history || history.length < 1) return "border-l-muted";
+              if (history.length >= 2) {
+                const current = history[history.length - 1];
+                const previous = history[history.length - 2];
+                const change = (current.value - current.invested) - (previous.value - previous.invested);
+                return change >= 0 ? "border-l-emerald-500" : "border-l-rose-500";
+              }
+              return "border-l-muted";
             })()}
             data-testid="stat-mom-profit"
           />
