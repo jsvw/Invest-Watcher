@@ -30,13 +30,27 @@ Preferred communication style: Simple, everyday language.
 - **Schema Location**: `shared/schema.ts` contains all table definitions
 - **Validation**: Zod schemas with drizzle-zod integration
 
+### Authentication & Security
+- **Multi-user authentication**: Email/password registration and login
+- **Password hashing**: bcrypt with secure salt rounds
+- **Session management**: express-session with PostgreSQL storage via connect-pg-simple
+- **Data isolation**: All data is scoped by userId; users cannot access other users' data
+- **Route protection**: All API routes use requireAuth middleware
+- **Ownership verification**: Storage layer methods verify resource ownership before access
+
+Key files:
+- `server/auth.ts`: Authentication setup, login/register/logout routes
+- `server/storage.ts`: User-scoped data access methods with SQL-level filtering
+- `client/src/App.tsx`: AuthContext provider with session-based auth check
+
 ### Data Model
-The application tracks five main entities:
-1. **Platforms**: Investment sources with configurable tracking modes
-2. **Investments**: Individual deposit/contribution records tied to platforms (standard mode)
-3. **Valuations**: Point-in-time value snapshots for each platform (standard mode)
-4. **Assets**: Individual investment items within a platform (asset_returns/item_valuations modes)
-5. **AssetValuations**: Point-in-time value snapshots for individual assets
+The application tracks six main entities:
+1. **Users**: User accounts with email, hashed password, and optional name
+2. **Platforms**: Investment sources with configurable tracking modes (scoped by userId)
+3. **Investments**: Individual deposit/contribution records tied to platforms (standard mode)
+4. **Valuations**: Point-in-time value snapshots for each platform (standard mode)
+5. **Assets**: Individual investment items within a platform (asset_returns/item_valuations modes)
+6. **AssetValuations**: Point-in-time value snapshots for individual assets
 
 ### Platform Tracking Modes
 Platforms support three tracking modes selected during creation:

@@ -18,51 +18,132 @@ import {
   type PlatformResponse,
   type AssetResponse
 } from "@shared/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and } from "drizzle-orm";
 
 export interface IStorage {
+  // Ownership verification
+  verifyPlatformOwnership(platformId: number, userId: number): Promise<boolean>;
+  verifyAssetOwnership(assetId: number, userId: number): Promise<boolean>;
+  
   // Platforms
-  getPlatforms(): Promise<PlatformResponse[]>;
-  getPlatform(id: number): Promise<PlatformResponse | undefined>;
-  createPlatform(platform: InsertPlatform): Promise<Platform>;
+  getPlatforms(userId: number): Promise<PlatformResponse[]>;
+  getPlatform(id: number, userId: number): Promise<PlatformResponse | undefined>;
+  createPlatform(platform: InsertPlatform, userId: number): Promise<Platform>;
+  updatePlatform(id: number, platform: Partial<InsertPlatform>, userId: number): Promise<Platform>;
+  deletePlatform(id: number, userId: number): Promise<void>;
 
-  // Investments
+  // Investments (require platform ownership verification in routes)
   getInvestments(platformId: number): Promise<Investment[]>;
+  getAllInvestmentsForUser(userId: number): Promise<Investment[]>;
   createInvestment(investment: InsertInvestment): Promise<Investment>;
   updateInvestment(id: number, investment: Partial<InsertInvestment>): Promise<Investment>;
-  getAllInvestments(): Promise<Investment[]>; // For aggregate calculations
+  getInvestmentPlatformId(investmentId: number): Promise<number | null>;
 
-  // Valuations
+  // Valuations (require platform ownership verification in routes)
   getValuations(platformId: number): Promise<Valuation[]>;
+  getAllValuationsForUser(userId: number): Promise<Valuation[]>;
   createValuation(valuation: InsertValuation): Promise<Valuation>;
   updateValuation(id: number, valuation: Partial<InsertValuation>): Promise<Valuation>;
-  getLatestValuations(): Promise<Map<number, number>>; // Map platformId -> value
+  getValuationPlatformId(valuationId: number): Promise<number | null>;
 
-  // Assets
+  // Assets (require platform ownership verification in routes)
   getAssets(platformId: number): Promise<AssetResponse[]>;
   getAsset(id: number): Promise<AssetResponse | undefined>;
   createAsset(asset: InsertAsset): Promise<Asset>;
   updateAsset(id: number, asset: Partial<InsertAsset>): Promise<Asset>;
   deleteAsset(id: number): Promise<void>;
   exitAsset(id: number, exitDate: Date, exitPrice: string): Promise<Asset>;
+  getAssetPlatformId(assetId: number): Promise<number | null>;
 
-  // Asset Valuations
+  // Asset Valuations (require asset ownership verification in routes)
   getAssetValuations(assetId: number): Promise<AssetValuation[]>;
   createAssetValuation(valuation: InsertAssetValuation): Promise<AssetValuation>;
   updateAssetValuation(id: number, valuation: Partial<InsertAssetValuation>): Promise<AssetValuation>;
+  getAssetValuationAssetId(valuationId: number): Promise<number | null>;
 
   // Asset Performance History
   getAssetPerformanceHistory(platformId: number): Promise<{ date: string; assets: { id: number; name: string; key: string; value: number }[] }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
-  async getPlatforms(): Promise<PlatformResponse[]> {
-    const allPlatforms = await db.select().from(platforms);
-    const allValuations = await db.select().from(valuations).orderBy(desc(valuations.date));
-    const allInvestments = await db.select().from(investments);
+  // Ownership verification methods
+  async verifyPlatformOwnership(platformId: number, userId: number): Promise<boolean> {
+    const [platform] = await db.select({ id: platforms.id })
+      .from(platforms)
+      .where(and(eq(platforms.id, platformId), eq(platforms.userId, userId)));
+    return !!platform;
+  }
+
+  async verifyAssetOwnership(assetId: number, userId: number): Promise<boolean> {
+    const result = await db.select({ platformId: assets.platformId })
+      .from(assets)
+      .where(eq(assets.id, assetId))
+      .limit(1);
+    if (!result.length) return false;
+    return this.verifyPlatformOwnership(result[0].platformId, userId);
+  }
+
+  async getInvestmentPlatformId(investmentId: number): Promise<number | null> {
+    const [investment] = await db.select({ platformId: investments.platformId })
+      .from(investments)
+      .where(eq(investments.id, investmentId));
+    return investment?.platformId ?? null;
+  }
+
+  async getValuationPlatformId(valuationId: number): Promise<number | null> {
+    const [valuation] = await db.select({ platformId: valuations.platformId })
+      .from(valuations)
+      .where(eq(valuations.id, valuationId));
+    return valuation?.platformId ?? null;
+  }
+
+  async getAssetPlatformId(assetId: number): Promise<number | null> {
+    const [asset] = await db.select({ platformId: assets.platformId })
+      .from(assets)
+      .where(eq(assets.id, assetId));
+    return asset?.platformId ?? null;
+  }
+
+  async getAssetValuationAssetId(valuationId: number): Promise<number | null> {
+    const [valuation] = await db.select({ assetId: assetValuations.assetId })
+      .from(assetValuations)
+      .where(eq(assetValuations.id, valuationId));
+    return valuation?.assetId ?? null;
+  }
+
+  async getPlatforms(userId: number): Promise<PlatformResponse[]> {
+    const allPlatforms = await db.select().from(platforms).where(eq(platforms.userId, userId));
+    const platformIds = allPlatforms.map(p => p.id);
+    
+    if (platformIds.length === 0) return [];
+    
+    // Use SQL-level filtering with JOIN to only get user's valuations
+    const userValuations = await db.select({
+      id: valuations.id,
+      platformId: valuations.platformId,
+      value: valuations.value,
+      date: valuations.date,
+      notes: valuations.notes,
+    })
+      .from(valuations)
+      .innerJoin(platforms, eq(valuations.platformId, platforms.id))
+      .where(eq(platforms.userId, userId))
+      .orderBy(desc(valuations.date));
+    
+    // Use SQL-level filtering with JOIN to only get user's investments
+    const userInvestments = await db.select({
+      id: investments.id,
+      platformId: investments.platformId,
+      amount: investments.amount,
+      date: investments.date,
+      notes: investments.notes,
+    })
+      .from(investments)
+      .innerJoin(platforms, eq(investments.platformId, platforms.id))
+      .where(eq(platforms.userId, userId));
 
     const latestValuationMap = new Map<number, any>();
-    for (const val of allValuations) {
+    for (const val of userValuations) {
       if (!latestValuationMap.has(val.platformId)) {
         latestValuationMap.set(val.platformId, val);
       }
@@ -70,7 +151,7 @@ export class DatabaseStorage implements IStorage {
 
     return allPlatforms.map(platform => {
       const latestVal = latestValuationMap.get(platform.id);
-      const totalInvested = allInvestments
+      const totalInvested = userInvestments
         .filter(inv => inv.platformId === platform.id)
         .reduce((sum, inv) => sum + Number(inv.amount), 0);
       
@@ -84,8 +165,8 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async getPlatform(id: number): Promise<PlatformResponse | undefined> {
-    const [platform] = await db.select().from(platforms).where(eq(platforms.id, id));
+  async getPlatform(id: number, userId: number): Promise<PlatformResponse | undefined> {
+    const [platform] = await db.select().from(platforms).where(and(eq(platforms.id, id), eq(platforms.userId, userId)));
     if (!platform) return undefined;
 
     const [latestValuation] = await db
@@ -107,21 +188,25 @@ export class DatabaseStorage implements IStorage {
     return response;
   }
 
-  async createPlatform(platform: InsertPlatform): Promise<Platform> {
-    const [newPlatform] = await db.insert(platforms).values(platform).returning();
+  async createPlatform(platform: InsertPlatform, userId: number): Promise<Platform> {
+    const [newPlatform] = await db.insert(platforms).values({ ...platform, userId }).returning();
     return newPlatform;
   }
 
-  async updatePlatform(id: number, platform: Partial<InsertPlatform>): Promise<Platform> {
+  async updatePlatform(id: number, platform: Partial<InsertPlatform>, userId: number): Promise<Platform> {
     const [updated] = await db.update(platforms)
       .set(platform)
-      .where(eq(platforms.id, id))
+      .where(and(eq(platforms.id, id), eq(platforms.userId, userId)))
       .returning();
     if (!updated) throw new Error("Platform not found");
     return updated;
   }
 
-  async deletePlatform(id: number): Promise<void> {
+  async deletePlatform(id: number, userId: number): Promise<void> {
+    // First verify ownership
+    const isOwner = await this.verifyPlatformOwnership(id, userId);
+    if (!isOwner) throw new Error("Platform not found");
+    
     // Delete all related data first
     const platformAssets = await db.select().from(assets).where(eq(assets.platformId, id));
     for (const asset of platformAssets) {
@@ -153,8 +238,36 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getAllInvestments(): Promise<Investment[]> {
-    return await db.select().from(investments);
+  async getAllInvestmentsForUser(userId: number): Promise<Investment[]> {
+    const result = await db.select({
+      id: investments.id,
+      platformId: investments.platformId,
+      amount: investments.amount,
+      date: investments.date,
+      notes: investments.notes,
+    })
+      .from(investments)
+      .innerJoin(platforms, eq(investments.platformId, platforms.id))
+      .where(eq(platforms.userId, userId))
+      .orderBy(desc(investments.date));
+    
+    return result;
+  }
+
+  async getAllValuationsForUser(userId: number): Promise<Valuation[]> {
+    const result = await db.select({
+      id: valuations.id,
+      platformId: valuations.platformId,
+      value: valuations.value,
+      date: valuations.date,
+      notes: valuations.notes,
+    })
+      .from(valuations)
+      .innerJoin(platforms, eq(valuations.platformId, platforms.id))
+      .where(eq(platforms.userId, userId))
+      .orderBy(desc(valuations.date));
+    
+    return result;
   }
 
   async getValuations(platformId: number): Promise<Valuation[]> {
@@ -195,13 +308,26 @@ export class DatabaseStorage implements IStorage {
       .where(eq(assets.platformId, platformId))
       .orderBy(desc(assets.acquisitionDate));
     
-    const allAssetValuations = await db.select().from(assetValuations)
+    // Only get asset valuations for assets belonging to this platform (SQL-level filtering)
+    const assetIds = allAssets.map(a => a.id);
+    if (assetIds.length === 0) return [];
+    
+    const platformAssetValuations = await db.select({
+      id: assetValuations.id,
+      assetId: assetValuations.assetId,
+      value: assetValuations.value,
+      date: assetValuations.date,
+      notes: assetValuations.notes,
+    })
+      .from(assetValuations)
+      .innerJoin(assets, eq(assetValuations.assetId, assets.id))
+      .where(eq(assets.platformId, platformId))
       .orderBy(desc(assetValuations.date));
     
     const latestValuationMap = new Map<number, number>();
-    for (const val of allAssetValuations) {
-      if (!latestValuationMap.has(val.assetId)) {
-        latestValuationMap.set(val.assetId, Number(val.value));
+    for (const row of platformAssetValuations) {
+      if (!latestValuationMap.has(row.assetId)) {
+        latestValuationMap.set(row.assetId, Number(row.value));
       }
     }
 

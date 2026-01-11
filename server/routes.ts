@@ -42,10 +42,11 @@ export async function registerRoutes(
     res.json(platforms);
   });
 
-  app.post(api.platforms.create.path, async (req, res) => {
+  app.post(api.platforms.create.path, requireAuth, async (req, res) => {
     try {
+      const userId = getAuthenticatedUserId(req)!;
       const input = api.platforms.create.input.parse(req.body);
-      const platform = await storage.createPlatform(input);
+      const platform = await storage.createPlatform(input, userId);
       res.status(201).json(platform);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -58,26 +59,29 @@ export async function registerRoutes(
     }
   });
 
-  app.get(api.platforms.get.path, async (req, res) => {
-    const platform = await storage.getPlatform(Number(req.params.id));
+  app.get(api.platforms.get.path, requireAuth, async (req, res) => {
+    const userId = getAuthenticatedUserId(req)!;
+    const platform = await storage.getPlatform(Number(req.params.id), userId);
     if (!platform) {
       return res.status(404).json({ message: 'Platform not found' });
     }
     res.json(platform);
   });
 
-  app.patch('/api/platforms/:id', async (req, res) => {
+  app.patch('/api/platforms/:id', requireAuth, async (req, res) => {
     try {
-      const platform = await storage.updatePlatform(Number(req.params.id), req.body);
+      const userId = getAuthenticatedUserId(req)!;
+      const platform = await storage.updatePlatform(Number(req.params.id), req.body, userId);
       res.json(platform);
     } catch (err) {
       res.status(404).json({ message: "Platform not found" });
     }
   });
 
-  app.delete('/api/platforms/:id', async (req, res) => {
+  app.delete('/api/platforms/:id', requireAuth, async (req, res) => {
     try {
-      await storage.deletePlatform(Number(req.params.id));
+      const userId = getAuthenticatedUserId(req)!;
+      await storage.deletePlatform(Number(req.params.id), userId);
       res.status(204).send();
     } catch (err) {
       res.status(404).json({ message: "Platform not found" });
@@ -85,15 +89,23 @@ export async function registerRoutes(
   });
 
   // --- Investments ---
-  app.get(api.investments.list.path, async (req, res) => {
-    const investments = await storage.getInvestments(Number(req.params.platformId));
+  app.get(api.investments.list.path, requireAuth, async (req, res) => {
+    const userId = getAuthenticatedUserId(req)!;
+    const platformId = Number(req.params.platformId);
+    const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+    if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+    
+    const investments = await storage.getInvestments(platformId);
     res.json(investments);
   });
 
-  app.post(api.investments.create.path, async (req, res) => {
+  app.post(api.investments.create.path, requireAuth, async (req, res) => {
     try {
-      // Coerce numeric strings to numbers if needed, though schema uses numeric string for pg
+      const userId = getAuthenticatedUserId(req)!;
       const input = api.investments.create.input.parse(req.body);
+      const isOwner = await storage.verifyPlatformOwnership(input.platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+      
       const investment = await storage.createInvestment(input);
       res.status(201).json(investment);
     } catch (err) {
@@ -107,8 +119,14 @@ export async function registerRoutes(
     }
   });
 
-  app.patch('/api/investments/:id', async (req, res) => {
+  app.patch('/api/investments/:id', requireAuth, async (req, res) => {
     try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = await storage.getInvestmentPlatformId(Number(req.params.id));
+      if (!platformId) return res.status(404).json({ message: "Investment not found" });
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Investment not found" });
+      
       const input = api.investments.update.input.parse(req.body);
       const investment = await storage.updateInvestment(Number(req.params.id), input);
       res.json(investment);
@@ -124,14 +142,23 @@ export async function registerRoutes(
   });
 
   // --- Valuations ---
-  app.get(api.valuations.list.path, async (req, res) => {
-    const valuations = await storage.getValuations(Number(req.params.platformId));
+  app.get(api.valuations.list.path, requireAuth, async (req, res) => {
+    const userId = getAuthenticatedUserId(req)!;
+    const platformId = Number(req.params.platformId);
+    const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+    if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+    
+    const valuations = await storage.getValuations(platformId);
     res.json(valuations);
   });
 
-  app.post(api.valuations.create.path, async (req, res) => {
+  app.post(api.valuations.create.path, requireAuth, async (req, res) => {
     try {
+      const userId = getAuthenticatedUserId(req)!;
       const input = api.valuations.create.input.parse(req.body);
+      const isOwner = await storage.verifyPlatformOwnership(input.platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+      
       const valuation = await storage.createValuation(input);
       res.status(201).json(valuation);
     } catch (err) {
@@ -145,8 +172,14 @@ export async function registerRoutes(
     }
   });
 
-  app.patch('/api/valuations/:id', async (req, res) => {
+  app.patch('/api/valuations/:id', requireAuth, async (req, res) => {
     try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = await storage.getValuationPlatformId(Number(req.params.id));
+      if (!platformId) return res.status(404).json({ message: "Valuation not found" });
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Valuation not found" });
+      
       const input = api.valuations.update.input.parse(req.body);
       const valuation = await storage.updateValuation(Number(req.params.id), input);
       res.json(valuation);
@@ -162,36 +195,47 @@ export async function registerRoutes(
   });
 
   // --- Assets (for asset_returns and item_valuations platform modes) ---
-  app.get('/api/platforms/:platformId/assets', async (req, res) => {
+  app.get('/api/platforms/:platformId/assets', requireAuth, async (req, res) => {
     try {
-      const assets = await storage.getAssets(Number(req.params.platformId));
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.platformId);
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+      
+      const assets = await storage.getAssets(platformId);
       res.json(assets);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch assets" });
     }
   });
 
-  app.get('/api/assets/:id', async (req, res) => {
+  app.get('/api/assets/:id', requireAuth, async (req, res) => {
     try {
-      const asset = await storage.getAsset(Number(req.params.id));
-      if (!asset) {
-        return res.status(404).json({ message: "Asset not found" });
-      }
+      const userId = getAuthenticatedUserId(req)!;
+      const assetId = Number(req.params.id);
+      const isOwner = await storage.verifyAssetOwnership(assetId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Asset not found" });
+      
+      const asset = await storage.getAsset(assetId);
+      if (!asset) return res.status(404).json({ message: "Asset not found" });
       res.json(asset);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch asset" });
     }
   });
 
-  app.post('/api/assets', async (req, res) => {
+  app.post('/api/assets', requireAuth, async (req, res) => {
     try {
-      // Convert date strings to Date objects
+      const userId = getAuthenticatedUserId(req)!;
       const body = {
         ...req.body,
         acquisitionDate: req.body.acquisitionDate ? new Date(req.body.acquisitionDate) : undefined,
         exitDate: req.body.exitDate ? new Date(req.body.exitDate) : null,
       };
       const input = insertAssetSchema.parse(body);
+      const isOwner = await storage.verifyPlatformOwnership(input.platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+      
       const asset = await storage.createAsset(input);
       res.status(201).json(asset);
     } catch (err) {
@@ -205,15 +249,19 @@ export async function registerRoutes(
     }
   });
 
-  app.patch('/api/assets/:id', async (req, res) => {
+  app.patch('/api/assets/:id', requireAuth, async (req, res) => {
     try {
-      // Convert date strings to Date objects
+      const userId = getAuthenticatedUserId(req)!;
+      const assetId = Number(req.params.id);
+      const isOwner = await storage.verifyAssetOwnership(assetId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Asset not found" });
+      
       const body = { ...req.body };
       if (body.acquisitionDate) body.acquisitionDate = new Date(body.acquisitionDate);
       if (body.exitDate) body.exitDate = new Date(body.exitDate);
       
       const input = insertAssetSchema.partial().parse(body);
-      const asset = await storage.updateAsset(Number(req.params.id), input);
+      const asset = await storage.updateAsset(assetId, input);
       res.json(asset);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -226,26 +274,32 @@ export async function registerRoutes(
     }
   });
 
-  app.delete('/api/assets/:id', async (req, res) => {
+  app.delete('/api/assets/:id', requireAuth, async (req, res) => {
     try {
-      await storage.deleteAsset(Number(req.params.id));
+      const userId = getAuthenticatedUserId(req)!;
+      const assetId = Number(req.params.id);
+      const isOwner = await storage.verifyAssetOwnership(assetId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Asset not found" });
+      
+      await storage.deleteAsset(assetId);
       res.json({ success: true });
     } catch (error) {
       res.status(404).json({ message: "Asset not found" });
     }
   });
 
-  app.post('/api/assets/:id/exit', async (req, res) => {
+  app.post('/api/assets/:id/exit', requireAuth, async (req, res) => {
     try {
+      const userId = getAuthenticatedUserId(req)!;
+      const assetId = Number(req.params.id);
+      const isOwner = await storage.verifyAssetOwnership(assetId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Asset not found" });
+      
       const { exitDate, exitPrice } = req.body;
       if (!exitDate || !exitPrice) {
         return res.status(400).json({ message: "exitDate and exitPrice are required" });
       }
-      const asset = await storage.exitAsset(
-        Number(req.params.id),
-        new Date(exitDate),
-        exitPrice
-      );
+      const asset = await storage.exitAsset(assetId, new Date(exitDate), exitPrice);
       res.json(asset);
     } catch (error) {
       res.status(404).json({ message: "Asset not found" });
@@ -253,18 +307,27 @@ export async function registerRoutes(
   });
 
   // --- Asset Valuations ---
-  app.get('/api/assets/:assetId/valuations', async (req, res) => {
+  app.get('/api/assets/:assetId/valuations', requireAuth, async (req, res) => {
     try {
-      const valuations = await storage.getAssetValuations(Number(req.params.assetId));
+      const userId = getAuthenticatedUserId(req)!;
+      const assetId = Number(req.params.assetId);
+      const isOwner = await storage.verifyAssetOwnership(assetId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Asset not found" });
+      
+      const valuations = await storage.getAssetValuations(assetId);
       res.json(valuations);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch asset valuations" });
     }
   });
 
-  app.post('/api/asset-valuations', async (req, res) => {
+  app.post('/api/asset-valuations', requireAuth, async (req, res) => {
     try {
+      const userId = getAuthenticatedUserId(req)!;
       const input = insertAssetValuationSchema.parse(req.body);
+      const isOwner = await storage.verifyAssetOwnership(input.assetId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Asset not found" });
+      
       const valuation = await storage.createAssetValuation(input);
       res.status(201).json(valuation);
     } catch (err) {
@@ -278,8 +341,14 @@ export async function registerRoutes(
     }
   });
 
-  app.patch('/api/asset-valuations/:id', async (req, res) => {
+  app.patch('/api/asset-valuations/:id', requireAuth, async (req, res) => {
     try {
+      const userId = getAuthenticatedUserId(req)!;
+      const assetId = await storage.getAssetValuationAssetId(Number(req.params.id));
+      if (!assetId) return res.status(404).json({ message: "Asset valuation not found" });
+      const isOwner = await storage.verifyAssetOwnership(assetId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Asset valuation not found" });
+      
       const input = insertAssetValuationSchema.partial().parse(req.body);
       const valuation = await storage.updateAssetValuation(Number(req.params.id), input);
       res.json(valuation);
@@ -295,11 +364,14 @@ export async function registerRoutes(
   });
 
   // --- CSV Import for Asset Valuations ---
-  app.post('/api/platforms/:platformId/asset-valuations/import', upload.single('file'), async (req, res) => {
+  app.post('/api/platforms/:platformId/asset-valuations/import', requireAuth, upload.single('file'), async (req, res) => {
     const file = req.file;
     
     try {
+      const userId = getAuthenticatedUserId(req)!;
       const platformId = Number(req.params.platformId);
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
       
       if (!file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -500,9 +572,14 @@ export async function registerRoutes(
   });
 
   // --- Asset Performance History ---
-  app.get('/api/platforms/:platformId/asset-performance', async (req, res) => {
+  app.get('/api/platforms/:platformId/asset-performance', requireAuth, async (req, res) => {
     try {
-      const history = await storage.getAssetPerformanceHistory(Number(req.params.platformId));
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.platformId);
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+      
+      const history = await storage.getAssetPerformanceHistory(platformId);
       res.json(history);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch asset performance history" });
@@ -510,12 +587,13 @@ export async function registerRoutes(
   });
 
   // --- Insights ---
-  app.post(api.insights.generate.path, async (req, res) => {
+  app.post(api.insights.generate.path, requireAuth, async (req, res) => {
     try {
+      const userId = getAuthenticatedUserId(req)!;
       const { prompt } = req.body;
       
       // Fetch all data to provide context to AI
-      const platforms = await storage.getPlatforms();
+      const platforms = await storage.getPlatforms(userId);
       // Prepare context string
       const context = JSON.stringify({
         platforms: platforms.map(p => ({
@@ -552,21 +630,29 @@ export async function registerRoutes(
     }
   });
 
-  app.get(api.portfolio.history.path, async (req, res) => {
+  app.get(api.portfolio.history.path, requireAuth, async (req, res) => {
     try {
+      const userId = getAuthenticatedUserId(req)!;
       const range = req.query.range as string || 'year';
       const platformId = req.query.platformId ? Number(req.query.platformId) : null;
       
-      const allInvestments = await storage.getAllInvestments();
-      const allValuations = await db.select().from(valuations).orderBy(desc(valuations.date));
+      // Verify platform ownership if specified
+      if (platformId) {
+        const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+        if (!isOwner) return res.json([]);
+      }
+      
+      // Use user-scoped storage methods
+      const userInvestments = await storage.getAllInvestmentsForUser(userId);
+      const userValuations = await storage.getAllValuationsForUser(userId);
       
       const filteredInvestments = platformId 
-        ? allInvestments.filter(inv => inv.platformId === platformId)
-        : allInvestments;
+        ? userInvestments.filter(inv => inv.platformId === platformId)
+        : userInvestments;
       
       const filteredValuations = platformId
-        ? allValuations.filter(val => val.platformId === platformId)
-        : allValuations;
+        ? userValuations.filter(val => val.platformId === platformId)
+        : userValuations;
       
       const dates = new Set<string>();
       filteredInvestments.forEach(inv => dates.add(new Date(inv.date).toISOString().split('T')[0]));
@@ -645,19 +731,28 @@ export async function registerRoutes(
     }
   });
 
-  app.get('/api/portfolio/available-filters', async (req, res) => {
+  app.get('/api/portfolio/available-filters', requireAuth, async (req, res) => {
     try {
+      const userId = getAuthenticatedUserId(req)!;
       const platformId = req.query.platformId ? Number(req.query.platformId) : null;
-      const allInvestments = await storage.getAllInvestments();
-      const allValuations = await db.select().from(valuations);
+      
+      // Verify platform ownership if specified
+      if (platformId) {
+        const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+        if (!isOwner) return res.json({ years: [], months: [] });
+      }
+      
+      // Use user-scoped storage methods
+      const userInvestments = await storage.getAllInvestmentsForUser(userId);
+      const userValuations = await storage.getAllValuationsForUser(userId);
       
       const filteredInvestments = platformId 
-        ? allInvestments.filter(inv => inv.platformId === platformId)
-        : allInvestments;
+        ? userInvestments.filter(inv => inv.platformId === platformId)
+        : userInvestments;
       
       const filteredValuations = platformId
-        ? allValuations.filter(val => val.platformId === platformId)
-        : allValuations;
+        ? userValuations.filter(val => val.platformId === platformId)
+        : userValuations;
 
       const dates = new Set<string>();
       filteredInvestments.forEach(inv => dates.add(new Date(inv.date).toISOString().split('T')[0]));

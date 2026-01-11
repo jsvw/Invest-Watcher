@@ -1,11 +1,25 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Wallet, PieChart, TrendingUp, Menu, X } from "lucide-react";
+import { LayoutDashboard, Wallet, PieChart, TrendingUp, Menu, X, LogOut } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/App";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await apiRequest("POST", "/api/auth/logout");
+      queryClient.clear();
+      setLocation("/login");
+    } catch (e) {
+      console.error("Logout failed:", e);
+    }
+  };
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -57,7 +71,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
 
-        <div className="absolute bottom-0 w-full p-6">
+        <div className="absolute bottom-0 w-full p-6 space-y-4">
+          {user && (
+            <div className="flex items-center justify-between">
+              <div className="text-sm truncate">
+                <div className="font-medium">{user.name || "User"}</div>
+                <div className="text-xs text-muted-foreground truncate">{user.email}</div>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleLogout}
+                title="Log out"
+                data-testid="button-logout"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
           <div className="bg-muted/50 rounded-xl p-4 border border-border/50">
             <h4 className="font-semibold text-sm mb-1">Pro Tip</h4>
             <p className="text-xs text-muted-foreground">Update your valuations monthly for accurate insights.</p>
