@@ -17,15 +17,22 @@ interface User {
   id: number;
   email: string;
   name: string | null;
+  currency: string;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   refetch: () => void;
+  refetchUser: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType>({ user: null, isLoading: true, refetch: () => {} });
+const AuthContext = createContext<AuthContextType>({ 
+  user: null, 
+  isLoading: true, 
+  refetch: () => {},
+  refetchUser: async () => {},
+});
 
 export function useAuth() {
   return useContext(AuthContext);
@@ -47,8 +54,12 @@ function AuthProvider({ children }: { children: React.ReactNode }) {
     staleTime: 5 * 60 * 1000,
   });
 
+  const refetchUser = async () => {
+    await refetch();
+  };
+
   return (
-    <AuthContext.Provider value={{ user: user ?? null, isLoading, refetch }}>
+    <AuthContext.Provider value={{ user: user ?? null, isLoading, refetch, refetchUser }}>
       {children}
     </AuthContext.Provider>
   );

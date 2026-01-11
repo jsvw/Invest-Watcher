@@ -81,6 +81,7 @@ export function setupAuth(app: Express) {
         id: newUser.id,
         email: newUser.email,
         name: newUser.name,
+        currency: newUser.currency,
       });
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -119,6 +120,7 @@ export function setupAuth(app: Express) {
         id: user.id,
         email: user.email,
         name: user.name,
+        currency: user.currency,
       });
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -162,7 +164,44 @@ export function setupAuth(app: Express) {
       id: user.id,
       email: user.email,
       name: user.name,
+      currency: user.currency,
     });
+  });
+
+  const updateCurrencySchema = z.object({
+    currency: z.string().min(1, "Currency is required"),
+  });
+
+  app.post("/api/auth/update-currency", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    try {
+      const { currency } = updateCurrencySchema.parse(req.body);
+
+      const [updatedUser] = await db
+        .update(users)
+        .set({ currency })
+        .where(eq(users.id, req.session.userId))
+        .returning();
+
+      res.json({
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        currency: updatedUser.currency,
+      });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join("."),
+        });
+      }
+      console.error("Update currency error:", err);
+      res.status(500).json({ message: "Failed to update currency" });
+    }
   });
 
   const changePasswordSchema = z.object({

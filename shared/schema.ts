@@ -13,6 +13,7 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(), // bcrypt hashed, never store plain passwords
   name: text("name"),
+  currency: text("currency").notNull().default("EUR"), // Default display currency for the account
   createdAt: timestamp("created_at").defaultNow(),
 });
 
