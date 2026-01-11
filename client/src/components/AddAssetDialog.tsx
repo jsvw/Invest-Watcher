@@ -20,7 +20,7 @@ export function AddAssetDialog({ platformId, mode, editAsset }: AddAssetDialogPr
   const updateMutation = useUpdateAsset(platformId);
   const isEdit = !!editAsset;
 
-  const form = useForm<Partial<InsertAsset>>({
+  const form = useForm<Partial<InsertAsset> & { exitDate?: string }>({
     defaultValues: {
       platformId,
       name: editAsset?.name || "",
@@ -30,10 +30,13 @@ export function AddAssetDialog({ platformId, mode, editAsset }: AddAssetDialogPr
       acquisitionDate: editAsset?.acquisitionDate 
         ? new Date(editAsset.acquisitionDate).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0],
+      exitDate: editAsset?.exitDate 
+        ? new Date(editAsset.exitDate).toISOString().split('T')[0]
+        : "",
     },
   });
 
-  const onSubmit = (data: Partial<InsertAsset>) => {
+  const onSubmit = (data: Partial<InsertAsset> & { exitDate?: string }) => {
     const payload = {
       name: data.name || "",
       platformId,
@@ -41,6 +44,7 @@ export function AddAssetDialog({ platformId, mode, editAsset }: AddAssetDialogPr
       annualYield: data.annualYield || null,
       description: data.description || null,
       acquisitionDate: new Date(data.acquisitionDate as string),
+      exitDate: data.exitDate ? new Date(data.exitDate) : null,
     } as InsertAsset;
 
     if (isEdit && editAsset) {
@@ -140,6 +144,18 @@ export function AddAssetDialog({ platformId, mode, editAsset }: AddAssetDialogPr
               data-testid="input-asset-date"
             />
           </div>
+
+          {mode === "asset_returns" && (
+            <div className="space-y-2">
+              <Label htmlFor="exitDate">Exit/Maturity Date (Optional)</Label>
+              <Input 
+                id="exitDate" 
+                type="date" 
+                {...form.register("exitDate")} 
+                data-testid="input-asset-exit-date"
+              />
+            </div>
+          )}
 
           <div className="pt-4 flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
