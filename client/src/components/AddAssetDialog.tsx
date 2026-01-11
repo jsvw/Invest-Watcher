@@ -226,19 +226,17 @@ export function AddAssetDialog({ platformId, mode, editAsset, open: controlledOp
             </div>
           )}
 
-          {mode === "asset_returns" && (
-            <div className="space-y-2">
-              <Label htmlFor="bonusAmount">Bonus (Optional)</Label>
-              <Input 
-                id="bonusAmount" 
-                type="number" 
-                step="0.01"
-                {...form.register("bonusAmount")} 
-                placeholder="Free money on top of investment" 
-                data-testid="input-asset-bonus"
-              />
-            </div>
-          )}
+          <div className="space-y-2">
+            <Label htmlFor="bonusAmount">Bonus (Optional)</Label>
+            <Input 
+              id="bonusAmount" 
+              type="number" 
+              step="0.01"
+              {...form.register("bonusAmount")} 
+              placeholder="Free money on top of investment" 
+              data-testid="input-asset-bonus"
+            />
+          </div>
 
           {mode === "asset_returns" && (
             <div className="space-y-2">
