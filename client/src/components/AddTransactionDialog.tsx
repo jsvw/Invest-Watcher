@@ -84,7 +84,12 @@ export function AddTransactionDialog({ platformId, type, initialData, mode = "ad
   }, [open, initialData, form]);
 
   const onSubmit = (data: any) => {
-    const payload = { ...data, platformId };
+    const payload = { 
+      ...data, 
+      platformId,
+      amount: data.amount !== undefined ? String(data.amount) : undefined,
+      value: data.value !== undefined ? String(data.value) : undefined,
+    };
     const onSuccess = () => {
       setOpen(false);
       if (!isEdit) {
