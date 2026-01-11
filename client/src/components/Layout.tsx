@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Wallet, PieChart, TrendingUp, Menu, X, LogOut } from "lucide-react";
+import { LayoutDashboard, Wallet, PieChart, TrendingUp, Menu, X, LogOut, Settings } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/platforms", label: "Platforms", icon: Wallet },
     { href: "/analytics", label: "Analytics", icon: PieChart },
+    { href: "/settings", label: "Settings", icon: Settings },
   ];
 
   return (

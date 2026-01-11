@@ -9,6 +9,7 @@ import Platforms from "@/pages/Platforms";
 import PlatformDetails from "@/pages/PlatformDetails";
 import Analytics from "@/pages/Analytics";
 import AuthPage from "@/pages/AuthPage";
+import Settings from "@/pages/Settings";
 import { useEffect, createContext, useContext } from "react";
 import { Loader2 } from "lucide-react";
 
@@ -90,6 +91,9 @@ function Router() {
       </Route>
       <Route path="/analytics">
         {(params) => <ProtectedRoute component={Analytics} {...params} />}
+      </Route>
+      <Route path="/settings">
+        {(params) => <ProtectedRoute component={Settings} {...params} />}
       </Route>
       <Route component={NotFound} />
     </Switch>
