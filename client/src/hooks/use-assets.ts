@@ -44,7 +44,7 @@ export function useCreateAsset(platformId: number) {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async (data: InsertAsset) => {
+    mutationFn: async (data: Record<string, unknown>) => {
       const res = await apiRequest("POST", "/api/assets", data);
       return res.json();
     },
@@ -64,7 +64,7 @@ export function useUpdateAsset(platformId: number) {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<InsertAsset> }) => {
+    mutationFn: async ({ id, data }: { id: number; data: Record<string, unknown> }) => {
       const res = await apiRequest("PATCH", `/api/assets/${id}`, data);
       return res.json();
     },

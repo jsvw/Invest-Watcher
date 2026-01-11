@@ -6,7 +6,17 @@ import { useForm } from "react-hook-form";
 import { useCreateAsset, useUpdateAsset } from "@/hooks/use-assets";
 import { useState } from "react";
 import { Plus, Pencil } from "lucide-react";
-import type { InsertAsset, Asset } from "@shared/schema";
+import type { Asset } from "@shared/schema";
+
+interface AssetFormData {
+  platformId: number;
+  name: string;
+  description: string;
+  investedAmount: string;
+  annualYield: string;
+  acquisitionDate: string;
+  exitDate: string;
+}
 
 interface AddAssetDialogProps {
   platformId: number;
@@ -20,7 +30,7 @@ export function AddAssetDialog({ platformId, mode, editAsset }: AddAssetDialogPr
   const updateMutation = useUpdateAsset(platformId);
   const isEdit = !!editAsset;
 
-  const form = useForm<Partial<InsertAsset> & { exitDate?: string }>({
+  const form = useForm<AssetFormData>({
     defaultValues: {
       platformId,
       name: editAsset?.name || "",
@@ -36,16 +46,16 @@ export function AddAssetDialog({ platformId, mode, editAsset }: AddAssetDialogPr
     },
   });
 
-  const onSubmit = (data: Partial<InsertAsset> & { exitDate?: string }) => {
+  const onSubmit = (data: AssetFormData) => {
     const payload = {
       name: data.name || "",
       platformId,
       investedAmount: data.investedAmount || "0",
       annualYield: data.annualYield || null,
       description: data.description || null,
-      acquisitionDate: new Date(data.acquisitionDate as string),
-      exitDate: data.exitDate ? new Date(data.exitDate) : null,
-    } as InsertAsset;
+      acquisitionDate: data.acquisitionDate,
+      exitDate: data.exitDate || null,
+    };
 
     if (isEdit && editAsset) {
       updateMutation.mutate(

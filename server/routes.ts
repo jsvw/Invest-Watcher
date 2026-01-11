@@ -156,7 +156,13 @@ export async function registerRoutes(
 
   app.post('/api/assets', async (req, res) => {
     try {
-      const input = insertAssetSchema.parse(req.body);
+      // Convert date strings to Date objects
+      const body = {
+        ...req.body,
+        acquisitionDate: req.body.acquisitionDate ? new Date(req.body.acquisitionDate) : undefined,
+        exitDate: req.body.exitDate ? new Date(req.body.exitDate) : null,
+      };
+      const input = insertAssetSchema.parse(body);
       const asset = await storage.createAsset(input);
       res.status(201).json(asset);
     } catch (err) {
@@ -172,7 +178,12 @@ export async function registerRoutes(
 
   app.patch('/api/assets/:id', async (req, res) => {
     try {
-      const input = insertAssetSchema.partial().parse(req.body);
+      // Convert date strings to Date objects
+      const body = { ...req.body };
+      if (body.acquisitionDate) body.acquisitionDate = new Date(body.acquisitionDate);
+      if (body.exitDate) body.exitDate = new Date(body.exitDate);
+      
+      const input = insertAssetSchema.partial().parse(body);
       const asset = await storage.updateAsset(Number(req.params.id), input);
       res.json(asset);
     } catch (err) {
