@@ -23,10 +23,15 @@ interface AddAssetDialogProps {
   platformId: number;
   mode: "asset_returns" | "item_valuations";
   editAsset?: Asset;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  trigger?: React.ReactNode;
 }
 
-export function AddAssetDialog({ platformId, mode, editAsset }: AddAssetDialogProps) {
-  const [open, setOpen] = useState(false);
+export function AddAssetDialog({ platformId, mode, editAsset, open: controlledOpen, onOpenChange, trigger }: AddAssetDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
   const createMutation = useCreateAsset(platformId);
   const updateMutation = useUpdateAsset(platformId);
   const deleteMutation = useDeleteAsset(platformId);
@@ -91,19 +96,23 @@ export function AddAssetDialog({ platformId, mode, editAsset }: AddAssetDialogPr
 
   const isPending = createMutation.isPending || updateMutation.isPending;
 
+  const defaultTrigger = isEdit ? (
+    <Button size="sm" variant="ghost" data-testid={`button-edit-asset-${editAsset?.id}`}>
+      <Pencil className="h-4 w-4" />
+    </Button>
+  ) : (
+    <Button className="gap-2" data-testid="button-add-asset">
+      <Plus className="h-4 w-4" /> Add {mode === "asset_returns" ? "Asset" : "Item"}
+    </Button>
+  );
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {isEdit ? (
-          <Button size="sm" variant="ghost" data-testid={`button-edit-asset-${editAsset?.id}`}>
-            <Pencil className="h-4 w-4" />
-          </Button>
-        ) : (
-          <Button className="gap-2" data-testid="button-add-asset">
-            <Plus className="h-4 w-4" /> Add {mode === "asset_returns" ? "Asset" : "Item"}
-          </Button>
-        )}
-      </DialogTrigger>
+      {trigger !== undefined ? (
+        trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>
+      ) : (
+        <DialogTrigger asChild>{defaultTrigger}</DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>

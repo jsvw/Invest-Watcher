@@ -10,7 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, TrendingUp, History, DollarSign, Package, CheckCircle } from "lucide-react";
+import { ArrowLeft, TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { format } from "date-fns";
@@ -23,6 +24,66 @@ import { AddAssetDialog } from "@/components/AddAssetDialog";
 import { AssetExitDialog } from "@/components/AssetExitDialog";
 import { AssetValuationDialog } from "@/components/AssetValuationDialog";
 import type { Asset } from "@shared/schema";
+
+function AssetActionsMenu({ asset, platformId, platformMode }: { asset: Asset; platformId: number; platformMode: "asset_returns" | "item_valuations" }) {
+  const [editOpen, setEditOpen] = useState(false);
+  const [exitEditOpen, setExitEditOpen] = useState(false);
+  
+  const isActive = asset.status === "active";
+  const isMaturedOrExited = asset.status === "matured" || asset.status === "exited";
+
+  return (
+    <div className="flex justify-end gap-1">
+      {platformMode === "item_valuations" && isActive && (
+        <AssetValuationDialog asset={asset} platformId={platformId} />
+      )}
+      {isActive && (
+        <AssetExitDialog asset={asset} platformId={platformId} />
+      )}
+      {isMaturedOrExited ? (
+        <>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost" data-testid={`button-asset-menu-${asset.id}`}>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setEditOpen(true)} data-testid={`menu-edit-asset-${asset.id}`}>
+                <Pencil className="h-4 w-4 mr-2" /> Edit Asset
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setExitEditOpen(true)} data-testid={`menu-edit-exit-${asset.id}`}>
+                <LogOut className="h-4 w-4 mr-2" /> Edit Exit
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <AddAssetDialog 
+            platformId={platformId} 
+            mode={platformMode}
+            editAsset={asset}
+            open={editOpen}
+            onOpenChange={setEditOpen}
+            trigger={null}
+          />
+          <AssetExitDialog 
+            asset={asset} 
+            platformId={platformId} 
+            mode="edit"
+            open={exitEditOpen}
+            onOpenChange={setExitEditOpen}
+            trigger={null}
+          />
+        </>
+      ) : (
+        <AddAssetDialog 
+          platformId={platformId} 
+          mode={platformMode}
+          editAsset={asset}
+        />
+      )}
+    </div>
+  );
+}
 
 export default function PlatformDetails() {
   const [, params] = useRoute("/platforms/:id");
@@ -406,22 +467,11 @@ export default function PlatformDetails() {
                                 </div>
                               )}
                             </div>
-                            <div className="flex justify-end gap-1">
-                              {platformMode === "item_valuations" && asset.status === "active" && (
-                                <AssetValuationDialog asset={asset as unknown as Asset} platformId={id} />
-                              )}
-                              {asset.status === "active" && (
-                                <AssetExitDialog asset={asset as unknown as Asset} platformId={id} />
-                              )}
-                              {(asset.status === "matured" || asset.status === "exited") && (
-                                <AssetExitDialog asset={asset as unknown as Asset} platformId={id} mode="edit" />
-                              )}
-                              <AddAssetDialog 
-                                platformId={id} 
-                                mode={platformMode as "asset_returns" | "item_valuations"}
-                                editAsset={asset as unknown as Asset}
-                              />
-                            </div>
+                            <AssetActionsMenu 
+                              asset={asset as unknown as Asset} 
+                              platformId={id} 
+                              platformMode={platformMode as "asset_returns" | "item_valuations"}
+                            />
                           </div>
                         ))
                       )}

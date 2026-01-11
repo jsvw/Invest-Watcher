@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
 import { useExitAsset } from "@/hooks/use-assets";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LogOut, Pencil } from "lucide-react";
 import type { Asset } from "@shared/schema";
 
@@ -12,10 +12,16 @@ interface AssetExitDialogProps {
   asset: Asset;
   platformId: number;
   mode?: "exit" | "edit";
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  trigger?: React.ReactNode;
 }
 
-export function AssetExitDialog({ asset, platformId, mode = "exit" }: AssetExitDialogProps) {
-  const [open, setOpen] = useState(false);
+export function AssetExitDialog({ asset, platformId, mode = "exit", open: controlledOpen, onOpenChange, trigger }: AssetExitDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
+  
   const exitMutation = useExitAsset(platformId);
   const isEdit = mode === "edit";
 
@@ -27,6 +33,17 @@ export function AssetExitDialog({ asset, platformId, mode = "exit" }: AssetExitD
       exitPrice: isEdit && asset.exitPrice ? String(asset.exitPrice) : "",
     },
   });
+
+  useEffect(() => {
+    if (open && isEdit) {
+      form.reset({
+        exitDate: asset.exitDate 
+          ? new Date(asset.exitDate).toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0],
+        exitPrice: asset.exitPrice ? String(asset.exitPrice) : "",
+      });
+    }
+  }, [open, isEdit, asset.exitDate, asset.exitPrice, form]);
 
   const onSubmit = (data: { exitDate: string; exitPrice: string }) => {
     exitMutation.mutate(
@@ -40,19 +57,23 @@ export function AssetExitDialog({ asset, platformId, mode = "exit" }: AssetExitD
     );
   };
 
+  const defaultTrigger = isEdit ? (
+    <Button size="sm" variant="outline" className="gap-1" data-testid={`button-edit-exit-${asset.id}`}>
+      <Pencil className="h-3 w-3" /> Edit Exit
+    </Button>
+  ) : (
+    <Button size="sm" variant="outline" className="gap-1 text-orange-600 border-orange-200 hover:bg-orange-50" data-testid={`button-exit-asset-${asset.id}`}>
+      <LogOut className="h-3 w-3" /> Exit
+    </Button>
+  );
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {isEdit ? (
-          <Button size="sm" variant="outline" className="gap-1" data-testid={`button-edit-exit-${asset.id}`}>
-            <Pencil className="h-3 w-3" /> Edit Exit
-          </Button>
-        ) : (
-          <Button size="sm" variant="outline" className="gap-1 text-orange-600 border-orange-200 hover:bg-orange-50" data-testid={`button-exit-asset-${asset.id}`}>
-            <LogOut className="h-3 w-3" /> Exit
-          </Button>
-        )}
-      </DialogTrigger>
+      {trigger !== undefined ? (
+        trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>
+      ) : (
+        <DialogTrigger asChild>{defaultTrigger}</DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Exit Details" : "Mark as Exited (Sold)"}</DialogTitle>
