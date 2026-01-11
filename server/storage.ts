@@ -433,6 +433,56 @@ export class DatabaseStorage implements IStorage {
       currentDate.setMonth(currentDate.getMonth() + 1);
     }
 
+    // Always add today as final data point to get most current values
+    const todayStr = now.toISOString().split('T')[0];
+    const todayTime = now.getTime();
+    
+    // Only add if last data point isn't already today
+    if (dataPoints.length === 0 || dataPoints[dataPoints.length - 1].date !== todayStr) {
+      const todayAssetValues = allAssets.map(asset => {
+        const acquisitionTime = new Date(asset.acquisitionDate).getTime();
+        const exitTime = asset.exitDate ? new Date(asset.exitDate).getTime() : null;
+        const userInvested = Number(asset.investedAmount);
+        const bonus = Number(asset.bonusAmount || 0);
+        const totalInvested = userInvested + bonus;
+        
+        let value = 0;
+        
+        if (todayTime < acquisitionTime) {
+          value = 0;
+        }
+        else if (exitTime && todayTime >= exitTime) {
+          value = 0;
+        }
+        else if (platform.platformMode === "item_valuations") {
+          const vals = allValuations[asset.id] || [];
+          const relevantVals = vals.filter(v => new Date(v.date).getTime() <= todayTime);
+          if (relevantVals.length > 0) {
+            value = Number(relevantVals[relevantVals.length - 1].value);
+          } else {
+            value = totalInvested;
+          }
+        }
+        else {
+          const annualYield = asset.annualYield ? Number(asset.annualYield) : 0;
+          const yearsElapsed = (todayTime - acquisitionTime) / (365 * 24 * 60 * 60 * 1000);
+          value = totalInvested + (totalInvested * (annualYield / 100) * yearsElapsed);
+        }
+        
+        return {
+          id: asset.id,
+          name: asset.name,
+          key: `${asset.name} #${asset.id}`,
+          value: Math.round(value * 100) / 100
+        };
+      });
+
+      dataPoints.push({
+        date: todayStr,
+        assets: todayAssetValues.filter(a => a.value > 0)
+      });
+    }
+
     return dataPoints;
   }
 }
