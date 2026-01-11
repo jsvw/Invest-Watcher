@@ -26,6 +26,7 @@ import { AssetExitDialog } from "@/components/AssetExitDialog";
 import { AssetValuationDialog } from "@/components/AssetValuationDialog";
 import { AssetValuationImportDialog } from "@/components/AssetValuationImportDialog";
 import { AggregatedPerformancePanel } from "@/components/AggregatedPerformancePanel";
+import { AssetValuationHoverCard } from "@/components/AssetValuationHoverCard";
 import type { Asset } from "@shared/schema";
 
 function AssetActionsMenu({ asset, platformId, platformMode }: { asset: Asset; platformId: number; platformMode: "asset_returns" | "item_valuations" }) {
@@ -388,7 +389,13 @@ export default function PlatformDetails() {
                               </div>
                             )}
                             <div>
-                              <div className="font-medium">{asset.name}</div>
+                              <AssetValuationHoverCard 
+                                assetId={asset.id} 
+                                assetName={asset.name}
+                                currency={(platform as any).currency || "USD"}
+                              >
+                                <div className="font-medium cursor-pointer hover:underline">{asset.name}</div>
+                              </AssetValuationHoverCard>
                               {asset.description && (
                                 <div className="text-xs text-muted-foreground">{asset.description}</div>
                               )}
