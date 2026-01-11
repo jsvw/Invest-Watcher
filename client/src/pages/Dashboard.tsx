@@ -4,7 +4,8 @@ import { usePlatforms } from "@/hooks/use-platforms";
 import { useGenerateInsight } from "@/hooks/use-insights";
 import { useAuth } from "@/App";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
-import { Wallet, TrendingUp, DollarSign, BrainCircuit, RefreshCcw, Filter, Check } from "lucide-react";
+import { Wallet, TrendingUp, DollarSign, BrainCircuit, RefreshCcw, Check } from "lucide-react";
+import { SiBinance, SiCoinbase, SiEthereum, SiBitcoin, SiRobinhood, SiPaypal, SiStripe, SiRevolut, SiWise } from "react-icons/si";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -18,10 +19,7 @@ import { format } from "date-fns";
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -32,8 +30,29 @@ export default function Dashboard() {
   const [specificYear, setSpecificYear] = useState<string | null>(null);
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
   const [excludedPlatforms, setExcludedPlatforms] = useState<number[]>([]);
-  const [pendingExcludedPlatforms, setPendingExcludedPlatforms] = useState<number[]>([]);
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
+
+  const getPlatformIcon = (name: string) => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes('binance')) return SiBinance;
+    if (lowerName.includes('coinbase')) return SiCoinbase;
+    if (lowerName.includes('ethereum') || lowerName.includes('eth')) return SiEthereum;
+    if (lowerName.includes('bitcoin') || lowerName.includes('btc')) return SiBitcoin;
+    if (lowerName.includes('robinhood')) return SiRobinhood;
+    if (lowerName.includes('paypal')) return SiPaypal;
+    if (lowerName.includes('stripe')) return SiStripe;
+    if (lowerName.includes('revolut')) return SiRevolut;
+    if (lowerName.includes('wise') || lowerName.includes('transferwise')) return SiWise;
+    return null;
+  };
+
+  const togglePlatform = (platformId: number) => {
+    setExcludedPlatforms(prev => 
+      prev.includes(platformId) 
+        ? prev.filter(id => id !== platformId)
+        : [...prev, platformId]
+    );
+  };
 
   const { data: history, isLoading: isHistoryLoading } = useQuery({
     queryKey: [api.portfolio.history.path, range, specificYear, specificMonth, excludedPlatforms],
@@ -115,77 +134,14 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold font-display tracking-tight text-foreground">Dashboard</h1>
             <p className="text-muted-foreground">Your financial overview at a glance.</p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Popover onOpenChange={(open) => { if (open) setPendingExcludedPlatforms(excludedPlatforms); }}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="default" data-testid="button-platform-filter">
-                  <Filter className="h-4 w-4 mr-2" />
-                  Filter Platforms
-                  {excludedPlatforms.length > 0 && (
-                    <Badge variant="secondary" className="ml-2">
-                      {platforms?.length ? platforms.length - excludedPlatforms.length : 0}/{platforms?.length || 0}
-                    </Badge>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64" align="end">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium text-sm">Select Platforms</h4>
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => setPendingExcludedPlatforms([])}
-                      className="h-auto py-1 px-2 text-xs"
-                      data-testid="button-select-all-platforms"
-                    >
-                      Select All
-                    </Button>
-                  </div>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {platforms?.map((platform) => (
-                      <div key={platform.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`platform-${platform.id}`}
-                          checked={!pendingExcludedPlatforms.includes(platform.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setPendingExcludedPlatforms(prev => prev.filter(id => id !== platform.id));
-                            } else {
-                              setPendingExcludedPlatforms(prev => [...prev, platform.id]);
-                            }
-                          }}
-                          data-testid={`checkbox-platform-${platform.id}`}
-                        />
-                        <Label 
-                          htmlFor={`platform-${platform.id}`}
-                          className="text-sm cursor-pointer flex-1"
-                        >
-                          {platform.name}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                  <Button 
-                    className="w-full" 
-                    size="sm"
-                    onClick={() => setExcludedPlatforms(pendingExcludedPlatforms)}
-                    data-testid="button-apply-platform-filter"
-                  >
-                    Apply Filter
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
-            <Button 
-              onClick={() => generateInsight("Analyze my portfolio allocation and performance.")}
-              className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0 shadow-lg shadow-indigo-500/25"
-              disabled={isInsightLoading}
-            >
-              {isInsightLoading ? <RefreshCcw className="h-4 w-4 animate-spin mr-2" /> : <BrainCircuit className="h-4 w-4 mr-2" />}
-              {isInsightLoading ? "Analyzing..." : "Get AI Insights"}
-            </Button>
-          </div>
+          <Button 
+            onClick={() => generateInsight("Analyze my portfolio allocation and performance.")}
+            className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0 shadow-lg shadow-indigo-500/25"
+            disabled={isInsightLoading}
+          >
+            {isInsightLoading ? <RefreshCcw className="h-4 w-4 animate-spin mr-2" /> : <BrainCircuit className="h-4 w-4 mr-2" />}
+            {isInsightLoading ? "Analyzing..." : "Get AI Insights"}
+          </Button>
         </div>
 
         {/* Stats Grid */}
@@ -251,6 +207,59 @@ export default function Dashboard() {
             })()}
             data-testid="stat-mom-profit"
           />
+        </div>
+
+        {/* Platform Filter Icons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm text-muted-foreground mr-2">Filter:</span>
+          {platforms?.map((platform) => {
+            const IconComponent = getPlatformIcon(platform.name);
+            const isExcluded = excludedPlatforms.includes(platform.id);
+            return (
+              <UITooltip key={platform.id}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => togglePlatform(platform.id)}
+                    className={cn(
+                      "w-10 h-10 rounded-full flex items-center justify-center transition-all relative",
+                      isExcluded 
+                        ? "opacity-30 grayscale bg-muted" 
+                        : "opacity-100 hover:scale-110"
+                    )}
+                    style={{ backgroundColor: isExcluded ? undefined : platform.color }}
+                    data-testid={`platform-icon-${platform.id}`}
+                  >
+                    {IconComponent ? (
+                      <IconComponent className="w-5 h-5 text-white" />
+                    ) : (
+                      <span className="text-white font-bold text-sm">
+                        {platform.name.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                    {!isExcluded && (
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
+                        <Check className="w-3 h-3 text-white" />
+                      </div>
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{platform.name} {isExcluded ? "(excluded)" : "(included)"}</p>
+                </TooltipContent>
+              </UITooltip>
+            );
+          })}
+          {excludedPlatforms.length > 0 && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setExcludedPlatforms([])}
+              className="text-xs"
+              data-testid="button-show-all-platforms"
+            >
+              Show All
+            </Button>
+          )}
         </div>
 
         {/* AI Insight Section */}
