@@ -311,11 +311,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAssetPerformanceHistory(platformId: number): Promise<{ date: string; assets: { id: number; name: string; value: number }[] }[]> {
+    // Get platform to determine mode
+    const [platform] = await db.select().from(platforms).where(eq(platforms.id, platformId));
+    if (!platform) return [];
+
     const allAssets = await db.select().from(assets)
       .where(eq(assets.platformId, platformId))
       .orderBy(desc(assets.acquisitionDate));
     
     if (allAssets.length === 0) return [];
+
+    // Get all valuations for item_valuations mode
+    const allValuations: Record<number, { date: Date; value: string }[]> = {};
+    if (platform.platformMode === "item_valuations") {
+      for (const asset of allAssets) {
+        const vals = await db.select().from(assetValuations)
+          .where(eq(assetValuations.assetId, asset.id))
+          .orderBy(assetValuations.date);
+        allValuations[asset.id] = vals.map(v => ({ date: v.date, value: v.value }));
+      }
+    }
 
     // Find date range: earliest acquisition to today
     const now = new Date();
@@ -337,7 +352,6 @@ export class DatabaseStorage implements IStorage {
         const acquisitionTime = new Date(asset.acquisitionDate).getTime();
         const exitTime = asset.exitDate ? new Date(asset.exitDate).getTime() : null;
         const investedAmount = Number(asset.investedAmount);
-        const annualYield = asset.annualYield ? Number(asset.annualYield) : 0;
         
         let value = 0;
         
@@ -345,16 +359,39 @@ export class DatabaseStorage implements IStorage {
         if (dateTime < acquisitionTime) {
           value = 0;
         }
-        // Asset has exited and this date is after exit
-        else if (exitTime && dateTime >= exitTime) {
-          // Calculate full term value
-          const yearsElapsed = (exitTime - acquisitionTime) / (365 * 24 * 60 * 60 * 1000);
-          value = investedAmount + (investedAmount * (annualYield / 100) * yearsElapsed);
+        // For item_valuations mode, use recorded valuations
+        else if (platform.platformMode === "item_valuations") {
+          const vals = allValuations[asset.id] || [];
+          // Find the most recent valuation on or before this date
+          const relevantVals = vals.filter(v => new Date(v.date).getTime() <= dateTime);
+          if (relevantVals.length > 0) {
+            value = Number(relevantVals[relevantVals.length - 1].value);
+          } else {
+            value = investedAmount; // Use invested amount if no valuation yet
+          }
+          // If exited with a price, use that after exit date
+          if (exitTime && dateTime >= exitTime && asset.exitPrice) {
+            value = Number(asset.exitPrice);
+          }
         }
-        // Asset is active at this date - calculate yield up to this point
+        // For asset_returns mode, calculate using yield
         else {
-          const yearsElapsed = (dateTime - acquisitionTime) / (365 * 24 * 60 * 60 * 1000);
-          value = investedAmount + (investedAmount * (annualYield / 100) * yearsElapsed);
+          const annualYield = asset.annualYield ? Number(asset.annualYield) : 0;
+          
+          // Asset has exited with explicit price
+          if (exitTime && dateTime >= exitTime && asset.exitPrice) {
+            value = Number(asset.exitPrice);
+          }
+          // Asset has exited/matured - calculate full term yield
+          else if (exitTime && dateTime >= exitTime) {
+            const yearsElapsed = (exitTime - acquisitionTime) / (365 * 24 * 60 * 60 * 1000);
+            value = investedAmount + (investedAmount * (annualYield / 100) * yearsElapsed);
+          }
+          // Asset is active at this date - calculate yield up to this point
+          else {
+            const yearsElapsed = (dateTime - acquisitionTime) / (365 * 24 * 60 * 60 * 1000);
+            value = investedAmount + (investedAmount * (annualYield / 100) * yearsElapsed);
+          }
         }
         
         return {

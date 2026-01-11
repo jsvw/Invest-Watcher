@@ -58,6 +58,17 @@ export default function PlatformDetails() {
     }
   });
 
+  // Asset performance history for non-standard modes
+  const { data: assetPerformance } = useQuery({
+    queryKey: ['/api/platforms', id, 'asset-performance'],
+    queryFn: async () => {
+      const res = await fetch(`/api/platforms/${id}/asset-performance`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch asset performance");
+      return await res.json() as { date: string; assets: { id: number; name: string; value: number }[] }[];
+    },
+    enabled: platformMode !== "standard"
+  });
+
   const years = availableFilters?.years || [];
   const monthsData = availableFilters?.months?.map((m: string) => {
     const [y, mm] = m.split('-');
@@ -191,7 +202,63 @@ export default function PlatformDetails() {
 
           {/* Assets Tab for non-standard modes */}
           {platformMode !== "standard" && (
-            <TabsContent value="assets" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <TabsContent value="assets" className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
+              {/* Asset Performance Chart */}
+              {assetPerformance && assetPerformance.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Asset Performance Over Time</CardTitle>
+                    <CardDescription>Individual asset value history</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart 
+                          data={assetPerformance.map(point => {
+                            const obj: Record<string, any> = { date: point.date };
+                            point.assets.forEach(a => {
+                              obj[a.name] = a.value;
+                            });
+                            return obj;
+                          })}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                          <XAxis 
+                            dataKey="date" 
+                            tick={{ fontSize: 12 }}
+                            tickFormatter={(value) => format(new Date(value), 'MMM yy')}
+                          />
+                          <YAxis 
+                            tick={{ fontSize: 12 }}
+                            tickFormatter={(value) => `${((platform as any).currency || "USD") === "USD" ? "$" : ""}${value.toLocaleString()}`}
+                          />
+                          <Tooltip 
+                            formatter={(value: number) => [
+                              `${((platform as any).currency || "USD") === "USD" ? "$" : ""}${value.toLocaleString()}${((platform as any).currency || "USD") !== "USD" ? ` ${(platform as any).currency}` : ""}`,
+                            ]}
+                            labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
+                          />
+                          <Legend />
+                          {assets && assets.slice(0, 10).map((asset, idx) => {
+                            const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00c49f', '#ffbb28', '#ff8042', '#a4de6c', '#d0ed57'];
+                            return (
+                              <Line 
+                                key={asset.id}
+                                type="monotone" 
+                                dataKey={asset.name}
+                                stroke={colors[idx % colors.length]}
+                                strokeWidth={2}
+                                dot={false}
+                              />
+                            );
+                          })}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
                   <div>
