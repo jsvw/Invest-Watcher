@@ -267,7 +267,15 @@ export default function PlatformDetails() {
                                   )}
                                 </Badge>
                               ) : (
-                                <Badge variant="outline">Active</Badge>
+                                <div className="flex flex-col gap-1">
+                                  <Badge variant="outline">Active</Badge>
+                                  {asset.profitLoss !== undefined && asset.profitLoss > 0 && (
+                                    <span className="text-xs text-green-600">
+                                      +{((platform as any).currency || "USD") === "USD" ? "$" : ""}
+                                      {asset.profitLoss.toLocaleString()} earned
+                                    </span>
+                                  )}
+                                </div>
                               )}
                             </div>
                             <div className="flex justify-end gap-1">

@@ -183,18 +183,28 @@ export class DatabaseStorage implements IStorage {
     return allAssets.map(asset => {
       const latestVal = latestValuationMap.get(asset.id);
       const investedAmount = Number(asset.investedAmount);
-      let currentValue = latestVal ?? investedAmount;
+      let currentValue: number;
       let profitLoss: number | undefined;
       
       if (asset.status === "exited" && asset.exitPrice) {
         currentValue = Number(asset.exitPrice);
         profitLoss = currentValue - investedAmount;
+      } else if (latestVal !== undefined) {
+        currentValue = latestVal;
+        profitLoss = currentValue - investedAmount;
+      } else if (asset.annualYield && asset.acquisitionDate) {
+        const yearsElapsed = (Date.now() - new Date(asset.acquisitionDate).getTime()) / (365 * 24 * 60 * 60 * 1000);
+        const accumulatedYield = investedAmount * (Number(asset.annualYield) / 100) * yearsElapsed;
+        currentValue = investedAmount + accumulatedYield;
+        profitLoss = accumulatedYield;
+      } else {
+        currentValue = investedAmount;
       }
       
       return {
         ...asset,
-        currentValue,
-        profitLoss
+        currentValue: Math.round(currentValue * 100) / 100,
+        profitLoss: profitLoss !== undefined ? Math.round(profitLoss * 100) / 100 : undefined
       };
     });
   }
@@ -209,18 +219,28 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
 
     const investedAmount = Number(asset.investedAmount);
-    let currentValue = latestValuation ? Number(latestValuation.value) : investedAmount;
+    let currentValue: number;
     let profitLoss: number | undefined;
 
     if (asset.status === "exited" && asset.exitPrice) {
       currentValue = Number(asset.exitPrice);
       profitLoss = currentValue - investedAmount;
+    } else if (latestValuation) {
+      currentValue = Number(latestValuation.value);
+      profitLoss = currentValue - investedAmount;
+    } else if (asset.annualYield && asset.acquisitionDate) {
+      const yearsElapsed = (Date.now() - new Date(asset.acquisitionDate).getTime()) / (365 * 24 * 60 * 60 * 1000);
+      const accumulatedYield = investedAmount * (Number(asset.annualYield) / 100) * yearsElapsed;
+      currentValue = investedAmount + accumulatedYield;
+      profitLoss = accumulatedYield;
+    } else {
+      currentValue = investedAmount;
     }
 
     return {
       ...asset,
-      currentValue,
-      profitLoss
+      currentValue: Math.round(currentValue * 100) / 100,
+      profitLoss: profitLoss !== undefined ? Math.round(profitLoss * 100) / 100 : undefined
     };
   }
 
