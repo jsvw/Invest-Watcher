@@ -188,8 +188,8 @@ export class DatabaseStorage implements IStorage {
       let profitLoss: number | undefined;
       let effectiveStatus = asset.status;
       
-      // Check if asset has matured (expected exit date passed)
-      const isMatured = asset.expectedExitDate && new Date(asset.expectedExitDate).getTime() <= now && asset.status === "active";
+      // Check if asset has matured (exit date passed but no exit price set)
+      const isMatured = asset.exitDate && new Date(asset.exitDate).getTime() <= now && asset.status === "active" && !asset.exitPrice;
       
       if (asset.status === "exited" && asset.exitPrice) {
         currentValue = Number(asset.exitPrice);
@@ -197,7 +197,7 @@ export class DatabaseStorage implements IStorage {
       } else if (isMatured && asset.annualYield && asset.acquisitionDate) {
         // Calculate full term yield for matured assets
         const acquisitionTime = new Date(asset.acquisitionDate).getTime();
-        const exitTime = new Date(asset.expectedExitDate!).getTime();
+        const exitTime = new Date(asset.exitDate!).getTime();
         const yearsElapsed = (exitTime - acquisitionTime) / (365 * 24 * 60 * 60 * 1000);
         const accumulatedYield = investedAmount * (Number(asset.annualYield) / 100) * yearsElapsed;
         currentValue = investedAmount + accumulatedYield;

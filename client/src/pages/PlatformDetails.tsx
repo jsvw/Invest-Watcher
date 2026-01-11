@@ -237,7 +237,7 @@ export default function PlatformDetails() {
                             </div>
                             {platformMode === "asset_returns" && (
                               <div className="text-muted-foreground">
-                                {(asset as any).expectedExitDate ? format(new Date((asset as any).expectedExitDate), 'MMM dd, yyyy') : '-'}
+                                {asset.exitDate ? format(new Date(asset.exitDate), 'MMM dd, yyyy') : '-'}
                               </div>
                             )}
                             <div>
