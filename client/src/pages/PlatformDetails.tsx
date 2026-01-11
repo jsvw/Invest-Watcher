@@ -166,12 +166,9 @@ export default function PlatformDetails() {
             </div>
             
             <div className="flex gap-2">
-              {platformMode === "standard" ? (
-                <>
-                  <AddTransactionDialog platformId={id} type="investment" />
-                  <AddTransactionDialog platformId={id} type="valuation" />
-                </>
-              ) : (
+              <AddTransactionDialog platformId={id} type="investment" />
+              <AddTransactionDialog platformId={id} type="valuation" />
+              {platformMode !== "standard" && (
                 <AddAssetDialog 
                   platformId={id} 
                   mode={platformMode as "asset_returns" | "item_valuations"} 
@@ -230,12 +227,8 @@ export default function PlatformDetails() {
               <TabsTrigger value="assets" className="gap-2"><Package className="h-4 w-4" /> Assets</TabsTrigger>
             )}
             <TabsTrigger value="chart" className="gap-2"><TrendingUp className="h-4 w-4" /> Performance</TabsTrigger>
-            {platformMode === "standard" && (
-              <>
-                <TabsTrigger value="investments" className="gap-2"><DollarSign className="h-4 w-4" /> Investment History</TabsTrigger>
-                <TabsTrigger value="valuations" className="gap-2"><History className="h-4 w-4" /> Valuation History</TabsTrigger>
-              </>
-            )}
+            <TabsTrigger value="investments" className="gap-2"><DollarSign className="h-4 w-4" /> Investments</TabsTrigger>
+            <TabsTrigger value="valuations" className="gap-2"><History className="h-4 w-4" /> Valuations</TabsTrigger>
           </TabsList>
 
           {/* Assets Tab for non-standard modes */}
