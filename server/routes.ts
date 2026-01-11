@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
@@ -13,6 +13,7 @@ import { importInvestmentData } from "./seed_data";
 import multer from "multer";
 import Papa from "papaparse";
 import fs from "fs";
+import { setupAuth, requireAuth, getAuthenticatedUserId } from "./auth";
 
 // Configure multer for file uploads
 const upload = multer({ dest: "/tmp/uploads/" });
@@ -27,13 +28,17 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Setup authentication (must be before routes)
+  setupAuth(app);
+  
   // Register AI integration routes
   registerChatRoutes(app);
   registerImageRoutes(app);
 
-  // --- Platforms ---
-  app.get(api.platforms.list.path, async (_req, res) => {
-    const platforms = await storage.getPlatforms();
+  // --- Platforms (protected) ---
+  app.get(api.platforms.list.path, requireAuth, async (req, res) => {
+    const userId = getAuthenticatedUserId(req)!;
+    const platforms = await storage.getPlatforms(userId);
     res.json(platforms);
   });
 
