@@ -18,7 +18,14 @@ interface PlatformFormData {
   currency: string;
   color: string;
   icon: string;
+  platformMode: string;
 }
+
+const TRACKING_MODES = [
+  { value: "standard", label: "Standard", description: "Track platform-level investments and valuations" },
+  { value: "asset_returns", label: "Asset Returns", description: "Track individual assets with annual yields" },
+  { value: "item_valuations", label: "Item Valuations", description: "Track items with periodic value updates" },
+];
 
 const CATEGORIES = ["Crypto", "Stock", "Bank", "Real Estate", "Retirement", "Other"];
 const CURRENCIES = ["USD", "EUR", "GBP", "CHF", "JPY", "AUD", "CAD"];
@@ -51,6 +58,7 @@ export function PlatformSettingsDialog({ platform }: PlatformSettingsDialogProps
       currency: (platform as any).currency || "USD",
       color: platform.color || "#3b82f6",
       icon: (platform as any).icon || "",
+      platformMode: (platform as any).platformMode || "standard",
     },
   });
 
@@ -137,6 +145,28 @@ export function PlatformSettingsDialog({ platform }: PlatformSettingsDialogProps
               <SelectContent>
                 {CURRENCIES.map((cur) => (
                   <SelectItem key={cur} value={cur}>{cur}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="platformMode">Tracking Mode</Label>
+            <Select 
+              value={form.watch("platformMode")} 
+              onValueChange={(value) => form.setValue("platformMode", value)}
+            >
+              <SelectTrigger data-testid="select-platform-mode">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TRACKING_MODES.map((mode) => (
+                  <SelectItem key={mode.value} value={mode.value}>
+                    <div>
+                      <span className="font-medium">{mode.label}</span>
+                      <span className="text-muted-foreground ml-2 text-xs">{mode.description}</span>
+                    </div>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
