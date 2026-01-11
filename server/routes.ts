@@ -716,6 +716,7 @@ export async function registerRoutes(
       // Use user-scoped storage methods
       const userInvestments = await storage.getAllInvestmentsForUser(userId);
       const userValuations = await storage.getAllValuationsForUser(userId);
+      const userWithdrawals = await storage.getAllWithdrawalsForUser(userId);
       
       let filteredInvestments = platformId 
         ? userInvestments.filter(inv => inv.platformId === platformId)
@@ -725,15 +726,21 @@ export async function registerRoutes(
         ? userValuations.filter(val => val.platformId === platformId)
         : userValuations;
       
+      let filteredWithdrawals = platformId
+        ? userWithdrawals.filter(wd => wd.platformId === platformId)
+        : userWithdrawals;
+      
       // Apply platform exclusion filter
       if (excludePlatforms.length > 0) {
         filteredInvestments = filteredInvestments.filter(inv => !excludePlatforms.includes(inv.platformId));
         filteredValuations = filteredValuations.filter(val => !excludePlatforms.includes(val.platformId));
+        filteredWithdrawals = filteredWithdrawals.filter(wd => !excludePlatforms.includes(wd.platformId));
       }
       
       const dates = new Set<string>();
       filteredInvestments.forEach(inv => dates.add(new Date(inv.date).toISOString().split('T')[0]));
       filteredValuations.forEach(val => dates.add(new Date(val.date).toISOString().split('T')[0]));
+      filteredWithdrawals.forEach(wd => dates.add(new Date(wd.date).toISOString().split('T')[0]));
       
       let sortedDates = Array.from(dates).sort();
       
@@ -778,9 +785,17 @@ export async function registerRoutes(
         const dateObj = new Date(date);
         
         // Sum investments up to this date
-        const invested = filteredInvestments
+        const totalInvested = filteredInvestments
           .filter(inv => new Date(inv.date) <= dateObj)
           .reduce((sum, inv) => sum + Number(inv.amount), 0);
+        
+        // Sum withdrawals up to this date
+        const totalWithdrawn = filteredWithdrawals
+          .filter(wd => new Date(wd.date) <= dateObj)
+          .reduce((sum, wd) => sum + Number(wd.amount), 0);
+        
+        // Net invested = investments - withdrawals
+        const invested = totalInvested - totalWithdrawn;
           
         // Get latest valuation for each platform up to this date
         const platformLatestValuations = new Map<number, number>();

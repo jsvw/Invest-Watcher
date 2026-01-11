@@ -126,7 +126,8 @@ export type ExitAssetRequest = { exitDate: string | Date; exitPrice: string };
 // Response types
 export type PlatformResponse = Platform & {
   currentValue?: number; // Calculated on the fly or fetched from latest valuation
-  totalInvested?: number; // Sum of investments
+  totalInvested?: number; // Sum of investments minus withdrawals (net invested)
+  totalWithdrawn?: number; // Sum of withdrawals
   lastValuationDate?: string | Date | null; // Date of the latest valuation
 };
 

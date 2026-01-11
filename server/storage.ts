@@ -128,6 +128,7 @@ export class DatabaseStorage implements IStorage {
         p.*,
         COALESCE(lv.value, 0) as current_value,
         COALESCE(inv_totals.total_invested, 0) as total_invested,
+        COALESCE(wd_totals.total_withdrawn, 0) as total_withdrawn,
         lv.date as last_valuation_date
       FROM platforms p
       LEFT JOIN LATERAL (
@@ -142,25 +143,35 @@ export class DatabaseStorage implements IStorage {
         FROM investments 
         GROUP BY platform_id
       ) inv_totals ON inv_totals.platform_id = p.id
+      LEFT JOIN (
+        SELECT platform_id, SUM(amount::numeric) as total_withdrawn 
+        FROM withdrawals 
+        GROUP BY platform_id
+      ) wd_totals ON wd_totals.platform_id = p.id
       WHERE p.user_id = ${userId}
       ORDER BY p.name
     `);
 
-    return result.rows.map((row: any) => ({
-      id: row.id,
-      userId: row.user_id,
-      name: row.name,
-      category: row.category,
-      color: row.color,
-      icon: row.icon,
-      description: row.description,
-      currency: row.currency,
-      platformMode: row.platform_mode,
-      createdAt: row.created_at,
-      currentValue: Number(row.current_value) || 0,
-      totalInvested: Number(row.total_invested) || 0,
-      lastValuationDate: row.last_valuation_date || null,
-    }));
+    return result.rows.map((row: any) => {
+      const totalInvested = Number(row.total_invested) || 0;
+      const totalWithdrawn = Number(row.total_withdrawn) || 0;
+      return {
+        id: row.id,
+        userId: row.user_id,
+        name: row.name,
+        category: row.category,
+        color: row.color,
+        icon: row.icon,
+        description: row.description,
+        currency: row.currency,
+        platformMode: row.platform_mode,
+        createdAt: row.created_at,
+        currentValue: Number(row.current_value) || 0,
+        totalInvested: totalInvested - totalWithdrawn,
+        totalWithdrawn: totalWithdrawn,
+        lastValuationDate: row.last_valuation_date || null,
+      };
+    });
   }
 
   async getPlatform(id: number, userId: number): Promise<PlatformResponse | undefined> {
@@ -169,6 +180,7 @@ export class DatabaseStorage implements IStorage {
         p.*,
         COALESCE(lv.value, 0) as current_value,
         COALESCE(inv_totals.total_invested, 0) as total_invested,
+        COALESCE(wd_totals.total_withdrawn, 0) as total_withdrawn,
         lv.date as last_valuation_date
       FROM platforms p
       LEFT JOIN LATERAL (
@@ -184,12 +196,20 @@ export class DatabaseStorage implements IStorage {
         WHERE platform_id = ${id}
         GROUP BY platform_id
       ) inv_totals ON inv_totals.platform_id = p.id
+      LEFT JOIN (
+        SELECT platform_id, SUM(amount::numeric) as total_withdrawn 
+        FROM withdrawals 
+        WHERE platform_id = ${id}
+        GROUP BY platform_id
+      ) wd_totals ON wd_totals.platform_id = p.id
       WHERE p.id = ${id} AND p.user_id = ${userId}
     `);
 
     if (result.rows.length === 0) return undefined;
     
     const row: any = result.rows[0];
+    const totalInvested = Number(row.total_invested) || 0;
+    const totalWithdrawn = Number(row.total_withdrawn) || 0;
     return {
       id: row.id,
       userId: row.user_id,
@@ -202,7 +222,8 @@ export class DatabaseStorage implements IStorage {
       platformMode: row.platform_mode,
       createdAt: row.created_at,
       currentValue: Number(row.current_value) || 0,
-      totalInvested: Number(row.total_invested) || 0,
+      totalInvested: totalInvested - totalWithdrawn,
+      totalWithdrawn: totalWithdrawn,
       lastValuationDate: row.last_valuation_date || null,
     };
   }
