@@ -10,13 +10,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut } from "lucide-react";
+import { ArrowLeft, TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend } from "recharts";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -101,6 +102,18 @@ export default function PlatformDetails() {
   
   const platformMode = (platform as any)?.platformMode || "standard";
   const { data: assets, isLoading: isAssetsLoading } = useAssets(id);
+  
+  const [assetNameFilter, setAssetNameFilter] = useState("");
+  
+  const filteredAssets = useMemo(() => {
+    if (!assets) return [];
+    if (!assetNameFilter.trim()) return assets;
+    
+    const normalizedFilter = assetNameFilter.toLowerCase().trim();
+    return assets.filter(asset => 
+      asset.name.toLowerCase().includes(normalizedFilter)
+    );
+  }, [assets, assetNameFilter]);
 
   const { data: history, isLoading: isHistoryLoading } = useQuery({
     queryKey: [api.portfolio.history.path, id, range, specificYear, specificMonth],
@@ -318,7 +331,17 @@ export default function PlatformDetails() {
                       }
                     </CardDescription>
                   </div>
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex gap-2 flex-wrap items-center">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Filter by name..."
+                        value={assetNameFilter}
+                        onChange={(e) => setAssetNameFilter(e.target.value)}
+                        className="pl-8 w-48"
+                        data-testid="input-filter-name"
+                      />
+                    </div>
                     {platformMode === "item_valuations" && (
                       <AssetValuationImportDialog platformId={id} />
                     )}
@@ -345,8 +368,12 @@ export default function PlatformDetails() {
                         <div className="p-8 text-center text-muted-foreground">
                           No {platformMode === "asset_returns" ? "assets" : "items"} recorded yet.
                         </div>
+                      ) : filteredAssets.length === 0 ? (
+                        <div className="p-8 text-center text-muted-foreground">
+                          No {platformMode === "asset_returns" ? "assets" : "items"} matching "{assetNameFilter}"
+                        </div>
                       ) : (
-                        assets.map((asset) => (
+                        filteredAssets.map((asset) => (
                           <div 
                             key={asset.id} 
                             className={`grid ${platformMode === "asset_returns" ? "grid-cols-8" : "grid-cols-6"} p-4 text-sm hover:bg-muted/30 transition-colors items-center`}
