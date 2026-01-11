@@ -205,6 +205,27 @@ export async function registerRoutes(
       else if (range === 'month') startDate = new Date(now.setMonth(now.getMonth() - 1));
       else if (range === 'quarter') startDate = new Date(now.setMonth(now.getMonth() - 3));
       else if (range === 'year') startDate = new Date(now.setFullYear(now.getFullYear() - 1));
+      else if (range.startsWith('year-')) {
+        const year = parseInt(range.split('-')[1]);
+        startDate = new Date(year, 0, 1);
+        const endDate = new Date(year, 11, 31, 23, 59, 59);
+        sortedDates = sortedDates.filter(d => {
+          const dt = new Date(d);
+          return dt >= startDate! && dt <= endDate;
+        });
+        startDate = null; // Prevent further filtering
+      } else if (range.startsWith('month-')) {
+        const parts = range.split('-');
+        const year = parseInt(parts[1]);
+        const month = parseInt(parts[2]) - 1;
+        startDate = new Date(year, month, 1);
+        const endDate = new Date(year, month + 1, 0, 23, 59, 59);
+        sortedDates = sortedDates.filter(d => {
+          const dt = new Date(d);
+          return dt >= startDate! && dt <= endDate;
+        });
+        startDate = null; // Prevent further filtering
+      }
 
       if (startDate) {
         sortedDates = sortedDates.filter(d => new Date(d) >= startDate!);

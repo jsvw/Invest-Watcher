@@ -1,6 +1,6 @@
 import { Layout } from "@/components/Layout";
 import { AddTransactionDialog } from "@/components/AddTransactionDialog";
-import { usePlatform } from "@/hooks/use-platforms";
+import { usePlatform, usePlatforms } from "@/hooks/use-platforms";
 import { useInvestments } from "@/hooks/use-investments";
 import { useValuations } from "@/hooks/use-valuations";
 import { useRoute } from "wouter";
@@ -14,15 +14,55 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@shared/routes";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function PlatformDetails() {
   const [, params] = useRoute("/platforms/:id");
   const id = Number(params?.id);
   const [range, setRange] = useState("year");
+  const [specificYear, setSpecificYear] = useState<string | null>(null);
+  const [specificMonth, setSpecificMonth] = useState<string | null>(null);
   
+  const { data: platforms } = usePlatforms();
   const { data: platform, isLoading: isPlatformLoading } = usePlatform(id);
   const { data: investments, isLoading: isInvestmentsLoading } = useInvestments(id);
   const { data: valuations, isLoading: isValuationsLoading } = useValuations(id);
+
+  const { data: history, isLoading: isHistoryLoading } = useQuery({
+    queryKey: [api.portfolio.history.path, id, range, specificYear, specificMonth],
+    queryFn: async () => {
+      let url = `${api.portfolio.history.path}?range=${range}&platformId=${id}`;
+      if (specificYear) url += `&year=${specificYear}`;
+      if (specificMonth) url += `&month_select=${specificMonth}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch history");
+      return await res.json();
+    }
+  });
+
+  // Generate available years and months
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 5 }, (_, i) => (currentYear - i).toString());
+  const months = [
+    { value: "01", label: "January" },
+    { value: "02", label: "February" },
+    { value: "03", label: "March" },
+    { value: "04", label: "April" },
+    { value: "05", label: "May" },
+    { value: "06", label: "June" },
+    { value: "07", label: "July" },
+    { value: "08", label: "August" },
+    { value: "09", label: "September" },
+    { value: "10", label: "October" },
+    { value: "11", label: "November" },
+    { value: "12", label: "December" },
+  ];
+
+  // Stats calculation
+  const platformTotalInvested = investments?.reduce((sum, inv) => sum + Number(inv.amount), 0) || 0;
+  const platformCurrentValue = valuations && valuations.length > 0 
+    ? Number([...valuations].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0].value) 
+    : 0;
 
   const { data: history, isLoading: isHistoryLoading } = useQuery({
     queryKey: [api.portfolio.history.path, id, range],
@@ -95,7 +135,7 @@ export default function PlatformDetails() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold font-display">
-                ${Number(platform.currentValue || 0).toLocaleString()}
+                ${platformCurrentValue.toLocaleString()}
               </div>
             </CardContent>
           </Card>
@@ -105,7 +145,7 @@ export default function PlatformDetails() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold font-display text-muted-foreground">
-                ${Number(platform.totalInvested || 0).toLocaleString()}
+                ${platformTotalInvested.toLocaleString()}
               </div>
             </CardContent>
           </Card>
@@ -126,15 +166,57 @@ export default function PlatformDetails() {
                   <CardTitle>Platform Performance</CardTitle>
                   <CardDescription>Invested vs. Valuation over time</CardDescription>
                 </div>
-                <Tabs value={range} onValueChange={setRange} className="w-auto">
-                  <TabsList>
-                    <TabsTrigger value="7d">7D</TabsTrigger>
-                    <TabsTrigger value="month">1M</TabsTrigger>
-                    <TabsTrigger value="quarter">3M</TabsTrigger>
-                    <TabsTrigger value="year">1Y</TabsTrigger>
-                    <TabsTrigger value="all">ALL</TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                <div className="flex flex-wrap items-center gap-2">
+                  {range === "year" && (
+                    <Select value={specificYear || ""} onValueChange={(val) => setRange(`year-${val}`)}>
+                      <SelectTrigger className="w-[100px] h-9">
+                        <SelectValue placeholder="Year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {years.map(y => (
+                          <SelectItem key={y} value={y}>{y}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {range === "month" && (
+                    <div className="flex gap-2">
+                      <Select value={specificYear || currentYear.toString()} onValueChange={(val) => setSpecificYear(val)}>
+                        <SelectTrigger className="w-[100px] h-9">
+                          <SelectValue placeholder="Year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {years.map(y => (
+                            <SelectItem key={y} value={y}>{y}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select value={specificMonth || ""} onValueChange={(val) => setRange(`month-${specificYear || currentYear}-${val}`)}>
+                        <SelectTrigger className="w-[120px] h-9">
+                          <SelectValue placeholder="Month" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {months.map(m => (
+                            <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <Tabs value={range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range} onValueChange={(val) => {
+                    setRange(val);
+                    setSpecificYear(null);
+                    setSpecificMonth(null);
+                  }} className="w-auto">
+                    <TabsList>
+                      <TabsTrigger value="7d">7D</TabsTrigger>
+                      <TabsTrigger value="month">1M</TabsTrigger>
+                      <TabsTrigger value="quarter">3M</TabsTrigger>
+                      <TabsTrigger value="year">1Y</TabsTrigger>
+                      <TabsTrigger value="all">ALL</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="h-[400px] w-full">
