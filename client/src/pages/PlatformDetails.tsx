@@ -24,6 +24,7 @@ import { AddAssetDialog } from "@/components/AddAssetDialog";
 import { AssetExitDialog } from "@/components/AssetExitDialog";
 import { AssetValuationDialog } from "@/components/AssetValuationDialog";
 import { AssetValuationImportDialog } from "@/components/AssetValuationImportDialog";
+import { AggregatedPerformancePanel } from "@/components/AggregatedPerformancePanel";
 import type { Asset } from "@shared/schema";
 
 function AssetActionsMenu({ asset, platformId, platformMode }: { asset: Asset; platformId: number; platformMode: "asset_returns" | "item_valuations" }) {
@@ -298,65 +299,12 @@ export default function PlatformDetails() {
           {/* Assets Tab for non-standard modes */}
           {platformMode !== "standard" && (
             <TabsContent value="assets" className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
-              {/* Asset Performance Chart */}
+              {/* Asset Performance Chart - Aggregated view for many assets */}
               {assetPerformance && assetPerformance.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Asset Performance Over Time</CardTitle>
-                    <CardDescription>Individual asset value history</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart 
-                          data={assetPerformance.map(point => {
-                            const obj: Record<string, any> = { date: point.date };
-                            point.assets.forEach(a => {
-                              obj[a.key] = a.value;
-                            });
-                            return obj;
-                          })}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                          <XAxis 
-                            dataKey="date" 
-                            tick={{ fontSize: 12 }}
-                            tickFormatter={(value) => format(new Date(value), 'MMM yy')}
-                          />
-                          <YAxis 
-                            tick={{ fontSize: 12 }}
-                            tickFormatter={(value) => `${((platform as any).currency || "USD") === "USD" ? "$" : ""}${value.toLocaleString()}`}
-                          />
-                          <Tooltip 
-                            formatter={(value: number) => [
-                              `${((platform as any).currency || "USD") === "USD" ? "$" : ""}${value.toLocaleString()}${((platform as any).currency || "USD") !== "USD" ? ` ${(platform as any).currency}` : ""}`,
-                            ]}
-                            labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
-                          />
-                          <Legend wrapperStyle={{ fontSize: '10px' }} />
-                          {(() => {
-                            const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00c49f', '#ffbb28', '#ff8042', '#a4de6c', '#d0ed57', '#8dd1e1', '#a28fd0', '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#dfe6e9', '#fab1a0', '#74b9ff', '#55efc4', '#81ecec'];
-                            // Get unique asset keys from performance data
-                            const assetKeys = new Set<string>();
-                            assetPerformance.forEach(point => {
-                              point.assets.forEach(a => assetKeys.add(a.key));
-                            });
-                            return Array.from(assetKeys).map((key, idx) => (
-                              <Line 
-                                key={key}
-                                type="monotone" 
-                                dataKey={key}
-                                stroke={colors[idx % colors.length]}
-                                strokeWidth={2}
-                                dot={false}
-                              />
-                            ));
-                          })()}
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
+                <AggregatedPerformancePanel 
+                  assetPerformance={assetPerformance}
+                  currency={(platform as any).currency || "USD"}
+                />
               )}
 
               <Card>
