@@ -118,7 +118,6 @@ export default function Dashboard() {
             <Tabs value={range} onValueChange={setRange} className="w-auto">
               <TabsList>
                 <TabsTrigger value="7d">7D</TabsTrigger>
-                <TabsTrigger value="30d">30D</TabsTrigger>
                 <TabsTrigger value="month">1M</TabsTrigger>
                 <TabsTrigger value="quarter">3M</TabsTrigger>
                 <TabsTrigger value="year">1Y</TabsTrigger>

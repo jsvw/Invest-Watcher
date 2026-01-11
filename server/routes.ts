@@ -192,7 +192,6 @@ export async function registerRoutes(
       let startDate: Date | null = null;
       
       if (range === '7d') startDate = new Date(now.setDate(now.getDate() - 7));
-      else if (range === '30d') startDate = new Date(now.setDate(now.getDate() - 30));
       else if (range === 'month') startDate = new Date(now.setMonth(now.getMonth() - 1));
       else if (range === 'quarter') startDate = new Date(now.setMonth(now.getMonth() - 3));
       else if (range === 'year') startDate = new Date(now.setFullYear(now.getFullYear() - 1));
