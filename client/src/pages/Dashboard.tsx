@@ -50,7 +50,8 @@ export default function Dashboard() {
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch history");
       return await res.json();
-    }
+    },
+    placeholderData: (previousData) => previousData,
   });
 
   const { data: availableFilters } = useQuery({
