@@ -173,16 +173,11 @@ export default function Dashboard() {
               return currentMoM >= 0 ? "up" : "down";
             })()}
             trendValue={(() => {
-              if (!history || history.length < 3) return "";
+              if (!history || history.length < 2) return "";
               const current = history[history.length - 1];
               const previous = history[history.length - 2];
-              const twoMonthsAgo = history[history.length - 3];
-              const currentMoM = current.value - previous.value;
-              const previousMoM = previous.value - twoMonthsAgo.value;
-              const growthDiff = currentMoM - previousMoM;
-              const growthPercent = previous.value > 0 ? (currentMoM / previous.value) * 100 : 0;
-              const diffSign = growthDiff >= 0 ? "+" : "";
-              return `${growthPercent.toFixed(1)}% | ${diffSign}${formatCurrency(growthDiff, currency)}`;
+              const growthPercent = previous.value > 0 ? ((current.value - previous.value) / previous.value) * 100 : 0;
+              return `${growthPercent.toFixed(1)}%`;
             })()}
             icon={TrendingUp}
             className={(() => {
