@@ -76,7 +76,7 @@ export interface IStorage {
   getAssetPerformanceHistory(platformId: number): Promise<{ date: string; assets: { id: number; name: string; key: string; value: number }[] }[]>;
 
   // Item Bubble Chart Data
-  getItemReturnBubbles(platformId: number): Promise<{ assetId: number; assetName: string; date: string; percentReturn: number; investedBasis: number; currentValue: number }[]>;
+  getItemReturnBubbles(platformId: number): Promise<{ assetId: number; assetName: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -706,14 +706,16 @@ export class DatabaseStorage implements IStorage {
     return dataPoints;
   }
 
-  async getItemReturnBubbles(platformId: number): Promise<{ assetId: number; assetName: string; date: string; percentReturn: number; investedBasis: number; currentValue: number }[]> {
+  async getItemReturnBubbles(platformId: number): Promise<{ assetId: number; assetName: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number }[]> {
     // Get all active and exited assets for this platform
     const allAssets = await db.select().from(assets)
       .where(eq(assets.platformId, platformId));
     
     if (allAssets.length === 0) return [];
 
-    const bubbleData: { assetId: number; assetName: string; date: string; percentReturn: number; investedBasis: number; currentValue: number }[] = [];
+    const bubbleData: { assetId: number; assetName: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number }[] = [];
+
+    const msPerWeek = 7 * 24 * 60 * 60 * 1000;
 
     for (const asset of allAssets) {
       const investedBasis = Number(asset.investedAmount) + Number(asset.bonusAmount || 0);
@@ -726,14 +728,20 @@ export class DatabaseStorage implements IStorage {
         .where(eq(assetValuations.assetId, asset.id))
         .orderBy(assetValuations.date);
 
+      // Find earliest date (first valuation date is the investment date)
+      const investmentDate = vals.length > 0 ? new Date(vals[0].date) : new Date();
+
       for (const val of vals) {
         const currentValue = Number(val.value);
         const percentReturn = ((currentValue - investedBasis) / investedBasis) * 100;
+        const valDate = new Date(val.date);
+        const weeksFromInvestment = Math.round((valDate.getTime() - investmentDate.getTime()) / msPerWeek * 10) / 10;
         
         bubbleData.push({
           assetId: asset.id,
           assetName: asset.name,
           date: val.date.toISOString().split('T')[0],
+          weeksFromInvestment,
           percentReturn: Math.round(percentReturn * 100) / 100,
           investedBasis,
           currentValue
@@ -743,19 +751,21 @@ export class DatabaseStorage implements IStorage {
       // Also add current value point (today) using latest valuation or invested basis
       const latestValue = vals.length > 0 ? Number(vals[vals.length - 1].value) : investedBasis;
       const todayReturn = ((latestValue - investedBasis) / investedBasis) * 100;
+      const weeksFromInvestmentToday = Math.round((new Date().getTime() - investmentDate.getTime()) / msPerWeek * 10) / 10;
       
       bubbleData.push({
         assetId: asset.id,
         assetName: asset.name,
         date: new Date().toISOString().split('T')[0],
+        weeksFromInvestment: weeksFromInvestmentToday,
         percentReturn: Math.round(todayReturn * 100) / 100,
         investedBasis,
         currentValue: latestValue
       });
     }
 
-    // Sort by date
-    bubbleData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Sort by weeks from investment
+    bubbleData.sort((a, b) => a.weeksFromInvestment - b.weeksFromInvestment);
 
     return bubbleData;
   }

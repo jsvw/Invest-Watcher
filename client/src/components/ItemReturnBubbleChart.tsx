@@ -10,6 +10,7 @@ interface BubbleDataPoint {
   assetId: number;
   assetName: string;
   date: string;
+  weeksFromInvestment: number;
   percentReturn: number;
   investedBasis: number;
   currentValue: number;
@@ -48,7 +49,7 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
 
     const data = bubbleData.map(d => ({
       ...d,
-      x: new Date(d.date).getTime(),
+      x: d.weeksFromInvestment,
       y: d.percentReturn,
       z: d.investedBasis,
       fill: colors[d.assetName]
@@ -90,8 +91,8 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
   return (
     <Card data-testid="card-item-return-bubbles">
       <CardHeader>
-        <CardTitle>Item Returns Over Time</CardTitle>
-        <CardDescription>Bubble size represents invested amount. Y-axis shows % return.</CardDescription>
+        <CardTitle>Item Returns Over Investment Time</CardTitle>
+        <CardDescription>X-axis shows weeks since investment. Bubble size represents invested amount.</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
@@ -100,10 +101,11 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
             <XAxis 
               type="number"
               dataKey="x"
-              name="Date"
-              domain={['dataMin', 'dataMax']}
-              tickFormatter={(val) => format(new Date(val), 'MMM yyyy')}
+              name="Weeks"
+              domain={[0, 'dataMax']}
+              tickFormatter={(val) => `${Math.round(val)}w`}
               className="text-xs fill-muted-foreground"
+              label={{ value: 'Weeks since investment', position: 'insideBottom', offset: -10, className: 'fill-muted-foreground text-xs' }}
             />
             <YAxis 
               type="number"
@@ -127,7 +129,7 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
                 return (
                   <div className="bg-popover border rounded-lg p-3 shadow-lg">
                     <p className="font-medium">{data.assetName}</p>
-                    <p className="text-sm text-muted-foreground">{format(new Date(data.date), 'MMM dd, yyyy')}</p>
+                    <p className="text-sm text-muted-foreground">Week {Math.round(data.weeksFromInvestment)} ({format(new Date(data.date), 'MMM dd, yyyy')})</p>
                     <div className="mt-2 space-y-1 text-sm">
                       <p>Invested: {formatCurrency(data.investedBasis, currency)}</p>
                       <p>Value: {formatCurrency(data.currentValue, currency)}</p>
