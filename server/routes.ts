@@ -178,12 +178,22 @@ export async function registerRoutes(
   app.get(api.portfolio.history.path, async (req, res) => {
     try {
       const range = req.query.range as string || 'year';
+      const platformId = req.query.platformId ? Number(req.query.platformId) : null;
+      
       const allInvestments = await storage.getAllInvestments();
       const allValuations = await db.select().from(valuations).orderBy(desc(valuations.date));
       
+      const filteredInvestments = platformId 
+        ? allInvestments.filter(inv => inv.platformId === platformId)
+        : allInvestments;
+      
+      const filteredValuations = platformId
+        ? allValuations.filter(val => val.platformId === platformId)
+        : allValuations;
+      
       const dates = new Set<string>();
-      allInvestments.forEach(inv => dates.add(new Date(inv.date).toISOString().split('T')[0]));
-      allValuations.forEach(val => dates.add(new Date(val.date).toISOString().split('T')[0]));
+      filteredInvestments.forEach(inv => dates.add(new Date(inv.date).toISOString().split('T')[0]));
+      filteredValuations.forEach(val => dates.add(new Date(val.date).toISOString().split('T')[0]));
       
       let sortedDates = Array.from(dates).sort();
       
@@ -204,14 +214,14 @@ export async function registerRoutes(
         const dateObj = new Date(date);
         
         // Sum investments up to this date
-        const invested = allInvestments
+        const invested = filteredInvestments
           .filter(inv => new Date(inv.date) <= dateObj)
           .reduce((sum, inv) => sum + Number(inv.amount), 0);
           
         // Get latest valuation for each platform up to this date
         const platformLatestValuations = new Map<number, number>();
         // Process valuations in chronological order to find the latest for each platform by the target date
-        [...allValuations]
+        [...filteredValuations]
           .reverse() // Sort to chronological
           .filter(val => new Date(val.date) <= dateObj)
           .forEach(val => {

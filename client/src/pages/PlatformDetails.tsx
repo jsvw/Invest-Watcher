@@ -5,22 +5,35 @@ import { useInvestments } from "@/hooks/use-investments";
 import { useValuations } from "@/hooks/use-valuations";
 import { useRoute } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, TrendingUp, History, DollarSign } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend } from "recharts";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@shared/routes";
 
 export default function PlatformDetails() {
   const [, params] = useRoute("/platforms/:id");
   const id = Number(params?.id);
+  const [range, setRange] = useState("year");
   
   const { data: platform, isLoading: isPlatformLoading } = usePlatform(id);
   const { data: investments, isLoading: isInvestmentsLoading } = useInvestments(id);
   const { data: valuations, isLoading: isValuationsLoading } = useValuations(id);
 
-  if (isPlatformLoading || isInvestmentsLoading || isValuationsLoading) {
+  const { data: history, isLoading: isHistoryLoading } = useQuery({
+    queryKey: [api.portfolio.history.path, id, range],
+    queryFn: async () => {
+      const res = await fetch(`${api.portfolio.history.path}?range=${range}&platformId=${id}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch history");
+      return await res.json();
+    }
+  });
+
+  if (isPlatformLoading || isInvestmentsLoading || isValuationsLoading || isHistoryLoading) {
     return (
       <Layout>
         <div className="space-y-6">
@@ -45,15 +58,6 @@ export default function PlatformDetails() {
       </Layout>
     );
   }
-
-  // Prepare chart data (combine valuations with dates)
-  const chartData = [...(valuations || [])]
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-    .map(v => ({
-      date: format(new Date(v.date), 'MMM dd'),
-      value: Number(v.value),
-      originalDate: v.date // for tooltip
-    }));
 
   return (
     <Layout>
@@ -117,20 +121,26 @@ export default function PlatformDetails() {
 
           <TabsContent value="chart" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
             <Card>
-              <CardHeader>
-                <CardTitle>Value Over Time</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <CardTitle>Platform Performance</CardTitle>
+                  <CardDescription>Invested vs. Valuation over time</CardDescription>
+                </div>
+                <Tabs value={range} onValueChange={setRange} className="w-auto">
+                  <TabsList>
+                    <TabsTrigger value="7d">7D</TabsTrigger>
+                    <TabsTrigger value="month">1M</TabsTrigger>
+                    <TabsTrigger value="quarter">3M</TabsTrigger>
+                    <TabsTrigger value="year">1Y</TabsTrigger>
+                    <TabsTrigger value="all">ALL</TabsTrigger>
+                  </TabsList>
+                </Tabs>
               </CardHeader>
               <CardContent>
                 <div className="h-[400px] w-full">
-                  {chartData.length > 0 ? (
+                  {history && history.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartData}>
-                        <defs>
-                          <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={platform.color} stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor={platform.color} stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
+                      <LineChart data={history}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                         <XAxis 
                           dataKey="date" 
@@ -138,6 +148,7 @@ export default function PlatformDetails() {
                           fontSize={12} 
                           tickLine={false} 
                           axisLine={false} 
+                          tickFormatter={(date) => format(new Date(date), 'MMM yy')}
                         />
                         <YAxis 
                           stroke="hsl(var(--muted-foreground))" 
@@ -148,22 +159,33 @@ export default function PlatformDetails() {
                         />
                         <Tooltip 
                           contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                          formatter={(value: number) => [`$${value.toLocaleString()}`, "Value"]}
-                          labelFormatter={(label) => label}
+                          formatter={(value: number) => [`$${value.toLocaleString()}`, ""]}
+                          labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
                         />
-                        <Area 
+                        <Legend verticalAlign="top" height={36}/>
+                        <Line 
                           type="monotone" 
                           dataKey="value" 
+                          name="Current Value"
                           stroke={platform.color} 
                           strokeWidth={3}
-                          fillOpacity={1} 
-                          fill="url(#colorValue)" 
+                          dot={false}
+                          activeDot={{ r: 6 }}
                         />
-                      </AreaChart>
+                        <Line 
+                          type="monotone" 
+                          dataKey="invested" 
+                          name="Total Invested"
+                          stroke="#8884d8" 
+                          strokeWidth={2}
+                          strokeDasharray="5 5"
+                          dot={false}
+                        />
+                      </LineChart>
                     </ResponsiveContainer>
                   ) : (
                     <div className="h-full flex items-center justify-center text-muted-foreground">
-                      No valuation history available. Add a valuation to see the chart.
+                      No performance history available.
                     </div>
                   )}
                 </div>
