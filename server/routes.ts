@@ -635,6 +635,9 @@ export async function registerRoutes(
       const userId = getAuthenticatedUserId(req)!;
       const range = req.query.range as string || 'year';
       const platformId = req.query.platformId ? Number(req.query.platformId) : null;
+      const excludePlatforms = req.query.excludePlatforms 
+        ? (req.query.excludePlatforms as string).split(',').map(Number).filter(n => !isNaN(n))
+        : [];
       
       // Verify platform ownership if specified
       if (platformId) {
@@ -646,13 +649,19 @@ export async function registerRoutes(
       const userInvestments = await storage.getAllInvestmentsForUser(userId);
       const userValuations = await storage.getAllValuationsForUser(userId);
       
-      const filteredInvestments = platformId 
+      let filteredInvestments = platformId 
         ? userInvestments.filter(inv => inv.platformId === platformId)
         : userInvestments;
       
-      const filteredValuations = platformId
+      let filteredValuations = platformId
         ? userValuations.filter(val => val.platformId === platformId)
         : userValuations;
+      
+      // Apply platform exclusion filter
+      if (excludePlatforms.length > 0) {
+        filteredInvestments = filteredInvestments.filter(inv => !excludePlatforms.includes(inv.platformId));
+        filteredValuations = filteredValuations.filter(val => !excludePlatforms.includes(val.platformId));
+      }
       
       const dates = new Set<string>();
       filteredInvestments.forEach(inv => dates.add(new Date(inv.date).toISOString().split('T')[0]));

@@ -4,7 +4,7 @@ import { usePlatforms } from "@/hooks/use-platforms";
 import { useGenerateInsight } from "@/hooks/use-insights";
 import { useAuth } from "@/App";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
-import { Wallet, TrendingUp, DollarSign, BrainCircuit, RefreshCcw } from "lucide-react";
+import { Wallet, TrendingUp, DollarSign, BrainCircuit, RefreshCcw, Filter, Check } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -18,6 +18,10 @@ import { format } from "date-fns";
 import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -27,13 +31,15 @@ export default function Dashboard() {
   const [range, setRange] = useState("year");
   const [specificYear, setSpecificYear] = useState<string | null>(null);
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
+  const [excludedPlatforms, setExcludedPlatforms] = useState<number[]>([]);
 
   const { data: history, isLoading: isHistoryLoading } = useQuery({
-    queryKey: [api.portfolio.history.path, range, specificYear, specificMonth],
+    queryKey: [api.portfolio.history.path, range, specificYear, specificMonth, excludedPlatforms],
     queryFn: async () => {
       let url = `${api.portfolio.history.path}?range=${range}`;
       if (specificYear) url += `&year=${specificYear}`;
       if (specificMonth) url += `&month_select=${specificMonth}`;
+      if (excludedPlatforms.length > 0) url += `&excludePlatforms=${excludedPlatforms.join(',')}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch history");
       return await res.json();
@@ -81,8 +87,11 @@ export default function Dashboard() {
   const netProfit = totalValue - totalInvested;
   const roi = totalInvested > 0 ? (netProfit / totalInvested) * 100 : 0;
 
+  // Filter platforms based on exclusion list
+  const filteredPlatforms = platforms?.filter(p => !excludedPlatforms.includes(p.id)) || [];
+
   // Prepare Chart Data
-  const pieData = platforms?.reduce((acc: any[], platform) => {
+  const pieData = filteredPlatforms.reduce((acc: any[], platform) => {
     const existing = acc.find(item => item.name === platform.category);
     if (existing) {
       existing.value += Number(platform.currentValue) || 0;
@@ -90,7 +99,7 @@ export default function Dashboard() {
       acc.push({ name: platform.category, value: Number(platform.currentValue) || 0 });
     }
     return acc;
-  }, []) || [];
+  }, []);
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
@@ -104,14 +113,69 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold font-display tracking-tight text-foreground">Dashboard</h1>
             <p className="text-muted-foreground">Your financial overview at a glance.</p>
           </div>
-          <Button 
-            onClick={() => generateInsight("Analyze my portfolio allocation and performance.")}
-            className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0 shadow-lg shadow-indigo-500/25"
-            disabled={isInsightLoading}
-          >
-            {isInsightLoading ? <RefreshCcw className="h-4 w-4 animate-spin mr-2" /> : <BrainCircuit className="h-4 w-4 mr-2" />}
-            {isInsightLoading ? "Analyzing..." : "Get AI Insights"}
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="default" data-testid="button-platform-filter">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filter Platforms
+                  {excludedPlatforms.length > 0 && (
+                    <Badge variant="secondary" className="ml-2">
+                      {platforms?.length ? platforms.length - excludedPlatforms.length : 0}/{platforms?.length || 0}
+                    </Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64" align="end">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-sm">Select Platforms</h4>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setExcludedPlatforms([])}
+                      className="h-auto py-1 px-2 text-xs"
+                      data-testid="button-select-all-platforms"
+                    >
+                      Select All
+                    </Button>
+                  </div>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {platforms?.map((platform) => (
+                      <div key={platform.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`platform-${platform.id}`}
+                          checked={!excludedPlatforms.includes(platform.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setExcludedPlatforms(prev => prev.filter(id => id !== platform.id));
+                            } else {
+                              setExcludedPlatforms(prev => [...prev, platform.id]);
+                            }
+                          }}
+                          data-testid={`checkbox-platform-${platform.id}`}
+                        />
+                        <Label 
+                          htmlFor={`platform-${platform.id}`}
+                          className="text-sm cursor-pointer flex-1"
+                        >
+                          {platform.name}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Button 
+              onClick={() => generateInsight("Analyze my portfolio allocation and performance.")}
+              className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0 shadow-lg shadow-indigo-500/25"
+              disabled={isInsightLoading}
+            >
+              {isInsightLoading ? <RefreshCcw className="h-4 w-4 animate-spin mr-2" /> : <BrainCircuit className="h-4 w-4 mr-2" />}
+              {isInsightLoading ? "Analyzing..." : "Get AI Insights"}
+            </Button>
+          </div>
         </div>
 
         {/* Stats Grid */}
