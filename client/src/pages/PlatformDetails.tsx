@@ -210,8 +210,9 @@ export default function PlatformDetails() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="rounded-md border">
-                    <div className={`grid ${platformMode === "asset_returns" ? "grid-cols-7" : "grid-cols-6"} p-4 bg-muted/50 font-medium text-sm`}>
+                    <div className={`grid ${platformMode === "asset_returns" ? "grid-cols-8" : "grid-cols-6"} p-4 bg-muted/50 font-medium text-sm`}>
                       <div>Investment Date</div>
+                      {platformMode === "asset_returns" && <div>Exit Date</div>}
                       <div>Name</div>
                       <div>Invested</div>
                       {platformMode === "asset_returns" && <div>Yield</div>}
@@ -228,12 +229,17 @@ export default function PlatformDetails() {
                         assets.map((asset) => (
                           <div 
                             key={asset.id} 
-                            className={`grid ${platformMode === "asset_returns" ? "grid-cols-7" : "grid-cols-6"} p-4 text-sm hover:bg-muted/30 transition-colors items-center`}
+                            className={`grid ${platformMode === "asset_returns" ? "grid-cols-8" : "grid-cols-6"} p-4 text-sm hover:bg-muted/30 transition-colors items-center`}
                             data-testid={`row-asset-${asset.id}`}
                           >
                             <div className="text-muted-foreground">
                               {asset.acquisitionDate ? format(new Date(asset.acquisitionDate), 'MMM dd, yyyy') : '-'}
                             </div>
+                            {platformMode === "asset_returns" && (
+                              <div className="text-muted-foreground">
+                                {(asset as any).expectedExitDate ? format(new Date((asset as any).expectedExitDate), 'MMM dd, yyyy') : '-'}
+                              </div>
+                            )}
                             <div>
                               <div className="font-medium">{asset.name}</div>
                               {asset.description && (
@@ -266,6 +272,18 @@ export default function PlatformDetails() {
                                     </span>
                                   )}
                                 </Badge>
+                              ) : asset.status === "matured" ? (
+                                <div className="flex flex-col gap-1">
+                                  <Badge className="gap-1 bg-green-600">
+                                    <CheckCircle className="h-3 w-3" /> Matured
+                                  </Badge>
+                                  {asset.profitLoss !== undefined && asset.profitLoss > 0 && (
+                                    <span className="text-xs text-green-600">
+                                      +{((platform as any).currency || "USD") === "USD" ? "$" : ""}
+                                      {asset.profitLoss.toLocaleString()} earned
+                                    </span>
+                                  )}
+                                </div>
                               ) : (
                                 <div className="flex flex-col gap-1">
                                   <Badge variant="outline">Active</Badge>

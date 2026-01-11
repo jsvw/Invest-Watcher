@@ -45,6 +45,7 @@ export const assets = pgTable("assets", {
   investedAmount: numeric("invested_amount").notNull(), // Amount invested in this asset
   annualYield: numeric("annual_yield"), // For asset_returns mode: expected annual yield %
   acquisitionDate: timestamp("acquisition_date").notNull(),
+  expectedExitDate: timestamp("expected_exit_date"), // Maturity date for the investment
   status: text("status").notNull().default("active"), // 'active' or 'exited'
   exitDate: timestamp("exit_date"), // When the asset was sold
   exitPrice: numeric("exit_price"), // Sale price when exited

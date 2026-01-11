@@ -180,20 +180,34 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
+    const now = Date.now();
     return allAssets.map(asset => {
       const latestVal = latestValuationMap.get(asset.id);
       const investedAmount = Number(asset.investedAmount);
       let currentValue: number;
       let profitLoss: number | undefined;
+      let effectiveStatus = asset.status;
+      
+      // Check if asset has matured (expected exit date passed)
+      const isMatured = asset.expectedExitDate && new Date(asset.expectedExitDate).getTime() <= now && asset.status === "active";
       
       if (asset.status === "exited" && asset.exitPrice) {
         currentValue = Number(asset.exitPrice);
         profitLoss = currentValue - investedAmount;
+      } else if (isMatured && asset.annualYield && asset.acquisitionDate) {
+        // Calculate full term yield for matured assets
+        const acquisitionTime = new Date(asset.acquisitionDate).getTime();
+        const exitTime = new Date(asset.expectedExitDate!).getTime();
+        const yearsElapsed = (exitTime - acquisitionTime) / (365 * 24 * 60 * 60 * 1000);
+        const accumulatedYield = investedAmount * (Number(asset.annualYield) / 100) * yearsElapsed;
+        currentValue = investedAmount + accumulatedYield;
+        profitLoss = accumulatedYield;
+        effectiveStatus = "matured";
       } else if (latestVal !== undefined) {
         currentValue = latestVal;
         profitLoss = currentValue - investedAmount;
       } else if (asset.annualYield && asset.acquisitionDate) {
-        const yearsElapsed = (Date.now() - new Date(asset.acquisitionDate).getTime()) / (365 * 24 * 60 * 60 * 1000);
+        const yearsElapsed = (now - new Date(asset.acquisitionDate).getTime()) / (365 * 24 * 60 * 60 * 1000);
         const accumulatedYield = investedAmount * (Number(asset.annualYield) / 100) * yearsElapsed;
         currentValue = investedAmount + accumulatedYield;
         profitLoss = accumulatedYield;
@@ -203,6 +217,7 @@ export class DatabaseStorage implements IStorage {
       
       return {
         ...asset,
+        status: effectiveStatus,
         currentValue: Math.round(currentValue * 100) / 100,
         profitLoss: profitLoss !== undefined ? Math.round(profitLoss * 100) / 100 : undefined
       };
