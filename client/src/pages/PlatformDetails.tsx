@@ -30,6 +30,7 @@ import { AssetValuationDialog } from "@/components/AssetValuationDialog";
 import { AssetValuationImportDialog } from "@/components/AssetValuationImportDialog";
 import { AggregatedPerformancePanel } from "@/components/AggregatedPerformancePanel";
 import { AssetValuationHoverCard } from "@/components/AssetValuationHoverCard";
+import { ItemReturnBubbleChart } from "@/components/ItemReturnBubbleChart";
 import type { Asset } from "@shared/schema";
 
 function AssetActionsMenu({ asset, platformId, platformMode }: { asset: Asset; platformId: number; platformMode: "asset_returns" | "item_valuations" }) {
@@ -355,6 +356,11 @@ export default function PlatformDetails() {
                   totalInvested={platformTotalInvested}
                   currentValue={platformCurrentValue}
                 />
+              )}
+
+              {/* Bubble chart for item_valuations mode showing % return over time */}
+              {platformMode === "item_valuations" && (
+                <ItemReturnBubbleChart platformId={id} currency={currency} />
               )}
 
               <Card>
