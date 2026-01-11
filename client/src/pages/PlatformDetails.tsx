@@ -86,6 +86,47 @@ export default function PlatformDetails() {
   const platformTotalInvested = statsData.invested;
   const platformCurrentValue = statsData.value;
 
+  // Calculate monthly increase for asset_returns platforms
+  const monthlyIncrease = (() => {
+    if (platformMode !== "asset_returns" || !assets || assets.length === 0) return 0;
+    
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const daysInMonth = monthEnd.getDate();
+    
+    let total = 0;
+    
+    for (const asset of assets) {
+      if (!asset.annualYield || asset.status === "exited") continue;
+      
+      const investedAmount = Number(asset.investedAmount);
+      const annualYield = Number(asset.annualYield);
+      const acquisitionDate = new Date(asset.acquisitionDate);
+      const exitDate = asset.exitDate ? new Date(asset.exitDate) : null;
+      
+      // Asset acquired after this month ends - skip
+      if (acquisitionDate > monthEnd) continue;
+      
+      // Asset exited before this month started - skip
+      if (exitDate && exitDate < monthStart) continue;
+      
+      // Calculate active days this month
+      const effectiveStart = acquisitionDate > monthStart ? acquisitionDate : monthStart;
+      const effectiveEnd = exitDate && exitDate < now ? exitDate : now < monthEnd ? now : monthEnd;
+      
+      const activeDays = Math.max(0, Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (24 * 60 * 60 * 1000)) + 1);
+      
+      // Monthly yield prorated by active days
+      const monthlyYield = (investedAmount * (annualYield / 100)) / 12;
+      const proratedYield = monthlyYield * (activeDays / daysInMonth);
+      
+      total += proratedYield;
+    }
+    
+    return Math.round(total * 100) / 100;
+  })();
+
   if (isPlatformLoading || isInvestmentsLoading || isValuationsLoading || isHistoryLoading || isAssetsLoading) {
     return (
       <Layout>
@@ -158,7 +199,7 @@ export default function PlatformDetails() {
         </div>
 
         {/* Overview Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className={`grid grid-cols-1 ${platformMode === "asset_returns" ? "md:grid-cols-3" : "md:grid-cols-2"} gap-6`}>
           <Card className="bg-gradient-to-br from-card to-muted/50">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Current Value</CardTitle>
@@ -183,6 +224,20 @@ export default function PlatformDetails() {
               </div>
             </CardContent>
           </Card>
+          {platformMode === "asset_returns" && (
+            <Card className="bg-gradient-to-br from-card to-muted/50" data-testid="card-monthly-increase">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Increase This Month</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold font-display text-green-600">
+                  +{((platform as any).currency || "USD") === "USD" ? "$" : ""}
+                  {monthlyIncrease.toLocaleString()}
+                  {((platform as any).currency || "USD") !== "USD" ? ` ${(platform as any).currency}` : ""}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Main Content Tabs */}
