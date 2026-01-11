@@ -64,15 +64,6 @@ export default function PlatformDetails() {
     ? Number([...valuations].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0].value) 
     : 0;
 
-  const { data: history, isLoading: isHistoryLoading } = useQuery({
-    queryKey: [api.portfolio.history.path, id, range],
-    queryFn: async () => {
-      const res = await fetch(`${api.portfolio.history.path}?range=${range}&platformId=${id}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch history");
-      return await res.json();
-    }
-  });
-
   if (isPlatformLoading || isInvestmentsLoading || isValuationsLoading || isHistoryLoading) {
     return (
       <Layout>
