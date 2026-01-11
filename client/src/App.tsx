@@ -8,7 +8,6 @@ import Dashboard from "@/pages/Dashboard";
 import Platforms from "@/pages/Platforms";
 import PlatformDetails from "@/pages/PlatformDetails";
 import Analytics from "@/pages/Analytics";
-import AssetDashboard from "@/pages/AssetDashboard";
 import Landing from "@/pages/Landing";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
@@ -42,9 +41,6 @@ function Router() {
       </Route>
       <Route path="/analytics">
         {(params) => <ProtectedRoute component={Analytics} {...params} />}
-      </Route>
-      <Route path="/assets">
-        {(params) => <ProtectedRoute component={AssetDashboard} {...params} />}
       </Route>
       <Route component={NotFound} />
     </Switch>
