@@ -352,7 +352,7 @@ export default function Dashboard() {
             <div className="h-[400px] w-full">
               {history && history.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={history}>
+                  <LineChart data={history.map((h: any) => ({ ...h, gain: h.value - h.invested }))}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                     <XAxis 
                       dataKey="date" 
@@ -363,15 +363,30 @@ export default function Dashboard() {
                       tickFormatter={(date) => format(new Date(date), 'MMM yy')}
                     />
                     <YAxis 
+                      yAxisId="left"
                       stroke="hsl(var(--muted-foreground))" 
                       fontSize={12} 
                       tickLine={false} 
                       axisLine={false} 
                       tickFormatter={(value) => `${getCurrencySymbol(currency)}${(value / 1000).toFixed(0)}k`}
                     />
+                    <YAxis 
+                      yAxisId="right"
+                      orientation="right"
+                      stroke="#10b981" 
+                      fontSize={12} 
+                      tickLine={false} 
+                      axisLine={false} 
+                      tickFormatter={(value) => `${value >= 0 ? '+' : ''}${getCurrencySymbol(currency)}${(value / 1000).toFixed(0)}k`}
+                    />
                     <Tooltip 
                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                      formatter={(value: number) => [formatCurrency(value, currency), ""]}
+                      formatter={(value: number, name: string) => [
+                        name === "Profit/Loss" 
+                          ? `${value >= 0 ? '+' : ''}${formatCurrency(value, currency)}`
+                          : formatCurrency(value, currency), 
+                        ""
+                      ]}
                       labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
                     />
                     <Legend verticalAlign="top" height={36}/>
@@ -379,6 +394,7 @@ export default function Dashboard() {
                       type="monotone" 
                       dataKey="value" 
                       name="Current Value"
+                      yAxisId="left"
                       stroke="hsl(var(--primary))" 
                       strokeWidth={3}
                       dot={false}
@@ -388,10 +404,21 @@ export default function Dashboard() {
                       type="monotone" 
                       dataKey="invested" 
                       name="Total Invested"
+                      yAxisId="left"
                       stroke="#8884d8" 
                       strokeWidth={2}
                       strokeDasharray="5 5"
                       dot={false}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="gain" 
+                      name="Profit/Loss"
+                      yAxisId="right"
+                      stroke="#10b981" 
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4, fill: "#10b981" }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
