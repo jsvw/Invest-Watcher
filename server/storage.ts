@@ -123,7 +123,7 @@ export class DatabaseStorage implements IStorage {
       platformId: valuations.platformId,
       value: valuations.value,
       date: valuations.date,
-      notes: valuations.notes,
+      createdAt: valuations.createdAt,
     })
       .from(valuations)
       .innerJoin(platforms, eq(valuations.platformId, platforms.id))
@@ -137,6 +137,7 @@ export class DatabaseStorage implements IStorage {
       amount: investments.amount,
       date: investments.date,
       notes: investments.notes,
+      createdAt: investments.createdAt,
     })
       .from(investments)
       .innerJoin(platforms, eq(investments.platformId, platforms.id))
@@ -245,6 +246,7 @@ export class DatabaseStorage implements IStorage {
       amount: investments.amount,
       date: investments.date,
       notes: investments.notes,
+      createdAt: investments.createdAt,
     })
       .from(investments)
       .innerJoin(platforms, eq(investments.platformId, platforms.id))
@@ -260,7 +262,7 @@ export class DatabaseStorage implements IStorage {
       platformId: valuations.platformId,
       value: valuations.value,
       date: valuations.date,
-      notes: valuations.notes,
+      createdAt: valuations.createdAt,
     })
       .from(valuations)
       .innerJoin(platforms, eq(valuations.platformId, platforms.id))
