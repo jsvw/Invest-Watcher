@@ -4,6 +4,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer, Cell 
 } from "recharts";
+import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { formatCurrency } from "@/lib/currency";
 
 interface AssetPerformancePoint {
   date: string;
@@ -13,11 +15,16 @@ interface AssetPerformancePoint {
 interface AggregatedPerformancePanelProps {
   assetPerformance: AssetPerformancePoint[];
   currency: string;
+  totalInvested?: number;
+  currentValue?: number;
 }
 
-export function AggregatedPerformancePanel({ assetPerformance, currency }: AggregatedPerformancePanelProps) {
+export function AggregatedPerformancePanel({ assetPerformance, currency, totalInvested = 0, currentValue = 0 }: AggregatedPerformancePanelProps) {
   const currencySymbol = currency === "USD" ? "$" : "";
   const currencySuffix = currency !== "USD" ? ` ${currency}` : "";
+  
+  const profitLoss = currentValue - totalInvested;
+  const profitLossPercent = totalInvested > 0 ? (profitLoss / totalInvested) * 100 : 0;
 
   const topContributors = useMemo(() => {
     if (assetPerformance.length === 0) return [];
@@ -66,6 +73,45 @@ export function AggregatedPerformancePanel({ assetPerformance, currency }: Aggre
 
   return (
     <div className="space-y-6">
+      {(totalInvested > 0 || currentValue > 0) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Portfolio Summary</CardTitle>
+            <CardDescription>Overall performance metrics</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-lg bg-muted/50">
+                <div className="text-sm text-muted-foreground">Total Invested</div>
+                <div className="text-2xl font-bold" data-testid="text-total-invested">
+                  {formatCurrency(totalInvested, currency)}
+                </div>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/50">
+                <div className="text-sm text-muted-foreground">Current Value</div>
+                <div className="text-2xl font-bold" data-testid="text-current-value">
+                  {formatCurrency(currentValue, currency)}
+                </div>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/50">
+                <div className="text-sm text-muted-foreground">Profit / Loss</div>
+                <div className={`text-2xl font-bold flex items-center gap-2 ${
+                  Math.abs(profitLossPercent) < 0.1 ? 'text-muted-foreground' : 
+                  profitLoss >= 0 ? 'text-green-600' : 'text-red-600'
+                }`} data-testid="text-profit-loss">
+                  {Math.abs(profitLossPercent) < 0.1 ? <Minus className="h-5 w-5" /> : 
+                   profitLoss >= 0 ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
+                  {profitLoss >= 0 ? '+' : ''}{formatCurrency(profitLoss, currency)}
+                  <span className="text-sm font-normal">
+                    ({profitLoss >= 0 ? '+' : ''}{profitLossPercent.toFixed(1)}%)
+                  </span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Top Holdings</CardTitle>

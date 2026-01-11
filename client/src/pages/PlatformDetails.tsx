@@ -349,6 +349,8 @@ export default function PlatformDetails() {
                 <AggregatedPerformancePanel 
                   assetPerformance={assetPerformance}
                   currency={currency}
+                  totalInvested={platformTotalInvested}
+                  currentValue={platformCurrentValue}
                 />
               )}
 
