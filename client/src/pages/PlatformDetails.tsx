@@ -692,6 +692,11 @@ export default function PlatformDetails() {
                           </div>
                           <div className={`font-medium ${item.type === 'withdrawal' ? 'text-red-600' : ''}`}>
                             {item.type === 'withdrawal' ? '-' : ''}{formatCurrency(item.amount, currency)}
+                            {item.type === 'investment' && (item as any).bonusAmount && Number((item as any).bonusAmount) > 0 && (
+                              <span className="text-xs text-muted-foreground ml-1">
+                                (+{formatCurrency((item as any).bonusAmount, currency)} bonus)
+                              </span>
+                            )}
                           </div>
                           <div className="text-muted-foreground truncate">{item.notes || "-"}</div>
                           <div className="flex justify-end">

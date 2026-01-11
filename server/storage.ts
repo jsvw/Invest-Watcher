@@ -286,6 +286,7 @@ export class DatabaseStorage implements IStorage {
       id: investments.id,
       platformId: investments.platformId,
       amount: investments.amount,
+      bonusAmount: investments.bonusAmount,
       date: investments.date,
       notes: investments.notes,
       createdAt: investments.createdAt,

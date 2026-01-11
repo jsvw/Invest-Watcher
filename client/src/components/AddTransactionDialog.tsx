@@ -20,6 +20,7 @@ import { z } from "zod";
 
 const investmentFormSchema = insertInvestmentSchema.extend({
   amount: z.coerce.number().min(0.01, "Amount must be greater than 0"),
+  bonusAmount: z.coerce.number().min(0).optional(),
   date: z.coerce.date().transform(d => d.toISOString().split('T')[0]),
 });
 
@@ -72,6 +73,7 @@ export function AddTransactionDialog({ platformId, type, initialData, mode = "ad
     defaultValues: initialData || {
       platformId,
       amount: 0,
+      bonusAmount: 0,
       value: 0,
       currentValue: 0,
       date: new Date().toISOString().split('T')[0],
@@ -90,13 +92,14 @@ export function AddTransactionDialog({ platformId, type, initialData, mode = "ad
       ...data, 
       platformId,
       amount: data.amount !== undefined ? String(data.amount) : undefined,
+      bonusAmount: data.bonusAmount ? String(data.bonusAmount) : null,
       value: data.value !== undefined ? String(data.value) : undefined,
       currentValue: data.currentValue !== undefined ? String(data.currentValue) : undefined,
     };
     const onSuccess = () => {
       setOpen(false);
       if (!isEdit) {
-        form.reset({ ...data, amount: 0, value: 0, currentValue: 0, notes: "" });
+        form.reset({ ...data, amount: 0, bonusAmount: 0, value: 0, currentValue: 0, notes: "" });
       }
     };
     
@@ -186,6 +189,20 @@ export function AddTransactionDialog({ platformId, type, initialData, mode = "ad
               </p>
             )}
           </div>
+
+          {isInvestment && (
+            <div className="space-y-2">
+              <Label htmlFor="bonusAmount">Bonus Amount (Optional)</Label>
+              <Input 
+                id="bonusAmount"
+                type="number" 
+                step="0.01"
+                {...form.register("bonusAmount")} 
+                placeholder="e.g. 50"
+                data-testid="input-bonus-amount"
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="date">Date</Label>
