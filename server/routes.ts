@@ -2,14 +2,20 @@ import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { valuations, insertAssetSchema, insertAssetValuationSchema } from "@shared/schema";
+import { valuations, assets, assetValuations, insertAssetSchema, insertAssetValuationSchema } from "@shared/schema";
 import { api } from "@shared/routes";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, ilike } from "drizzle-orm";
 import { z } from "zod";
 import { registerChatRoutes } from "./replit_integrations/chat";
 import { registerImageRoutes } from "./replit_integrations/image";
 import OpenAI from "openai";
 import { importInvestmentData } from "./seed_data";
+import multer from "multer";
+import Papa from "papaparse";
+import fs from "fs";
+
+// Configure multer for file uploads
+const upload = multer({ dest: "/tmp/uploads/" });
 
 // Initialize OpenAI client for insights
 const openai = new OpenAI({
@@ -280,6 +286,123 @@ export async function registerRoutes(
         });
       }
       res.status(404).json({ message: "Asset valuation not found" });
+    }
+  });
+
+  // --- CSV Import for Asset Valuations ---
+  app.post('/api/platforms/:platformId/asset-valuations/import', upload.single('file'), async (req, res) => {
+    try {
+      const platformId = Number(req.params.platformId);
+      const file = req.file;
+      
+      if (!file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      // Read and parse CSV file
+      const fileContent = fs.readFileSync(file.path, 'utf-8');
+      fs.unlinkSync(file.path); // Clean up temp file
+      
+      const parseResult = Papa.parse(fileContent, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header) => header.trim().toLowerCase(),
+      });
+
+      if (parseResult.errors.length > 0) {
+        return res.status(400).json({ 
+          message: "CSV parsing error", 
+          errors: parseResult.errors.map(e => e.message) 
+        });
+      }
+
+      // Get all assets for this platform for name matching
+      const platformAssets = await db.select().from(assets)
+        .where(eq(assets.platformId, platformId));
+
+      const results = {
+        success: 0,
+        failed: 0,
+        errors: [] as { row: number; assetName: string; error: string }[]
+      };
+
+      // Process each row
+      for (let i = 0; i < parseResult.data.length; i++) {
+        const row = parseResult.data[i] as Record<string, string>;
+        const rowNum = i + 2; // Account for header row and 0-index
+
+        // Find asset name column (supports various column names)
+        const assetName = row['asset'] || row['asset name'] || row['name'] || row['assetname'] || '';
+        const valueStr = row['value'] || row['valuation'] || row['price'] || row['current value'] || '';
+        const dateStr = row['date'] || row['valuation date'] || row['valuationdate'] || '';
+
+        if (!assetName.trim()) {
+          results.failed++;
+          results.errors.push({ row: rowNum, assetName: '(empty)', error: 'Missing asset name' });
+          continue;
+        }
+
+        if (!valueStr.trim()) {
+          results.failed++;
+          results.errors.push({ row: rowNum, assetName, error: 'Missing value' });
+          continue;
+        }
+
+        // Parse value - remove currency symbols and commas
+        const cleanValue = valueStr.replace(/[^0-9.,\-]/g, '').replace(',', '.');
+        const value = parseFloat(cleanValue);
+        if (isNaN(value)) {
+          results.failed++;
+          results.errors.push({ row: rowNum, assetName, error: `Invalid value: ${valueStr}` });
+          continue;
+        }
+
+        // Parse date
+        let date: Date;
+        if (dateStr.trim()) {
+          date = new Date(dateStr);
+          if (isNaN(date.getTime())) {
+            results.failed++;
+            results.errors.push({ row: rowNum, assetName, error: `Invalid date: ${dateStr}` });
+            continue;
+          }
+        } else {
+          date = new Date(); // Default to today
+        }
+
+        // Match asset by name (case-insensitive)
+        const matchedAsset = platformAssets.find(a => 
+          a.name.toLowerCase().trim() === assetName.toLowerCase().trim()
+        );
+
+        if (!matchedAsset) {
+          results.failed++;
+          results.errors.push({ row: rowNum, assetName, error: 'Asset not found in platform' });
+          continue;
+        }
+
+        try {
+          // Create the valuation
+          await storage.createAssetValuation({
+            assetId: matchedAsset.id,
+            value: value.toString(),
+            date,
+            notes: `Imported from CSV`,
+          });
+          results.success++;
+        } catch (error) {
+          results.failed++;
+          results.errors.push({ row: rowNum, assetName, error: 'Failed to create valuation' });
+        }
+      }
+
+      res.json({
+        message: `Import complete: ${results.success} valuations created, ${results.failed} failed`,
+        ...results
+      });
+    } catch (error) {
+      console.error("CSV import error:", error);
+      res.status(500).json({ message: "Failed to import CSV" });
     }
   });
 
