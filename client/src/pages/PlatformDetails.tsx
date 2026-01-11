@@ -160,8 +160,11 @@ export default function PlatformDetails() {
                   <CardDescription>Invested vs. Valuation over time</CardDescription>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  {range === "year" && (
-                    <Select value={specificYear || ""} onValueChange={(val) => setRange(`year-${val}`)}>
+                  {(range === "year" || range.startsWith("year-")) && (
+                    <Select value={specificYear || (range.startsWith("year-") ? range.split("-")[1] : "")} onValueChange={(val) => {
+                      setRange(`year-${val}`);
+                      setSpecificYear(val);
+                    }}>
                       <SelectTrigger className="w-[100px] h-9">
                         <SelectValue placeholder="Year" />
                       </SelectTrigger>
@@ -172,9 +175,9 @@ export default function PlatformDetails() {
                       </SelectContent>
                     </Select>
                   )}
-                  {range === "month" && (
+                  {(range === "month" || range.startsWith("month-")) && (
                     <div className="flex gap-2">
-                      <Select value={specificYear || currentYear} onValueChange={(val) => setSpecificYear(val)}>
+                      <Select value={specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear)} onValueChange={(val) => setSpecificYear(val)}>
                         <SelectTrigger className="w-[100px] h-9">
                           <SelectValue placeholder="Year" />
                         </SelectTrigger>
@@ -184,12 +187,16 @@ export default function PlatformDetails() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <Select value={specificMonth || ""} onValueChange={(val) => setRange(`month-${specificYear || currentYear}-${val}`)}>
+                      <Select value={specificMonth || (range.startsWith("month-") ? range.split("-")[2] : "")} onValueChange={(val) => {
+                        const year = specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear);
+                        setRange(`month-${year}-${val}`);
+                        setSpecificMonth(val);
+                      }}>
                         <SelectTrigger className="w-[120px] h-9">
                           <SelectValue placeholder="Month" />
                         </SelectTrigger>
                         <SelectContent>
-                          {monthsData.filter((m: any) => m.year === (specificYear || currentYear)).map((m: any) => (
+                          {monthsData.filter((m: any) => m.year === (specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear))).map((m: any) => (
                             <SelectItem key={`${m.year}-${m.value}`} value={m.value}>{m.label}</SelectItem>
                           ))}
                         </SelectContent>
