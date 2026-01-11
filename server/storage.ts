@@ -220,7 +220,8 @@ export class DatabaseStorage implements IStorage {
       
       if (asset.status === "exited" && asset.exitPrice) {
         currentValue = Number(asset.exitPrice);
-        profitLoss = currentValue - totalInvested;
+        // Profit is exit value minus user's own investment (bonus is free money, counts as profit)
+        profitLoss = currentValue - userInvested;
       } else if (isMatured && asset.annualYield && asset.acquisitionDate) {
         // Calculate full term yield for matured assets
         const acquisitionTime = new Date(asset.acquisitionDate).getTime();
@@ -268,7 +269,8 @@ export class DatabaseStorage implements IStorage {
 
     if (asset.status === "exited" && asset.exitPrice) {
       currentValue = Number(asset.exitPrice);
-      profitLoss = currentValue - totalInvested;
+      // Profit is exit value minus user's own investment (bonus is free money, counts as profit)
+      profitLoss = currentValue - userInvested;
     } else if (latestValuation) {
       currentValue = Number(latestValuation.value);
       profitLoss = currentValue - totalInvested;
