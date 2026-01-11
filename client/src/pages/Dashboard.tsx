@@ -145,30 +145,38 @@ export default function Dashboard() {
               if (!history || history.length < 2) return "N/A";
               const current = history[history.length - 1];
               const previous = history[history.length - 2];
-              const momChange = current.value - previous.value;
-              return formatCurrency(momChange, currency);
+              const currentMoM = current.value - previous.value;
+              return formatCurrency(currentMoM, currency);
             })()} 
             trend={(() => {
-              if (!history || history.length < 2) return undefined;
+              if (!history || history.length < 3) return undefined;
               const current = history[history.length - 1];
               const previous = history[history.length - 2];
-              return (current.value - previous.value) >= 0 ? "up" : "down";
+              const twoMonthsAgo = history[history.length - 3];
+              const currentMoM = current.value - previous.value;
+              const previousMoM = previous.value - twoMonthsAgo.value;
+              return (currentMoM - previousMoM) >= 0 ? "up" : "down";
             })()}
             trendValue={(() => {
-              if (!history || history.length < 2) return "";
+              if (!history || history.length < 3) return "";
               const current = history[history.length - 1];
               const previous = history[history.length - 2];
-              const momChange = current.value - previous.value;
-              if (previous.value === 0) return "New";
-              const percent = (momChange / previous.value) * 100;
-              return `${Math.abs(percent).toFixed(1)}% (${formatCurrency(Math.abs(momChange), currency)})`;
+              const twoMonthsAgo = history[history.length - 3];
+              const currentMoM = current.value - previous.value;
+              const previousMoM = previous.value - twoMonthsAgo.value;
+              if (previousMoM === 0) return "New";
+              const changePercent = ((currentMoM - previousMoM) / Math.abs(previousMoM)) * 100;
+              return `${Math.abs(changePercent).toFixed(1)}%`;
             })()}
             icon={TrendingUp}
             className={(() => {
-              if (!history || history.length < 2) return "border-l-muted";
+              if (!history || history.length < 3) return "border-l-muted";
               const current = history[history.length - 1];
               const previous = history[history.length - 2];
-              return (current.value - previous.value) >= 0 ? "border-l-emerald-500" : "border-l-rose-500";
+              const twoMonthsAgo = history[history.length - 3];
+              const currentMoM = current.value - previous.value;
+              const previousMoM = previous.value - twoMonthsAgo.value;
+              return (currentMoM - previousMoM) >= 0 ? "border-l-emerald-500" : "border-l-rose-500";
             })()}
             data-testid="stat-mom-profit"
           />
