@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
 import { useCreateAsset, useUpdateAsset, useDeleteAsset } from "@/hooks/use-assets";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import type { Asset } from "@shared/schema";
 
@@ -61,6 +61,25 @@ export function AddAssetDialog({ platformId, mode, editAsset, open: controlledOp
         : "",
     },
   });
+
+  useEffect(() => {
+    if (open && isEdit && editAsset) {
+      form.reset({
+        platformId,
+        name: editAsset.name || "",
+        description: editAsset.description || "",
+        investedAmount: editAsset.investedAmount || "",
+        bonusAmount: (editAsset as any).bonusAmount || "",
+        annualYield: editAsset.annualYield || "",
+        acquisitionDate: editAsset.acquisitionDate 
+          ? new Date(editAsset.acquisitionDate).toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0],
+        exitDate: editAsset.exitDate 
+          ? new Date(editAsset.exitDate).toISOString().split('T')[0]
+          : "",
+      });
+    }
+  }, [open, isEdit, editAsset, form, platformId]);
 
   const onSubmit = (data: AssetFormData) => {
     const payload = {
