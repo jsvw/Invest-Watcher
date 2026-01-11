@@ -338,7 +338,7 @@ export default function PlatformDetails() {
                         placeholder="Filter..."
                         value={assetNameFilter}
                         onChange={(e) => setAssetNameFilter(e.target.value)}
-                        className="pl-8 w-32"
+                        className="pl-8 w-24"
                         data-testid="input-filter-name"
                       />
                     </div>
