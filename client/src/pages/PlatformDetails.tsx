@@ -278,7 +278,6 @@ export default function PlatformDetails() {
                        {platformMode === "asset_returns" ? "Asset Tracking" : "Item Tracking"}
                      </Badge></>
                    )}
-                   {platform.description && ` • ${platform.description}`}
                  </p>
                </div>
             </div>
