@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Wallet, PieChart, TrendingUp, Menu, X } from "lucide-react";
+import { LayoutDashboard, Wallet, PieChart, TrendingUp, Menu, X, Building } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +10,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/platforms", label: "Platforms", icon: Wallet },
+    { href: "/assets", label: "Assets", icon: Building },
     { href: "/analytics", label: "Analytics", icon: PieChart },
   ];
 
