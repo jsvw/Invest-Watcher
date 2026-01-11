@@ -2,8 +2,8 @@ import type { Express, Request, Response, NextFunction } from "express";
 import session from "express-session";
 import bcrypt from "bcrypt";
 import { db } from "./db";
-import { users } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { users, platforms, investments, valuations, assets, assetValuations } from "@shared/schema";
+import { eq, sql, inArray } from "drizzle-orm";
 import { z } from "zod";
 import connectPgSimple from "connect-pg-simple";
 
@@ -249,6 +249,66 @@ export function setupAuth(app: Express) {
       }
       console.error("Change password error:", err);
       res.status(500).json({ message: "Failed to change password" });
+    }
+  });
+
+  app.delete("/api/auth/account", async (req: Request, res: Response) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    try {
+      const userId = req.session.userId;
+
+      // Get all platform IDs for the user
+      const userPlatforms = await db
+        .select({ id: platforms.id })
+        .from(platforms)
+        .where(eq(platforms.userId, userId));
+      
+      const platformIds = userPlatforms.map(p => p.id);
+
+      if (platformIds.length > 0) {
+        // Get all asset IDs for the user's platforms
+        const userAssets = await db
+          .select({ id: assets.id })
+          .from(assets)
+          .where(inArray(assets.platformId, platformIds));
+        
+        const assetIds = userAssets.map(a => a.id);
+
+        // Delete asset valuations
+        if (assetIds.length > 0) {
+          await db.delete(assetValuations).where(inArray(assetValuations.assetId, assetIds));
+        }
+
+        // Delete assets
+        await db.delete(assets).where(inArray(assets.platformId, platformIds));
+
+        // Delete valuations
+        await db.delete(valuations).where(inArray(valuations.platformId, platformIds));
+
+        // Delete investments
+        await db.delete(investments).where(inArray(investments.platformId, platformIds));
+
+        // Delete platforms
+        await db.delete(platforms).where(eq(platforms.userId, userId));
+      }
+
+      // Delete user
+      await db.delete(users).where(eq(users.id, userId));
+
+      // Destroy session
+      req.session.destroy((err) => {
+        if (err) {
+          console.error("Session destroy error:", err);
+        }
+        res.clearCookie("connect.sid");
+        res.json({ message: "Account deleted successfully" });
+      });
+    } catch (err) {
+      console.error("Delete account error:", err);
+      res.status(500).json({ message: "Failed to delete account" });
     }
   });
 }
