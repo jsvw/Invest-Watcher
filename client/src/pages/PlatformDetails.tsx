@@ -4,6 +4,7 @@ import { PlatformSettingsDialog } from "@/components/PlatformSettingsDialog";
 import { usePlatform, usePlatforms } from "@/hooks/use-platforms";
 import { useInvestments } from "@/hooks/use-investments";
 import { useValuations } from "@/hooks/use-valuations";
+import { useWithdrawals } from "@/hooks/use-withdrawals";
 import { useAssets } from "@/hooks/use-assets";
 import { useAuth } from "@/App";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
@@ -104,6 +105,7 @@ export default function PlatformDetails() {
   const { data: platform, isLoading: isPlatformLoading } = usePlatform(id);
   const { data: investments, isLoading: isInvestmentsLoading } = useInvestments(id);
   const { data: valuations, isLoading: isValuationsLoading } = useValuations(id);
+  const { data: withdrawals, isLoading: isWithdrawalsLoading } = useWithdrawals(id);
   
   const platformMode = (platform as any)?.platformMode || "standard";
   const { data: assets, isLoading: isAssetsLoading } = useAssets(id);
@@ -225,7 +227,7 @@ export default function PlatformDetails() {
     return Math.round(total * 100) / 100;
   })();
 
-  if (isPlatformLoading || isInvestmentsLoading || isValuationsLoading || isHistoryLoading || isAssetsLoading) {
+  if (isPlatformLoading || isInvestmentsLoading || isValuationsLoading || isWithdrawalsLoading || isHistoryLoading || isAssetsLoading) {
     return (
       <Layout>
         <div className="space-y-6">
@@ -661,29 +663,40 @@ export default function PlatformDetails() {
             <Card>
               <CardContent className="p-0">
                 <div className="rounded-md border">
-                  <div className="grid grid-cols-4 p-4 bg-muted/50 font-medium text-sm">
+                  <div className="grid grid-cols-5 p-4 bg-muted/50 font-medium text-sm">
                     <div>Date</div>
+                    <div>Type</div>
                     <div>Amount</div>
                     <div>Notes</div>
                     <div className="text-right">Actions</div>
                   </div>
                   <div className="divide-y">
-                    {investments?.length === 0 ? (
-                       <div className="p-8 text-center text-muted-foreground">No investments recorded yet.</div>
+                    {(investments?.length === 0 && withdrawals?.length === 0) ? (
+                       <div className="p-8 text-center text-muted-foreground">No transactions recorded yet.</div>
                     ) : (
-                      investments?.map((inv) => (
-                        <div key={inv.id} className="grid grid-cols-4 p-4 text-sm hover:bg-muted/30 transition-colors items-center">
-                          <div className="text-muted-foreground">{format(new Date(inv.date), 'MMM dd, yyyy')}</div>
-                          <div className="font-medium">{formatCurrency(inv.amount, currency)}</div>
-                          <div className="text-muted-foreground truncate">{inv.notes || "-"}</div>
+                      [...(investments || []).map(inv => ({ ...inv, type: 'investment' as const })),
+                       ...(withdrawals || []).map(w => ({ ...w, type: 'withdrawal' as const }))]
+                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                        .map((item) => (
+                        <div key={`${item.type}-${item.id}`} className="grid grid-cols-5 p-4 text-sm hover:bg-muted/30 transition-colors items-center" data-testid={`row-${item.type}-${item.id}`}>
+                          <div className="text-muted-foreground">{format(new Date(item.date), 'MMM dd, yyyy')}</div>
+                          <div>
+                            <Badge variant={item.type === 'investment' ? 'default' : 'secondary'}>
+                              {item.type === 'investment' ? 'Deposit' : 'Withdrawal'}
+                            </Badge>
+                          </div>
+                          <div className={`font-medium ${item.type === 'withdrawal' ? 'text-red-600' : ''}`}>
+                            {item.type === 'withdrawal' ? '-' : ''}{formatCurrency(item.amount, currency)}
+                          </div>
+                          <div className="text-muted-foreground truncate">{item.notes || "-"}</div>
                           <div className="flex justify-end">
                             <AddTransactionDialog 
                               platformId={id} 
-                              type="investment" 
+                              type={item.type} 
                               mode="edit" 
                               initialData={{
-                                ...inv,
-                                date: new Date(inv.date).toISOString().split('T')[0]
+                                ...item,
+                                date: new Date(item.date).toISOString().split('T')[0]
                               }} 
                             />
                           </div>
