@@ -355,7 +355,7 @@ export default function Dashboard() {
                   <LineChart data={history.map((h: any, i: number, arr: any[]) => ({ 
                     ...h, 
                     gain: h.value - h.invested,
-                    monthlyChange: i === 0 ? 0 : h.value - arr[i - 1].value
+                    monthlyChange: i === 0 ? 0 : (h.value - arr[i - 1].value) - (h.invested - arr[i - 1].invested)
                   }))}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                     <XAxis 
