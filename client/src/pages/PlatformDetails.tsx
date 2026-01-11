@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search } from "lucide-react";
+import { ArrowLeft, TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search, ArrowUpDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -105,16 +105,49 @@ export default function PlatformDetails() {
   const { data: assets, isLoading: isAssetsLoading } = useAssets(id);
   
   const [assetNameFilter, setAssetNameFilter] = useState("");
+  const [assetSort, setAssetSort] = useState<"name" | "date" | "invested" | "value" | "return">("date");
   
-  const filteredAssets = useMemo(() => {
+  const filteredAndSortedAssets = useMemo(() => {
     if (!assets) return [];
-    if (!assetNameFilter.trim()) return assets;
     
-    const normalizedFilter = assetNameFilter.toLowerCase().trim();
-    return assets.filter(asset => 
-      asset.name.toLowerCase().includes(normalizedFilter)
-    );
-  }, [assets, assetNameFilter]);
+    let result = [...assets];
+    
+    // Filter by name
+    if (assetNameFilter.trim()) {
+      const normalizedFilter = assetNameFilter.toLowerCase().trim();
+      result = result.filter(asset => 
+        asset.name.toLowerCase().includes(normalizedFilter)
+      );
+    }
+    
+    // Sort
+    result.sort((a, b) => {
+      switch (assetSort) {
+        case "name":
+          return a.name.localeCompare(b.name);
+        case "date":
+          const dateA = a.acquisitionDate ? new Date(a.acquisitionDate).getTime() : 0;
+          const dateB = b.acquisitionDate ? new Date(b.acquisitionDate).getTime() : 0;
+          return dateB - dateA; // Most recent first
+        case "invested":
+          const investedA = Number(a.investedAmount) + Number((a as any).bonusAmount || 0);
+          const investedB = Number(b.investedAmount) + Number((b as any).bonusAmount || 0);
+          return investedB - investedA; // Highest first
+        case "value":
+          const valueA = a.currentValue || Number(a.investedAmount);
+          const valueB = b.currentValue || Number(b.investedAmount);
+          return valueB - valueA; // Highest first
+        case "return":
+          const returnA = a.profitLoss || 0;
+          const returnB = b.profitLoss || 0;
+          return returnB - returnA; // Highest return first
+        default:
+          return 0;
+      }
+    });
+    
+    return result;
+  }, [assets, assetNameFilter, assetSort]);
 
   const { data: history, isLoading: isHistoryLoading } = useQuery({
     queryKey: [api.portfolio.history.path, id, range, specificYear, specificMonth],
@@ -343,6 +376,31 @@ export default function PlatformDetails() {
                         data-testid="input-filter-name"
                       />
                     </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-1" data-testid="button-sort">
+                          <ArrowUpDown className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Sort</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setAssetSort("name")} data-testid="sort-name">
+                          {assetSort === "name" && "✓ "}Name (A-Z)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setAssetSort("date")} data-testid="sort-date">
+                          {assetSort === "date" && "✓ "}Date (Newest)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setAssetSort("invested")} data-testid="sort-invested">
+                          {assetSort === "invested" && "✓ "}Invested (Highest)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setAssetSort("value")} data-testid="sort-value">
+                          {assetSort === "value" && "✓ "}Value (Highest)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setAssetSort("return")} data-testid="sort-return">
+                          {assetSort === "return" && "✓ "}Return (Highest)
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     {platformMode === "item_valuations" && (
                       <AssetValuationImportDialog platformId={id} />
                     )}
@@ -369,12 +427,12 @@ export default function PlatformDetails() {
                         <div className="p-8 text-center text-muted-foreground">
                           No {platformMode === "asset_returns" ? "assets" : "items"} recorded yet.
                         </div>
-                      ) : filteredAssets.length === 0 ? (
+                      ) : filteredAndSortedAssets.length === 0 ? (
                         <div className="p-8 text-center text-muted-foreground">
                           No {platformMode === "asset_returns" ? "assets" : "items"} matching "{assetNameFilter}"
                         </div>
                       ) : (
-                        filteredAssets.map((asset) => (
+                        filteredAndSortedAssets.map((asset) => (
                           <div 
                             key={asset.id} 
                             className={`grid ${platformMode === "asset_returns" ? "grid-cols-[1fr_1fr_1.5fr_1fr_0.5fr_1fr_0.5fr_1.5fr]" : "grid-cols-[1fr_1.5fr_1fr_1fr_0.5fr_1.5fr]"} p-4 text-sm hover:bg-muted/30 transition-colors items-center`}
