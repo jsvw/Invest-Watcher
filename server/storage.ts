@@ -74,6 +74,9 @@ export interface IStorage {
 
   // Asset Performance History
   getAssetPerformanceHistory(platformId: number): Promise<{ date: string; assets: { id: number; name: string; key: string; value: number }[] }[]>;
+
+  // Item Bubble Chart Data
+  getItemReturnBubbles(platformId: number): Promise<{ assetId: number; assetName: string; date: string; percentReturn: number; investedBasis: number; currentValue: number }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -701,6 +704,60 @@ export class DatabaseStorage implements IStorage {
     }
 
     return dataPoints;
+  }
+
+  async getItemReturnBubbles(platformId: number): Promise<{ assetId: number; assetName: string; date: string; percentReturn: number; investedBasis: number; currentValue: number }[]> {
+    // Get all active and exited assets for this platform
+    const allAssets = await db.select().from(assets)
+      .where(eq(assets.platformId, platformId));
+    
+    if (allAssets.length === 0) return [];
+
+    const bubbleData: { assetId: number; assetName: string; date: string; percentReturn: number; investedBasis: number; currentValue: number }[] = [];
+
+    for (const asset of allAssets) {
+      const investedBasis = Number(asset.investedAmount) + Number(asset.bonusAmount || 0);
+      
+      // Skip if no invested basis (would cause division by zero)
+      if (investedBasis <= 0) continue;
+
+      // Get all valuations for this asset
+      const vals = await db.select().from(assetValuations)
+        .where(eq(assetValuations.assetId, asset.id))
+        .orderBy(assetValuations.date);
+
+      for (const val of vals) {
+        const currentValue = Number(val.value);
+        const percentReturn = ((currentValue - investedBasis) / investedBasis) * 100;
+        
+        bubbleData.push({
+          assetId: asset.id,
+          assetName: asset.name,
+          date: val.date.toISOString().split('T')[0],
+          percentReturn: Math.round(percentReturn * 100) / 100,
+          investedBasis,
+          currentValue
+        });
+      }
+
+      // Also add current value point (today) using latest valuation or invested basis
+      const latestValue = vals.length > 0 ? Number(vals[vals.length - 1].value) : investedBasis;
+      const todayReturn = ((latestValue - investedBasis) / investedBasis) * 100;
+      
+      bubbleData.push({
+        assetId: asset.id,
+        assetName: asset.name,
+        date: new Date().toISOString().split('T')[0],
+        percentReturn: Math.round(todayReturn * 100) / 100,
+        investedBasis,
+        currentValue: latestValue
+      });
+    }
+
+    // Sort by date
+    bubbleData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    return bubbleData;
   }
 }
 

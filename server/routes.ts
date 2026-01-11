@@ -666,6 +666,21 @@ export async function registerRoutes(
     }
   });
 
+  // Item bubble chart data for item_valuations platforms
+  app.get('/api/platforms/:platformId/item-bubbles', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.platformId);
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+      
+      const bubbles = await storage.getItemReturnBubbles(platformId);
+      res.json(bubbles);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch item bubble data" });
+    }
+  });
+
   // --- Insights ---
   app.post(api.insights.generate.path, requireAuth, async (req, res) => {
     try {
