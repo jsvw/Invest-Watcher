@@ -32,6 +32,7 @@ export default function Dashboard() {
   const [specificYear, setSpecificYear] = useState<string | null>(null);
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
   const [excludedPlatforms, setExcludedPlatforms] = useState<number[]>([]);
+  const [pendingExcludedPlatforms, setPendingExcludedPlatforms] = useState<number[]>([]);
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
 
   const { data: history, isLoading: isHistoryLoading } = useQuery({
@@ -115,7 +116,7 @@ export default function Dashboard() {
             <p className="text-muted-foreground">Your financial overview at a glance.</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Popover>
+            <Popover onOpenChange={(open) => { if (open) setPendingExcludedPlatforms(excludedPlatforms); }}>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="default" data-testid="button-platform-filter">
                   <Filter className="h-4 w-4 mr-2" />
@@ -134,7 +135,7 @@ export default function Dashboard() {
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      onClick={() => setExcludedPlatforms([])}
+                      onClick={() => setPendingExcludedPlatforms([])}
                       className="h-auto py-1 px-2 text-xs"
                       data-testid="button-select-all-platforms"
                     >
@@ -146,12 +147,12 @@ export default function Dashboard() {
                       <div key={platform.id} className="flex items-center space-x-2">
                         <Checkbox
                           id={`platform-${platform.id}`}
-                          checked={!excludedPlatforms.includes(platform.id)}
+                          checked={!pendingExcludedPlatforms.includes(platform.id)}
                           onCheckedChange={(checked) => {
                             if (checked) {
-                              setExcludedPlatforms(prev => prev.filter(id => id !== platform.id));
+                              setPendingExcludedPlatforms(prev => prev.filter(id => id !== platform.id));
                             } else {
-                              setExcludedPlatforms(prev => [...prev, platform.id]);
+                              setPendingExcludedPlatforms(prev => [...prev, platform.id]);
                             }
                           }}
                           data-testid={`checkbox-platform-${platform.id}`}
@@ -165,6 +166,14 @@ export default function Dashboard() {
                       </div>
                     ))}
                   </div>
+                  <Button 
+                    className="w-full" 
+                    size="sm"
+                    onClick={() => setExcludedPlatforms(pendingExcludedPlatforms)}
+                    data-testid="button-apply-platform-filter"
+                  >
+                    Apply Filter
+                  </Button>
                 </div>
               </PopoverContent>
             </Popover>
