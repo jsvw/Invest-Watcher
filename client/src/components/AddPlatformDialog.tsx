@@ -41,6 +41,7 @@ export function AddPlatformDialog() {
       category: "Stock",
       color: "#3b82f6",
       icon: "",
+      customIconUrl: null,
       currency: "USD",
       platformMode: "standard",
     },
@@ -160,6 +161,8 @@ export function AddPlatformDialog() {
             <PlatformIconPicker 
               value={form.watch("icon")} 
               onChange={(val) => form.setValue("icon", val)}
+              customIconUrl={form.watch("customIconUrl")}
+              onCustomIconChange={(url) => form.setValue("customIconUrl", url)}
               color={form.watch("color")}
             />
           </div>

@@ -32,6 +32,7 @@ import { AggregatedPerformancePanel } from "@/components/AggregatedPerformancePa
 import { AssetValuationHoverCard } from "@/components/AssetValuationHoverCard";
 import { ItemReturnBubbleChart } from "@/components/ItemReturnBubbleChart";
 import type { Asset } from "@shared/schema";
+import { PlatformIcon } from "@/components/PlatformIcon";
 
 function AssetActionsMenu({ asset, platformId, platformMode }: { asset: Asset; platformId: number; platformMode: "asset_returns" | "item_valuations" }) {
   const [editOpen, setEditOpen] = useState(false);
@@ -266,9 +267,14 @@ export default function PlatformDetails() {
           
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
-               <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg" style={{ backgroundColor: platform.color }}>
-                 {platform.name.charAt(0)}
-               </div>
+               <PlatformIcon
+                 icon={(platform as any).icon}
+                 customIconUrl={(platform as any).customIconUrl}
+                 color={platform.color}
+                 name={platform.name}
+                 size="xl"
+                 className="rounded-xl shadow-lg"
+               />
                <div>
                  <h1 className="text-3xl font-bold font-display tracking-tight">{platform.name}</h1>
                  <p className="text-muted-foreground">

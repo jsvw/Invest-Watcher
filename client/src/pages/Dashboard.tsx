@@ -5,7 +5,7 @@ import { useGenerateInsight } from "@/hooks/use-insights";
 import { useAuth } from "@/App";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 import { Wallet, TrendingUp, DollarSign, BrainCircuit, RefreshCcw, Check } from "lucide-react";
-import { getIconById } from "@/components/PlatformIconPicker";
+import { PlatformIcon } from "@/components/PlatformIcon";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -195,8 +195,6 @@ export default function Dashboard() {
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm text-muted-foreground mr-2">Filter:</span>
           {platforms?.map((platform) => {
-            const iconInfo = getIconById(platform.icon);
-            const IconComponent = iconInfo?.icon;
             const isExcluded = excludedPlatforms.includes(platform.id);
             return (
               <UITooltip key={platform.id}>
@@ -205,21 +203,20 @@ export default function Dashboard() {
                     type="button"
                     onClick={() => togglePlatform(platform.id)}
                     className={cn(
-                      "w-10 h-10 rounded-full flex items-center justify-center transition-all relative border-2",
+                      "relative border-2 rounded-full transition-all",
                       isExcluded 
                         ? "opacity-50 border-muted-foreground/30" 
                         : "opacity-100 hover:scale-110 border-transparent"
                     )}
-                    style={{ backgroundColor: platform.color }}
                     data-testid={`platform-icon-${platform.id}`}
                   >
-                    {IconComponent ? (
-                      <IconComponent className="w-5 h-5 text-white" />
-                    ) : (
-                      <span className="text-white font-bold text-sm">
-                        {platform.name.charAt(0).toUpperCase()}
-                      </span>
-                    )}
+                    <PlatformIcon
+                      icon={(platform as any).icon}
+                      customIconUrl={(platform as any).customIconUrl}
+                      color={platform.color}
+                      name={platform.name}
+                      size="lg"
+                    />
                     {!isExcluded && (
                       <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
                         <Check className="w-3 h-3 text-white" />
@@ -540,8 +537,14 @@ export default function Dashboard() {
                      return (
                        <Link key={platform.id} href={`/platforms/${platform.id}`} className="flex items-center justify-between p-4 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer group">
                          <div className="flex items-center gap-4">
-                           <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold group-hover:scale-110 transition-transform" style={{ backgroundColor: platform.color }}>
-                             {platform.name.charAt(0)}
+                           <div className="group-hover:scale-110 transition-transform">
+                             <PlatformIcon
+                               icon={(platform as any).icon}
+                               customIconUrl={(platform as any).customIconUrl}
+                               color={platform.color}
+                               name={platform.name}
+                               size="lg"
+                             />
                            </div>
                            <div>
                              <h4 className="font-semibold group-hover:text-primary transition-colors">{platform.name}</h4>

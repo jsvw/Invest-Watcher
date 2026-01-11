@@ -18,6 +18,7 @@ interface PlatformFormData {
   currency: string;
   color: string;
   icon: string;
+  customIconUrl: string | null;
   platformMode: string;
 }
 
@@ -58,6 +59,7 @@ export function PlatformSettingsDialog({ platform }: PlatformSettingsDialogProps
       currency: (platform as any).currency || "USD",
       color: platform.color || "#3b82f6",
       icon: (platform as any).icon || "",
+      customIconUrl: (platform as any).customIconUrl || null,
       platformMode: (platform as any).platformMode || "standard",
     },
   });
@@ -199,6 +201,8 @@ export function PlatformSettingsDialog({ platform }: PlatformSettingsDialogProps
             <PlatformIconPicker 
               value={form.watch("icon")} 
               onChange={(val) => form.setValue("icon", val)}
+              customIconUrl={form.watch("customIconUrl")}
+              onCustomIconChange={(url) => form.setValue("customIconUrl", url)}
               color={form.watch("color")}
             />
           </div>

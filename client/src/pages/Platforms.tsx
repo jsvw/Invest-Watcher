@@ -9,6 +9,7 @@ import { Link } from "wouter";
 import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { PlatformIcon } from "@/components/PlatformIcon";
 
 export default function Platforms() {
   const { user } = useAuth();
@@ -38,12 +39,21 @@ export default function Platforms() {
               <Link key={platform.id} href={`/platforms/${platform.id}`}>
                 <div className="group cursor-pointer">
                   <Card className="h-full hover:shadow-xl transition-all duration-300 border-t-4" style={{ borderTopColor: platform.color }}>
-                    <CardHeader className="flex flex-row items-start justify-between">
-                      <div>
-                        <CardTitle className="text-xl font-bold">{platform.name}</CardTitle>
-                        <span className="inline-block mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-                          {platform.category} • {(platform as any).currency || "USD"}
-                        </span>
+                    <CardHeader className="flex flex-row items-start justify-between gap-2">
+                      <div className="flex items-start gap-3">
+                        <PlatformIcon
+                          icon={(platform as any).icon}
+                          customIconUrl={(platform as any).customIconUrl}
+                          color={platform.color}
+                          name={platform.name}
+                          size="lg"
+                        />
+                        <div>
+                          <CardTitle className="text-xl font-bold">{platform.name}</CardTitle>
+                          <span className="inline-block mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                            {platform.category} • {(platform as any).currency || "USD"}
+                          </span>
+                        </div>
                       </div>
                       <div className="p-2 bg-muted rounded-full group-hover:bg-primary group-hover:text-white transition-colors">
                         <ArrowUpRight className="h-4 w-4" />

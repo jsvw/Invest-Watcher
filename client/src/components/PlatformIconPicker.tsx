@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -12,8 +12,10 @@ import {
   Building2, Landmark, TrendingUp, Home, Coins, 
   Wallet, CreditCard, PiggyBank, DollarSign, BarChart3,
   Briefcase, Building, Factory, Gem, Globe,
-  LineChart, Receipt, BadgeDollarSign, CircleDollarSign, Banknote
+  LineChart, Receipt, BadgeDollarSign, CircleDollarSign, Banknote,
+  Upload, Image, Loader2, X
 } from "lucide-react";
+import { useUpload } from "@/hooks/use-upload";
 
 export type IconType = {
   id: string;
@@ -68,12 +70,62 @@ export function getIconById(id: string | null | undefined): IconType | undefined
 interface PlatformIconPickerProps {
   value: string | null | undefined;
   onChange: (value: string) => void;
+  customIconUrl?: string | null;
+  onCustomIconChange?: (url: string | null) => void;
   color?: string;
 }
 
-export function PlatformIconPicker({ value, onChange, color = "#3b82f6" }: PlatformIconPickerProps) {
+export function PlatformIconPicker({ 
+  value, 
+  onChange, 
+  customIconUrl,
+  onCustomIconChange,
+  color = "#3b82f6" 
+}: PlatformIconPickerProps) {
   const [open, setOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const selectedIcon = getIconById(value);
+  
+  const { uploadFile, isUploading } = useUpload({
+    onSuccess: (response) => {
+      const publicUrl = response.objectPath.startsWith("/objects/") 
+        ? response.objectPath 
+        : "/objects" + (response.objectPath.startsWith("/") ? "" : "/") + response.objectPath;
+      onCustomIconChange?.(publicUrl);
+      onChange("custom");
+      setOpen(false);
+    },
+    onError: (error) => {
+      console.error("Upload failed:", error);
+    }
+  });
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith("image/")) {
+      console.error("Please select an image file");
+      return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) {
+      console.error("File size must be less than 5MB");
+      return;
+    }
+    
+    await uploadFile(file);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveCustomIcon = () => {
+    onCustomIconChange?.(null);
+    if (value === "custom") {
+      onChange("");
+    }
+  };
 
   const categories = [
     { id: "crypto", label: "Crypto" },
@@ -83,6 +135,8 @@ export function PlatformIconPicker({ value, onChange, color = "#3b82f6" }: Platf
     { id: "generic", label: "Generic" },
   ];
 
+  const hasCustomIcon = value === "custom" && customIconUrl;
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -91,7 +145,21 @@ export function PlatformIconPicker({ value, onChange, color = "#3b82f6" }: Platf
           className="w-full justify-start gap-2"
           data-testid="button-icon-picker"
         >
-          {selectedIcon ? (
+          {hasCustomIcon ? (
+            <>
+              <div 
+                className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden"
+                style={{ backgroundColor: color }}
+              >
+                <img 
+                  src={customIconUrl} 
+                  alt="Custom icon" 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <span>Custom Icon</span>
+            </>
+          ) : selectedIcon ? (
             <>
               <div 
                 className="w-8 h-8 rounded-full flex items-center justify-center"
@@ -108,6 +176,71 @@ export function PlatformIconPicker({ value, onChange, color = "#3b82f6" }: Platf
       </PopoverTrigger>
       <PopoverContent className="w-80 p-3" align="start">
         <div className="space-y-3">
+          <div>
+            <p className="text-xs font-medium text-muted-foreground mb-2">Custom Upload</p>
+            <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                className="hidden"
+                data-testid="input-custom-icon"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="flex-1"
+                data-testid="button-upload-icon"
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Image
+                  </>
+                )}
+              </Button>
+              {hasCustomIcon && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRemoveCustomIcon}
+                  data-testid="button-remove-custom-icon"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+            {hasCustomIcon && (
+              <div className="mt-2 flex items-center gap-2">
+                <div 
+                  className="w-9 h-9 rounded-md flex items-center justify-center overflow-hidden ring-2 ring-primary"
+                  style={{ backgroundColor: color }}
+                >
+                  <img 
+                    src={customIconUrl} 
+                    alt="Custom icon" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground">Current custom icon</span>
+              </div>
+            )}
+          </div>
+          
+          <div className="border-t pt-3">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Or choose from library</p>
+          </div>
+          
           {categories.map(category => {
             const icons = PLATFORM_ICONS.filter(i => i.category === category.id);
             return (
@@ -117,13 +250,17 @@ export function PlatformIconPicker({ value, onChange, color = "#3b82f6" }: Platf
                   {icons.map(icon => (
                     <button
                       key={icon.id}
+                      type="button"
                       onClick={() => {
                         onChange(icon.id);
+                        if (onCustomIconChange) {
+                          onCustomIconChange(null);
+                        }
                         setOpen(false);
                       }}
                       className={cn(
                         "w-9 h-9 rounded-md flex items-center justify-center transition-all hover-elevate",
-                        value === icon.id ? "ring-2 ring-primary" : ""
+                        value === icon.id && !hasCustomIcon ? "ring-2 ring-primary" : ""
                       )}
                       style={{ backgroundColor: color }}
                       title={icon.name}

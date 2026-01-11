@@ -1,5 +1,6 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { requireAuth } from "../../auth";
 
 /**
  * Register object storage routes for file uploads.
@@ -35,13 +36,25 @@ export function registerObjectStorageRoutes(app: Express): void {
    * IMPORTANT: The client should NOT send the file to this endpoint.
    * Send JSON metadata only, then upload the file directly to uploadURL.
    */
-  app.post("/api/uploads/request-url", async (req, res) => {
+  app.post("/api/uploads/request-url", requireAuth, async (req: Request, res: Response) => {
     try {
       const { name, size, contentType } = req.body;
 
       if (!name) {
         return res.status(400).json({
           error: "Missing required field: name",
+        });
+      }
+      
+      if (!contentType || !contentType.startsWith("image/")) {
+        return res.status(400).json({
+          error: "Only image files are allowed",
+        });
+      }
+      
+      if (size && size > 5 * 1024 * 1024) {
+        return res.status(400).json({
+          error: "File size must be less than 5MB",
         });
       }
 
