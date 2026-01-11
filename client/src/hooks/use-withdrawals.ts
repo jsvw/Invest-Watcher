@@ -39,7 +39,10 @@ export function useCreateWithdrawal() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [api.withdrawals.list.path, variables.platformId] });
+      queryClient.invalidateQueries({ queryKey: [api.valuations.list.path, variables.platformId] });
       queryClient.invalidateQueries({ queryKey: [api.platforms.list.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/platforms', variables.platformId] });
+      queryClient.invalidateQueries({ queryKey: [api.portfolio.history.path] });
       toast({
         title: "Success",
         description: "Withdrawal recorded successfully",

@@ -26,6 +26,7 @@ const investmentFormSchema = insertInvestmentSchema.extend({
 const withdrawalFormSchema = insertWithdrawalSchema.extend({
   amount: z.coerce.number().min(0.01, "Amount must be greater than 0"),
   date: z.coerce.date().transform(d => d.toISOString().split('T')[0]),
+  currentValue: z.coerce.number().min(0, "Current value cannot be negative"),
 });
 
 const valuationFormSchema = insertValuationSchema.extend({
@@ -72,6 +73,7 @@ export function AddTransactionDialog({ platformId, type, initialData, mode = "ad
       platformId,
       amount: 0,
       value: 0,
+      currentValue: 0,
       date: new Date().toISOString().split('T')[0],
       notes: "",
     },
@@ -89,11 +91,12 @@ export function AddTransactionDialog({ platformId, type, initialData, mode = "ad
       platformId,
       amount: data.amount !== undefined ? String(data.amount) : undefined,
       value: data.value !== undefined ? String(data.value) : undefined,
+      currentValue: data.currentValue !== undefined ? String(data.currentValue) : undefined,
     };
     const onSuccess = () => {
       setOpen(false);
       if (!isEdit) {
-        form.reset({ ...data, amount: 0, value: 0, notes: "" });
+        form.reset({ ...data, amount: 0, value: 0, currentValue: 0, notes: "" });
       }
     };
     
@@ -188,6 +191,24 @@ export function AddTransactionDialog({ platformId, type, initialData, mode = "ad
             <Label htmlFor="date">Date</Label>
             <Input id="date" type="date" {...form.register("date")} data-testid="input-date" />
           </div>
+
+          {isWithdrawal && !isEdit && (
+            <div className="space-y-2">
+              <Label htmlFor="currentValue">Current Platform Value (after withdrawal)</Label>
+              <Input 
+                id="currentValue"
+                type="number" 
+                step="0.01"
+                {...form.register("currentValue")} 
+                data-testid="input-current-value"
+              />
+              {form.formState.errors.currentValue && (
+                <p className="text-sm text-destructive">
+                  {String(form.formState.errors.currentValue?.message)}
+                </p>
+              )}
+            </div>
+          )}
 
           {(isInvestment || isWithdrawal) && (
             <div className="space-y-2">

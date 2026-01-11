@@ -159,7 +159,19 @@ export async function registerRoutes(
       const isOwner = await storage.verifyPlatformOwnership(input.platformId, userId);
       if (!isOwner) return res.status(404).json({ message: "Platform not found" });
       
+      // Create the withdrawal
       const withdrawal = await storage.createWithdrawal(input);
+      
+      // If currentValue is provided, also create a valuation for the same date
+      const currentValue = req.body.currentValue;
+      if (currentValue !== undefined && currentValue !== null && currentValue !== '') {
+        await storage.createValuation({
+          platformId: input.platformId,
+          value: String(currentValue),
+          date: input.date,
+        });
+      }
+      
       res.status(201).json(withdrawal);
     } catch (err) {
       if (err instanceof z.ZodError) {
