@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ComposedChart, Scatter, Line, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from "recharts";
+import { ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, ReferenceLine } from "recharts";
 import { formatCurrency } from "@/lib/currency";
 import { format } from "date-fns";
 import { useMemo } from "react";
@@ -36,9 +36,9 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
     }
   });
 
-  const { chartData, monthlyAverages, maxWeeks } = useMemo(() => {
+  const { chartData, maxWeeks, avgReturn } = useMemo(() => {
     if (!bubbleData || bubbleData.length === 0) {
-      return { chartData: [], monthlyAverages: [], maxWeeks: 10 };
+      return { chartData: [], maxWeeks: 10, avgReturn: 0 };
     }
 
     const uniqueAssets = Array.from(new Set(bubbleData.map(d => d.assetName)));
@@ -59,22 +59,11 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
     // Calculate max weeks for domain
     const maxWeeksVal = Math.max(...bubbleData.map(d => d.weeksFromInvestment), 10);
 
-    // Group by month (4 weeks = 1 month) and calculate averages
-    const monthBuckets: Record<number, number[]> = {};
-    bubbleData.forEach(d => {
-      const month = Math.round(d.weeksFromInvestment / 4);
-      if (!monthBuckets[month]) monthBuckets[month] = [];
-      monthBuckets[month].push(d.percentReturn);
-    });
+    // Calculate average return for reference line
+    const totalReturn = bubbleData.reduce((sum, d) => sum + d.percentReturn, 0);
+    const avg = Math.round((totalReturn / bubbleData.length) * 100) / 100;
 
-    const avgData = Object.entries(monthBuckets)
-      .map(([month, returns]) => ({
-        x: Number(month) * 4, // Convert back to weeks for x-axis
-        avgReturn: Math.round((returns.reduce((a, b) => a + b, 0) / returns.length) * 100) / 100
-      }))
-      .sort((a, b) => a.x - b.x);
-
-    return { chartData: data, monthlyAverages: avgData, maxWeeks: maxWeeksVal };
+    return { chartData: data, maxWeeks: maxWeeksVal, avgReturn: avg };
   }, [bubbleData]);
 
   if (isLoading) {
@@ -111,21 +100,20 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
     <Card data-testid="card-item-return-bubbles">
       <CardHeader>
         <CardTitle>Item Returns Over Investment Time</CardTitle>
-        <CardDescription>X-axis shows weeks since investment. Bubble size represents invested amount.</CardDescription>
+        <CardDescription>X-axis shows weeks since investment. Bubble size represents invested amount. Avg return: {avgReturn >= 0 ? '+' : ''}{avgReturn}%</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
-          <ComposedChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+          <ScatterChart margin={{ top: 20, right: 20, bottom: 30, left: 20 }}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis 
               type="number"
               dataKey="x"
               name="Weeks"
               domain={[0, Math.ceil(maxWeeks * 1.1)]}
-              allowDataOverflow={false}
               tickFormatter={(val) => `${Math.round(val)}w`}
               className="text-xs fill-muted-foreground"
-              label={{ value: 'Weeks since investment', position: 'insideBottom', offset: -10, className: 'fill-muted-foreground text-xs' }}
+              label={{ value: 'Weeks since investment', position: 'insideBottom', offset: -15, className: 'fill-muted-foreground text-xs' }}
             />
             <YAxis 
               type="number"
@@ -140,21 +128,12 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
               range={[100, 800]}
               name="Invested"
             />
+            <ReferenceLine y={avgReturn} stroke="hsl(var(--primary))" strokeDasharray="5 5" label={{ value: `Avg: ${avgReturn}%`, position: 'right', fill: 'hsl(var(--primary))', fontSize: 12 }} />
             <Tooltip 
               cursor={{ strokeDasharray: '3 3' }}
               content={({ active, payload }) => {
                 if (!active || !payload || !payload.length) return null;
                 const data = payload[0].payload;
-                if (data.avgReturn !== undefined) {
-                  return (
-                    <div className="bg-popover border rounded-lg p-2 shadow-lg">
-                      <p className="text-sm font-medium">Month {Math.round(data.x / 4)} Average</p>
-                      <p className={data.avgReturn >= 0 ? "text-green-600" : "text-red-600"}>
-                        {data.avgReturn >= 0 ? '+' : ''}{data.avgReturn}%
-                      </p>
-                    </div>
-                  );
-                }
                 return (
                   <div className="bg-popover border rounded-lg p-3 shadow-lg">
                     <p className="font-medium">{data.assetName}</p>
@@ -170,24 +149,15 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
                 );
               }}
             />
-            <Line 
-              data={monthlyAverages}
-              type="monotone"
-              dataKey="avgReturn"
-              stroke="hsl(var(--primary))"
-              strokeWidth={2}
-              dot={{ fill: 'hsl(var(--primary))', r: 4 }}
-              name="Monthly Average"
-            />
             <Scatter 
               data={chartData} 
-              dataKey="y"
+              name="Items"
             >
               {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.fill} fillOpacity={0.8} stroke={entry.fill} strokeWidth={1} />
               ))}
             </Scatter>
-          </ComposedChart>
+          </ScatterChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>
