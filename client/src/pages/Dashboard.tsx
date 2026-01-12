@@ -32,6 +32,22 @@ export default function Dashboard() {
   const [excludedPlatforms, setExcludedPlatforms] = useState<number[]>([]);
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
 
+  const formatAxisValue = (value: number, showSign: boolean = false) => {
+    const symbol = getCurrencySymbol(currency);
+    const sign = showSign && value >= 0 ? '+' : '';
+    const absValue = Math.abs(value);
+    
+    if (absValue >= 1000000) {
+      return `${sign}${symbol}${(value / 1000000).toFixed(1)}M`;
+    } else if (absValue >= 1000) {
+      return `${sign}${symbol}${(value / 1000).toFixed(1)}k`;
+    } else if (absValue >= 1) {
+      return `${sign}${symbol}${value.toFixed(0)}`;
+    } else {
+      return `${sign}${symbol}${value.toFixed(2)}`;
+    }
+  };
+
   const togglePlatform = (platformId: number) => {
     setExcludedPlatforms(prev => 
       prev.includes(platformId) 
@@ -392,7 +408,8 @@ export default function Dashboard() {
                         fontSize={12} 
                         tickLine={false} 
                         axisLine={false} 
-                        tickFormatter={(value) => `${getCurrencySymbol(currency)}${(value / 1000).toFixed(0)}k`}
+                        tickFormatter={(value) => formatAxisValue(value)}
+                        domain={['auto', 'auto']}
                       />
                     )}
                     {(chartView === "profit" || chartView === "all") && (
@@ -403,7 +420,8 @@ export default function Dashboard() {
                         fontSize={12} 
                         tickLine={false} 
                         axisLine={false} 
-                        tickFormatter={(value) => `${value >= 0 ? '+' : ''}${getCurrencySymbol(currency)}${(value / 1000).toFixed(0)}k`}
+                        tickFormatter={(value) => formatAxisValue(value, true)}
+                        domain={['auto', 'auto']}
                       />
                     )}
                     {(chartView === "monthly" || chartView === "all") && (
@@ -414,7 +432,8 @@ export default function Dashboard() {
                         fontSize={12} 
                         tickLine={false} 
                         axisLine={false} 
-                        tickFormatter={(value) => `${value >= 0 ? '+' : ''}${getCurrencySymbol(currency)}${(value / 1000).toFixed(1)}k`}
+                        tickFormatter={(value) => formatAxisValue(value, true)}
+                        domain={['auto', 'auto']}
                       />
                     )}
                     <Tooltip 
