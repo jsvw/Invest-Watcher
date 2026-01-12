@@ -357,6 +357,7 @@ export default function PlatformDetails() {
                 <AssetInsightTabs
                   platformId={id}
                   currency={currency}
+                  totalInvested={platformTotalInvested}
                 />
               )}
 
