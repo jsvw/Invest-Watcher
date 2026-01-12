@@ -1,10 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, ReferenceLine } from "recharts";
+import { ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, ReferenceLine, LineChart, Line } from "recharts";
 import { formatCurrency } from "@/lib/currency";
 import { format } from "date-fns";
 import { useMemo } from "react";
+
+interface ValuationPoint {
+  date: string;
+  value: number;
+}
 
 interface BubbleDataPoint {
   assetId: number;
@@ -14,6 +19,7 @@ interface BubbleDataPoint {
   percentReturn: number;
   investedBasis: number;
   currentValue: number;
+  valuationHistory: ValuationPoint[];
 }
 
 interface ItemReturnBubbleChartProps {
@@ -25,6 +31,61 @@ const COLORS = [
   "#8884d8", "#82ca9d", "#ffc658", "#ff7300", "#00C49F", 
   "#FFBB28", "#FF8042", "#0088FE", "#a4de6c", "#d0ed57"
 ];
+
+function MiniValuationChart({ data, currency }: { data: ValuationPoint[]; currency: string }) {
+  const currencySymbol = currency === "USD" ? "$" : "";
+  
+  if (data.length === 0) {
+    return (
+      <div className="h-20 flex items-center justify-center text-xs text-muted-foreground">
+        No history
+      </div>
+    );
+  }
+  
+  if (data.length === 1) {
+    return (
+      <div className="h-20 flex flex-col items-center justify-center">
+        <div className="text-sm font-medium">
+          {currencySymbol}{data[0].value.toLocaleString()}
+        </div>
+        <div className="text-xs text-muted-foreground">
+          {format(new Date(data[0].date), 'MMM dd, yyyy')}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-24 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+          <XAxis 
+            dataKey="date" 
+            tick={{ fontSize: 9 }}
+            tickFormatter={(value) => format(new Date(value), 'MMM yy')}
+            interval="preserveStartEnd"
+          />
+          <YAxis 
+            tick={{ fontSize: 9 }}
+            tickFormatter={(value) => {
+              if (value >= 1000) return `${currencySymbol}${(value / 1000).toFixed(0)}k`;
+              return `${currencySymbol}${value}`;
+            }}
+            width={35}
+          />
+          <Line 
+            type="monotone" 
+            dataKey="value" 
+            stroke="#8884d8" 
+            strokeWidth={2}
+            dot={{ r: 2 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubbleChartProps) {
   const { data: bubbleData, isLoading } = useQuery<BubbleDataPoint[]>({
@@ -47,7 +108,6 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
       colors[name] = COLORS[i % COLORS.length];
     });
 
-    // Use weeksFromInvestment directly as x coordinate
     const data = bubbleData.map(d => ({
       ...d,
       x: d.weeksFromInvestment,
@@ -56,10 +116,8 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
       fill: colors[d.assetName]
     }));
 
-    // Calculate max weeks for domain
     const maxWeeksVal = Math.max(...bubbleData.map(d => d.weeksFromInvestment), 10);
 
-    // Calculate average return for reference line
     const totalReturn = bubbleData.reduce((sum, d) => sum + d.percentReturn, 0);
     const avg = Math.round((totalReturn / bubbleData.length) * 100) / 100;
 
@@ -135,15 +193,29 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
                 if (!active || !payload || !payload.length) return null;
                 const data = payload[0].payload;
                 return (
-                  <div className="bg-popover border rounded-lg p-3 shadow-lg">
-                    <p className="font-medium">{data.assetName}</p>
-                    <p className="text-sm text-muted-foreground">Week {Math.round(data.weeksFromInvestment)} ({format(new Date(data.date), 'MMM dd, yyyy')})</p>
-                    <div className="mt-2 space-y-1 text-sm">
-                      <p>Invested: {formatCurrency(data.investedBasis, currency)}</p>
-                      <p>Value: {formatCurrency(data.currentValue, currency)}</p>
-                      <p className={data.percentReturn >= 0 ? "text-green-600" : "text-red-600"}>
-                        Return: {data.percentReturn >= 0 ? '+' : ''}{data.percentReturn}%
-                      </p>
+                  <div className="bg-popover border rounded-lg p-3 shadow-lg w-64">
+                    <p className="font-medium truncate">{data.assetName}</p>
+                    <p className="text-xs text-muted-foreground mb-2">Valuation History</p>
+                    <MiniValuationChart data={data.valuationHistory || []} currency={currency} />
+                    <div className="mt-2 pt-2 border-t space-y-1 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Invested:</span>
+                        <span>{formatCurrency(data.investedBasis, currency)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Current:</span>
+                        <span>{formatCurrency(data.currentValue, currency)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Return:</span>
+                        <span className={data.percentReturn >= 0 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                          {data.percentReturn >= 0 ? '+' : ''}{data.percentReturn}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Week {Math.round(data.weeksFromInvestment)}</span>
+                        <span>{format(new Date(data.date), 'MMM dd, yyyy')}</span>
+                      </div>
                     </div>
                   </div>
                 );

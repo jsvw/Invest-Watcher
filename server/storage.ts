@@ -709,14 +709,14 @@ export class DatabaseStorage implements IStorage {
     return dataPoints;
   }
 
-  async getItemReturnBubbles(platformId: number): Promise<{ assetId: number; assetName: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number }[]> {
+  async getItemReturnBubbles(platformId: number): Promise<{ assetId: number; assetName: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number; valuationHistory: { date: string; value: number }[] }[]> {
     // Get all active and exited assets for this platform
     const allAssets = await db.select().from(assets)
       .where(eq(assets.platformId, platformId));
     
     if (allAssets.length === 0) return [];
 
-    const bubbleData: { assetId: number; assetName: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number }[] = [];
+    const bubbleData: { assetId: number; assetName: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number; valuationHistory: { date: string; value: number }[] }[] = [];
 
     const msPerWeek = 7 * 24 * 60 * 60 * 1000;
 
@@ -745,6 +745,12 @@ export class DatabaseStorage implements IStorage {
       const latestValue = Number(latestVal.value);
       const percentReturn = ((latestValue - investedBasis) / investedBasis) * 100;
       
+      // Include valuation history for the mini chart
+      const valuationHistory = vals.map(v => ({
+        date: v.date.toISOString().split('T')[0],
+        value: Number(v.value)
+      }));
+      
       bubbleData.push({
         assetId: asset.id,
         assetName: asset.name,
@@ -752,7 +758,8 @@ export class DatabaseStorage implements IStorage {
         weeksFromInvestment,
         percentReturn: Math.round(percentReturn * 100) / 100,
         investedBasis,
-        currentValue: latestValue
+        currentValue: latestValue,
+        valuationHistory
       });
     }
 
