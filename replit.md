@@ -94,3 +94,12 @@ The project uses a typed API contract pattern where:
 - **@replit/vite-plugin-runtime-error-modal**: Error overlay in development
 - **@replit/vite-plugin-cartographer**: Development tooling
 - **@replit/vite-plugin-dev-banner**: Development environment indicator
+
+## Versioning
+
+The app uses semantic versioning (x.x.x) stored in `client/src/lib/version.ts`:
+- **Major (x.0.0)**: Breaking changes or major feature overhauls
+- **Minor (0.x.0)**: New features, significant improvements
+- **Patch (0.0.x)**: Bug fixes, small tweaks, minor UI changes
+
+Update the version in `client/src/lib/version.ts` before each publication. The version is displayed in the sidebar footer.

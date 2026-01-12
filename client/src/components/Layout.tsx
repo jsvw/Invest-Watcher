@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/App";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { APP_VERSION } from "@/lib/version";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location, setLocation] = useLocation();
@@ -93,6 +94,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="bg-muted/50 rounded-xl p-4 border border-border/50">
             <h4 className="font-semibold text-sm mb-1">Pro Tip</h4>
             <p className="text-xs text-muted-foreground">Update your valuations monthly for accurate insights.</p>
+          </div>
+          <div className="text-center text-xs text-muted-foreground/60" data-testid="text-app-version">
+            v{APP_VERSION}
           </div>
         </div>
       </aside>
