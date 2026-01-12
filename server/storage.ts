@@ -736,12 +736,14 @@ export class DatabaseStorage implements IStorage {
       // Use the asset's acquisition date as the investment date
       const investmentDate = new Date(asset.acquisitionDate);
       
-      // Only use the latest valuation
+      // Calculate weeks from acquisition date to today (not to valuation date)
+      const today = new Date();
+      const weeksFromInvestment = Math.round((today.getTime() - investmentDate.getTime()) / msPerWeek * 10) / 10;
+      
+      // Only use the latest valuation for the value
       const latestVal = vals[vals.length - 1];
       const latestValue = Number(latestVal.value);
       const percentReturn = ((latestValue - investedBasis) / investedBasis) * 100;
-      const valDate = new Date(latestVal.date);
-      const weeksFromInvestment = Math.round((valDate.getTime() - investmentDate.getTime()) / msPerWeek * 10) / 10;
       
       bubbleData.push({
         assetId: asset.id,
