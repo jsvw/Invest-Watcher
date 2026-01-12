@@ -144,7 +144,7 @@ export default function Dashboard() {
             title="Total Invested" 
             value={formatCurrency(totalInvested, currency)} 
             icon={DollarSign}
-            className="border-l-secondary"
+            className="border-l-blue-500"
             data-testid="stat-total-invested"
           />
           <StatCard 
