@@ -40,6 +40,13 @@ export function AssetValuationHoverCard({ assetId, assetName, currency, children
     }))
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()) || [];
 
+  const values = chartData.map(d => d.value);
+  const minValue = values.length > 0 ? Math.min(...values) : 0;
+  const maxValue = values.length > 0 ? Math.max(...values) : 0;
+  const padding = (maxValue - minValue) * 0.1 || maxValue * 0.1;
+  const yMin = Math.max(0, minValue - padding);
+  const yMax = maxValue + padding;
+
   return (
     <HoverCard openDelay={300} closeDelay={100}>
       <HoverCardTrigger asChild>
@@ -79,9 +86,10 @@ export function AssetValuationHoverCard({ assetId, assetName, currency, children
                   />
                   <YAxis 
                     tick={{ fontSize: 10 }}
+                    domain={[yMin, yMax]}
                     tickFormatter={(value) => {
                       if (value >= 1000) return `${currencySymbol}${(value / 1000).toFixed(0)}k`;
-                      return `${currencySymbol}${value}`;
+                      return `${currencySymbol}${Math.round(value)}`;
                     }}
                     width={40}
                   />
