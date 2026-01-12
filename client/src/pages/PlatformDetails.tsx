@@ -3,7 +3,7 @@ import { AddTransactionDialog } from "@/components/AddTransactionDialog";
 import { PlatformSettingsDialog } from "@/components/PlatformSettingsDialog";
 import { usePlatform, usePlatforms } from "@/hooks/use-platforms";
 import { useInvestments } from "@/hooks/use-investments";
-import { useValuations } from "@/hooks/use-valuations";
+import { useValuations, useDeleteValuation } from "@/hooks/use-valuations";
 import { useWithdrawals } from "@/hooks/use-withdrawals";
 import { useAssets } from "@/hooks/use-assets";
 import { useAuth } from "@/App";
@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search, ArrowUpDown } from "lucide-react";
+import { ArrowLeft, TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search, ArrowUpDown, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -106,6 +106,7 @@ export default function PlatformDetails() {
   const { data: platform, isLoading: isPlatformLoading } = usePlatform(id);
   const { data: investments, isLoading: isInvestmentsLoading } = useInvestments(id);
   const { data: valuations, isLoading: isValuationsLoading } = useValuations(id);
+  const deleteValuation = useDeleteValuation();
   const { data: withdrawals, isLoading: isWithdrawalsLoading } = useWithdrawals(id);
   
   const platformMode = (platform as any)?.platformMode || "standard";
@@ -745,7 +746,7 @@ export default function PlatformDetails() {
                         <div key={v.id} className="grid grid-cols-3 p-4 text-sm hover:bg-muted/30 transition-colors items-center">
                           <div className="text-muted-foreground">{format(new Date(v.date), 'MMM dd, yyyy')}</div>
                           <div className="font-medium">{formatCurrency(v.value, currency)}</div>
-                          <div className="flex justify-end">
+                          <div className="flex justify-end gap-1">
                             <AddTransactionDialog 
                               platformId={id} 
                               type="valuation" 
@@ -755,6 +756,20 @@ export default function PlatformDetails() {
                                 date: new Date(v.date).toISOString().split('T')[0]
                               }} 
                             />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => {
+                                if (confirm("Are you sure you want to delete this valuation?")) {
+                                  deleteValuation.mutate({ id: v.id, platformId: id });
+                                }
+                              }}
+                              disabled={deleteValuation.isPending}
+                              data-testid={`button-delete-valuation-${v.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
                       ))

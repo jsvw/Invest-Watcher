@@ -166,6 +166,14 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/valuations/:id',
+      responses: {
+        204: z.undefined(),
+        404: errorSchemas.notFound,
+      },
+    },
   },
   insights: {
     generate: {

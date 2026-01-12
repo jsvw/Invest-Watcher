@@ -96,3 +96,38 @@ export function useUpdateValuation() {
     },
   });
 }
+
+export function useDeleteValuation() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, platformId }: { id: number; platformId: number }) => {
+      const res = await fetch(api.valuations.delete.path.replace(':id', String(id)), {
+        method: api.valuations.delete.method,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        throw new Error("Failed to delete valuation");
+      }
+      return platformId;
+    },
+    onSuccess: (platformId) => {
+      queryClient.invalidateQueries({ queryKey: [api.valuations.list.path, platformId] });
+      queryClient.invalidateQueries({ queryKey: [api.platforms.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.portfolio.history.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio/available-filters'] });
+      toast({
+        title: "Success",
+        description: "Valuation deleted successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete valuation",
+        variant: "destructive",
+      });
+    },
+  });
+}

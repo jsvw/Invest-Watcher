@@ -278,6 +278,21 @@ export async function registerRoutes(
     }
   });
 
+  app.delete('/api/valuations/:id', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = await storage.getValuationPlatformId(Number(req.params.id));
+      if (!platformId) return res.status(404).json({ message: "Valuation not found" });
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Valuation not found" });
+      
+      await storage.deleteValuation(Number(req.params.id));
+      res.status(204).send();
+    } catch (err) {
+      res.status(404).json({ message: "Valuation not found" });
+    }
+  });
+
   // --- Assets (for asset_returns and item_valuations platform modes) ---
   app.get('/api/platforms/:platformId/assets', requireAuth, async (req, res) => {
     try {

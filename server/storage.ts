@@ -55,6 +55,7 @@ export interface IStorage {
   getAllValuationsForUser(userId: number): Promise<Valuation[]>;
   createValuation(valuation: InsertValuation): Promise<Valuation>;
   updateValuation(id: number, valuation: Partial<InsertValuation>): Promise<Valuation>;
+  deleteValuation(id: number): Promise<void>;
   getValuationPlatformId(valuationId: number): Promise<number | null>;
 
   // Assets (require platform ownership verification in routes)
@@ -385,6 +386,10 @@ export class DatabaseStorage implements IStorage {
       .returning();
     if (!updated) throw new Error("Valuation not found");
     return updated;
+  }
+
+  async deleteValuation(id: number): Promise<void> {
+    await db.delete(valuations).where(eq(valuations.id, id));
   }
 
   async getLatestValuations(): Promise<Map<number, number>> {
