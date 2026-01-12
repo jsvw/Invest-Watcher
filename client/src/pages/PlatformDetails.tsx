@@ -352,15 +352,13 @@ export default function PlatformDetails() {
           {/* Assets Tab for non-standard modes */}
           {platformMode !== "standard" && (
             <TabsContent value="assets" className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
-              {/* Combined asset insights with tabs */}
-              <AssetInsightTabs
-                platformId={id}
-                platformMode={platformMode}
-                currency={currency}
-                assetPerformance={assetPerformance}
-                totalInvested={platformTotalInvested}
-                currentValue={platformCurrentValue}
-              />
+              {/* Combined asset insights with tabs - only for item_valuations mode */}
+              {platformMode === "item_valuations" && (
+                <AssetInsightTabs
+                  platformId={id}
+                  currency={currency}
+                />
+              )}
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
