@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, ReferenceLine, LineChart, Line } from "recharts";
+import { ComposedChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, Line, LineChart } from "recharts";
 import { formatCurrency } from "@/lib/currency";
 import { format } from "date-fns";
 import { useMemo } from "react";
@@ -97,9 +97,9 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
     }
   });
 
-  const { chartData, maxWeeks, avgReturn } = useMemo(() => {
+  const { chartData, maxWeeks, monthlyAvgData } = useMemo(() => {
     if (!bubbleData || bubbleData.length === 0) {
-      return { chartData: [], maxWeeks: 10, avgReturn: 0 };
+      return { chartData: [], maxWeeks: 10, monthlyAvgData: [] };
     }
 
     const uniqueAssets = Array.from(new Set(bubbleData.map(d => d.assetName)));
@@ -118,10 +118,27 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
 
     const maxWeeksVal = Math.max(...bubbleData.map(d => d.weeksFromInvestment), 10);
 
-    const totalReturn = bubbleData.reduce((sum, d) => sum + d.percentReturn, 0);
-    const avg = Math.round((totalReturn / bubbleData.length) * 100) / 100;
+    // Calculate monthly average (group by 4-week buckets)
+    const weeksPerMonth = 4;
+    const monthBuckets = new Map<number, number[]>();
+    
+    bubbleData.forEach(d => {
+      const monthBucket = Math.floor(d.weeksFromInvestment / weeksPerMonth);
+      if (!monthBuckets.has(monthBucket)) {
+        monthBuckets.set(monthBucket, []);
+      }
+      monthBuckets.get(monthBucket)!.push(d.percentReturn);
+    });
 
-    return { chartData: data, maxWeeks: maxWeeksVal, avgReturn: avg };
+    // Convert to array for the line chart, sorted by month
+    const monthlyAvg = Array.from(monthBuckets.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([monthBucket, returns]) => ({
+        x: monthBucket * weeksPerMonth + weeksPerMonth / 2, // center of the bucket
+        avgReturn: Math.round((returns.reduce((s, r) => s + r, 0) / returns.length) * 100) / 100
+      }));
+
+    return { chartData: data, maxWeeks: maxWeeksVal, monthlyAvgData: monthlyAvg };
   }, [bubbleData]);
 
   if (isLoading) {
@@ -158,11 +175,11 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
     <Card data-testid="card-item-return-bubbles">
       <CardHeader>
         <CardTitle>Item Returns Over Investment Time</CardTitle>
-        <CardDescription>X-axis shows weeks since investment. Bubble size represents invested amount. Avg return: {avgReturn >= 0 ? '+' : ''}{avgReturn}%</CardDescription>
+        <CardDescription>X-axis shows weeks since investment. Bubble size represents invested amount. Dashed line shows monthly average.</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
-          <ScatterChart margin={{ top: 20, right: 20, bottom: 30, left: 20 }}>
+          <ComposedChart margin={{ top: 20, right: 20, bottom: 30, left: 20 }}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis 
               type="number"
@@ -186,12 +203,32 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
               range={[100, 800]}
               name="Invested"
             />
-            <ReferenceLine y={avgReturn} stroke="hsl(var(--primary))" strokeDasharray="5 5" label={{ value: `Avg: ${avgReturn}%`, position: 'right', fill: 'hsl(var(--primary))', fontSize: 12 }} />
+            <Line 
+              data={monthlyAvgData}
+              type="monotone"
+              dataKey="avgReturn"
+              stroke="hsl(var(--primary))"
+              strokeWidth={2}
+              strokeDasharray="5 5"
+              dot={{ fill: 'hsl(var(--primary))', r: 4 }}
+              name="Monthly Avg"
+            />
             <Tooltip 
               cursor={{ strokeDasharray: '3 3' }}
               content={({ active, payload }) => {
                 if (!active || !payload || !payload.length) return null;
                 const data = payload[0].payload;
+                
+                // Check if this is a monthly average point (no assetName)
+                if (data.avgReturn !== undefined && !data.assetName) {
+                  return (
+                    <div className="bg-popover border rounded-lg p-3 shadow-lg">
+                      <p className="font-medium">Monthly Average</p>
+                      <p className="text-sm">Week {Math.round(data.x)}: {data.avgReturn >= 0 ? '+' : ''}{data.avgReturn}%</p>
+                    </div>
+                  );
+                }
+                
                 return (
                   <div className="bg-popover border rounded-lg p-3 shadow-lg w-64">
                     <p className="font-medium truncate">{data.assetName}</p>
@@ -229,7 +266,7 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
                 <Cell key={`cell-${index}`} fill={entry.fill} fillOpacity={0.8} stroke={entry.fill} strokeWidth={1} />
               ))}
             </Scatter>
-          </ScatterChart>
+          </ComposedChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>
