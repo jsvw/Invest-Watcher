@@ -156,6 +156,13 @@ export default function PlatformDetails() {
     return result;
   }, [assets, assetNameFilter, assetSort]);
 
+  const totalActivelyInvested = useMemo(() => {
+    if (!assets) return 0;
+    return assets
+      .filter(asset => asset.status === "active")
+      .reduce((sum, asset) => sum + Number(asset.investedAmount) + Number((asset as any).bonusAmount || 0), 0);
+  }, [assets]);
+
   const { data: history, isLoading: isHistoryLoading } = useQuery({
     queryKey: [api.portfolio.history.path, id, range, specificYear, specificMonth],
     queryFn: async () => {
@@ -357,7 +364,7 @@ export default function PlatformDetails() {
                 <AssetInsightTabs
                   platformId={id}
                   currency={currency}
-                  totalInvested={platformTotalInvested}
+                  totalInvested={totalActivelyInvested}
                 />
               )}
 
@@ -371,6 +378,9 @@ export default function PlatformDetails() {
                         : "Track items with periodic valuations"
                       }
                     </CardDescription>
+                  </div>
+                  <div className="text-sm text-muted-foreground" data-testid="text-active-invested">
+                    Active: <span className="font-medium text-foreground">{formatCurrency(totalActivelyInvested, currency)}</span>
                   </div>
                   <div className="flex gap-2 flex-wrap items-center">
                     <div className="relative">
