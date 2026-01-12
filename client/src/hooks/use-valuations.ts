@@ -38,10 +38,12 @@ export function useCreateValuation() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: [api.valuations.list.path, variables.platformId] });
-      queryClient.invalidateQueries({ queryKey: [api.platforms.list.path] }); // Refresh totals
+      queryClient.invalidateQueries({ queryKey: [api.platforms.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.portfolio.history.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio/available-filters'] });
       toast({
         title: "Success",
-        description: "Valuation updated successfully",
+        description: "Valuation recorded successfully",
       });
     },
     onError: (error) => {
@@ -77,7 +79,9 @@ export function useUpdateValuation() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [api.valuations.list.path, data.platformId] });
-      queryClient.invalidateQueries({ queryKey: [api.platforms.list.path] }); // Refresh totals
+      queryClient.invalidateQueries({ queryKey: [api.platforms.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.portfolio.history.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio/available-filters'] });
       toast({
         title: "Success",
         description: "Valuation updated successfully",
