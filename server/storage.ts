@@ -762,17 +762,18 @@ export class DatabaseStorage implements IStorage {
     return bubbleData;
   }
 
-  async getItemCohortReturns(platformId: number): Promise<{ cohortKey: string; cohortLabel: string; data: { monthIndex: number; avgReturn: number; assetCount: number }[] }[]> {
+  async getItemCohortReturns(platformId: number): Promise<{ cohortKey: string; cohortLabel: string; data: { calendarMonth: string; calendarLabel: string; avgReturn: number; assetCount: number }[] }[]> {
     const allAssets = await db.select().from(assets)
       .where(eq(assets.platformId, platformId));
     
     if (allAssets.length === 0) return [];
 
-    const msPerMonth = 30.44 * 24 * 60 * 60 * 1000;
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-    // Group assets by acquisition calendar month (YYYY-MM)
-    // For each cohort, track returns at each month age (0, 1, 2... months since acquisition)
-    const cohortData = new Map<string, Map<number, number[]>>();
+    // Group assets by acquisition calendar month (cohort)
+    // For each cohort, track returns at each CALENDAR month (not relative months)
+    // Key: cohortKey (YYYY-MM of acquisition), Value: Map<calendarMonth (YYYY-MM), returns[]>
+    const cohortData = new Map<string, Map<string, number[]>>();
     const cohortLabels = new Map<string, string>();
 
     for (const asset of allAssets) {
@@ -781,7 +782,6 @@ export class DatabaseStorage implements IStorage {
 
       const acquisitionDate = new Date(asset.acquisitionDate);
       const cohortKey = `${acquisitionDate.getFullYear()}-${String(acquisitionDate.getMonth() + 1).padStart(2, '0')}`;
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       const cohortLabel = `${monthNames[acquisitionDate.getMonth()]} ${acquisitionDate.getFullYear()}`;
       
       if (!cohortData.has(cohortKey)) {
@@ -796,39 +796,40 @@ export class DatabaseStorage implements IStorage {
 
       if (vals.length === 0) continue;
 
-      // For each valuation, calculate how many months old the asset was
+      // For each valuation, group by the CALENDAR month of the valuation
       for (const val of vals) {
         const valDate = new Date(val.date);
-        const monthIndex = Math.floor((valDate.getTime() - acquisitionDate.getTime()) / msPerMonth);
-        
-        if (monthIndex < 0) continue;
+        const calendarMonth = `${valDate.getFullYear()}-${String(valDate.getMonth() + 1).padStart(2, '0')}`;
 
         const valValue = Number(val.value);
         const percentReturn = ((valValue - investedBasis) / investedBasis) * 100;
         
         const cohortMonths = cohortData.get(cohortKey)!;
-        if (!cohortMonths.has(monthIndex)) {
-          cohortMonths.set(monthIndex, []);
+        if (!cohortMonths.has(calendarMonth)) {
+          cohortMonths.set(calendarMonth, []);
         }
-        cohortMonths.get(monthIndex)!.push(percentReturn);
+        cohortMonths.get(calendarMonth)!.push(percentReturn);
       }
     }
 
     // Convert to output format - one line per cohort
-    const result: { cohortKey: string; cohortLabel: string; data: { monthIndex: number; avgReturn: number; assetCount: number }[] }[] = [];
+    const result: { cohortKey: string; cohortLabel: string; data: { calendarMonth: string; calendarLabel: string; avgReturn: number; assetCount: number }[] }[] = [];
 
     const sortedCohortKeys = Array.from(cohortData.keys()).sort();
 
     for (const cohortKey of sortedCohortKeys) {
       const monthsMap = cohortData.get(cohortKey)!;
-      const sortedMonthIndexes = Array.from(monthsMap.keys()).sort((a, b) => a - b);
+      const sortedCalendarMonths = Array.from(monthsMap.keys()).sort();
       
-      const data: { monthIndex: number; avgReturn: number; assetCount: number }[] = [];
-      for (const monthIndex of sortedMonthIndexes) {
-        const returns = monthsMap.get(monthIndex)!;
+      const data: { calendarMonth: string; calendarLabel: string; avgReturn: number; assetCount: number }[] = [];
+      for (const calendarMonth of sortedCalendarMonths) {
+        const returns = monthsMap.get(calendarMonth)!;
         const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+        const [year, month] = calendarMonth.split('-');
+        const calendarLabel = `${monthNames[parseInt(month) - 1]} ${year}`;
         data.push({
-          monthIndex,
+          calendarMonth,
+          calendarLabel,
           avgReturn: Math.round(avgReturn * 100) / 100,
           assetCount: returns.length
         });
