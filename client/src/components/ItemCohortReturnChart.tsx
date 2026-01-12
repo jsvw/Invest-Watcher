@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { useMemo } from "react";
 
 interface CohortData {
@@ -149,7 +149,6 @@ export function ItemCohortReturnChart({ platformId }: ItemCohortReturnChartProps
                 );
               }}
             />
-            <Legend />
             {cohortData.map((cohort, idx) => (
               <Line
                 key={cohort.cohortKey}
