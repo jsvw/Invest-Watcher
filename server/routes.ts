@@ -685,6 +685,21 @@ export async function registerRoutes(
     }
   });
 
+  // Item cohort return data for item_valuations platforms - shows average return per month cohort
+  app.get('/api/platforms/:platformId/item-cohort-returns', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.platformId);
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+      
+      const cohorts = await storage.getItemCohortReturns(platformId);
+      res.json(cohorts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch item cohort data" });
+    }
+  });
+
   // --- Insights ---
   app.post(api.insights.generate.path, requireAuth, async (req, res) => {
     try {

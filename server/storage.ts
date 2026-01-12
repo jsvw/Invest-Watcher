@@ -761,6 +761,67 @@ export class DatabaseStorage implements IStorage {
 
     return bubbleData;
   }
+
+  async getItemCohortReturns(platformId: number): Promise<{ cohort: number; cohortLabel: string; data: { month: number; avgReturn: number; assetCount: number }[] }[]> {
+    const allAssets = await db.select().from(assets)
+      .where(eq(assets.platformId, platformId));
+    
+    if (allAssets.length === 0) return [];
+
+    const msPerMonth = 30.44 * 24 * 60 * 60 * 1000;
+    const today = new Date();
+
+    // Group assets by their cohort (month of acquisition)
+    const cohortMap = new Map<number, { asset: typeof allAssets[0]; monthsSinceInvestment: number; percentReturn: number }[]>();
+
+    for (const asset of allAssets) {
+      const investedBasis = Number(asset.investedAmount) + Number(asset.bonusAmount || 0);
+      if (investedBasis <= 0) continue;
+
+      const acquisitionDate = new Date(asset.acquisitionDate);
+      const monthsSinceInvestment = Math.floor((today.getTime() - acquisitionDate.getTime()) / msPerMonth);
+      
+      // Get latest valuation for current return
+      const vals = await db.select().from(assetValuations)
+        .where(eq(assetValuations.assetId, asset.id))
+        .orderBy(assetValuations.date);
+
+      if (vals.length === 0) continue;
+
+      const latestValue = Number(vals[vals.length - 1].value);
+      const percentReturn = ((latestValue - investedBasis) / investedBasis) * 100;
+
+      // Group by cohort (monthsSinceInvestment)
+      if (!cohortMap.has(monthsSinceInvestment)) {
+        cohortMap.set(monthsSinceInvestment, []);
+      }
+      cohortMap.get(monthsSinceInvestment)!.push({
+        asset,
+        monthsSinceInvestment,
+        percentReturn: Math.round(percentReturn * 100) / 100
+      });
+    }
+
+    // Convert to output format - for each cohort, calculate average return
+    const cohorts = Array.from(cohortMap.entries())
+      .map(([cohort, assets]) => {
+        const totalReturn = assets.reduce((sum, a) => sum + a.percentReturn, 0);
+        const avgReturn = Math.round((totalReturn / assets.length) * 100) / 100;
+        
+        return {
+          cohort,
+          cohortLabel: `Month ${cohort}`,
+          data: [{
+            month: cohort,
+            avgReturn,
+            assetCount: assets.length
+          }]
+        };
+      })
+      .sort((a, b) => a.cohort - b.cohort);
+
+    return cohorts;
+  }
 }
 
 export const storage = new DatabaseStorage();
