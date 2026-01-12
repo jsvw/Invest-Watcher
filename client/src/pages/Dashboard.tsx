@@ -241,6 +241,17 @@ export default function Dashboard() {
               Show All
             </Button>
           )}
+          {platforms && platforms.length > 0 && excludedPlatforms.length < platforms.length && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setExcludedPlatforms(platforms.map(p => p.id))}
+              className="text-xs"
+              data-testid="button-deselect-all-platforms"
+            >
+              Deselect All
+            </Button>
+          )}
         </div>
 
         {/* AI Insight Section */}
