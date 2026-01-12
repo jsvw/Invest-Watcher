@@ -733,8 +733,8 @@ export class DatabaseStorage implements IStorage {
 
       if (vals.length === 0) continue;
 
-      // Find earliest date (first valuation date is the investment date)
-      const investmentDate = new Date(vals[0].date);
+      // Use the asset's acquisition date as the investment date
+      const investmentDate = new Date(asset.acquisitionDate);
       
       // Only use the latest valuation
       const latestVal = vals[vals.length - 1];
