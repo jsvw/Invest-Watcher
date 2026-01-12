@@ -15,7 +15,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     try {
       await apiRequest("POST", "/api/auth/logout");
       queryClient.clear();
-      setLocation("/login");
+      window.location.href = "/login";
     } catch (e) {
       console.error("Logout failed:", e);
     }
