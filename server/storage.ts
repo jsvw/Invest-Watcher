@@ -762,65 +762,88 @@ export class DatabaseStorage implements IStorage {
     return bubbleData;
   }
 
-  async getItemCohortReturns(platformId: number): Promise<{ cohort: number; cohortLabel: string; data: { month: number; avgReturn: number; assetCount: number }[] }[]> {
+  async getItemCohortReturns(platformId: number): Promise<{ cohortKey: string; cohortLabel: string; data: { monthIndex: number; avgReturn: number; assetCount: number }[] }[]> {
     const allAssets = await db.select().from(assets)
       .where(eq(assets.platformId, platformId));
     
     if (allAssets.length === 0) return [];
 
     const msPerMonth = 30.44 * 24 * 60 * 60 * 1000;
-    const today = new Date();
 
-    // Group assets by their cohort (month of acquisition)
-    const cohortMap = new Map<number, { asset: typeof allAssets[0]; monthsSinceInvestment: number; percentReturn: number }[]>();
+    // Group assets by acquisition calendar month (YYYY-MM)
+    // For each cohort, track returns at each month age (0, 1, 2... months since acquisition)
+    const cohortData = new Map<string, Map<number, number[]>>();
+    const cohortLabels = new Map<string, string>();
 
     for (const asset of allAssets) {
       const investedBasis = Number(asset.investedAmount) + Number(asset.bonusAmount || 0);
       if (investedBasis <= 0) continue;
 
       const acquisitionDate = new Date(asset.acquisitionDate);
-      const monthsSinceInvestment = Math.floor((today.getTime() - acquisitionDate.getTime()) / msPerMonth);
+      const cohortKey = `${acquisitionDate.getFullYear()}-${String(acquisitionDate.getMonth() + 1).padStart(2, '0')}`;
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const cohortLabel = `${monthNames[acquisitionDate.getMonth()]} ${acquisitionDate.getFullYear()}`;
       
-      // Get latest valuation for current return
+      if (!cohortData.has(cohortKey)) {
+        cohortData.set(cohortKey, new Map());
+        cohortLabels.set(cohortKey, cohortLabel);
+      }
+
+      // Get all valuations for this asset
       const vals = await db.select().from(assetValuations)
         .where(eq(assetValuations.assetId, asset.id))
         .orderBy(assetValuations.date);
 
       if (vals.length === 0) continue;
 
-      const latestValue = Number(vals[vals.length - 1].value);
-      const percentReturn = ((latestValue - investedBasis) / investedBasis) * 100;
+      // For each valuation, calculate how many months old the asset was
+      for (const val of vals) {
+        const valDate = new Date(val.date);
+        const monthIndex = Math.floor((valDate.getTime() - acquisitionDate.getTime()) / msPerMonth);
+        
+        if (monthIndex < 0) continue;
 
-      // Group by cohort (monthsSinceInvestment)
-      if (!cohortMap.has(monthsSinceInvestment)) {
-        cohortMap.set(monthsSinceInvestment, []);
+        const valValue = Number(val.value);
+        const percentReturn = ((valValue - investedBasis) / investedBasis) * 100;
+        
+        const cohortMonths = cohortData.get(cohortKey)!;
+        if (!cohortMonths.has(monthIndex)) {
+          cohortMonths.set(monthIndex, []);
+        }
+        cohortMonths.get(monthIndex)!.push(percentReturn);
       }
-      cohortMap.get(monthsSinceInvestment)!.push({
-        asset,
-        monthsSinceInvestment,
-        percentReturn: Math.round(percentReturn * 100) / 100
-      });
     }
 
-    // Convert to output format - for each cohort, calculate average return
-    const cohorts = Array.from(cohortMap.entries())
-      .map(([cohort, assets]) => {
-        const totalReturn = assets.reduce((sum, a) => sum + a.percentReturn, 0);
-        const avgReturn = Math.round((totalReturn / assets.length) * 100) / 100;
-        
-        return {
-          cohort,
-          cohortLabel: `Month ${cohort}`,
-          data: [{
-            month: cohort,
-            avgReturn,
-            assetCount: assets.length
-          }]
-        };
-      })
-      .sort((a, b) => a.cohort - b.cohort);
+    // Convert to output format - one line per cohort
+    const result: { cohortKey: string; cohortLabel: string; data: { monthIndex: number; avgReturn: number; assetCount: number }[] }[] = [];
 
-    return cohorts;
+    const sortedCohortKeys = Array.from(cohortData.keys()).sort();
+
+    for (const cohortKey of sortedCohortKeys) {
+      const monthsMap = cohortData.get(cohortKey)!;
+      const sortedMonthIndexes = Array.from(monthsMap.keys()).sort((a, b) => a - b);
+      
+      const data: { monthIndex: number; avgReturn: number; assetCount: number }[] = [];
+      for (const monthIndex of sortedMonthIndexes) {
+        const returns = monthsMap.get(monthIndex)!;
+        const avgReturn = returns.reduce((sum, r) => sum + r, 0) / returns.length;
+        data.push({
+          monthIndex,
+          avgReturn: Math.round(avgReturn * 100) / 100,
+          assetCount: returns.length
+        });
+      }
+
+      if (data.length > 0) {
+        result.push({
+          cohortKey,
+          cohortLabel: cohortLabels.get(cohortKey)!,
+          data
+        });
+      }
+    }
+
+    return result;
   }
 }
 

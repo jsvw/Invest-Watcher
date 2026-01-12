@@ -31,6 +31,7 @@ import { AssetValuationImportDialog } from "@/components/AssetValuationImportDia
 import { AggregatedPerformancePanel } from "@/components/AggregatedPerformancePanel";
 import { AssetValuationHoverCard } from "@/components/AssetValuationHoverCard";
 import { ItemReturnBubbleChart } from "@/components/ItemReturnBubbleChart";
+import { ItemCohortReturnChart } from "@/components/ItemCohortReturnChart";
 import type { Asset } from "@shared/schema";
 import { PlatformIcon } from "@/components/PlatformIcon";
 
@@ -366,6 +367,11 @@ export default function PlatformDetails() {
               {/* Bubble chart for item_valuations mode showing % return over time */}
               {platformMode === "item_valuations" && (
                 <ItemReturnBubbleChart platformId={id} currency={currency} />
+              )}
+
+              {/* Monthly cohort returns chart for item_valuations mode */}
+              {platformMode === "item_valuations" && (
+                <ItemCohortReturnChart platformId={id} />
               )}
 
               <Card>

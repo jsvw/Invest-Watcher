@@ -5,9 +5,9 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { useMemo } from "react";
 
 interface CohortData {
-  cohort: number;
+  cohortKey: string;
   cohortLabel: string;
-  data: { month: number; avgReturn: number; assetCount: number }[];
+  data: { monthIndex: number; avgReturn: number; assetCount: number }[];
 }
 
 interface ItemCohortReturnChartProps {
@@ -29,37 +29,37 @@ export function ItemCohortReturnChart({ platformId }: ItemCohortReturnChartProps
     }
   });
 
-  const { chartData, maxMonth } = useMemo(() => {
+  const { chartData, maxMonth, cohortInfoMap } = useMemo(() => {
     if (!cohortData || cohortData.length === 0) {
-      return { chartData: [], maxMonth: 0 };
+      return { chartData: [], maxMonth: 0, cohortInfoMap: new Map<string, Map<number, number>>() };
     }
 
-    // Create a single data point array with each cohort's data as a separate key
-    // Format: [{ month: 1, "Month 6": 5.2, "Month 12": 8.4, ... }, ...]
-    const monthMap = new Map<number, Record<string, number | null>>();
+    const monthMap = new Map<number, Record<string, number | undefined>>();
+    const infoMap = new Map<string, Map<number, number>>();
     let max = 0;
 
     cohortData.forEach(cohort => {
-      if (cohort.cohort > max) max = cohort.cohort;
+      infoMap.set(cohort.cohortLabel, new Map());
       cohort.data.forEach(d => {
-        if (!monthMap.has(d.month)) {
-          monthMap.set(d.month, { month: d.month });
+        if (d.monthIndex > max) max = d.monthIndex;
+        if (!monthMap.has(d.monthIndex)) {
+          monthMap.set(d.monthIndex, { monthIndex: d.monthIndex });
         }
-        monthMap.get(d.month)![cohort.cohortLabel] = d.avgReturn;
+        monthMap.get(d.monthIndex)![cohort.cohortLabel] = d.avgReturn;
+        infoMap.get(cohort.cohortLabel)!.set(d.monthIndex, d.assetCount);
       });
     });
 
-    // Convert map to array and sort by month
-    const data = Array.from(monthMap.values()).sort((a, b) => (a.month as number) - (b.month as number));
+    const data = Array.from(monthMap.values()).sort((a, b) => (a.monthIndex as number) - (b.monthIndex as number));
 
-    return { chartData: data, maxMonth: max };
+    return { chartData: data, maxMonth: max, cohortInfoMap: infoMap };
   }, [cohortData]);
 
   if (isLoading) {
     return (
       <Card data-testid="card-item-cohort-returns">
         <CardHeader>
-          <CardTitle>Returns by Investment Month</CardTitle>
+          <CardTitle>Returns by Investment Cohort</CardTitle>
           <CardDescription>Loading chart data...</CardDescription>
         </CardHeader>
         <CardContent>
@@ -73,12 +73,12 @@ export function ItemCohortReturnChart({ platformId }: ItemCohortReturnChartProps
     return (
       <Card data-testid="card-item-cohort-returns">
         <CardHeader>
-          <CardTitle>Returns by Investment Month</CardTitle>
-          <CardDescription>Average return grouped by months since investment</CardDescription>
+          <CardTitle>Returns by Investment Cohort</CardTitle>
+          <CardDescription>Shows how returns evolve over time for assets grouped by acquisition month</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-            No data available yet.
+            No valuation data available yet.
           </div>
         </CardContent>
       </Card>
@@ -88,15 +88,15 @@ export function ItemCohortReturnChart({ platformId }: ItemCohortReturnChartProps
   return (
     <Card data-testid="card-item-cohort-returns">
       <CardHeader>
-        <CardTitle>Returns by Investment Month</CardTitle>
-        <CardDescription>Average return % for assets grouped by months since investment. Each bar represents a cohort of assets invested X months ago.</CardDescription>
+        <CardTitle>Returns by Investment Cohort</CardTitle>
+        <CardDescription>Each line represents assets acquired in the same month. X-axis shows months since investment.</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
           <LineChart data={chartData} margin={{ top: 20, right: 30, bottom: 30, left: 20 }}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis 
-              dataKey="month"
+              dataKey="monthIndex"
               type="number"
               domain={[0, maxMonth + 1]}
               tickFormatter={(val) => `${val}m`}
@@ -110,15 +110,25 @@ export function ItemCohortReturnChart({ platformId }: ItemCohortReturnChartProps
             <Tooltip 
               content={({ active, payload, label }) => {
                 if (!active || !payload || !payload.length) return null;
+                const monthIdx = Number(label);
                 return (
                   <div className="bg-popover border rounded-lg p-3 shadow-lg">
-                    <p className="font-medium mb-2">Month {label} Cohorts</p>
+                    <p className="font-medium mb-2">At Month {monthIdx}</p>
                     <div className="space-y-1 text-sm">
-                      {payload.map((entry, idx) => (
-                        <p key={idx} style={{ color: entry.color }}>
-                          {entry.name}: {(entry.value as number) >= 0 ? '+' : ''}{entry.value}%
-                        </p>
-                      ))}
+                      {payload.map((entry, idx) => {
+                        const cohortLabel = entry.name as string;
+                        const count = cohortInfoMap.get(cohortLabel)?.get(monthIdx) || 0;
+                        return (
+                          <div key={idx} className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                            <span>{cohortLabel}:</span>
+                            <span className="font-medium">
+                              {(entry.value as number) >= 0 ? '+' : ''}{entry.value}%
+                            </span>
+                            <span className="text-muted-foreground text-xs">({count} valuations)</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -127,7 +137,7 @@ export function ItemCohortReturnChart({ platformId }: ItemCohortReturnChartProps
             <Legend />
             {cohortData.map((cohort, idx) => (
               <Line
-                key={cohort.cohort}
+                key={cohort.cohortKey}
                 type="monotone"
                 dataKey={cohort.cohortLabel}
                 stroke={COLORS[idx % COLORS.length]}
