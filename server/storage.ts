@@ -740,9 +740,6 @@ export class DatabaseStorage implements IStorage {
       const today = new Date();
       const weeksFromInvestment = Math.round((today.getTime() - investmentDate.getTime()) / msPerWeek * 10) / 10;
       
-      // Debug logging
-      console.log(`[BUBBLE DEBUG] Asset: ${asset.name}, acquisitionDate raw: ${asset.acquisitionDate}, parsed: ${investmentDate.toISOString()}, today: ${today.toISOString()}, weeks: ${weeksFromInvestment}`);
-      
       // Only use the latest valuation for the value
       const latestVal = vals[vals.length - 1];
       const latestValue = Number(latestVal.value);
