@@ -690,10 +690,11 @@ export async function registerRoutes(
     try {
       const userId = getAuthenticatedUserId(req)!;
       const platformId = Number(req.params.platformId);
+      const statusFilter = (req.query.statusFilter as string) || "all";
       const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
       if (!isOwner) return res.status(404).json({ message: "Platform not found" });
       
-      const bubbles = await storage.getItemReturnBubbles(platformId);
+      const bubbles = await storage.getItemReturnBubbles(platformId, statusFilter);
       res.json(bubbles);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch item bubble data" });
@@ -705,10 +706,11 @@ export async function registerRoutes(
     try {
       const userId = getAuthenticatedUserId(req)!;
       const platformId = Number(req.params.platformId);
+      const statusFilter = (req.query.statusFilter as string) || "all";
       const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
       if (!isOwner) return res.status(404).json({ message: "Platform not found" });
       
-      const cohorts = await storage.getItemCohortReturns(platformId);
+      const cohorts = await storage.getItemCohortReturns(platformId, statusFilter);
       res.json(cohorts);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch item cohort data" });

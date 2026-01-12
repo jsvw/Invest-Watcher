@@ -22,9 +22,12 @@ interface BubbleDataPoint {
   valuationHistory: ValuationPoint[];
 }
 
+import type { AssetStatusFilter } from "@/components/AssetInsightTabs";
+
 interface ItemReturnBubbleChartProps {
   platformId: number;
   currency: string;
+  statusFilter?: AssetStatusFilter;
 }
 
 const COLORS = [
@@ -95,11 +98,12 @@ function MiniValuationChart({ data, currency }: { data: ValuationPoint[]; curren
   );
 }
 
-export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubbleChartProps) {
+export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "all" }: ItemReturnBubbleChartProps) {
   const { data: bubbleData, isLoading } = useQuery<BubbleDataPoint[]>({
-    queryKey: ['/api/platforms', platformId, 'item-bubbles'],
+    queryKey: ['/api/platforms', platformId, 'item-bubbles', statusFilter],
     queryFn: async () => {
-      const res = await fetch(`/api/platforms/${platformId}/item-bubbles`, { credentials: "include" });
+      const url = `/api/platforms/${platformId}/item-bubbles?statusFilter=${statusFilter}`;
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch bubble data");
       return await res.json();
     }

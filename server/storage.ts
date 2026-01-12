@@ -21,7 +21,7 @@ import {
   type PlatformResponse,
   type AssetResponse
 } from "@shared/schema";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { eq, desc, sql, and, or } from "drizzle-orm";
 
 export interface IStorage {
   // Ownership verification
@@ -77,7 +77,10 @@ export interface IStorage {
   getAssetPerformanceHistory(platformId: number): Promise<{ date: string; assets: { id: number; name: string; key: string; value: number }[] }[]>;
 
   // Item Bubble Chart Data
-  getItemReturnBubbles(platformId: number): Promise<{ assetId: number; assetName: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number }[]>;
+  getItemReturnBubbles(platformId: number, statusFilter?: string): Promise<{ assetId: number; assetName: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number }[]>;
+  
+  // Item Cohort Returns
+  getItemCohortReturns(platformId: number, statusFilter?: string): Promise<{ cohortKey: string; cohortLabel: string; data: { calendarMonth: string; calendarLabel: string; avgReturn: number; assetCount: number }[] }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -714,10 +717,19 @@ export class DatabaseStorage implements IStorage {
     return dataPoints;
   }
 
-  async getItemReturnBubbles(platformId: number): Promise<{ assetId: number; assetName: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number; valuationHistory: { date: string; value: number }[] }[]> {
-    // Get all active and exited assets for this platform
-    const allAssets = await db.select().from(assets)
-      .where(eq(assets.platformId, platformId));
+  async getItemReturnBubbles(platformId: number, statusFilter: string = "all"): Promise<{ assetId: number; assetName: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number; valuationHistory: { date: string; value: number }[] }[]> {
+    // Get assets for this platform with optional status filter
+    let allAssets;
+    if (statusFilter === "active") {
+      allAssets = await db.select().from(assets)
+        .where(and(eq(assets.platformId, platformId), eq(assets.status, "active")));
+    } else if (statusFilter === "exited") {
+      allAssets = await db.select().from(assets)
+        .where(and(eq(assets.platformId, platformId), or(eq(assets.status, "exited"), eq(assets.status, "matured"))));
+    } else {
+      allAssets = await db.select().from(assets)
+        .where(eq(assets.platformId, platformId));
+    }
     
     if (allAssets.length === 0) return [];
 
@@ -774,9 +786,18 @@ export class DatabaseStorage implements IStorage {
     return bubbleData;
   }
 
-  async getItemCohortReturns(platformId: number): Promise<{ cohortKey: string; cohortLabel: string; data: { calendarMonth: string; calendarLabel: string; avgReturn: number; assetCount: number }[] }[]> {
-    const allAssets = await db.select().from(assets)
-      .where(eq(assets.platformId, platformId));
+  async getItemCohortReturns(platformId: number, statusFilter: string = "all"): Promise<{ cohortKey: string; cohortLabel: string; data: { calendarMonth: string; calendarLabel: string; avgReturn: number; assetCount: number }[] }[]> {
+    let allAssets;
+    if (statusFilter === "active") {
+      allAssets = await db.select().from(assets)
+        .where(and(eq(assets.platformId, platformId), eq(assets.status, "active")));
+    } else if (statusFilter === "exited") {
+      allAssets = await db.select().from(assets)
+        .where(and(eq(assets.platformId, platformId), or(eq(assets.status, "exited"), eq(assets.status, "matured"))));
+    } else {
+      allAssets = await db.select().from(assets)
+        .where(eq(assets.platformId, platformId));
+    }
     
     if (allAssets.length === 0) return [];
 

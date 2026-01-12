@@ -10,8 +10,11 @@ interface CohortData {
   data: { calendarMonth: string; calendarLabel: string; avgReturn: number; assetCount: number }[];
 }
 
+import type { AssetStatusFilter } from "@/components/AssetInsightTabs";
+
 interface ItemCohortReturnChartProps {
   platformId: number;
+  statusFilter?: AssetStatusFilter;
 }
 
 const COLORS = [
@@ -19,11 +22,12 @@ const COLORS = [
   "#FFBB28", "#FF8042", "#0088FE", "#a4de6c", "#d0ed57"
 ];
 
-export function ItemCohortReturnChart({ platformId }: ItemCohortReturnChartProps) {
+export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: ItemCohortReturnChartProps) {
   const { data: cohortData, isLoading } = useQuery<CohortData[]>({
-    queryKey: ['/api/platforms', platformId, 'item-cohort-returns'],
+    queryKey: ['/api/platforms', platformId, 'item-cohort-returns', statusFilter],
     queryFn: async () => {
-      const res = await fetch(`/api/platforms/${platformId}/item-cohort-returns`, { credentials: "include" });
+      const url = `/api/platforms/${platformId}/item-cohort-returns?statusFilter=${statusFilter}`;
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch cohort data");
       return await res.json();
     }
