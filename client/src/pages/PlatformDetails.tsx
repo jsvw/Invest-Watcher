@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search, ArrowUpDown, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { format } from "date-fns";
@@ -113,7 +113,7 @@ export default function PlatformDetails() {
   const { data: assets, isLoading: isAssetsLoading } = useAssets(id);
   
   const [assetNameFilter, setAssetNameFilter] = useState("");
-  const [assetSort, setAssetSort] = useState<"name" | "date" | "invested" | "value" | "return">("date");
+  const [assetSort, setAssetSort] = useState<"name" | "name-desc" | "date" | "date-asc" | "invested" | "invested-asc" | "value" | "value-asc" | "return" | "return-asc" | "exit" | "exit-desc">("date");
   
   const filteredAndSortedAssets = useMemo(() => {
     if (!assets) return [];
@@ -133,22 +133,50 @@ export default function PlatformDetails() {
       switch (assetSort) {
         case "name":
           return a.name.localeCompare(b.name);
+        case "name-desc":
+          return b.name.localeCompare(a.name);
         case "date":
           const dateA = a.acquisitionDate ? new Date(a.acquisitionDate).getTime() : 0;
           const dateB = b.acquisitionDate ? new Date(b.acquisitionDate).getTime() : 0;
           return dateB - dateA; // Most recent first
+        case "date-asc":
+          const dateA2 = a.acquisitionDate ? new Date(a.acquisitionDate).getTime() : 0;
+          const dateB2 = b.acquisitionDate ? new Date(b.acquisitionDate).getTime() : 0;
+          return dateA2 - dateB2; // Oldest first
         case "invested":
           const investedA = Number(a.investedAmount) + Number((a as any).bonusAmount || 0);
           const investedB = Number(b.investedAmount) + Number((b as any).bonusAmount || 0);
           return investedB - investedA; // Highest first
+        case "invested-asc":
+          const investedA2 = Number(a.investedAmount) + Number((a as any).bonusAmount || 0);
+          const investedB2 = Number(b.investedAmount) + Number((b as any).bonusAmount || 0);
+          return investedA2 - investedB2; // Lowest first
         case "value":
           const valueA = a.currentValue || Number(a.investedAmount);
           const valueB = b.currentValue || Number(b.investedAmount);
           return valueB - valueA; // Highest first
+        case "value-asc":
+          const valueA2 = a.currentValue || Number(a.investedAmount);
+          const valueB2 = b.currentValue || Number(b.investedAmount);
+          return valueA2 - valueB2; // Lowest first
         case "return":
           const returnA = a.profitLoss || 0;
           const returnB = b.profitLoss || 0;
           return returnB - returnA; // Highest return first
+        case "return-asc":
+          const returnA2 = a.profitLoss || 0;
+          const returnB2 = b.profitLoss || 0;
+          return returnA2 - returnB2; // Lowest return first
+        case "exit":
+          // Nearest exit first (items without exit date go to the end)
+          const exitA = a.exitDate ? new Date(a.exitDate).getTime() : Infinity;
+          const exitB = b.exitDate ? new Date(b.exitDate).getTime() : Infinity;
+          return exitA - exitB;
+        case "exit-desc":
+          // Furthest exit first (items without exit date go to the end)
+          const exitA2 = a.exitDate ? new Date(a.exitDate).getTime() : -Infinity;
+          const exitB2 = b.exitDate ? new Date(b.exitDate).getTime() : -Infinity;
+          return exitB2 - exitA2;
         default:
           return 0;
       }
@@ -401,21 +429,50 @@ export default function PlatformDetails() {
                           <span className="hidden sm:inline">Sort</span>
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
+                      <DropdownMenuContent align="end" className="w-48">
                         <DropdownMenuItem onClick={() => setAssetSort("name")} data-testid="sort-name">
                           {assetSort === "name" && "✓ "}Name (A-Z)
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setAssetSort("name-desc")} data-testid="sort-name-desc">
+                          {assetSort === "name-desc" && "✓ "}Name (Z-A)
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => setAssetSort("date")} data-testid="sort-date">
                           {assetSort === "date" && "✓ "}Date (Newest)
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setAssetSort("date-asc")} data-testid="sort-date-asc">
+                          {assetSort === "date-asc" && "✓ "}Date (Oldest)
+                        </DropdownMenuItem>
+                        {platformMode === "asset_returns" && (
+                          <>
+                            <DropdownMenuItem onClick={() => setAssetSort("exit")} data-testid="sort-exit">
+                              {assetSort === "exit" && "✓ "}Exit (Nearest)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setAssetSort("exit-desc")} data-testid="sort-exit-desc">
+                              {assetSort === "exit-desc" && "✓ "}Exit (Furthest)
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => setAssetSort("invested")} data-testid="sort-invested">
                           {assetSort === "invested" && "✓ "}Invested (Highest)
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setAssetSort("invested-asc")} data-testid="sort-invested-asc">
+                          {assetSort === "invested-asc" && "✓ "}Invested (Lowest)
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => setAssetSort("value")} data-testid="sort-value">
                           {assetSort === "value" && "✓ "}Value (Highest)
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setAssetSort("value-asc")} data-testid="sort-value-asc">
+                          {assetSort === "value-asc" && "✓ "}Value (Lowest)
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => setAssetSort("return")} data-testid="sort-return">
                           {assetSort === "return" && "✓ "}Return (Highest)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setAssetSort("return-asc")} data-testid="sort-return-asc">
+                          {assetSort === "return-asc" && "✓ "}Return (Lowest)
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
