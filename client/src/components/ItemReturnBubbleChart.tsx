@@ -56,6 +56,13 @@ function MiniValuationChart({ data, currency }: { data: ValuationPoint[]; curren
     );
   }
 
+  const values = data.map(d => d.value);
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const padding = (maxValue - minValue) * 0.1 || maxValue * 0.1;
+  const yMin = Math.max(0, minValue - padding);
+  const yMax = maxValue + padding;
+
   return (
     <div className="h-24 w-full">
       <ResponsiveContainer width="100%" height="100%">
@@ -68,9 +75,10 @@ function MiniValuationChart({ data, currency }: { data: ValuationPoint[]; curren
           />
           <YAxis 
             tick={{ fontSize: 9 }}
+            domain={[yMin, yMax]}
             tickFormatter={(value) => {
               if (value >= 1000) return `${currencySymbol}${(value / 1000).toFixed(0)}k`;
-              return `${currencySymbol}${value}`;
+              return `${currencySymbol}${Math.round(value)}`;
             }}
             width={35}
           />
