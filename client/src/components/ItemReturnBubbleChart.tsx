@@ -203,30 +203,15 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
               range={[100, 800]}
               name="Invested"
             />
-            <Line 
-              data={monthlyAvgData}
-              type="monotone"
-              dataKey="avgReturn"
-              stroke="hsl(var(--primary))"
-              strokeWidth={2}
-              strokeDasharray="5 5"
-              dot={{ fill: 'hsl(var(--primary))', r: 4 }}
-              name="Monthly Avg"
-            />
             <Tooltip 
               cursor={{ strokeDasharray: '3 3' }}
               content={({ active, payload }) => {
                 if (!active || !payload || !payload.length) return null;
                 const data = payload[0].payload;
                 
-                // Check if this is a monthly average point (no assetName)
-                if (data.avgReturn !== undefined && !data.assetName) {
-                  return (
-                    <div className="bg-popover border rounded-lg p-3 shadow-lg">
-                      <p className="font-medium">Monthly Average</p>
-                      <p className="text-sm">Week {Math.round(data.x)}: {data.avgReturn >= 0 ? '+' : ''}{data.avgReturn}%</p>
-                    </div>
-                  );
+                // Skip if this is a monthly average point (from the Line)
+                if (!data.assetName) {
+                  return null;
                 }
                 
                 return (
@@ -266,6 +251,20 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
                 <Cell key={`cell-${index}`} fill={entry.fill} fillOpacity={0.8} stroke={entry.fill} strokeWidth={1} />
               ))}
             </Scatter>
+            <Line 
+              data={monthlyAvgData}
+              type="monotone"
+              dataKey="avgReturn"
+              xAxisId={0}
+              yAxisId={0}
+              stroke="hsl(var(--primary))"
+              strokeWidth={2}
+              strokeDasharray="5 5"
+              dot={{ fill: 'hsl(var(--primary))', r: 3 }}
+              activeDot={false}
+              legendType="none"
+              tooltipType="none"
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </CardContent>
