@@ -230,7 +230,6 @@ export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "al
             <Scatter 
               data={chartData} 
               name="Items"
-              isAnimationActive={false}
             >
               {chartData.map((entry) => (
                 <Cell key={`cell-${entry.assetId}`} fill={entry.fill} fillOpacity={0.8} stroke={entry.fill} strokeWidth={1} />
