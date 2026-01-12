@@ -114,18 +114,12 @@ export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "al
       return { chartData: [], maxWeeks: 10, avgReturn: 0 };
     }
 
-    const uniqueAssets = Array.from(new Set(bubbleData.map(d => d.assetName)));
-    const colors: Record<string, string> = {};
-    uniqueAssets.forEach((name, i) => {
-      colors[name] = COLORS[i % COLORS.length];
-    });
-
     const data = bubbleData.map(d => ({
       ...d,
       x: d.weeksFromInvestment,
       y: d.percentReturn,
       z: d.investedBasis,
-      fill: colors[d.assetName]
+      fill: COLORS[d.assetId % COLORS.length]
     }));
 
     const maxWeeksVal = Math.max(...bubbleData.map(d => d.weeksFromInvestment), 10);
@@ -236,9 +230,10 @@ export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "al
             <Scatter 
               data={chartData} 
               name="Items"
+              isAnimationActive={false}
             >
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.fill} fillOpacity={0.8} stroke={entry.fill} strokeWidth={1} />
+              {chartData.map((entry) => (
+                <Cell key={`cell-${entry.assetId}`} fill={entry.fill} fillOpacity={0.8} stroke={entry.fill} strokeWidth={1} />
               ))}
             </Scatter>
           </ScatterChart>
