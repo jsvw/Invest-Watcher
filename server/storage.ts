@@ -797,8 +797,11 @@ export class DatabaseStorage implements IStorage {
       if (vals.length === 0) continue;
 
       // For each valuation, group by the CALENDAR month of the valuation
+      // Skip valuations that predate the asset's acquisition
       for (const val of vals) {
         const valDate = new Date(val.date);
+        if (valDate < acquisitionDate) continue;
+        
         const calendarMonth = `${valDate.getFullYear()}-${String(valDate.getMonth() + 1).padStart(2, '0')}`;
 
         const valValue = Number(val.value);
