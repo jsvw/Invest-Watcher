@@ -36,9 +36,9 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
     }
   });
 
-  const { chartData, monthlyAverages } = useMemo(() => {
+  const { chartData, monthlyAverages, maxWeeks } = useMemo(() => {
     if (!bubbleData || bubbleData.length === 0) {
-      return { chartData: [], monthlyAverages: [] };
+      return { chartData: [], monthlyAverages: [], maxWeeks: 10 };
     }
 
     const uniqueAssets = Array.from(new Set(bubbleData.map(d => d.assetName)));
@@ -47,6 +47,7 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
       colors[name] = COLORS[i % COLORS.length];
     });
 
+    // Use weeksFromInvestment directly as x coordinate
     const data = bubbleData.map(d => ({
       ...d,
       x: d.weeksFromInvestment,
@@ -54,6 +55,9 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
       z: d.investedBasis,
       fill: colors[d.assetName]
     }));
+
+    // Calculate max weeks for domain
+    const maxWeeksVal = Math.max(...bubbleData.map(d => d.weeksFromInvestment), 10);
 
     // Group by month (4 weeks = 1 month) and calculate averages
     const monthBuckets: Record<number, number[]> = {};
@@ -70,7 +74,7 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
       }))
       .sort((a, b) => a.x - b.x);
 
-    return { chartData: data, monthlyAverages: avgData };
+    return { chartData: data, monthlyAverages: avgData, maxWeeks: maxWeeksVal };
   }, [bubbleData]);
 
   if (isLoading) {
@@ -117,7 +121,8 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
               type="number"
               dataKey="x"
               name="Weeks"
-              domain={[0, 'dataMax']}
+              domain={[0, Math.ceil(maxWeeks * 1.1)]}
+              allowDataOverflow={false}
               tickFormatter={(val) => `${Math.round(val)}w`}
               className="text-xs fill-muted-foreground"
               label={{ value: 'Weeks since investment', position: 'insideBottom', offset: -10, className: 'fill-muted-foreground text-xs' }}
@@ -174,7 +179,10 @@ export function ItemReturnBubbleChart({ platformId, currency }: ItemReturnBubble
               dot={{ fill: 'hsl(var(--primary))', r: 4 }}
               name="Monthly Average"
             />
-            <Scatter data={chartData} dataKey="y">
+            <Scatter 
+              data={chartData} 
+              dataKey="y"
+            >
               {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.fill} fillOpacity={0.8} stroke={entry.fill} strokeWidth={1} />
               ))}
