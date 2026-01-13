@@ -5,7 +5,7 @@ import { usePlatform, usePlatforms } from "@/hooks/use-platforms";
 import { useInvestments } from "@/hooks/use-investments";
 import { useValuations, useDeleteValuation } from "@/hooks/use-valuations";
 import { useWithdrawals } from "@/hooks/use-withdrawals";
-import { useAssets } from "@/hooks/use-assets";
+import { useAssets, useUpdateAsset } from "@/hooks/use-assets";
 import { useAuth } from "@/App";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 import { useRoute } from "wouter";
@@ -39,9 +39,23 @@ function AssetActionsMenu({ asset, platformId, platformMode, currency }: { asset
   const [exitOpen, setExitOpen] = useState(false);
   const [repaymentOpen, setRepaymentOpen] = useState(false);
   const [valuationOpen, setValuationOpen] = useState(false);
+  const updateAsset = useUpdateAsset(platformId);
   
   const isActive = asset.status === "active";
   const isMaturedOrExited = asset.status === "matured" || asset.status === "exited";
+  
+  const handleRemoveExit = () => {
+    if (confirm("Are you sure you want to remove the exit? The asset will be marked as active again.")) {
+      updateAsset.mutate({
+        id: asset.id,
+        data: {
+          status: "active",
+          exitDate: null,
+          exitPrice: null
+        }
+      });
+    }
+  };
 
   return (
     <div className="flex justify-end gap-1">
@@ -77,6 +91,10 @@ function AssetActionsMenu({ asset, platformId, platformMode, currency }: { asset
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setExitOpen(true)} data-testid={`menu-edit-exit-${asset.id}`}>
               <LogOut className="h-4 w-4 mr-2" /> Edit Exit
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleRemoveExit} className="text-destructive" data-testid={`menu-remove-exit-${asset.id}`}>
+              <Trash2 className="h-4 w-4 mr-2" /> Remove Exit
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
