@@ -560,63 +560,27 @@ export default function PlatformDetails() {
                             <div className="font-medium">
                               {formatCurrency(asset.currentValue || Number(asset.investedAmount), currency)}
                             </div>
-                            <div>
+                            <div className="flex flex-col gap-1">
                               {asset.status === "exited" ? (
-                                <div className="flex flex-col gap-1">
-                                  <Badge variant="secondary" className="gap-1">
-                                    <CheckCircle className="h-3 w-3" /> Exited
-                                    {asset.profitLoss !== undefined && (
-                                      <span className={asset.profitLoss >= 0 ? "text-green-600" : "text-red-600"}>
-                                        ({asset.profitLoss >= 0 ? "+" : ""}{formatCurrency(asset.profitLoss, currency)}
-                                        {Number(asset.investedAmount) > 0 && (
-                                          <span className="ml-1">
-                                            | {((asset.profitLoss / Number(asset.investedAmount)) * 100).toFixed(1)}%
-                                          </span>
-                                        )})
-                                      </span>
-                                    )}
-                                  </Badge>
-                                  {asset.exitDate && asset.acquisitionDate && (
-                                    <span className="text-xs text-muted-foreground">
-                                      {(() => {
-                                        const years = (new Date(asset.exitDate).getTime() - new Date(asset.acquisitionDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
-                                        return years < 1 
-                                          ? `${Math.round(years * 12)} months` 
-                                          : `${years.toFixed(1)} years`;
-                                      })()}
-                                    </span>
-                                  )}
-                                </div>
+                                <Badge variant="secondary" className="gap-1 w-fit">
+                                  <CheckCircle className="h-3 w-3" /> Exited
+                                </Badge>
                               ) : asset.status === "matured" ? (
-                                <div className="flex flex-col gap-1">
-                                  <Badge className="gap-1 bg-green-600">
-                                    <CheckCircle className="h-3 w-3" /> Matured
-                                  </Badge>
-                                  {asset.profitLoss !== undefined && asset.profitLoss > 0 && (
-                                    <span className="text-xs text-green-600">
-                                      +{formatCurrency(asset.profitLoss, currency)}
-                                      {Number(asset.investedAmount) > 0 && (
-                                        <span className="ml-1">
-                                          ({((asset.profitLoss / Number(asset.investedAmount)) * 100).toFixed(1)}%)
-                                        </span>
-                                      )}
-                                    </span>
-                                  )}
-                                </div>
+                                <Badge className="gap-1 bg-green-600 w-fit">
+                                  <CheckCircle className="h-3 w-3" /> Matured
+                                </Badge>
                               ) : (
-                                <div className="flex flex-col gap-1">
-                                  <Badge variant="outline">Active</Badge>
-                                  {asset.profitLoss !== undefined && asset.profitLoss > 0 && (
-                                    <span className="text-xs text-green-600">
-                                      +{formatCurrency(asset.profitLoss, currency)}
-                                      {Number(asset.investedAmount) > 0 && (
-                                        <span className="ml-1">
-                                          ({((asset.profitLoss / Number(asset.investedAmount)) * 100).toFixed(1)}%)
-                                        </span>
-                                      )}
+                                <Badge variant="outline" className="w-fit">Active</Badge>
+                              )}
+                              {asset.profitLoss !== undefined && (
+                                <span className={`text-xs ${asset.profitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                  {asset.profitLoss >= 0 ? "+" : ""}{formatCurrency(asset.profitLoss, currency)}
+                                  {Number(asset.investedAmount) > 0 && (
+                                    <span className="ml-1">
+                                      ({((asset.profitLoss / Number(asset.investedAmount)) * 100).toFixed(1)}%)
                                     </span>
                                   )}
-                                </div>
+                                </span>
                               )}
                             </div>
                             <AssetActionsMenu 
