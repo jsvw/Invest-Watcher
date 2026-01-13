@@ -48,19 +48,19 @@ function AssetActionsMenu({ asset, platformId, platformMode, currency }: { asset
       {isActive ? (
         <>
           {platformMode === "asset_returns" && (
-            <Button size="icon" variant="ghost" onClick={() => setRepaymentOpen(true)} title="Record Repayment" data-testid={`button-repayment-${asset.id}`}>
+            <Button size="icon" variant="outline" onClick={() => setRepaymentOpen(true)} title="Record Repayment" data-testid={`button-repayment-${asset.id}`}>
               <DollarSign className="h-4 w-4 text-blue-600" />
             </Button>
           )}
           {platformMode === "item_valuations" && (
-            <Button size="icon" variant="ghost" onClick={() => setValuationOpen(true)} title="Add Valuation" data-testid={`button-valuation-${asset.id}`}>
+            <Button size="icon" variant="outline" onClick={() => setValuationOpen(true)} title="Add Valuation" data-testid={`button-valuation-${asset.id}`}>
               <TrendingUp className="h-4 w-4" />
             </Button>
           )}
-          <Button size="icon" variant="ghost" onClick={() => setExitOpen(true)} title="Exit Asset" data-testid={`button-exit-${asset.id}`}>
+          <Button size="icon" variant="outline" onClick={() => setExitOpen(true)} title="Exit Asset" data-testid={`button-exit-${asset.id}`}>
             <LogOut className="h-4 w-4 text-orange-600" />
           </Button>
-          <Button size="icon" variant="ghost" onClick={() => setEditOpen(true)} title="Edit Asset" data-testid={`button-edit-${asset.id}`}>
+          <Button size="icon" variant="outline" onClick={() => setEditOpen(true)} title="Edit Asset" data-testid={`button-edit-${asset.id}`}>
             <Pencil className="h-4 w-4" />
           </Button>
         </>
