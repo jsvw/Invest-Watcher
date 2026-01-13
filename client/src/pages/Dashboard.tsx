@@ -209,33 +209,27 @@ export default function Dashboard() {
           <StatCard 
             title="MoM Performance" 
             value={(() => {
-              if (!history || history.length < 2) return "N/A";
-              const current = history[history.length - 1];
-              const previous = history[history.length - 2];
-              const currentMoM = current.value - previous.value;
-              return formatCurrency(currentMoM, currency);
+              if (!platformMomData || platformMomData.length === 0) return "N/A";
+              const totalMomChange = platformMomData.reduce((sum: number, p: any) => sum + p.momChange, 0);
+              return formatCurrency(totalMomChange, currency);
             })()} 
             trend={(() => {
-              if (!history || history.length < 2) return undefined;
-              const current = history[history.length - 1];
-              const previous = history[history.length - 2];
-              const currentMoM = current.value - previous.value;
-              return currentMoM >= 0 ? "up" : "down";
+              if (!platformMomData || platformMomData.length === 0) return undefined;
+              const totalMomChange = platformMomData.reduce((sum: number, p: any) => sum + p.momChange, 0);
+              return totalMomChange >= 0 ? "up" : "down";
             })()}
             trendValue={(() => {
-              if (!history || history.length < 2) return "";
-              const current = history[history.length - 1];
-              const previous = history[history.length - 2];
-              const growthPercent = previous.value > 0 ? ((current.value - previous.value) / previous.value) * 100 : 0;
+              if (!platformMomData || platformMomData.length === 0) return "";
+              const totalPrevValue = platformMomData.reduce((sum: number, p: any) => sum + p.prevValue, 0);
+              const totalMomChange = platformMomData.reduce((sum: number, p: any) => sum + p.momChange, 0);
+              const growthPercent = totalPrevValue > 0 ? (totalMomChange / totalPrevValue) * 100 : 0;
               return `${growthPercent.toFixed(1)}%`;
             })()}
             icon={TrendingUp}
             className={(() => {
-              if (!history || history.length < 2) return "border-l-muted";
-              const current = history[history.length - 1];
-              const previous = history[history.length - 2];
-              const currentMoM = current.value - previous.value;
-              return currentMoM >= 0 ? "border-l-emerald-500" : "border-l-rose-500";
+              if (!platformMomData || platformMomData.length === 0) return "border-l-muted";
+              const totalMomChange = platformMomData.reduce((sum: number, p: any) => sum + p.momChange, 0);
+              return totalMomChange >= 0 ? "border-l-emerald-500" : "border-l-rose-500";
             })()}
             platformBreakdown={platformMomData?.map((p: any) => ({
               name: p.name,
