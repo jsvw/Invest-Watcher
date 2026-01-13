@@ -601,17 +601,17 @@ export default function PlatformDetails() {
                             <div className="font-medium">
                               {formatCurrency(asset.currentValue || Number(asset.investedAmount), currency)}
                             </div>
-                            <div className="flex flex-col gap-1">
+                            <div className="flex flex-col gap-1 items-start">
                               {asset.status === "exited" ? (
-                                <Badge variant="secondary" className="gap-1 w-fit">
+                                <Badge variant="secondary" className="gap-1 justify-start">
                                   <CheckCircle className="h-3 w-3" /> Exited
                                 </Badge>
                               ) : asset.status === "matured" ? (
-                                <Badge className="gap-1 bg-green-600 w-fit">
+                                <Badge className="gap-1 bg-green-600 justify-start">
                                   <CheckCircle className="h-3 w-3" /> Matured
                                 </Badge>
                               ) : (
-                                <Badge variant="outline" className="w-fit">Active</Badge>
+                                <Badge variant="outline" className="justify-start">Active</Badge>
                               )}
                               {asset.profitLoss !== undefined && (
                                 <span className={`text-xs ${asset.profitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
