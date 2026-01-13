@@ -1039,16 +1039,10 @@ export async function registerRoutes(
       
       const userPlatforms = await storage.getPlatforms(userId);
       const userValuations = await storage.getAllValuationsForUser(userId);
-      const userInvestments = await storage.getAllInvestmentsForUser(userId);
-      const userWithdrawals = await storage.getAllWithdrawalsForUser(userId);
-      const userAssets = await storage.getAllAssetsForUser(userId);
       
       // Filter out excluded platforms
       const filteredPlatforms = userPlatforms.filter((p: any) => !excludePlatforms.includes(p.id));
       const filteredValuations = userValuations.filter((v: any) => !excludePlatforms.includes(v.platformId));
-      const filteredInvestments = userInvestments.filter((inv: any) => !excludePlatforms.includes(inv.platformId));
-      const filteredWithdrawals = userWithdrawals.filter((wd: any) => !excludePlatforms.includes(wd.platformId));
-      const filteredAssets = userAssets.filter((a: any) => !excludePlatforms.includes(a.platformId));
       
       // Calculate per-platform MoM using actual valuation months (not calendar months)
       const platformMom = filteredPlatforms.map((platform: any) => {
@@ -1057,13 +1051,13 @@ export async function registerRoutes(
           .filter((v: any) => v.platformId === platform.id)
           .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
         
-        // Group valuations by month and get latest valuation date for each month
-        const monthlyVals = new Map<string, { value: number; date: Date }>();
+        // Group valuations by month and get latest value for each month
+        const monthlyVals = new Map<string, number>();
         platformVals.forEach((v: any) => {
           const d = new Date(v.date);
           const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
           if (!monthlyVals.has(key)) {
-            monthlyVals.set(key, { value: Number(v.value), date: d });
+            monthlyVals.set(key, Number(v.value));
           }
         });
         
@@ -1073,60 +1067,19 @@ export async function registerRoutes(
         const previousMonth = sortedMonths[1];
         
         // Only calculate MoM if we have at least 2 months of valuation data
+        // Otherwise, MoM is not meaningful
         const hasEnoughData = latestMonth && previousMonth;
-        const currentData = latestMonth ? monthlyVals.get(latestMonth)! : { value: 0, date: new Date() };
-        const prevData = previousMonth ? monthlyVals.get(previousMonth)! : { value: 0, date: new Date() };
-        
-        // Calculate new investments made between the two valuation dates
-        const platformInvestments = filteredInvestments.filter((inv: any) => inv.platformId === platform.id);
-        const platformWithdrawals = filteredWithdrawals.filter((wd: any) => wd.platformId === platform.id);
-        const platformAssets = filteredAssets.filter((a: any) => a.platformId === platform.id);
-        
-        // Determine investment source based on platform mode
-        const isAssetBased = platform.platformMode === 'asset_returns' || platform.platformMode === 'item_valuations';
-        
-        let newInvestments = 0;
-        if (hasEnoughData) {
-          if (isAssetBased) {
-            // For asset-based platforms, use assets table (acquisitionDate)
-            newInvestments = platformAssets
-              .filter((a: any) => {
-                const acqDate = new Date(a.acquisitionDate);
-                return acqDate > prevData.date && acqDate <= currentData.date;
-              })
-              .reduce((sum: number, a: any) => sum + Number(a.investedAmount || 0), 0);
-          } else {
-            // For standard platforms, use investments table
-            newInvestments = platformInvestments
-              .filter((inv: any) => {
-                const invDate = new Date(inv.date);
-                return invDate > prevData.date && invDate <= currentData.date;
-              })
-              .reduce((sum: number, inv: any) => sum + Number(inv.amount), 0);
-          }
-        }
-        
-        const newWithdrawals = hasEnoughData ? platformWithdrawals
-          .filter((wd: any) => {
-            const wdDate = new Date(wd.date);
-            return wdDate > prevData.date && wdDate <= currentData.date;
-          })
-          .reduce((sum: number, wd: any) => sum + Number(wd.amount), 0) : 0;
-        
-        // Net new capital = investments - withdrawals
-        const netNewCapital = newInvestments - newWithdrawals;
-        
-        // MoM change = value change - net new capital (to get actual growth/returns)
-        const rawChange = currentData.value - prevData.value;
-        const momChange = hasEnoughData ? rawChange - netNewCapital : 0;
-        const momGrowthPercent = hasEnoughData && prevData.value > 0 ? (momChange / prevData.value) * 100 : 0;
+        const currentValue = latestMonth ? monthlyVals.get(latestMonth)! : 0;
+        const prevValue = previousMonth ? monthlyVals.get(previousMonth)! : 0;
+        const momChange = hasEnoughData ? currentValue - prevValue : 0;
+        const momGrowthPercent = hasEnoughData && prevValue > 0 ? ((currentValue - prevValue) / prevValue) * 100 : 0;
         
         return {
           platformId: platform.id,
           name: platform.name,
           customIconUrl: (platform as any).customIconUrl,
-          currentValue: currentData.value,
-          prevValue: prevData.value,
+          currentValue,
+          prevValue,
           momChange,
           momGrowthPercent
         };
