@@ -79,6 +79,7 @@ export interface IStorage {
   // Asset Repayments (partial principal repayments)
   getAssetRepayments(assetId: number): Promise<AssetRepayment[]>;
   createAssetRepayment(repayment: InsertAssetRepayment): Promise<AssetRepayment>;
+  updateAssetRepayment(id: number, data: { amount?: string; date?: Date; notes?: string | null }): Promise<AssetRepayment>;
   deleteAssetRepayment(id: number): Promise<void>;
   getAssetRepaymentAssetId(repaymentId: number): Promise<number | null>;
 
@@ -616,6 +617,14 @@ export class DatabaseStorage implements IStorage {
   async createAssetRepayment(repayment: InsertAssetRepayment): Promise<AssetRepayment> {
     const [newRepayment] = await db.insert(assetRepayments).values(repayment).returning();
     return newRepayment;
+  }
+
+  async updateAssetRepayment(id: number, data: { amount?: string; date?: Date; notes?: string | null }): Promise<AssetRepayment> {
+    const [updated] = await db.update(assetRepayments)
+      .set(data)
+      .where(eq(assetRepayments.id, id))
+      .returning();
+    return updated;
   }
 
   async deleteAssetRepayment(id: number): Promise<void> {

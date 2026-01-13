@@ -705,6 +705,24 @@ export async function registerRoutes(
     }
   });
 
+  app.patch('/api/asset-repayments/:id', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const repaymentId = Number(req.params.id);
+      const assetId = await storage.getAssetRepaymentAssetId(repaymentId);
+      if (!assetId) return res.status(404).json({ message: "Repayment not found" });
+      
+      const isOwner = await storage.verifyAssetOwnership(assetId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Repayment not found" });
+      
+      const { amount, date, notes } = req.body;
+      const repayment = await storage.updateAssetRepayment(repaymentId, { amount, date, notes });
+      res.json(repayment);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update repayment" });
+    }
+  });
+
   app.delete('/api/asset-repayments/:id', requireAuth, async (req, res) => {
     try {
       const userId = getAuthenticatedUserId(req)!;

@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
-import { Banknote, Trash2 } from "lucide-react";
+import { Banknote, Trash2, Pencil, X } from "lucide-react";
 import type { Asset, AssetRepayment } from "@shared/schema";
 import { formatCurrency } from "@/lib/currency";
 import { format } from "date-fns";
@@ -26,6 +26,7 @@ interface AssetRepaymentDialogProps {
 
 export function AssetRepaymentDialog({ asset, platformId, currency }: AssetRepaymentDialogProps) {
   const [open, setOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -47,10 +48,30 @@ export function AssetRepaymentDialog({ asset, platformId, currency }: AssetRepay
       queryClient.invalidateQueries({ queryKey: ['/api/assets', asset.id, 'repayments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/platforms', platformId, 'assets'] });
       toast({ title: "Repayment recorded", description: "The partial repayment has been added." });
-      form.reset();
+      form.reset({ amount: "", date: new Date().toISOString().split('T')[0], notes: "" });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to record repayment.", variant: "destructive" });
+    }
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: { id: number; amount: string; date: Date; notes: string | null }) => {
+      return apiRequest('PATCH', `/api/asset-repayments/${data.id}`, {
+        amount: data.amount,
+        date: data.date,
+        notes: data.notes
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/assets', asset.id, 'repayments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/platforms', platformId, 'assets'] });
+      toast({ title: "Repayment updated", description: "The repayment has been updated." });
+      setEditingId(null);
+      form.reset({ amount: "", date: new Date().toISOString().split('T')[0], notes: "" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update repayment.", variant: "destructive" });
     }
   });
 
@@ -82,12 +103,35 @@ export function AssetRepaymentDialog({ asset, platformId, currency }: AssetRepay
       return;
     }
 
-    createMutation.mutate({
-      assetId: asset.id,
-      amount: data.amount,
-      date: new Date(data.date),
-      notes: data.notes || null
+    if (editingId) {
+      updateMutation.mutate({
+        id: editingId,
+        amount: data.amount,
+        date: new Date(data.date),
+        notes: data.notes || null
+      });
+    } else {
+      createMutation.mutate({
+        assetId: asset.id,
+        amount: data.amount,
+        date: new Date(data.date),
+        notes: data.notes || null
+      });
+    }
+  };
+
+  const startEditing = (repayment: AssetRepayment) => {
+    setEditingId(repayment.id);
+    form.reset({
+      amount: String(repayment.amount),
+      date: new Date(repayment.date).toISOString().split('T')[0],
+      notes: repayment.notes || ""
     });
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    form.reset({ amount: "", date: new Date().toISOString().split('T')[0], notes: "" });
   };
 
   const totalRepaid = repayments?.reduce((sum, r) => sum + Number(r.amount), 0) || 0;
@@ -162,14 +206,29 @@ export function AssetRepaymentDialog({ asset, platformId, currency }: AssetRepay
                 data-testid="input-repayment-notes"
               />
             </div>
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={createMutation.isPending}
-              data-testid="button-add-repayment"
-            >
-              {createMutation.isPending ? "Adding..." : "Add Repayment"}
-            </Button>
+            <div className="flex gap-2">
+              {editingId && (
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={cancelEditing}
+                  data-testid="button-cancel-edit"
+                >
+                  <X className="h-4 w-4 mr-1" /> Cancel
+                </Button>
+              )}
+              <Button 
+                type="submit" 
+                className="flex-1" 
+                disabled={createMutation.isPending || updateMutation.isPending}
+                data-testid={editingId ? "button-update-repayment" : "button-add-repayment"}
+              >
+                {editingId 
+                  ? (updateMutation.isPending ? "Updating..." : "Update Repayment")
+                  : (createMutation.isPending ? "Adding..." : "Add Repayment")
+                }
+              </Button>
+            </div>
           </form>
 
           {repayments && repayments.length > 0 && (
@@ -195,16 +254,28 @@ export function AssetRepaymentDialog({ asset, platformId, currency }: AssetRepay
                         </span>
                       )}
                     </div>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-6 w-6 text-destructive hover:bg-destructive/10"
-                      onClick={() => deleteMutation.mutate(repayment.id)}
-                      disabled={deleteMutation.isPending}
-                      data-testid={`button-delete-repayment-${repayment.id}`}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6"
+                        onClick={() => startEditing(repayment)}
+                        disabled={editingId === repayment.id}
+                        data-testid={`button-edit-repayment-${repayment.id}`}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 text-destructive hover:bg-destructive/10"
+                        onClick={() => deleteMutation.mutate(repayment.id)}
+                        disabled={deleteMutation.isPending}
+                        data-testid={`button-delete-repayment-${repayment.id}`}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
