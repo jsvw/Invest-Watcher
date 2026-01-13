@@ -1082,21 +1082,29 @@ export async function registerRoutes(
         const platformWithdrawals = filteredWithdrawals.filter((wd: any) => wd.platformId === platform.id);
         const platformAssets = filteredAssets.filter((a: any) => a.platformId === platform.id);
         
-        // For standard platforms, use investments table
-        const newInvestmentsFromTable = hasEnoughData ? platformInvestments
-          .filter((inv: any) => {
-            const invDate = new Date(inv.date);
-            return invDate > prevData.date && invDate <= currentData.date;
-          })
-          .reduce((sum: number, inv: any) => sum + Number(inv.amount), 0) : 0;
+        // Determine investment source based on platform mode
+        const isAssetBased = platform.platformMode === 'asset_returns' || platform.platformMode === 'item_valuations';
         
-        // For asset_returns and item_valuations platforms, also check assets table
-        const newInvestmentsFromAssets = hasEnoughData ? platformAssets
-          .filter((a: any) => {
-            const acqDate = new Date(a.acquisitionDate);
-            return acqDate > prevData.date && acqDate <= currentData.date;
-          })
-          .reduce((sum: number, a: any) => sum + Number(a.investedAmount || 0), 0) : 0;
+        let newInvestments = 0;
+        if (hasEnoughData) {
+          if (isAssetBased) {
+            // For asset-based platforms, use assets table (acquisitionDate)
+            newInvestments = platformAssets
+              .filter((a: any) => {
+                const acqDate = new Date(a.acquisitionDate);
+                return acqDate > prevData.date && acqDate <= currentData.date;
+              })
+              .reduce((sum: number, a: any) => sum + Number(a.investedAmount || 0), 0);
+          } else {
+            // For standard platforms, use investments table
+            newInvestments = platformInvestments
+              .filter((inv: any) => {
+                const invDate = new Date(inv.date);
+                return invDate > prevData.date && invDate <= currentData.date;
+              })
+              .reduce((sum: number, inv: any) => sum + Number(inv.amount), 0);
+          }
+        }
         
         const newWithdrawals = hasEnoughData ? platformWithdrawals
           .filter((wd: any) => {
@@ -1104,9 +1112,6 @@ export async function registerRoutes(
             return wdDate > prevData.date && wdDate <= currentData.date;
           })
           .reduce((sum: number, wd: any) => sum + Number(wd.amount), 0) : 0;
-        
-        // Use the larger of the two investment sources (they shouldn't both have values)
-        const newInvestments = Math.max(newInvestmentsFromTable, newInvestmentsFromAssets);
         
         // Net new capital = investments - withdrawals
         const netNewCapital = newInvestments - newWithdrawals;

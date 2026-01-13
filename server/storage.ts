@@ -63,6 +63,7 @@ export interface IStorage {
 
   // Assets (require platform ownership verification in routes)
   getAssets(platformId: number): Promise<AssetResponse[]>;
+  getAllAssetsForUser(userId: number): Promise<Asset[]>;
   getAsset(id: number): Promise<AssetResponse | undefined>;
   createAsset(asset: InsertAsset): Promise<Asset>;
   updateAsset(id: number, asset: Partial<InsertAsset>): Promise<Asset>;
@@ -513,6 +514,14 @@ export class DatabaseStorage implements IStorage {
         remainingPrincipal: totalRepaid > 0 ? Math.round(remainingPrincipal * 100) / 100 : undefined
       };
     });
+  }
+
+  async getAllAssetsForUser(userId: number): Promise<Asset[]> {
+    const result = await db.select()
+      .from(assets)
+      .innerJoin(platforms, eq(assets.platformId, platforms.id))
+      .where(eq(platforms.userId, userId));
+    return result.map(row => row.assets);
   }
 
   async getAsset(id: number): Promise<AssetResponse | undefined> {
