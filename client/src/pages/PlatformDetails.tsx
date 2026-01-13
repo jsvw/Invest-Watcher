@@ -491,7 +491,7 @@ export default function PlatformDetails() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="rounded-md border">
-                    <div className={`grid ${platformMode === "asset_returns" ? "grid-cols-[1fr_1fr_1.5fr_1fr_0.5fr_1fr_0.5fr_1.5fr]" : "grid-cols-[1fr_1.5fr_1fr_1fr_0.5fr_1.5fr]"} p-4 bg-muted/50 font-medium text-sm`}>
+                    <div className={`grid ${platformMode === "asset_returns" ? "grid-cols-[0.8fr_0.8fr_1.2fr_1.2fr_0.5fr_0.8fr_1.8fr_auto]" : "grid-cols-[1fr_1.5fr_1fr_1fr_1.5fr_auto]"} p-4 bg-muted/50 font-medium text-sm gap-2`}>
                       <div>Date</div>
                       {platformMode === "asset_returns" && <div>Exit</div>}
                       <div>Name</div>
@@ -514,7 +514,7 @@ export default function PlatformDetails() {
                         filteredAndSortedAssets.map((asset) => (
                           <div 
                             key={asset.id} 
-                            className={`grid ${platformMode === "asset_returns" ? "grid-cols-[1fr_1fr_1.5fr_1fr_0.5fr_1fr_0.5fr_1.5fr]" : "grid-cols-[1fr_1.5fr_1fr_1fr_0.5fr_1.5fr]"} p-4 text-sm hover:bg-muted/30 transition-colors items-center`}
+                            className={`grid ${platformMode === "asset_returns" ? "grid-cols-[0.8fr_0.8fr_1.2fr_1.2fr_0.5fr_0.8fr_1.8fr_auto]" : "grid-cols-[1fr_1.5fr_1fr_1fr_1.5fr_auto]"} p-4 text-sm hover:bg-muted/30 transition-colors items-center gap-2`}
                             data-testid={`row-asset-${asset.id}`}
                           >
                             <div className="text-muted-foreground">
