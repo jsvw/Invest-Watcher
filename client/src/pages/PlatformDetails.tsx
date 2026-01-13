@@ -30,10 +30,11 @@ import { AssetValuationDialog } from "@/components/AssetValuationDialog";
 import { AssetValuationImportDialog } from "@/components/AssetValuationImportDialog";
 import { AssetValuationHoverCard } from "@/components/AssetValuationHoverCard";
 import { AssetInsightTabs } from "@/components/AssetInsightTabs";
+import { AssetRepaymentDialog } from "@/components/AssetRepaymentDialog";
 import type { Asset } from "@shared/schema";
 import { PlatformIcon } from "@/components/PlatformIcon";
 
-function AssetActionsMenu({ asset, platformId, platformMode }: { asset: Asset; platformId: number; platformMode: "asset_returns" | "item_valuations" }) {
+function AssetActionsMenu({ asset, platformId, platformMode, currency }: { asset: Asset; platformId: number; platformMode: "asset_returns" | "item_valuations"; currency: string }) {
   const [editOpen, setEditOpen] = useState(false);
   const [exitEditOpen, setExitEditOpen] = useState(false);
   
@@ -42,6 +43,9 @@ function AssetActionsMenu({ asset, platformId, platformMode }: { asset: Asset; p
 
   return (
     <div className="flex justify-end gap-1">
+      {platformMode === "asset_returns" && isActive && (
+        <AssetRepaymentDialog asset={asset} platformId={platformId} currency={currency} />
+      )}
       {platformMode === "item_valuations" && isActive && (
         <AssetValuationDialog asset={asset} platformId={platformId} />
       )}
@@ -540,6 +544,13 @@ export default function PlatformDetails() {
                                   (+{formatCurrency((asset as any).bonusAmount, currency)} bonus)
                                 </span>
                               )}
+                              {(asset as any).totalRepaid && (asset as any).totalRepaid > 0 && (
+                                <div className="text-xs">
+                                  <span className="text-green-600">{formatCurrency((asset as any).totalRepaid, currency)} repaid</span>
+                                  <span className="text-muted-foreground"> / </span>
+                                  <span className="text-muted-foreground">{formatCurrency((asset as any).remainingPrincipal || 0, currency)} remaining</span>
+                                </div>
+                              )}
                             </div>
                             {platformMode === "asset_returns" && (
                               <div className="text-muted-foreground">
@@ -597,6 +608,7 @@ export default function PlatformDetails() {
                               asset={asset as unknown as Asset} 
                               platformId={id} 
                               platformMode={platformMode as "asset_returns" | "item_valuations"}
+                              currency={currency}
                             />
                           </div>
                         ))

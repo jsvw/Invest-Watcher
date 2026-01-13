@@ -6,6 +6,7 @@ import {
   valuations,
   assets,
   assetValuations,
+  assetRepayments,
   type Platform,
   type InsertPlatform,
   type Investment,
@@ -18,6 +19,8 @@ import {
   type InsertAsset,
   type AssetValuation,
   type InsertAssetValuation,
+  type AssetRepayment,
+  type InsertAssetRepayment,
   type PlatformResponse,
   type AssetResponse
 } from "@shared/schema";
@@ -72,6 +75,12 @@ export interface IStorage {
   createAssetValuation(valuation: InsertAssetValuation): Promise<AssetValuation>;
   updateAssetValuation(id: number, valuation: Partial<InsertAssetValuation>): Promise<AssetValuation>;
   getAssetValuationAssetId(valuationId: number): Promise<number | null>;
+
+  // Asset Repayments (partial principal repayments)
+  getAssetRepayments(assetId: number): Promise<AssetRepayment[]>;
+  createAssetRepayment(repayment: InsertAssetRepayment): Promise<AssetRepayment>;
+  deleteAssetRepayment(id: number): Promise<void>;
+  getAssetRepaymentAssetId(repaymentId: number): Promise<number | null>;
 
   // Asset Performance History
   getAssetPerformanceHistory(platformId: number): Promise<{ date: string; assets: { id: number; name: string; key: string; value: number }[] }[]>;
@@ -429,6 +438,21 @@ export class DatabaseStorage implements IStorage {
       .where(eq(assets.platformId, platformId))
       .orderBy(desc(assetValuations.date));
     
+    // Get total repayments per asset
+    const platformRepayments = await db.select({
+      assetId: assetRepayments.assetId,
+      amount: assetRepayments.amount,
+    })
+      .from(assetRepayments)
+      .innerJoin(assets, eq(assetRepayments.assetId, assets.id))
+      .where(eq(assets.platformId, platformId));
+    
+    const repaymentTotals = new Map<number, number>();
+    for (const row of platformRepayments) {
+      const current = repaymentTotals.get(row.assetId) || 0;
+      repaymentTotals.set(row.assetId, current + Number(row.amount));
+    }
+    
     const latestValuationMap = new Map<number, number>();
     for (const row of platformAssetValuations) {
       if (!latestValuationMap.has(row.assetId)) {
@@ -442,6 +466,9 @@ export class DatabaseStorage implements IStorage {
       const userInvested = Number(asset.investedAmount);
       const bonus = Number(asset.bonusAmount || 0);
       const totalInvested = userInvested + bonus; // Total working capital
+      const totalRepaid = repaymentTotals.get(asset.id) || 0;
+      const remainingPrincipal = Math.max(0, userInvested - totalRepaid);
+      const workingCapital = remainingPrincipal + bonus; // Current working capital after repayments
       let currentValue: number;
       let profitLoss: number | undefined;
       let effectiveStatus = asset.status;
@@ -455,30 +482,34 @@ export class DatabaseStorage implements IStorage {
         profitLoss = currentValue - userInvested;
       } else if (isMatured && asset.annualYield && asset.acquisitionDate) {
         // Calculate full term yield for matured assets
+        // Use original invested amount to calculate historical yield (repayments don't reduce past yield earned)
         const acquisitionTime = new Date(asset.acquisitionDate).getTime();
         const exitTime = new Date(asset.exitDate!).getTime();
         const yearsElapsed = (exitTime - acquisitionTime) / (365 * 24 * 60 * 60 * 1000);
         const accumulatedYield = totalInvested * (Number(asset.annualYield) / 100) * yearsElapsed;
-        currentValue = totalInvested + accumulatedYield;
-        profitLoss = accumulatedYield;
+        currentValue = workingCapital + accumulatedYield;
+        profitLoss = accumulatedYield; // Profit is only the yield earned (repayments are return of capital, not profit)
         effectiveStatus = "matured";
       } else if (latestVal !== undefined) {
         currentValue = latestVal;
-        profitLoss = currentValue - totalInvested;
+        profitLoss = currentValue - workingCapital;
       } else if (asset.annualYield && asset.acquisitionDate) {
+        // Calculate yield on remaining principal (after repayments)
         const yearsElapsed = (now - new Date(asset.acquisitionDate).getTime()) / (365 * 24 * 60 * 60 * 1000);
-        const accumulatedYield = totalInvested * (Number(asset.annualYield) / 100) * yearsElapsed;
-        currentValue = totalInvested + accumulatedYield;
+        const accumulatedYield = workingCapital * (Number(asset.annualYield) / 100) * yearsElapsed;
+        currentValue = workingCapital + accumulatedYield;
         profitLoss = accumulatedYield;
       } else {
-        currentValue = totalInvested;
+        currentValue = workingCapital;
       }
       
       return {
         ...asset,
         status: effectiveStatus,
         currentValue: Math.round(currentValue * 100) / 100,
-        profitLoss: profitLoss !== undefined ? Math.round(profitLoss * 100) / 100 : undefined
+        profitLoss: profitLoss !== undefined ? Math.round(profitLoss * 100) / 100 : undefined,
+        totalRepaid: totalRepaid > 0 ? Math.round(totalRepaid * 100) / 100 : undefined,
+        remainingPrincipal: totalRepaid > 0 ? Math.round(remainingPrincipal * 100) / 100 : undefined
       };
     });
   }
@@ -537,6 +568,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteAsset(id: number): Promise<void> {
     await db.delete(assetValuations).where(eq(assetValuations.assetId, id));
+    await db.delete(assetRepayments).where(eq(assetRepayments.assetId, id));
     await db.delete(assets).where(eq(assets.id, id));
   }
 
@@ -572,6 +604,29 @@ export class DatabaseStorage implements IStorage {
       .returning();
     if (!updated) throw new Error("Asset valuation not found");
     return updated;
+  }
+
+  // === ASSET REPAYMENTS ===
+  async getAssetRepayments(assetId: number): Promise<AssetRepayment[]> {
+    return await db.select().from(assetRepayments)
+      .where(eq(assetRepayments.assetId, assetId))
+      .orderBy(desc(assetRepayments.date));
+  }
+
+  async createAssetRepayment(repayment: InsertAssetRepayment): Promise<AssetRepayment> {
+    const [newRepayment] = await db.insert(assetRepayments).values(repayment).returning();
+    return newRepayment;
+  }
+
+  async deleteAssetRepayment(id: number): Promise<void> {
+    await db.delete(assetRepayments).where(eq(assetRepayments.id, id));
+  }
+
+  async getAssetRepaymentAssetId(repaymentId: number): Promise<number | null> {
+    const [repayment] = await db.select({ assetId: assetRepayments.assetId })
+      .from(assetRepayments)
+      .where(eq(assetRepayments.id, repaymentId));
+    return repayment?.assetId ?? null;
   }
 
   async getAssetPerformanceHistory(platformId: number): Promise<{ date: string; assets: { id: number; name: string; key: string; value: number }[] }[]> {

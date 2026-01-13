@@ -2,7 +2,7 @@ import type { Express, Request } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { valuations, assets, assetValuations, insertAssetSchema, insertAssetValuationSchema } from "@shared/schema";
+import { valuations, assets, assetValuations, assetRepayments, insertAssetSchema, insertAssetValuationSchema, insertAssetRepaymentSchema } from "@shared/schema";
 import { api } from "@shared/routes";
 import { eq, desc, and, ilike } from "drizzle-orm";
 import { z } from "zod";
@@ -667,6 +667,58 @@ export async function registerRoutes(
           console.error("Failed to clean up temp file:", e);
         }
       }
+    }
+  });
+
+  // --- Asset Repayments (partial principal repayments) ---
+  app.get('/api/assets/:assetId/repayments', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const assetId = Number(req.params.assetId);
+      const isOwner = await storage.verifyAssetOwnership(assetId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Asset not found" });
+      
+      const repayments = await storage.getAssetRepayments(assetId);
+      res.json(repayments);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch asset repayments" });
+    }
+  });
+
+  app.post('/api/asset-repayments', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const input = insertAssetRepaymentSchema.parse(req.body);
+      const isOwner = await storage.verifyAssetOwnership(input.assetId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Asset not found" });
+      
+      const repayment = await storage.createAssetRepayment(input);
+      res.status(201).json(repayment);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({
+          message: err.errors[0].message,
+          field: err.errors[0].path.join('.'),
+        });
+      }
+      res.status(500).json({ message: "Failed to create asset repayment" });
+    }
+  });
+
+  app.delete('/api/asset-repayments/:id', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const repaymentId = Number(req.params.id);
+      const assetId = await storage.getAssetRepaymentAssetId(repaymentId);
+      if (!assetId) return res.status(404).json({ message: "Repayment not found" });
+      
+      const isOwner = await storage.verifyAssetOwnership(assetId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Repayment not found" });
+      
+      await storage.deleteAssetRepayment(repaymentId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete repayment" });
     }
   });
 

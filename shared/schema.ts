@@ -87,6 +87,16 @@ export const assetValuations = pgTable("asset_valuations", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// === ASSET REPAYMENTS (partial principal repayments for crowdlending etc) ===
+export const assetRepayments = pgTable("asset_repayments", {
+  id: serial("id").primaryKey(),
+  assetId: integer("asset_id").notNull().references(() => assets.id),
+  amount: numeric("amount").notNull(), // Amount of principal repaid
+  date: timestamp("date").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === BASE SCHEMAS ===
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertPlatformSchema = createInsertSchema(platforms).omit({ id: true, createdAt: true });
@@ -95,6 +105,7 @@ export const insertWithdrawalSchema = createInsertSchema(withdrawals).omit({ id:
 export const insertValuationSchema = createInsertSchema(valuations).omit({ id: true, createdAt: true });
 export const insertAssetSchema = createInsertSchema(assets).omit({ id: true, createdAt: true });
 export const insertAssetValuationSchema = createInsertSchema(assetValuations).omit({ id: true, createdAt: true });
+export const insertAssetRepaymentSchema = createInsertSchema(assetRepayments).omit({ id: true, createdAt: true });
 
 // === EXPLICIT API CONTRACT TYPES ===
 
@@ -106,6 +117,7 @@ export type Withdrawal = typeof withdrawals.$inferSelect;
 export type Valuation = typeof valuations.$inferSelect;
 export type Asset = typeof assets.$inferSelect;
 export type AssetValuation = typeof assetValuations.$inferSelect;
+export type AssetRepayment = typeof assetRepayments.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertPlatform = z.infer<typeof insertPlatformSchema>;
@@ -114,6 +126,7 @@ export type InsertWithdrawal = z.infer<typeof insertWithdrawalSchema>;
 export type InsertValuation = z.infer<typeof insertValuationSchema>;
 export type InsertAsset = z.infer<typeof insertAssetSchema>;
 export type InsertAssetValuation = z.infer<typeof insertAssetValuationSchema>;
+export type InsertAssetRepayment = z.infer<typeof insertAssetRepaymentSchema>;
 
 // Request types
 export type CreatePlatformRequest = InsertPlatform;
@@ -136,6 +149,8 @@ export type PlatformResponse = Platform & {
 export type AssetResponse = Asset & {
   currentValue?: number; // Latest valuation or invested amount if no valuations
   profitLoss?: number; // For exited assets: exitPrice - investedAmount
+  totalRepaid?: number; // Sum of all partial repayments
+  remainingPrincipal?: number; // investedAmount - totalRepaid
 };
 
 export type DashboardStats = {
