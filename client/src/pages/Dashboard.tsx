@@ -223,11 +223,16 @@ export default function Dashboard() {
               const currentMoM = current.value - previous.value;
               return currentMoM >= 0 ? "border-l-emerald-500" : "border-l-rose-500";
             })()}
-            platformBreakdown={filteredPlatforms.map(p => ({
-              name: p.name,
-              value: formatCurrency(Number(p.currentValue) || 0, currency),
-              iconUrl: (p as any).customIconUrl
-            }))}
+            platformBreakdown={filteredPlatforms.map(p => {
+              const invested = Number(p.totalInvested) || 0;
+              const value = Number(p.currentValue) || 0;
+              const profit = value - invested;
+              return {
+                name: p.name,
+                value: `${profit >= 0 ? '+' : ''}${formatCurrency(profit, currency)}`,
+                iconUrl: (p as any).customIconUrl
+              };
+            })}
             data-testid="stat-mom-profit"
           />
         </div>
