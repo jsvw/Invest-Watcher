@@ -38,7 +38,7 @@ export function StatCard({ title, value, subValue, trend, trendValue, icon: Icon
             <HoverCardTrigger asChild>
               {iconElement}
             </HoverCardTrigger>
-            <HoverCardContent className="w-64 p-3" align="end">
+            <HoverCardContent className="w-64 p-3" side="bottom" align="center">
               <div className="space-y-2">
                 <h4 className="text-sm font-semibold text-foreground">{title}</h4>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto">
