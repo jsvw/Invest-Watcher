@@ -1039,10 +1039,14 @@ export async function registerRoutes(
       
       const userPlatforms = await storage.getPlatforms(userId);
       const userValuations = await storage.getAllValuationsForUser(userId);
+      const userInvestments = await storage.getAllInvestmentsForUser(userId);
+      const userWithdrawals = await storage.getAllWithdrawalsForUser(userId);
       
       // Filter out excluded platforms
       const filteredPlatforms = userPlatforms.filter((p: any) => !excludePlatforms.includes(p.id));
       const filteredValuations = userValuations.filter((v: any) => !excludePlatforms.includes(v.platformId));
+      const filteredInvestments = userInvestments.filter((i: any) => !excludePlatforms.includes(i.platformId));
+      const filteredWithdrawals = userWithdrawals.filter((w: any) => !excludePlatforms.includes(w.platformId));
       
       // Calculate per-platform MoM using actual valuation months (not calendar months)
       const platformMom = filteredPlatforms.map((platform: any) => {
@@ -1067,12 +1071,40 @@ export async function registerRoutes(
         const previousMonth = sortedMonths[1];
         
         // Only calculate MoM if we have at least 2 months of valuation data
-        // Otherwise, MoM is not meaningful
         const hasEnoughData = latestMonth && previousMonth;
         const currentValue = latestMonth ? monthlyVals.get(latestMonth)! : 0;
         const prevValue = previousMonth ? monthlyVals.get(previousMonth)! : 0;
-        const momChange = hasEnoughData ? currentValue - prevValue : 0;
-        const momGrowthPercent = hasEnoughData && prevValue > 0 ? ((currentValue - prevValue) / prevValue) * 100 : 0;
+        
+        // Calculate net investments during the latest month (investments - withdrawals)
+        let netInvestmentsDuringPeriod = 0;
+        if (latestMonth) {
+          const [year, month] = latestMonth.split('-').map(Number);
+          const monthStart = new Date(year, month - 1, 1);
+          const monthEnd = new Date(year, month, 0, 23, 59, 59);
+          
+          const investmentsDuringMonth = filteredInvestments
+            .filter((i: any) => i.platformId === platform.id)
+            .filter((i: any) => {
+              const d = new Date(i.date);
+              return d >= monthStart && d <= monthEnd;
+            })
+            .reduce((sum: number, i: any) => sum + Number(i.amount), 0);
+          
+          const withdrawalsDuringMonth = filteredWithdrawals
+            .filter((w: any) => w.platformId === platform.id)
+            .filter((w: any) => {
+              const d = new Date(w.date);
+              return d >= monthStart && d <= monthEnd;
+            })
+            .reduce((sum: number, w: any) => sum + Number(w.amount), 0);
+          
+          netInvestmentsDuringPeriod = investmentsDuringMonth - withdrawalsDuringMonth;
+        }
+        
+        // MoM change = value change - net investments (to show actual growth, not deposits)
+        const rawChange = currentValue - prevValue;
+        const momChange = hasEnoughData ? rawChange - netInvestmentsDuringPeriod : 0;
+        const momGrowthPercent = hasEnoughData && prevValue > 0 ? (momChange / prevValue) * 100 : 0;
         
         return {
           platformId: platform.id,
