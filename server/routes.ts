@@ -688,7 +688,12 @@ export async function registerRoutes(
   app.post('/api/asset-repayments', requireAuth, async (req, res) => {
     try {
       const userId = getAuthenticatedUserId(req)!;
-      const input = insertAssetRepaymentSchema.parse(req.body);
+      // Convert date string to Date object if needed
+      const body = {
+        ...req.body,
+        date: req.body.date ? new Date(req.body.date) : new Date()
+      };
+      const input = insertAssetRepaymentSchema.parse(body);
       const isOwner = await storage.verifyAssetOwnership(input.assetId, userId);
       if (!isOwner) return res.status(404).json({ message: "Asset not found" });
       
@@ -716,7 +721,13 @@ export async function registerRoutes(
       if (!isOwner) return res.status(404).json({ message: "Repayment not found" });
       
       const { amount, date, notes } = req.body;
-      const repayment = await storage.updateAssetRepayment(repaymentId, { amount, date, notes });
+      // Convert date string to Date object if needed
+      const parsedDate = date ? new Date(date) : undefined;
+      const repayment = await storage.updateAssetRepayment(repaymentId, { 
+        amount, 
+        date: parsedDate, 
+        notes 
+      });
       res.json(repayment);
     } catch (error) {
       res.status(500).json({ message: "Failed to update repayment" });
