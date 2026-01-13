@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search, ArrowUpDown, Trash2 } from "lucide-react";
+import { ArrowLeft, TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search, ArrowUpDown, Trash2, RotateCcw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -63,7 +63,7 @@ function AssetActionsMenu({ asset, platformId, platformMode, currency }: { asset
         <>
           {platformMode === "asset_returns" && (
             <Button size="icon" variant="outline" onClick={() => setRepaymentOpen(true)} title="Record Repayment" data-testid={`button-repayment-${asset.id}`}>
-              <DollarSign className="h-4 w-4 text-blue-600" />
+              <RotateCcw className="h-4 w-4 text-blue-600" />
             </Button>
           )}
           {platformMode === "item_valuations" && (
