@@ -7,6 +7,7 @@ interface PlatformBreakdown {
   name: string;
   value: string;
   iconUrl?: string | null;
+  sortValue?: number;
 }
 
 interface StatCardProps {
@@ -42,7 +43,7 @@ export function StatCard({ title, value, subValue, trend, trendValue, icon: Icon
               <div className="space-y-2">
                 <h4 className="text-sm font-semibold text-foreground">{title}</h4>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                  {platformBreakdown.map((item, index) => (
+                  {[...platformBreakdown].sort((a, b) => (b.sortValue ?? 0) - (a.sortValue ?? 0)).map((item, index) => (
                     <div key={index} className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2 truncate flex-1 min-w-0">
                         {item.iconUrl ? (

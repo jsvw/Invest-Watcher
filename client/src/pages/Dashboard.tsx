@@ -168,7 +168,8 @@ export default function Dashboard() {
             platformBreakdown={filteredPlatforms.map(p => ({
               name: p.name,
               value: formatCurrency(Number(p.currentValue) || 0, currency),
-              iconUrl: (p as any).customIconUrl
+              iconUrl: (p as any).customIconUrl,
+              sortValue: Number(p.currentValue) || 0
             }))}
             data-testid="stat-total-value"
           />
@@ -180,7 +181,8 @@ export default function Dashboard() {
             platformBreakdown={filteredPlatforms.map(p => ({
               name: p.name,
               value: formatCurrency(Number(p.totalInvested) || 0, currency),
-              iconUrl: (p as any).customIconUrl
+              iconUrl: (p as any).customIconUrl,
+              sortValue: Number(p.totalInvested) || 0
             }))}
             data-testid="stat-total-invested"
           />
@@ -198,7 +200,8 @@ export default function Dashboard() {
               return {
                 name: p.name,
                 value: `${profit >= 0 ? '+' : ''}${formatCurrency(profit, currency)}`,
-                iconUrl: (p as any).customIconUrl
+                iconUrl: (p as any).customIconUrl,
+                sortValue: profit
               };
             })}
             data-testid="stat-net-profit"
@@ -237,7 +240,8 @@ export default function Dashboard() {
             platformBreakdown={platformMomData?.map((p: any) => ({
               name: p.name,
               value: `${p.momGrowthPercent >= 0 ? '+' : ''}${p.momGrowthPercent.toFixed(1)}% (${p.momChange >= 0 ? '+' : ''}${formatCurrency(p.momChange, currency)})`,
-              iconUrl: p.customIconUrl
+              iconUrl: p.customIconUrl,
+              sortValue: p.momChange
             })) || []}
             data-testid="stat-mom-profit"
           />
