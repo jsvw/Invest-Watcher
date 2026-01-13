@@ -22,10 +22,15 @@ interface AssetRepaymentDialogProps {
   asset: Asset;
   platformId: number;
   currency: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  trigger?: React.ReactNode | null;
 }
 
-export function AssetRepaymentDialog({ asset, platformId, currency }: AssetRepaymentDialogProps) {
-  const [open, setOpen] = useState(false);
+export function AssetRepaymentDialog({ asset, platformId, currency, open: controlledOpen, onOpenChange, trigger }: AssetRepaymentDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
   const [editingId, setEditingId] = useState<number | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -140,16 +145,20 @@ export function AssetRepaymentDialog({ asset, platformId, currency }: AssetRepay
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button 
-          size="sm" 
-          variant="outline" 
-          className="gap-1 text-blue-600 border-blue-200 hover:bg-blue-50" 
-          data-testid={`button-repayment-asset-${asset.id}`}
-        >
-          <Banknote className="h-3 w-3" /> Repayment
-        </Button>
-      </DialogTrigger>
+      {trigger !== null && (
+        <DialogTrigger asChild>
+          {trigger || (
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="gap-1 text-blue-600 border-blue-200 hover:bg-blue-50" 
+              data-testid={`button-repayment-asset-${asset.id}`}
+            >
+              <Banknote className="h-3 w-3" /> Repayment
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Partial Repayments</DialogTitle>

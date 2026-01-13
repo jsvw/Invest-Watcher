@@ -12,10 +12,15 @@ import type { Asset, InsertAssetValuation } from "@shared/schema";
 interface AssetValuationDialogProps {
   asset: Asset;
   platformId: number;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  trigger?: React.ReactNode | null;
 }
 
-export function AssetValuationDialog({ asset, platformId }: AssetValuationDialogProps) {
-  const [open, setOpen] = useState(false);
+export function AssetValuationDialog({ asset, platformId, open: controlledOpen, onOpenChange, trigger }: AssetValuationDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
   const createMutation = useCreateAssetValuation(asset.id, platformId);
 
   const form = useForm<Partial<InsertAssetValuation>>({
@@ -45,11 +50,15 @@ export function AssetValuationDialog({ asset, platformId }: AssetValuationDialog
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline" className="gap-1" data-testid={`button-value-asset-${asset.id}`}>
-          <TrendingUp className="h-3 w-3" /> Update Value
-        </Button>
-      </DialogTrigger>
+      {trigger !== null && (
+        <DialogTrigger asChild>
+          {trigger || (
+            <Button size="sm" variant="outline" className="gap-1" data-testid={`button-value-asset-${asset.id}`}>
+              <TrendingUp className="h-3 w-3" /> Update Value
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
           <DialogTitle>Record New Valuation</DialogTitle>

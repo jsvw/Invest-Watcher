@@ -36,63 +36,82 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 
 function AssetActionsMenu({ asset, platformId, platformMode, currency }: { asset: Asset; platformId: number; platformMode: "asset_returns" | "item_valuations"; currency: string }) {
   const [editOpen, setEditOpen] = useState(false);
-  const [exitEditOpen, setExitEditOpen] = useState(false);
+  const [exitOpen, setExitOpen] = useState(false);
+  const [repaymentOpen, setRepaymentOpen] = useState(false);
+  const [valuationOpen, setValuationOpen] = useState(false);
   
   const isActive = asset.status === "active";
   const isMaturedOrExited = asset.status === "matured" || asset.status === "exited";
 
   return (
-    <div className="flex justify-end gap-1">
-      {platformMode === "asset_returns" && isActive && (
-        <AssetRepaymentDialog asset={asset} platformId={platformId} currency={currency} />
-      )}
-      {platformMode === "item_valuations" && isActive && (
-        <AssetValuationDialog asset={asset} platformId={platformId} />
-      )}
-      {isActive && (
-        <AssetExitDialog asset={asset} platformId={platformId} />
-      )}
-      {isMaturedOrExited ? (
-        <>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost" data-testid={`button-asset-menu-${asset.id}`}>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setEditOpen(true)} data-testid={`menu-edit-asset-${asset.id}`}>
-                <Pencil className="h-4 w-4 mr-2" /> Edit Asset
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setExitEditOpen(true)} data-testid={`menu-edit-exit-${asset.id}`}>
-                <LogOut className="h-4 w-4 mr-2" /> Edit Exit
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <AddAssetDialog 
-            platformId={platformId} 
-            mode={platformMode}
-            editAsset={asset}
-            open={editOpen}
-            onOpenChange={setEditOpen}
-            trigger={null}
-          />
-          <AssetExitDialog 
-            asset={asset} 
-            platformId={platformId} 
-            mode="edit"
-            open={exitEditOpen}
-            onOpenChange={setExitEditOpen}
-            trigger={null}
-          />
-        </>
-      ) : (
-        <AddAssetDialog 
+    <div className="flex justify-end">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="icon" variant="ghost" data-testid={`button-asset-menu-${asset.id}`}>
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => setEditOpen(true)} data-testid={`menu-edit-asset-${asset.id}`}>
+            <Pencil className="h-4 w-4 mr-2" /> Edit Asset
+          </DropdownMenuItem>
+          {platformMode === "asset_returns" && isActive && (
+            <DropdownMenuItem onClick={() => setRepaymentOpen(true)} data-testid={`menu-repayment-${asset.id}`}>
+              <DollarSign className="h-4 w-4 mr-2" /> Record Repayment
+            </DropdownMenuItem>
+          )}
+          {platformMode === "item_valuations" && isActive && (
+            <DropdownMenuItem onClick={() => setValuationOpen(true)} data-testid={`menu-valuation-${asset.id}`}>
+              <TrendingUp className="h-4 w-4 mr-2" /> Add Valuation
+            </DropdownMenuItem>
+          )}
+          {isActive && (
+            <DropdownMenuItem onClick={() => setExitOpen(true)} data-testid={`menu-exit-${asset.id}`}>
+              <LogOut className="h-4 w-4 mr-2" /> Exit Asset
+            </DropdownMenuItem>
+          )}
+          {isMaturedOrExited && (
+            <DropdownMenuItem onClick={() => setExitOpen(true)} data-testid={`menu-edit-exit-${asset.id}`}>
+              <LogOut className="h-4 w-4 mr-2" /> Edit Exit
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <AddAssetDialog 
+        platformId={platformId} 
+        mode={platformMode}
+        editAsset={asset}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        trigger={null}
+      />
+      {platformMode === "asset_returns" && (
+        <AssetRepaymentDialog 
+          asset={asset} 
           platformId={platformId} 
-          mode={platformMode}
-          editAsset={asset}
+          currency={currency}
+          open={repaymentOpen}
+          onOpenChange={setRepaymentOpen}
+          trigger={null}
         />
       )}
+      {platformMode === "item_valuations" && (
+        <AssetValuationDialog 
+          asset={asset} 
+          platformId={platformId}
+          open={valuationOpen}
+          onOpenChange={setValuationOpen}
+          trigger={null}
+        />
+      )}
+      <AssetExitDialog 
+        asset={asset} 
+        platformId={platformId} 
+        mode={isMaturedOrExited ? "edit" : "exit"}
+        open={exitOpen}
+        onOpenChange={setExitOpen}
+        trigger={null}
+      />
     </div>
   );
 }
