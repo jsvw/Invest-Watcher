@@ -570,7 +570,7 @@ export default function PlatformDetails() {
                                         ({asset.profitLoss >= 0 ? "+" : ""}{formatCurrency(asset.profitLoss, currency)}
                                         {Number(asset.investedAmount) > 0 && (
                                           <span className="ml-1">
-                                            / {((asset.profitLoss / Number(asset.investedAmount)) * 100).toFixed(1)}%
+                                            | {((asset.profitLoss / Number(asset.investedAmount)) * 100).toFixed(1)}%
                                           </span>
                                         )})
                                       </span>
