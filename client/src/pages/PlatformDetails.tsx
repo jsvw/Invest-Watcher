@@ -567,7 +567,12 @@ export default function PlatformDetails() {
                                     <CheckCircle className="h-3 w-3" /> Exited
                                     {asset.profitLoss !== undefined && (
                                       <span className={asset.profitLoss >= 0 ? "text-green-600" : "text-red-600"}>
-                                        ({asset.profitLoss >= 0 ? "+" : ""}{formatCurrency(asset.profitLoss, currency)})
+                                        ({asset.profitLoss >= 0 ? "+" : ""}{formatCurrency(asset.profitLoss, currency)}
+                                        {Number(asset.investedAmount) > 0 && (
+                                          <span className="ml-1">
+                                            / {((asset.profitLoss / Number(asset.investedAmount)) * 100).toFixed(1)}%
+                                          </span>
+                                        )})
                                       </span>
                                     )}
                                   </Badge>
@@ -589,7 +594,12 @@ export default function PlatformDetails() {
                                   </Badge>
                                   {asset.profitLoss !== undefined && asset.profitLoss > 0 && (
                                     <span className="text-xs text-green-600">
-                                      +{formatCurrency(asset.profitLoss, currency)} earned
+                                      +{formatCurrency(asset.profitLoss, currency)}
+                                      {Number(asset.investedAmount) > 0 && (
+                                        <span className="ml-1">
+                                          ({((asset.profitLoss / Number(asset.investedAmount)) * 100).toFixed(1)}%)
+                                        </span>
+                                      )}
                                     </span>
                                   )}
                                 </div>
@@ -598,7 +608,12 @@ export default function PlatformDetails() {
                                   <Badge variant="outline">Active</Badge>
                                   {asset.profitLoss !== undefined && asset.profitLoss > 0 && (
                                     <span className="text-xs text-green-600">
-                                      +{formatCurrency(asset.profitLoss, currency)} earned
+                                      +{formatCurrency(asset.profitLoss, currency)}
+                                      {Number(asset.investedAmount) > 0 && (
+                                        <span className="ml-1">
+                                          ({((asset.profitLoss / Number(asset.investedAmount)) * 100).toFixed(1)}%)
+                                        </span>
+                                      )}
                                     </span>
                                   )}
                                 </div>
