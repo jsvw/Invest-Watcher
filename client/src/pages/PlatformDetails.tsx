@@ -531,7 +531,7 @@ export default function PlatformDetails() {
                                 assetName={asset.name}
                                 currency={currency}
                               >
-                                <div className="font-medium cursor-pointer hover:underline">{asset.name}</div>
+                                <div className="font-medium cursor-pointer hover:underline truncate max-w-[150px]" title={asset.name}>{asset.name}</div>
                               </AssetValuationHoverCard>
                               {asset.description && (
                                 <div className="text-xs text-muted-foreground">{asset.description}</div>
