@@ -223,6 +223,11 @@ export default function Dashboard() {
               const currentMoM = current.value - previous.value;
               return currentMoM >= 0 ? "border-l-emerald-500" : "border-l-rose-500";
             })()}
+            platformBreakdown={filteredPlatforms.map(p => ({
+              name: p.name,
+              value: formatCurrency(Number(p.currentValue) || 0, currency),
+              iconUrl: (p as any).customIconUrl
+            }))}
             data-testid="stat-mom-profit"
           />
         </div>
