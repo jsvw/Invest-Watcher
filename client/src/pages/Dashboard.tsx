@@ -154,6 +154,11 @@ export default function Dashboard() {
             value={formatCurrency(totalValue, currency)} 
             icon={Wallet} 
             className="border-l-primary"
+            platformBreakdown={filteredPlatforms.map(p => ({
+              name: p.name,
+              value: formatCurrency(Number(p.currentValue) || 0, currency),
+              iconUrl: (p as any).customIconUrl
+            }))}
             data-testid="stat-total-value"
           />
           <StatCard 
@@ -161,6 +166,11 @@ export default function Dashboard() {
             value={formatCurrency(totalInvested, currency)} 
             icon={DollarSign}
             className="border-l-blue-500"
+            platformBreakdown={filteredPlatforms.map(p => ({
+              name: p.name,
+              value: formatCurrency(Number(p.totalInvested) || 0, currency),
+              iconUrl: (p as any).customIconUrl
+            }))}
             data-testid="stat-total-invested"
           />
           <StatCard 
@@ -170,6 +180,16 @@ export default function Dashboard() {
             trendValue={`${roi.toFixed(2)}%`}
             icon={TrendingUp}
             className={netProfit >= 0 ? "border-l-emerald-500" : "border-l-rose-500"}
+            platformBreakdown={filteredPlatforms.map(p => {
+              const invested = Number(p.totalInvested) || 0;
+              const value = Number(p.currentValue) || 0;
+              const profit = value - invested;
+              return {
+                name: p.name,
+                value: `${profit >= 0 ? '+' : ''}${formatCurrency(profit, currency)}`,
+                iconUrl: (p as any).customIconUrl
+              };
+            })}
             data-testid="stat-net-profit"
           />
           <StatCard 
