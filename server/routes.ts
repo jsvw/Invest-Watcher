@@ -1029,6 +1029,64 @@ export async function registerRoutes(
     }
   });
 
+  // Per-platform month-over-month performance
+  app.get('/api/portfolio/platform-mom', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const excludePlatforms = req.query.excludePlatforms 
+        ? (req.query.excludePlatforms as string).split(',').map(Number).filter(n => !isNaN(n))
+        : [];
+      
+      const userPlatforms = await storage.getPlatforms(userId);
+      const userValuations = await storage.getAllValuationsForUser(userId);
+      
+      // Filter out excluded platforms
+      const filteredPlatforms = userPlatforms.filter((p: any) => !excludePlatforms.includes(p.id));
+      const filteredValuations = userValuations.filter((v: any) => !excludePlatforms.includes(v.platformId));
+      
+      // Calculate per-platform MoM using actual valuation months (not calendar months)
+      const platformMom = filteredPlatforms.map((platform: any) => {
+        // Get valuations for this platform
+        const platformVals = filteredValuations
+          .filter((v: any) => v.platformId === platform.id)
+          .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        
+        // Group valuations by month and get latest value for each month
+        const monthlyVals = new Map<string, number>();
+        platformVals.forEach((v: any) => {
+          const d = new Date(v.date);
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          if (!monthlyVals.has(key)) {
+            monthlyVals.set(key, Number(v.value));
+          }
+        });
+        
+        // Get the two most recent months with valuations
+        const sortedMonths = Array.from(monthlyVals.keys()).sort().reverse();
+        const latestMonth = sortedMonths[0];
+        const previousMonth = sortedMonths[1];
+        
+        const currentValue = latestMonth ? monthlyVals.get(latestMonth)! : (Number(platform.currentValue) || 0);
+        const prevValue = previousMonth ? monthlyVals.get(previousMonth)! : 0;
+        const momChange = currentValue - prevValue;
+        
+        return {
+          platformId: platform.id,
+          name: platform.name,
+          customIconUrl: (platform as any).customIconUrl,
+          currentValue,
+          prevValue,
+          momChange
+        };
+      });
+      
+      res.json(platformMom);
+    } catch (error) {
+      console.error("Error fetching platform MoM:", error);
+      res.status(500).json({ message: "Failed to fetch platform MoM data" });
+    }
+  });
+
   await seedDatabase();
   // removed importInvestmentData() call to prevent duplicates on restart
 

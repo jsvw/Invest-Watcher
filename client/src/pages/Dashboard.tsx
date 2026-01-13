@@ -79,6 +79,17 @@ export default function Dashboard() {
     }
   });
 
+  const { data: platformMomData } = useQuery({
+    queryKey: ['/api/portfolio/platform-mom', excludedPlatforms],
+    queryFn: async () => {
+      let url = '/api/portfolio/platform-mom';
+      if (excludedPlatforms.length > 0) url += `?excludePlatforms=${excludedPlatforms.join(',')}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch platform MoM");
+      return await res.json();
+    }
+  });
+
   const years = availableFilters?.years || [];
   const monthsData = availableFilters?.months?.map((m: string) => {
     const [y, mm] = m.split('-');
@@ -223,16 +234,11 @@ export default function Dashboard() {
               const currentMoM = current.value - previous.value;
               return currentMoM >= 0 ? "border-l-emerald-500" : "border-l-rose-500";
             })()}
-            platformBreakdown={filteredPlatforms.map(p => {
-              const invested = Number(p.totalInvested) || 0;
-              const value = Number(p.currentValue) || 0;
-              const profit = value - invested;
-              return {
-                name: p.name,
-                value: `${profit >= 0 ? '+' : ''}${formatCurrency(profit, currency)}`,
-                iconUrl: (p as any).customIconUrl
-              };
-            })}
+            platformBreakdown={platformMomData?.map((p: any) => ({
+              name: p.name,
+              value: `${p.momChange >= 0 ? '+' : ''}${formatCurrency(p.momChange, currency)}`,
+              iconUrl: p.customIconUrl
+            })) || []}
             data-testid="stat-mom-profit"
           />
         </div>
