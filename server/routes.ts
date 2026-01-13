@@ -1066,10 +1066,13 @@ export async function registerRoutes(
         const latestMonth = sortedMonths[0];
         const previousMonth = sortedMonths[1];
         
-        const currentValue = latestMonth ? monthlyVals.get(latestMonth)! : (Number(platform.currentValue) || 0);
+        // Only calculate MoM if we have at least 2 months of valuation data
+        // Otherwise, MoM is not meaningful
+        const hasEnoughData = latestMonth && previousMonth;
+        const currentValue = latestMonth ? monthlyVals.get(latestMonth)! : 0;
         const prevValue = previousMonth ? monthlyVals.get(previousMonth)! : 0;
-        const momChange = currentValue - prevValue;
-        const momGrowthPercent = prevValue > 0 ? ((currentValue - prevValue) / prevValue) * 100 : 0;
+        const momChange = hasEnoughData ? currentValue - prevValue : 0;
+        const momGrowthPercent = hasEnoughData && prevValue > 0 ? ((currentValue - prevValue) / prevValue) * 100 : 0;
         
         return {
           platformId: platform.id,
