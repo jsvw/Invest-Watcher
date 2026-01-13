@@ -236,7 +236,7 @@ export default function Dashboard() {
             })()}
             platformBreakdown={platformMomData?.map((p: any) => ({
               name: p.name,
-              value: `${p.momChange >= 0 ? '+' : ''}${formatCurrency(p.momChange, currency)}`,
+              value: `${p.momGrowthPercent >= 0 ? '+' : ''}${p.momGrowthPercent.toFixed(1)}%`,
               iconUrl: p.customIconUrl
             })) || []}
             data-testid="stat-mom-profit"

@@ -1069,6 +1069,7 @@ export async function registerRoutes(
         const currentValue = latestMonth ? monthlyVals.get(latestMonth)! : (Number(platform.currentValue) || 0);
         const prevValue = previousMonth ? monthlyVals.get(previousMonth)! : 0;
         const momChange = currentValue - prevValue;
+        const momGrowthPercent = prevValue > 0 ? ((currentValue - prevValue) / prevValue) * 100 : 0;
         
         return {
           platformId: platform.id,
@@ -1076,7 +1077,8 @@ export async function registerRoutes(
           customIconUrl: (platform as any).customIconUrl,
           currentValue,
           prevValue,
-          momChange
+          momChange,
+          momGrowthPercent
         };
       });
       
