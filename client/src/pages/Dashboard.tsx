@@ -241,7 +241,7 @@ export default function Dashboard() {
               name: p.name,
               value: `${p.momGrowthPercent >= 0 ? '+' : ''}${p.momGrowthPercent.toFixed(1)}% (${p.momChange >= 0 ? '+' : ''}${formatCurrency(p.momChange, currency)})`,
               iconUrl: p.customIconUrl,
-              sortValue: p.momChange
+              sortValue: p.momGrowthPercent
             })) || []}
             data-testid="stat-mom-profit"
           />
