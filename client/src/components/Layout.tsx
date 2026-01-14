@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Wallet, PieChart, TrendingUp, Menu, X, LogOut, Settings } from "lucide-react";
+import { LayoutDashboard, Wallet, PieChart, TrendingUp, Menu, X, LogOut, Settings, Coffee } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -91,10 +91,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </Button>
             </div>
           )}
-          <div className="bg-muted/50 rounded-xl p-4 border border-border/50">
-            <h4 className="font-semibold text-sm mb-1">Pro Tip</h4>
-            <p className="text-xs text-muted-foreground">Update your valuations monthly for accurate insights.</p>
-          </div>
+          <a 
+            href="https://buymeacoffee.com/investmenttracker" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 bg-amber-500/10 hover:bg-amber-500/20 rounded-xl p-4 border border-amber-500/30 transition-colors"
+            data-testid="link-buy-me-coffee"
+          >
+            <Coffee className="h-5 w-5 text-amber-500 flex-shrink-0" />
+            <div>
+              <h4 className="font-semibold text-sm text-amber-600 dark:text-amber-400">Buy me a coffee</h4>
+              <p className="text-xs text-muted-foreground">Support this project</p>
+            </div>
+          </a>
           <div className="text-center text-xs text-muted-foreground/60" data-testid="text-app-version">
             v{APP_VERSION}
           </div>
