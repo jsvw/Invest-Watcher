@@ -1,19 +1,17 @@
 import { Layout } from "@/components/Layout";
 import { StatCard } from "@/components/StatCard";
 import { usePlatforms } from "@/hooks/use-platforms";
-import { useGenerateInsight } from "@/hooks/use-insights";
 import { useAuth } from "@/App";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
-import { Wallet, TrendingUp, DollarSign, BrainCircuit, RefreshCcw, Check } from "lucide-react";
+import { Wallet, TrendingUp, DollarSign, Check } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { api, buildUrl } from "@shared/routes";
+import { api } from "@shared/routes";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { useState } from "react";
@@ -25,7 +23,6 @@ export default function Dashboard() {
   const { user } = useAuth();
   const currency = user?.currency || "EUR";
   const { data: platforms, isLoading: isPlatformsLoading } = usePlatforms();
-  const { mutate: generateInsight, data: insightData, isPending: isInsightLoading } = useGenerateInsight();
   const [range, setRange] = useState("all");
   const [specificYear, setSpecificYear] = useState<string | null>(null);
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
@@ -143,19 +140,9 @@ export default function Dashboard() {
       <div className="space-y-8">
         
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold font-display tracking-tight text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground">Your financial overview at a glance.</p>
-          </div>
-          <Button 
-            onClick={() => generateInsight("Analyze my portfolio allocation and performance.")}
-            className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0 shadow-lg shadow-indigo-500/25"
-            disabled={isInsightLoading}
-          >
-            {isInsightLoading ? <RefreshCcw className="h-4 w-4 animate-spin mr-2" /> : <BrainCircuit className="h-4 w-4 mr-2" />}
-            {isInsightLoading ? "Analyzing..." : "Get AI Insights"}
-          </Button>
+        <div>
+          <h1 className="text-3xl font-bold font-display tracking-tight text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground">Your financial overview at a glance.</p>
         </div>
 
         {/* Stats Grid */}
