@@ -305,10 +305,22 @@ export async function fetchEmailsForUser(userId: number): Promise<{ success: boo
                     const from = parsed.from?.text || "";
                     const date = parsed.date || new Date();
                     
+                    // Log email details and attachments
+                    console.log(`\n=== Processing Email ===`);
+                    console.log(`Subject: ${subject}`);
+                    console.log(`From: ${from}`);
+                    console.log(`Attachments found: ${parsed.attachments?.length || 0}`);
+                    if (parsed.attachments && parsed.attachments.length > 0) {
+                      parsed.attachments.forEach((att, i) => {
+                        console.log(`  [${i}] ${att.filename} (${att.contentType}, ${att.size || att.content?.length || 0} bytes)`);
+                      });
+                    }
+                    
                     // Extract text from attachments (PDFs, CSVs, text files)
                     const attachmentText = parsed.attachments && parsed.attachments.length > 0
                       ? await extractTextFromAttachments(parsed.attachments)
                       : "";
+                    console.log(`Attachment text extracted: ${attachmentText.length} chars`);
 
                     const aiResult = await parseEmailWithAI(subject, body, userPlatforms, userAssets, attachmentText);
 
