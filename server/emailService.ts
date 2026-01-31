@@ -92,7 +92,16 @@ export async function parseEmailWithAI(
   attachmentText: string = ""
 ): Promise<ParsedTransaction> {
   const platformNames = userPlatforms.map((p) => p.name).join(", ");
-  const assetNames = userAssets.map((a) => `${a.name} (platform: ${userPlatforms.find(p => p.id === a.platformId)?.name || 'unknown'})`).join(", ");
+  
+  // Include asset details with quantity for exit type determination
+  const assetDetails = userAssets
+    .filter(a => a.status === "active")
+    .map((a) => {
+      const platform = userPlatforms.find(p => p.id === a.platformId);
+      const qty = a.quantity ? `qty: ${a.quantity}` : "";
+      const invested = a.investedAmount ? `invested: ${a.investedAmount}` : "";
+      return `${a.name} (platform: ${platform?.name || 'unknown'}, ${qty}, ${invested})`.replace(/, ,/g, ",").replace(/,\s*\)/g, ")");
+    }).join("; ");
 
   const attachmentSection = attachmentText 
     ? `\n\nEMAIL ATTACHMENTS:\n${attachmentText.substring(0, 6000)}`
@@ -106,7 +115,7 @@ EMAIL BODY:
 ${body.substring(0, 4000)}${attachmentSection}
 
 USER'S EXISTING PLATFORMS: ${platformNames || "None yet"}
-USER'S EXISTING ASSETS: ${assetNames || "None yet"}
+USER'S EXISTING ASSETS (active only): ${assetDetails || "None yet"}
 
 Extract the following information in JSON format:
 {
@@ -130,9 +139,16 @@ Transaction type definitions:
 - deposit: Adding money to a platform
 - withdrawal: Taking money out of a platform
 - purchase: Buying a specific asset/investment item
-- partial_exit: Selling part of an asset or receiving partial principal repayment
-- full_exit: Complete sale/closure of an asset
+- partial_exit: Selling PART of an asset (less than total quantity held)
+- full_exit: Complete sale/closure of an asset (ALL quantity sold)
 - interest: Receiving interest, dividends, or returns
+
+EXIT TYPE DETERMINATION:
+When an email mentions selling/exiting an asset, compare the quantity being sold to the user's holdings:
+- If the email mentions selling ALL shares/splints/units OR the quantity matches the user's total holding → full_exit
+- If the email mentions selling SOME shares/splints/units OR quantity is less than user's holding → partial_exit
+- Look for phrases like "all", "complete", "full", "entire" → full_exit
+- Look for phrases like "partial", "some", "portion" → partial_exit
 
 If the email doesn't appear to be investment-related, set all fields to null.
 Try to match platformName to an existing platform if possible.
