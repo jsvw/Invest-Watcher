@@ -4,8 +4,11 @@ import { db } from "./db";
 import { emailSettings, emailImports, platforms, assets, type EmailSettings, type Platform, type Asset } from "@shared/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import OpenAI from "openai";
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const pdfParse = require("pdf-parse");
+// Dynamic import for pdf-parse (CommonJS module)
+let pdfParse: (dataBuffer: Buffer) => Promise<{ text: string }>;
+import("pdf-parse").then((module) => {
+  pdfParse = module.default;
+});
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -31,7 +34,7 @@ async function extractTextFromAttachments(attachments: Attachment[]): Promise<st
       
       // Handle PDF attachments
       if (contentType.includes("pdf") || filename.endsWith(".pdf")) {
-        if (attachment.content) {
+        if (attachment.content && pdfParse) {
           const pdfData = await pdfParse(attachment.content);
           if (pdfData.text) {
             textParts.push(`[PDF: ${attachment.filename}]\n${pdfData.text.substring(0, 5000)}`);
