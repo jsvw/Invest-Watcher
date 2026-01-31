@@ -143,12 +143,13 @@ Transaction type definitions:
 - full_exit: Complete sale/closure of an asset (ALL quantity sold)
 - interest: Receiving interest, dividends, or returns
 
-EXIT TYPE DETERMINATION:
-When an email mentions selling/exiting an asset, compare the quantity being sold to the user's holdings:
-- If the email mentions selling ALL shares/splints/units OR the quantity matches the user's total holding → full_exit
-- If the email mentions selling SOME shares/splints/units OR quantity is less than user's holding → partial_exit
-- Look for phrases like "all", "complete", "full", "entire" → full_exit
-- Look for phrases like "partial", "some", "portion" → partial_exit
+EXIT TYPE DETERMINATION (CRITICAL - compare amounts carefully):
+When an email mentions selling/exiting/repaying an asset, compare the amount to the user's holdings:
+- PARTIAL EXIT: Amount repaid/sold is LESS than the user's total invested amount for that asset
+- FULL EXIT: Amount repaid/sold EQUALS or EXCEEDS the user's total invested amount, OR email explicitly says "all", "complete", "full", "entire"
+- For loans/real estate: "repaid" with a specific amount that is LESS than invested → partial_exit (it's a partial principal repayment)
+- Example: If user has €317.98 invested and €17.65 is repaid → partial_exit (not full_exit!)
+- Only use full_exit when the ENTIRE position is closed
 
 If the email doesn't appear to be investment-related, set all fields to null.
 Try to match platformName to an existing platform if possible.
