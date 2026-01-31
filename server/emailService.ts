@@ -2,7 +2,7 @@ import Imap from "imap";
 import { simpleParser, ParsedMail } from "mailparser";
 import { db } from "./db";
 import { emailSettings, emailImports, platforms, assets, type EmailSettings, type Platform, type Asset } from "@shared/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import OpenAI from "openai";
 
 const openai = new OpenAI({
@@ -140,7 +140,12 @@ export async function fetchEmailsForUser(userId: number): Promise<{ success: boo
 
   const config = settings[0];
   const userPlatforms = await db.select().from(platforms).where(eq(platforms.userId, userId));
-  const userAssets = await db.select().from(assets);
+  
+  // Only fetch assets for the user's platforms to ensure data isolation
+  const userPlatformIds = userPlatforms.map(p => p.id);
+  const userAssets = userPlatformIds.length > 0 
+    ? await db.select().from(assets).where(inArray(assets.platformId, userPlatformIds))
+    : [];
 
   return new Promise((resolve) => {
     const imap = new Imap({
@@ -149,7 +154,7 @@ export async function fetchEmailsForUser(userId: number): Promise<{ success: boo
       host: config.imapHost,
       port: config.imapPort,
       tls: config.imapTls,
-      tlsOptions: { rejectUnauthorized: false },
+      tlsOptions: { rejectUnauthorized: true },
     });
 
     let processedCount = 0;
