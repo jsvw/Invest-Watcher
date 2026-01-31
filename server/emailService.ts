@@ -106,6 +106,14 @@ Extract the following information in JSON format:
   "notes": "brief summary of the transaction"
 }
 
+IMPORTANT - Amount extraction:
+Look for these common fields in attachments and emails:
+- "Total Price", "Total Amount", "Total", "Totaal"
+- "Investment Amount", "Purchase Price", "Transaction Value"
+- "Amount Paid", "Amount Invested", "Value"
+- "Bedrag", "Inleg", "Aankoopprijs" (Dutch terms)
+Extract the TOTAL amount as the transaction amount, not individual unit prices.
+
 Transaction type definitions:
 - deposit: Adding money to a platform
 - withdrawal: Taking money out of a platform
