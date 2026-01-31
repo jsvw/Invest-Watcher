@@ -1,16 +1,18 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { useLocation, Link } from "wouter";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/App";
-import { Loader2, Lock, User, Mail, Coins, Trash2, AlertTriangle } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Loader2, Lock, User, Mail, Coins, Trash2, AlertTriangle, Inbox, RefreshCw, CheckCircle, ExternalLink } from "lucide-react";
 
 const CURRENCIES = [
   { code: "EUR", name: "Euro", symbol: "€" },
@@ -36,6 +38,97 @@ export default function Settings() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  
+  // Email settings state
+  const [emailAddress, setEmailAddress] = useState("");
+  const [appPassword, setAppPassword] = useState("");
+  const [emailEnabled, setEmailEnabled] = useState(true);
+  const [isSavingEmail, setIsSavingEmail] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
+
+  // Fetch email settings
+  const { data: emailSettings, refetch: refetchEmailSettings } = useQuery({
+    queryKey: ["/api/email-settings"],
+  });
+
+  // Fetch pending imports count
+  const { data: pendingImports } = useQuery({
+    queryKey: ["/api/email-imports"],
+  });
+
+  useEffect(() => {
+    if (emailSettings) {
+      setEmailAddress(emailSettings.imapUser || "");
+      setEmailEnabled(emailSettings.enabled ?? true);
+    }
+  }, [emailSettings]);
+
+  const handleSaveEmailSettings = async () => {
+    if (!emailAddress) {
+      toast({
+        title: "Email required",
+        description: "Please enter your Gmail address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingEmail(true);
+    try {
+      await apiRequest("POST", "/api/email-settings", {
+        imapHost: "imap.gmail.com",
+        imapPort: 993,
+        imapUser: emailAddress,
+        imapPassword: appPassword || undefined,
+        imapTls: true,
+        enabled: emailEnabled,
+      });
+      await refetchEmailSettings();
+      setAppPassword("");
+      toast({
+        title: "Email settings saved",
+        description: "Your email import settings have been updated.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Failed to save",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingEmail(false);
+    }
+  };
+
+  const handlePollEmails = async () => {
+    setIsPolling(true);
+    try {
+      const result = await apiRequest("POST", "/api/email-settings/poll");
+      queryClient.invalidateQueries({ queryKey: ["/api/email-imports"] });
+      if (result.success) {
+        toast({
+          title: "Emails checked",
+          description: result.count > 0 
+            ? `Found ${result.count} new investment email(s) to review.`
+            : "No new investment emails found.",
+        });
+      } else {
+        toast({
+          title: "Check failed",
+          description: result.error || "Could not connect to email server.",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Check failed",
+        description: error.message || "Please verify your email settings.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPolling(false);
+    }
+  };
 
   const handleDeleteAccount = async () => {
     if (deleteConfirmation !== "DELETE") {
@@ -265,6 +358,104 @@ export default function Settings() {
                   Change Password
                 </Button>
               </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Inbox className="h-5 w-5" />
+                Email Import
+              </CardTitle>
+              <CardDescription>
+                Automatically import investments from your email inbox
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="emailAddress">Gmail Address</Label>
+                <Input
+                  id="emailAddress"
+                  type="email"
+                  value={emailAddress}
+                  onChange={(e) => setEmailAddress(e.target.value)}
+                  placeholder="your.email@gmail.com"
+                  data-testid="input-email-import-address"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="appPassword">
+                  App Password {emailSettings?.hasPassword && <span className="text-green-600 text-xs">(saved)</span>}
+                </Label>
+                <Input
+                  id="appPassword"
+                  type="password"
+                  value={appPassword}
+                  onChange={(e) => setAppPassword(e.target.value)}
+                  placeholder={emailSettings?.hasPassword ? "••••••••••••••••" : "Enter Gmail App Password"}
+                  data-testid="input-email-app-password"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Create an App Password at{" "}
+                  <a 
+                    href="https://myaccount.google.com/apppasswords" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline inline-flex items-center gap-1"
+                  >
+                    myaccount.google.com <ExternalLink className="h-3 w-3" />
+                  </a>
+                </p>
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="emailEnabled">Enable email import</Label>
+                <Switch
+                  id="emailEnabled"
+                  checked={emailEnabled}
+                  onCheckedChange={setEmailEnabled}
+                  data-testid="switch-email-enabled"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleSaveEmailSettings} 
+                  disabled={isSavingEmail}
+                  data-testid="button-save-email-settings"
+                >
+                  {isSavingEmail && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Settings
+                </Button>
+                {emailSettings && (
+                  <Button 
+                    variant="outline" 
+                    onClick={handlePollEmails}
+                    disabled={isPolling || !emailSettings.hasPassword}
+                    data-testid="button-poll-emails"
+                  >
+                    {isPolling ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                    )}
+                    Check Emails Now
+                  </Button>
+                )}
+              </div>
+              {Array.isArray(pendingImports) && pendingImports.length > 0 && (
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-amber-500" />
+                      <span className="text-sm font-medium">{pendingImports.length} pending import(s)</span>
+                    </div>
+                    <Link href="/imports">
+                      <Button size="sm" variant="outline" data-testid="button-view-imports">
+                        Review
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
