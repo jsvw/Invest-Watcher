@@ -13,6 +13,7 @@ const Platforms = lazy(() => import("@/pages/Platforms"));
 const PlatformDetails = lazy(() => import("@/pages/PlatformDetails"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const Settings = lazy(() => import("@/pages/Settings"));
+const Imports = lazy(() => import("@/pages/Imports"));
 
 function PageLoader() {
   return (
@@ -118,6 +119,9 @@ function Router() {
       </Route>
       <Route path="/settings">
         {(params) => <ProtectedRoute component={Settings} {...params} />}
+      </Route>
+      <Route path="/imports">
+        {(params) => <ProtectedRoute component={Imports} {...params} />}
       </Route>
       <Route component={NotFound} />
     </Switch>

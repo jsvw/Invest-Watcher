@@ -14,6 +14,24 @@ import { useAuth } from "@/App";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Loader2, Lock, User, Mail, Coins, Trash2, AlertTriangle, Inbox, RefreshCw, CheckCircle, ExternalLink } from "lucide-react";
 
+interface EmailSettingsResponse {
+  id: number;
+  userId: number;
+  imapHost: string;
+  imapPort: number;
+  imapUser: string;
+  imapTls: boolean;
+  enabled: boolean;
+  lastPollAt: string | null;
+  hasPassword: boolean;
+}
+
+interface PollResult {
+  success: boolean;
+  count: number;
+  error?: string;
+}
+
 const CURRENCIES = [
   { code: "EUR", name: "Euro", symbol: "€" },
   { code: "USD", name: "US Dollar", symbol: "$" },
@@ -47,12 +65,12 @@ export default function Settings() {
   const [isPolling, setIsPolling] = useState(false);
 
   // Fetch email settings
-  const { data: emailSettings, refetch: refetchEmailSettings } = useQuery({
+  const { data: emailSettings, refetch: refetchEmailSettings } = useQuery<EmailSettingsResponse | null>({
     queryKey: ["/api/email-settings"],
   });
 
   // Fetch pending imports count
-  const { data: pendingImports } = useQuery({
+  const { data: pendingImports } = useQuery<any[]>({
     queryKey: ["/api/email-imports"],
   });
 
@@ -103,7 +121,7 @@ export default function Settings() {
   const handlePollEmails = async () => {
     setIsPolling(true);
     try {
-      const result = await apiRequest("POST", "/api/email-settings/poll");
+      const result = await apiRequest("POST", "/api/email-settings/poll") as unknown as PollResult;
       queryClient.invalidateQueries({ queryKey: ["/api/email-imports"] });
       if (result.success) {
         toast({
