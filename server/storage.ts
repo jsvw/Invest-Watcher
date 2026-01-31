@@ -7,6 +7,8 @@ import {
   assets,
   assetValuations,
   assetRepayments,
+  emailSettings,
+  emailImports,
   type Platform,
   type InsertPlatform,
   type Investment,
@@ -22,7 +24,11 @@ import {
   type AssetRepayment,
   type InsertAssetRepayment,
   type PlatformResponse,
-  type AssetResponse
+  type AssetResponse,
+  type EmailSettings,
+  type InsertEmailSettings,
+  type EmailImport,
+  type InsertEmailImport
 } from "@shared/schema";
 import { eq, desc, sql, and, or } from "drizzle-orm";
 
@@ -91,6 +97,18 @@ export interface IStorage {
   
   // Item Cohort Returns
   getItemCohortReturns(platformId: number, statusFilter?: string): Promise<{ cohortKey: string; cohortLabel: string; data: { calendarMonth: string; calendarLabel: string; avgReturn: number; assetCount: number }[] }[]>;
+
+  // Email Settings
+  getEmailSettings(userId: number): Promise<EmailSettings | undefined>;
+  saveEmailSettings(userId: number, settings: Partial<InsertEmailSettings>): Promise<EmailSettings>;
+  deleteEmailSettings(userId: number): Promise<void>;
+
+  // Email Imports
+  getPendingEmailImports(userId: number): Promise<EmailImport[]>;
+  getEmailImport(id: number, userId: number): Promise<EmailImport | undefined>;
+  updateEmailImport(id: number, userId: number, data: Partial<EmailImport>): Promise<EmailImport>;
+  dismissEmailImport(id: number, userId: number): Promise<void>;
+  approveEmailImport(id: number, userId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -945,6 +963,95 @@ export class DatabaseStorage implements IStorage {
     }
 
     return result;
+  }
+
+  // Email Settings
+  async getEmailSettings(userId: number): Promise<EmailSettings | undefined> {
+    const [settings] = await db.select()
+      .from(emailSettings)
+      .where(eq(emailSettings.userId, userId))
+      .limit(1);
+    return settings;
+  }
+
+  async saveEmailSettings(userId: number, settings: Partial<InsertEmailSettings>): Promise<EmailSettings> {
+    const existing = await this.getEmailSettings(userId);
+    
+    if (existing) {
+      const [updated] = await db.update(emailSettings)
+        .set(settings)
+        .where(eq(emailSettings.userId, userId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(emailSettings)
+        .values({
+          userId,
+          imapHost: settings.imapHost || "imap.gmail.com",
+          imapPort: settings.imapPort || 993,
+          imapUser: settings.imapUser!,
+          imapPassword: settings.imapPassword!,
+          imapTls: settings.imapTls ?? true,
+          enabled: settings.enabled ?? true,
+        })
+        .returning();
+      return created;
+    }
+  }
+
+  async deleteEmailSettings(userId: number): Promise<void> {
+    await db.delete(emailSettings).where(eq(emailSettings.userId, userId));
+  }
+
+  // Email Imports
+  async getPendingEmailImports(userId: number): Promise<EmailImport[]> {
+    return db.select()
+      .from(emailImports)
+      .where(and(
+        eq(emailImports.userId, userId),
+        eq(emailImports.status, "pending")
+      ))
+      .orderBy(desc(emailImports.emailDate));
+  }
+
+  async getEmailImport(id: number, userId: number): Promise<EmailImport | undefined> {
+    const [result] = await db.select()
+      .from(emailImports)
+      .where(and(
+        eq(emailImports.id, id),
+        eq(emailImports.userId, userId)
+      ))
+      .limit(1);
+    return result;
+  }
+
+  async updateEmailImport(id: number, userId: number, data: Partial<EmailImport>): Promise<EmailImport> {
+    const [updated] = await db.update(emailImports)
+      .set(data)
+      .where(and(
+        eq(emailImports.id, id),
+        eq(emailImports.userId, userId)
+      ))
+      .returning();
+    return updated;
+  }
+
+  async dismissEmailImport(id: number, userId: number): Promise<void> {
+    await db.update(emailImports)
+      .set({ status: "dismissed" })
+      .where(and(
+        eq(emailImports.id, id),
+        eq(emailImports.userId, userId)
+      ));
+  }
+
+  async approveEmailImport(id: number, userId: number): Promise<void> {
+    await db.update(emailImports)
+      .set({ status: "approved" })
+      .where(and(
+        eq(emailImports.id, id),
+        eq(emailImports.userId, userId)
+      ));
   }
 }
 

@@ -1124,6 +1124,179 @@ export async function registerRoutes(
     }
   });
 
+  // --- Email Settings ---
+  app.get("/api/email-settings", requireAuth, async (req, res) => {
+    const userId = getAuthenticatedUserId(req)!;
+    const settings = await storage.getEmailSettings(userId);
+    if (settings) {
+      const { imapPassword, ...safeSettings } = settings;
+      res.json({ ...safeSettings, hasPassword: !!imapPassword });
+    } else {
+      res.json(null);
+    }
+  });
+
+  app.post("/api/email-settings", requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const { imapHost, imapPort, imapUser, imapPassword, imapTls, enabled } = req.body;
+      
+      if (!imapUser) {
+        return res.status(400).json({ message: "Email address is required" });
+      }
+      
+      const settings = await storage.saveEmailSettings(userId, {
+        imapHost: imapHost || "imap.gmail.com",
+        imapPort: imapPort || 993,
+        imapUser,
+        imapPassword,
+        imapTls: imapTls ?? true,
+        enabled: enabled ?? true,
+      });
+      
+      const { imapPassword: pwd, ...safeSettings } = settings;
+      res.json({ ...safeSettings, hasPassword: !!pwd });
+    } catch (err) {
+      console.error("Error saving email settings:", err);
+      res.status(500).json({ message: "Failed to save email settings" });
+    }
+  });
+
+  app.delete("/api/email-settings", requireAuth, async (req, res) => {
+    const userId = getAuthenticatedUserId(req)!;
+    await storage.deleteEmailSettings(userId);
+    res.status(204).send();
+  });
+
+  app.post("/api/email-settings/poll", requireAuth, async (req, res) => {
+    const userId = getAuthenticatedUserId(req)!;
+    const { fetchEmailsForUser } = await import("./emailService");
+    const result = await fetchEmailsForUser(userId);
+    res.json(result);
+  });
+
+  // --- Email Imports ---
+  app.get("/api/email-imports", requireAuth, async (req, res) => {
+    const userId = getAuthenticatedUserId(req)!;
+    const imports = await storage.getPendingEmailImports(userId);
+    res.json(imports);
+  });
+
+  app.get("/api/email-imports/:id", requireAuth, async (req, res) => {
+    const userId = getAuthenticatedUserId(req)!;
+    const emailImport = await storage.getEmailImport(Number(req.params.id), userId);
+    if (!emailImport) {
+      return res.status(404).json({ message: "Import not found" });
+    }
+    res.json(emailImport);
+  });
+
+  app.patch("/api/email-imports/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const updated = await storage.updateEmailImport(Number(req.params.id), userId, req.body);
+      res.json(updated);
+    } catch (err) {
+      res.status(404).json({ message: "Import not found" });
+    }
+  });
+
+  app.post("/api/email-imports/:id/dismiss", requireAuth, async (req, res) => {
+    const userId = getAuthenticatedUserId(req)!;
+    await storage.dismissEmailImport(Number(req.params.id), userId);
+    res.status(204).send();
+  });
+
+  app.post("/api/email-imports/:id/approve", requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const id = Number(req.params.id);
+      const emailImport = await storage.getEmailImport(id, userId);
+      
+      if (!emailImport) {
+        return res.status(404).json({ message: "Import not found" });
+      }
+      
+      if (!emailImport.matchedPlatformId) {
+        return res.status(400).json({ message: "Please select a platform before approving" });
+      }
+      
+      const transactionType = emailImport.transactionType || "deposit";
+      const amount = emailImport.parsedAmount?.toString() || "0";
+      const date = emailImport.parsedDate || new Date();
+      const notes = emailImport.parsedNotes || `Imported from email: ${emailImport.emailSubject}`;
+      
+      switch (transactionType) {
+        case "deposit":
+        case "purchase":
+          if (transactionType === "purchase" && emailImport.matchedAssetId) {
+            const asset = await storage.getAsset(emailImport.matchedAssetId);
+            if (asset) {
+              await storage.updateAsset(emailImport.matchedAssetId, {
+                investedAmount: (Number(asset.investedAmount) + Number(amount)).toString()
+              });
+            }
+          } else if (transactionType === "purchase" && emailImport.parsedAssetName) {
+            await storage.createAsset({
+              platformId: emailImport.matchedPlatformId,
+              name: emailImport.parsedAssetName,
+              investedAmount: amount,
+              acquisitionDate: date,
+              status: "active",
+            });
+          } else {
+            await storage.createInvestment({
+              platformId: emailImport.matchedPlatformId,
+              amount,
+              date,
+              notes,
+            });
+          }
+          break;
+          
+        case "withdrawal":
+          await storage.createWithdrawal({
+            platformId: emailImport.matchedPlatformId,
+            amount,
+            date,
+            notes,
+          });
+          break;
+          
+        case "partial_exit":
+          if (emailImport.matchedAssetId) {
+            await storage.createAssetRepayment({
+              assetId: emailImport.matchedAssetId,
+              amount,
+              date,
+              notes,
+            });
+          }
+          break;
+          
+        case "full_exit":
+          if (emailImport.matchedAssetId) {
+            await storage.exitAsset(emailImport.matchedAssetId, date, amount);
+          }
+          break;
+          
+        case "interest":
+          await storage.createValuation({
+            platformId: emailImport.matchedPlatformId,
+            value: amount,
+            date,
+          });
+          break;
+      }
+      
+      await storage.approveEmailImport(id, userId);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Error approving email import:", err);
+      res.status(500).json({ message: "Failed to approve import" });
+    }
+  });
+
   await seedDatabase();
   // removed importInvestmentData() call to prevent duplicates on restart
 
