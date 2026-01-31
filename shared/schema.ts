@@ -120,6 +120,7 @@ export const emailImports = pgTable("email_imports", {
   emailFrom: text("email_from"),
   emailDate: timestamp("email_date"),
   emailBody: text("email_body"), // Store for reference
+  attachmentContent: text("attachment_content"), // Parsed text from attachments (PDFs, etc.)
   // Parsed fields (from AI)
   transactionType: text("transaction_type"), // 'deposit', 'withdrawal', 'purchase', 'partial_exit', 'full_exit', 'interest'
   parsedPlatformName: text("parsed_platform_name"),

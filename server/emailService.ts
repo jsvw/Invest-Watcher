@@ -326,6 +326,7 @@ export async function fetchEmailsForUser(userId: number): Promise<{ success: boo
                       emailFrom: from.substring(0, 200),
                       emailDate: date,
                       emailBody: body.substring(0, 10000),
+                      attachmentContent: attachmentText ? attachmentText.substring(0, 10000) : null,
                       transactionType: aiResult.transactionType,
                       parsedPlatformName: aiResult.platformName,
                       parsedAssetName: aiResult.assetName,

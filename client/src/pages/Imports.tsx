@@ -336,6 +336,18 @@ export default function Imports() {
                       </div>
                     </div>
                   )}
+                  
+                  {selectedImport.attachmentContent && (
+                    <div className="pt-4 border-t">
+                      <Label className="text-xs text-muted-foreground">Attachment Content (Parsed)</Label>
+                      <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-950 rounded-lg max-h-48 overflow-auto border border-blue-200 dark:border-blue-800">
+                        <pre className="text-xs whitespace-pre-wrap font-mono">
+                          {selectedImport.attachmentContent.substring(0, 2000)}
+                          {selectedImport.attachmentContent.length > 2000 && "..."}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
