@@ -221,6 +221,8 @@ export async function fetchEmailsForUser(userId: number): Promise<{ success: boo
       port: config.imapPort,
       tls: config.imapTls,
       tlsOptions: { rejectUnauthorized: false },
+      authTimeout: 30000,
+      connTimeout: 30000,
     });
 
     let processedCount = 0;
