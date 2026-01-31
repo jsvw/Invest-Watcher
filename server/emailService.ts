@@ -4,11 +4,17 @@ import { db } from "./db";
 import { emailSettings, emailImports, platforms, assets, type EmailSettings, type Platform, type Asset } from "@shared/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import OpenAI from "openai";
-// Dynamic import for pdf-parse (CommonJS module)
-let pdfParse: (dataBuffer: Buffer) => Promise<{ text: string }>;
-import("pdf-parse").then((module) => {
-  pdfParse = module.default;
-});
+// Lazy load pdf-parse
+let pdfParseModule: ((dataBuffer: Buffer) => Promise<{ text: string }>) | null = null;
+
+async function getPdfParse(): Promise<(dataBuffer: Buffer) => Promise<{ text: string }>> {
+  if (!pdfParseModule) {
+    // pdf-parse exports differently in ESM context
+    const module = await import("pdf-parse") as any;
+    pdfParseModule = module.default || module;
+  }
+  return pdfParseModule!;
+}
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -27,15 +33,21 @@ interface ParsedTransaction {
 async function extractTextFromAttachments(attachments: Attachment[]): Promise<string> {
   const textParts: string[] = [];
   
+  console.log(`Processing ${attachments.length} attachment(s)`);
+  
   for (const attachment of attachments) {
     try {
       const contentType = attachment.contentType?.toLowerCase() || "";
       const filename = attachment.filename?.toLowerCase() || "";
       
+      console.log(`Attachment: ${attachment.filename}, type: ${contentType}, size: ${attachment.content?.length || 0} bytes`);
+      
       // Handle PDF attachments
       if (contentType.includes("pdf") || filename.endsWith(".pdf")) {
-        if (attachment.content && pdfParse) {
+        if (attachment.content) {
+          const pdfParse = await getPdfParse();
           const pdfData = await pdfParse(attachment.content);
+          console.log(`PDF parsed, text length: ${pdfData.text?.length || 0}`);
           if (pdfData.text) {
             textParts.push(`[PDF: ${attachment.filename}]\n${pdfData.text.substring(0, 5000)}`);
           }
