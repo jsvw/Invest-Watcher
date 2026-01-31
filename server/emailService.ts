@@ -154,7 +154,7 @@ export async function fetchEmailsForUser(userId: number): Promise<{ success: boo
       host: config.imapHost,
       port: config.imapPort,
       tls: config.imapTls,
-      tlsOptions: { rejectUnauthorized: true },
+      tlsOptions: { rejectUnauthorized: false },
     });
 
     let processedCount = 0;
