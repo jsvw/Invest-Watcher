@@ -97,6 +97,45 @@ export const assetRepayments = pgTable("asset_repayments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// === EMAIL IMPORT SETTINGS ===
+export const emailSettings = pgTable("email_settings", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id).unique(),
+  imapHost: text("imap_host").notNull().default("imap.gmail.com"),
+  imapPort: integer("imap_port").notNull().default(993),
+  imapUser: text("imap_user").notNull(), // Email address
+  imapPassword: text("imap_password").notNull(), // App password (encrypted in transit)
+  imapTls: boolean("imap_tls").notNull().default(true),
+  enabled: boolean("enabled").notNull().default(true),
+  lastPollAt: timestamp("last_poll_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// === EMAIL IMPORTS (pending parsed emails) ===
+export const emailImports = pgTable("email_imports", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  emailUid: text("email_uid").notNull(), // IMAP UID to prevent duplicates
+  emailSubject: text("email_subject"),
+  emailFrom: text("email_from"),
+  emailDate: timestamp("email_date"),
+  emailBody: text("email_body"), // Store for reference
+  // Parsed fields (from AI)
+  transactionType: text("transaction_type"), // 'deposit', 'withdrawal', 'purchase', 'partial_exit', 'full_exit', 'interest'
+  parsedPlatformName: text("parsed_platform_name"),
+  parsedAssetName: text("parsed_asset_name"),
+  parsedAmount: numeric("parsed_amount"),
+  parsedDate: timestamp("parsed_date"),
+  parsedNotes: text("parsed_notes"),
+  // Matching
+  matchedPlatformId: integer("matched_platform_id").references(() => platforms.id),
+  matchedAssetId: integer("matched_asset_id").references(() => assets.id),
+  // Status
+  status: text("status").notNull().default("pending"), // 'pending', 'approved', 'dismissed', 'error'
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === BASE SCHEMAS ===
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertPlatformSchema = createInsertSchema(platforms).omit({ id: true, createdAt: true });
@@ -106,6 +145,8 @@ export const insertValuationSchema = createInsertSchema(valuations).omit({ id: t
 export const insertAssetSchema = createInsertSchema(assets).omit({ id: true, createdAt: true });
 export const insertAssetValuationSchema = createInsertSchema(assetValuations).omit({ id: true, createdAt: true });
 export const insertAssetRepaymentSchema = createInsertSchema(assetRepayments).omit({ id: true, createdAt: true });
+export const insertEmailSettingsSchema = createInsertSchema(emailSettings).omit({ id: true, createdAt: true, lastPollAt: true });
+export const insertEmailImportSchema = createInsertSchema(emailImports).omit({ id: true, createdAt: true });
 
 // === EXPLICIT API CONTRACT TYPES ===
 
@@ -118,6 +159,8 @@ export type Valuation = typeof valuations.$inferSelect;
 export type Asset = typeof assets.$inferSelect;
 export type AssetValuation = typeof assetValuations.$inferSelect;
 export type AssetRepayment = typeof assetRepayments.$inferSelect;
+export type EmailSettings = typeof emailSettings.$inferSelect;
+export type EmailImport = typeof emailImports.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertPlatform = z.infer<typeof insertPlatformSchema>;
@@ -127,6 +170,8 @@ export type InsertValuation = z.infer<typeof insertValuationSchema>;
 export type InsertAsset = z.infer<typeof insertAssetSchema>;
 export type InsertAssetValuation = z.infer<typeof insertAssetValuationSchema>;
 export type InsertAssetRepayment = z.infer<typeof insertAssetRepaymentSchema>;
+export type InsertEmailSettings = z.infer<typeof insertEmailSettingsSchema>;
+export type InsertEmailImport = z.infer<typeof insertEmailImportSchema>;
 
 // Request types
 export type CreatePlatformRequest = InsertPlatform;
