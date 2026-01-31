@@ -1,9 +1,11 @@
 import Imap from "imap";
-import { simpleParser, ParsedMail } from "mailparser";
+import { simpleParser, ParsedMail, Attachment } from "mailparser";
 import { db } from "./db";
 import { emailSettings, emailImports, platforms, assets, type EmailSettings, type Platform, type Asset } from "@shared/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import OpenAI from "openai";
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const pdfParse = require("pdf-parse");
 
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -19,21 +21,74 @@ interface ParsedTransaction {
   notes: string | null;
 }
 
+async function extractTextFromAttachments(attachments: Attachment[]): Promise<string> {
+  const textParts: string[] = [];
+  
+  for (const attachment of attachments) {
+    try {
+      const contentType = attachment.contentType?.toLowerCase() || "";
+      const filename = attachment.filename?.toLowerCase() || "";
+      
+      // Handle PDF attachments
+      if (contentType.includes("pdf") || filename.endsWith(".pdf")) {
+        if (attachment.content) {
+          const pdfData = await pdfParse(attachment.content);
+          if (pdfData.text) {
+            textParts.push(`[PDF: ${attachment.filename}]\n${pdfData.text.substring(0, 5000)}`);
+          }
+        }
+      }
+      // Handle text/plain attachments
+      else if (contentType.includes("text/plain") || filename.endsWith(".txt")) {
+        if (attachment.content) {
+          textParts.push(`[Text: ${attachment.filename}]\n${attachment.content.toString("utf8").substring(0, 5000)}`);
+        }
+      }
+      // Handle CSV files
+      else if (contentType.includes("csv") || filename.endsWith(".csv")) {
+        if (attachment.content) {
+          textParts.push(`[CSV: ${attachment.filename}]\n${attachment.content.toString("utf8").substring(0, 5000)}`);
+        }
+      }
+      // Handle HTML attachments (sometimes transaction confirmations are HTML)
+      else if (contentType.includes("html") || filename.endsWith(".html")) {
+        if (attachment.content) {
+          // Strip HTML tags for plain text
+          const htmlText = attachment.content.toString("utf8")
+            .replace(/<[^>]*>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+          textParts.push(`[HTML: ${attachment.filename}]\n${htmlText.substring(0, 5000)}`);
+        }
+      }
+    } catch (err) {
+      console.error(`Error parsing attachment ${attachment.filename}:`, err);
+    }
+  }
+  
+  return textParts.join("\n\n");
+}
+
 export async function parseEmailWithAI(
   subject: string,
   body: string,
   userPlatforms: Platform[],
-  userAssets: Asset[]
+  userAssets: Asset[],
+  attachmentText: string = ""
 ): Promise<ParsedTransaction> {
   const platformNames = userPlatforms.map((p) => p.name).join(", ");
   const assetNames = userAssets.map((a) => `${a.name} (platform: ${userPlatforms.find(p => p.id === a.platformId)?.name || 'unknown'})`).join(", ");
+
+  const attachmentSection = attachmentText 
+    ? `\n\nEMAIL ATTACHMENTS:\n${attachmentText.substring(0, 6000)}`
+    : "";
 
   const prompt = `Analyze this investment-related email and extract transaction details.
 
 EMAIL SUBJECT: ${subject}
 
 EMAIL BODY:
-${body.substring(0, 4000)}
+${body.substring(0, 4000)}${attachmentSection}
 
 USER'S EXISTING PLATFORMS: ${platformNames || "None yet"}
 USER'S EXISTING ASSETS: ${assetNames || "None yet"}
@@ -207,8 +262,13 @@ export async function fetchEmailsForUser(userId: number): Promise<{ success: boo
                     const body = parsed.text || "";
                     const from = parsed.from?.text || "";
                     const date = parsed.date || new Date();
+                    
+                    // Extract text from attachments (PDFs, CSVs, text files)
+                    const attachmentText = parsed.attachments && parsed.attachments.length > 0
+                      ? await extractTextFromAttachments(parsed.attachments)
+                      : "";
 
-                    const aiResult = await parseEmailWithAI(subject, body, userPlatforms, userAssets);
+                    const aiResult = await parseEmailWithAI(subject, body, userPlatforms, userAssets, attachmentText);
 
                     const matchedPlatform = aiResult.platformName
                       ? findBestPlatformMatch(aiResult.platformName, userPlatforms)
