@@ -1194,10 +1194,28 @@ export async function registerRoutes(
   app.patch("/api/email-imports/:id", requireAuth, async (req, res) => {
     try {
       const userId = getAuthenticatedUserId(req)!;
-      const updated = await storage.updateEmailImport(Number(req.params.id), userId, req.body);
-      res.json(updated);
+      const id = Number(req.params.id);
+      
+      // First verify the import exists
+      const existing = await storage.getEmailImport(id, userId);
+      if (!existing) {
+        return res.status(404).json({ message: "Import not found" });
+      }
+      
+      // Build update object with only valid fields
+      const updateData: Record<string, unknown> = {};
+      if (req.body.transactionType !== undefined) updateData.transactionType = req.body.transactionType;
+      if (req.body.parsedAmount !== undefined) updateData.parsedAmount = req.body.parsedAmount?.toString();
+      if (req.body.parsedDate !== undefined) updateData.parsedDate = req.body.parsedDate ? new Date(req.body.parsedDate) : null;
+      if (req.body.matchedPlatformId !== undefined) updateData.matchedPlatformId = req.body.matchedPlatformId;
+      if (req.body.matchedAssetId !== undefined) updateData.matchedAssetId = req.body.matchedAssetId;
+      if (req.body.parsedNotes !== undefined) updateData.parsedNotes = req.body.parsedNotes;
+      
+      const updated = await storage.updateEmailImport(id, userId, updateData);
+      res.json(updated || existing);
     } catch (err) {
-      res.status(404).json({ message: "Import not found" });
+      console.error("Error updating email import:", err);
+      res.status(500).json({ message: "Failed to update import" });
     }
   });
 
