@@ -8,17 +8,15 @@ import OpenAI from "openai";
 async function parsePdf(buffer: Buffer): Promise<{ text: string }> {
   try {
     const mod = await import("pdf-parse") as any;
-    // PDFParse is a class that needs to be instantiated
-    if (mod.PDFParse) {
-      const parser = new mod.PDFParse();
+    if (mod.PDFParse && mod.VerbosityLevel) {
+      // PDFParse class requires verbosity option
+      const parser = new mod.PDFParse({ verbosity: mod.VerbosityLevel.ERRORS });
       const result = await parser.loadPDF(buffer);
       return { text: result.text || "" };
     } else if (mod.default) {
-      // Fallback for different module versions
       const result = await mod.default(buffer);
       return { text: result.text || "" };
     } else {
-      console.log("pdf-parse module keys:", Object.keys(mod));
       throw new Error("Could not find PDF parser in module");
     }
   } catch (err) {
