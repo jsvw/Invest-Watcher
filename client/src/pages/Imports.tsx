@@ -41,8 +41,12 @@ export default function Imports() {
 
   const { data: allAssets } = useQuery<Asset[]>({
     queryKey: ["/api/assets"],
-    enabled: false,
   });
+  
+  // Filter assets for the selected platform (for exits)
+  const platformAssets = allAssets?.filter(
+    a => a.platformId === editedData.matchedPlatformId && a.status === "active"
+  ) || [];
 
   const handleSelectImport = (imp: EmailImport) => {
     setSelectedImport(imp);
@@ -269,9 +273,7 @@ export default function Imports() {
                     />
                   </div>
 
-                  {(editedData.transactionType === "purchase" || 
-                    editedData.transactionType === "partial_exit" || 
-                    editedData.transactionType === "full_exit") && (
+                  {editedData.transactionType === "purchase" && (
                     <div className="space-y-2">
                       <Label className="flex items-center gap-2">
                         <Package className="h-4 w-4" />
@@ -284,6 +286,48 @@ export default function Imports() {
                         data-testid="input-asset-name"
                       />
                       {selectedImport.parsedAssetName && selectedImport.parsedAssetName !== editedData.parsedAssetName && (
+                        <p className="text-xs text-muted-foreground">
+                          AI detected: {selectedImport.parsedAssetName}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {(editedData.transactionType === "partial_exit" || 
+                    editedData.transactionType === "full_exit") && (
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Asset
+                      </Label>
+                      <Select
+                        value={editedData.matchedAssetId?.toString() || ""}
+                        onValueChange={(v) => {
+                          const asset = platformAssets.find(a => a.id.toString() === v);
+                          setEditedData({
+                            ...editedData, 
+                            matchedAssetId: Number(v),
+                            parsedAssetName: asset?.name || ""
+                          });
+                        }}
+                      >
+                        <SelectTrigger data-testid="select-asset">
+                          <SelectValue placeholder="Select asset" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {platformAssets.map((asset) => (
+                            <SelectItem key={asset.id} value={asset.id.toString()}>
+                              {asset.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {platformAssets.length === 0 && editedData.matchedPlatformId && (
+                        <p className="text-xs text-muted-foreground">
+                          No active assets found for this platform
+                        </p>
+                      )}
+                      {selectedImport.parsedAssetName && (
                         <p className="text-xs text-muted-foreground">
                           AI detected: {selectedImport.parsedAssetName}
                         </p>
