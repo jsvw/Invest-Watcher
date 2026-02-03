@@ -12,26 +12,20 @@ async function getPdfParse(): Promise<(dataBuffer: Buffer) => Promise<{ text: st
     try {
       // pdf-parse exports differently in ESM context
       const mod = await import("pdf-parse") as any;
-      // Handle various export patterns
-      if (typeof mod === 'function') {
+      // The correct export is PDFParse (capital letters)
+      if (mod.PDFParse && typeof mod.PDFParse === 'function') {
+        pdfParseModule = mod.PDFParse;
+        console.log("Using pdf-parse PDFParse export");
+      } else if (typeof mod === 'function') {
         pdfParseModule = mod;
       } else if (mod.default && typeof mod.default === 'function') {
         pdfParseModule = mod.default;
       } else if (mod.default && mod.default.default && typeof mod.default.default === 'function') {
         pdfParseModule = mod.default.default;
-      } else if (mod.pdfParse && typeof mod.pdfParse === 'function') {
-        pdfParseModule = mod.pdfParse;
       } else {
-        // Fallback: try to find any function export
-        for (const key of Object.keys(mod)) {
-          if (typeof mod[key] === 'function') {
-            pdfParseModule = mod[key];
-            console.log(`Using pdf-parse export: ${key}`);
-            break;
-          }
-        }
+        console.log("pdf-parse module keys:", Object.keys(mod));
+        throw new Error("Could not find PDFParse function in pdf-parse module");
       }
-      console.log("pdf-parse loaded:", typeof pdfParseModule, "module keys:", Object.keys(mod));
     } catch (err) {
       console.error("Failed to load pdf-parse:", err);
       throw err;
