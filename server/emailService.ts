@@ -346,6 +346,41 @@ export async function fetchEmailsForUser(userId: number): Promise<{ success: boo
                       ? findBestAssetMatch(aiResult.assetName, userAssets, matchedPlatform?.id)
                       : null;
 
+                    // Use AI-parsed date, or fall back to the email date
+                    let transactionDate: Date | null = null;
+                    if (aiResult.date) {
+                      transactionDate = new Date(aiResult.date);
+                    } else if (date) {
+                      // Fall back to email date (for forwarded emails, this is the forwarded date)
+                      // Try to extract original email date from body (look for "Verzonden:", "Sent:", "Date:")
+                      const originalDateMatch = body.match(/(?:Verzonden|Sent|Date):\s*[^\n]*?(\d{1,2})\s+(\w+)\s+(\d{4})/i);
+                      if (originalDateMatch) {
+                        const [, day, monthStr, year] = originalDateMatch;
+                        const monthMap: Record<string, number> = {
+                          'januari': 0, 'january': 0, 'jan': 0,
+                          'februari': 1, 'february': 1, 'feb': 1,
+                          'maart': 2, 'march': 2, 'mar': 2,
+                          'april': 3, 'apr': 3,
+                          'mei': 4, 'may': 4,
+                          'juni': 5, 'june': 5, 'jun': 5,
+                          'juli': 6, 'july': 6, 'jul': 6,
+                          'augustus': 7, 'august': 7, 'aug': 7,
+                          'september': 8, 'sep': 8,
+                          'oktober': 9, 'october': 9, 'oct': 9,
+                          'november': 10, 'nov': 10,
+                          'december': 11, 'dec': 11,
+                        };
+                        const month = monthMap[monthStr.toLowerCase()];
+                        if (month !== undefined) {
+                          transactionDate = new Date(parseInt(year), month, parseInt(day));
+                        }
+                      }
+                      // Final fallback to forwarded email date
+                      if (!transactionDate) {
+                        transactionDate = date;
+                      }
+                    }
+
                     await db.insert(emailImports).values({
                       userId,
                       emailUid: uid,
@@ -358,7 +393,7 @@ export async function fetchEmailsForUser(userId: number): Promise<{ success: boo
                       parsedPlatformName: aiResult.platformName,
                       parsedAssetName: aiResult.assetName,
                       parsedAmount: aiResult.amount?.toString() || null,
-                      parsedDate: aiResult.date ? new Date(aiResult.date) : null,
+                      parsedDate: transactionDate,
                       parsedNotes: aiResult.notes,
                       matchedPlatformId: matchedPlatform?.id || null,
                       matchedAssetId: matchedAsset?.id || null,
