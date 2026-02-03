@@ -586,11 +586,18 @@ export default function PlatformDetails() {
                                 </span>
                               )}
                               {(asset as any).totalRepaid && (asset as any).totalRepaid > 0 && (
-                                <div className="text-xs">
-                                  <span className="text-green-600">{formatCurrency((asset as any).totalRepaid, currency)} repaid</span>
-                                  <span className="text-muted-foreground"> / </span>
-                                  <span className="text-muted-foreground">{formatCurrency((asset as any).remainingPrincipal || 0, currency)} remaining</span>
-                                </div>
+                                <AssetRepaymentDialog
+                                  asset={asset as unknown as Asset}
+                                  platformId={id}
+                                  currency={currency}
+                                  trigger={
+                                    <div className="text-xs cursor-pointer hover:underline" data-testid={`link-repayment-${asset.id}`}>
+                                      <span className="text-green-600">{formatCurrency((asset as any).totalRepaid, currency)} repaid</span>
+                                      <span className="text-muted-foreground"> / </span>
+                                      <span className="text-muted-foreground">{formatCurrency((asset as any).remainingPrincipal || 0, currency)} remaining</span>
+                                    </div>
+                                  }
+                                />
                               )}
                             </div>
                             {platformMode === "asset_returns" && (
