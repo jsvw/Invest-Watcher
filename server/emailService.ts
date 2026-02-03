@@ -276,9 +276,13 @@ export async function fetchEmailsForUser(userId: number): Promise<{ success: boo
       host: config.imapHost,
       port: config.imapPort,
       tls: config.imapTls,
-      tlsOptions: { rejectUnauthorized: false },
-      authTimeout: 30000,
-      connTimeout: 30000,
+      tlsOptions: { 
+        rejectUnauthorized: false,
+        servername: config.imapHost 
+      },
+      authTimeout: 60000,
+      connTimeout: 60000,
+      socketTimeout: 60000,
     });
 
     let processedCount = 0;
