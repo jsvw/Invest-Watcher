@@ -53,6 +53,7 @@ export default function Imports() {
       matchedPlatformId: imp.matchedPlatformId,
       matchedAssetId: imp.matchedAssetId,
       parsedNotes: imp.parsedNotes,
+      parsedAssetName: imp.parsedAssetName,
     });
   };
 
@@ -277,12 +278,16 @@ export default function Imports() {
                         Asset Name
                       </Label>
                       <Input
-                        value={selectedImport.parsedAssetName || ""}
-                        placeholder="Asset name (optional)"
-                        disabled
-                        className="bg-muted"
+                        value={editedData.parsedAssetName || ""}
+                        onChange={(e) => setEditedData({...editedData, parsedAssetName: e.target.value})}
+                        placeholder="Asset name (e.g., vault name, property)"
                         data-testid="input-asset-name"
                       />
+                      {selectedImport.parsedAssetName && selectedImport.parsedAssetName !== editedData.parsedAssetName && (
+                        <p className="text-xs text-muted-foreground">
+                          AI detected: {selectedImport.parsedAssetName}
+                        </p>
+                      )}
                     </div>
                   )}
 

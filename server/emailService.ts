@@ -146,10 +146,13 @@ Extract the TOTAL amount as the transaction amount, not individual unit prices.
 Transaction type definitions:
 - deposit: Adding money to a platform
 - withdrawal: Taking money out of a platform
-- purchase: Buying a specific asset/investment item
+- purchase: Buying a specific asset/investment item (includes creating vaults, opening new investment positions)
 - partial_exit: Selling PART of an asset (less than total quantity held)
 - full_exit: Complete sale/closure of an asset (ALL quantity sold)
 - interest: Receiving interest, dividends, or returns
+
+PLATFORM-SPECIFIC RULES:
+- Monefit: A "Vault" is an asset. "New Vault created" = purchase transaction. The vault name is the assetName.
 
 EXIT TYPE DETERMINATION (CRITICAL - compare amounts carefully):
 When an email mentions selling/exiting/repaying an asset, compare the amount to the user's holdings:
