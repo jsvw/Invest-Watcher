@@ -4,37 +4,27 @@ import { db } from "./db";
 import { emailSettings, emailImports, platforms, assets, type EmailSettings, type Platform, type Asset } from "@shared/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import OpenAI from "openai";
-// Lazy load pdf-parse
-let pdfParseModule: any = null;
 
-async function getPdfParse(): Promise<(dataBuffer: Buffer) => Promise<{ text: string }>> {
-  if (!pdfParseModule) {
-    try {
-      // pdf-parse exports differently in ESM context
-      const mod = await import("pdf-parse") as any;
-      // The correct export is PDFParse (capital letters)
-      if (mod.PDFParse && typeof mod.PDFParse === 'function') {
-        pdfParseModule = mod.PDFParse;
-        console.log("Using pdf-parse PDFParse export");
-      } else if (typeof mod === 'function') {
-        pdfParseModule = mod;
-      } else if (mod.default && typeof mod.default === 'function') {
-        pdfParseModule = mod.default;
-      } else if (mod.default && mod.default.default && typeof mod.default.default === 'function') {
-        pdfParseModule = mod.default.default;
-      } else {
-        console.log("pdf-parse module keys:", Object.keys(mod));
-        throw new Error("Could not find PDFParse function in pdf-parse module");
-      }
-    } catch (err) {
-      console.error("Failed to load pdf-parse:", err);
-      throw err;
+async function parsePdf(buffer: Buffer): Promise<{ text: string }> {
+  try {
+    const mod = await import("pdf-parse") as any;
+    // PDFParse is a class that needs to be instantiated
+    if (mod.PDFParse) {
+      const parser = new mod.PDFParse();
+      const result = await parser.loadPDF(buffer);
+      return { text: result.text || "" };
+    } else if (mod.default) {
+      // Fallback for different module versions
+      const result = await mod.default(buffer);
+      return { text: result.text || "" };
+    } else {
+      console.log("pdf-parse module keys:", Object.keys(mod));
+      throw new Error("Could not find PDF parser in module");
     }
+  } catch (err) {
+    console.error("Failed to parse PDF:", err);
+    throw err;
   }
-  if (!pdfParseModule) {
-    throw new Error("pdf-parse module could not be loaded");
-  }
-  return pdfParseModule;
 }
 
 const openai = new OpenAI({
@@ -66,8 +56,7 @@ async function extractTextFromAttachments(attachments: Attachment[]): Promise<st
       // Handle PDF attachments
       if (contentType.includes("pdf") || filename.endsWith(".pdf")) {
         if (attachment.content) {
-          const pdfParse = await getPdfParse();
-          const pdfData = await pdfParse(attachment.content);
+          const pdfData = await parsePdf(attachment.content);
           console.log(`PDF parsed, text length: ${pdfData.text?.length || 0}`);
           if (pdfData.text) {
             textParts.push(`[PDF: ${attachment.filename}]\n${pdfData.text.substring(0, 5000)}`);
