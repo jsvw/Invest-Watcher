@@ -5,15 +5,42 @@ import { emailSettings, emailImports, platforms, assets, type EmailSettings, typ
 import { eq, and, desc, inArray } from "drizzle-orm";
 import OpenAI from "openai";
 // Lazy load pdf-parse
-let pdfParseModule: ((dataBuffer: Buffer) => Promise<{ text: string }>) | null = null;
+let pdfParseModule: any = null;
 
 async function getPdfParse(): Promise<(dataBuffer: Buffer) => Promise<{ text: string }>> {
   if (!pdfParseModule) {
-    // pdf-parse exports differently in ESM context
-    const module = await import("pdf-parse") as any;
-    pdfParseModule = module.default || module;
+    try {
+      // pdf-parse exports differently in ESM context
+      const mod = await import("pdf-parse") as any;
+      // Handle various export patterns
+      if (typeof mod === 'function') {
+        pdfParseModule = mod;
+      } else if (mod.default && typeof mod.default === 'function') {
+        pdfParseModule = mod.default;
+      } else if (mod.default && mod.default.default && typeof mod.default.default === 'function') {
+        pdfParseModule = mod.default.default;
+      } else if (mod.pdfParse && typeof mod.pdfParse === 'function') {
+        pdfParseModule = mod.pdfParse;
+      } else {
+        // Fallback: try to find any function export
+        for (const key of Object.keys(mod)) {
+          if (typeof mod[key] === 'function') {
+            pdfParseModule = mod[key];
+            console.log(`Using pdf-parse export: ${key}`);
+            break;
+          }
+        }
+      }
+      console.log("pdf-parse loaded:", typeof pdfParseModule, "module keys:", Object.keys(mod));
+    } catch (err) {
+      console.error("Failed to load pdf-parse:", err);
+      throw err;
+    }
   }
-  return pdfParseModule!;
+  if (!pdfParseModule) {
+    throw new Error("pdf-parse module could not be loaded");
+  }
+  return pdfParseModule;
 }
 
 const openai = new OpenAI({
