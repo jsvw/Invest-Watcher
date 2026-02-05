@@ -238,6 +238,13 @@ export default function PlatformDetails() {
       .reduce((sum, asset) => sum + Number(asset.investedAmount) + Number((asset as any).bonusAmount || 0), 0);
   }, [assets]);
 
+  const totalActiveCurrentValue = useMemo(() => {
+    if (!assets) return 0;
+    return assets
+      .filter(asset => asset.status === "active")
+      .reduce((sum, asset) => sum + Number(asset.currentValue || asset.investedAmount), 0);
+  }, [assets]);
+
   const { data: history, isLoading: isHistoryLoading } = useQuery({
     queryKey: [api.portfolio.history.path, id, range, specificYear, specificMonth],
     queryFn: async () => {
@@ -454,8 +461,9 @@ export default function PlatformDetails() {
                       }
                     </CardDescription>
                   </div>
-                  <div className="text-sm text-muted-foreground" data-testid="text-active-invested">
-                    Active: <span className="font-medium text-foreground">{formatCurrency(totalActivelyInvested, currency)}</span>
+                  <div className="text-sm text-muted-foreground flex gap-3" data-testid="text-active-invested">
+                    <span>Invested: <span className="font-medium text-foreground">{formatCurrency(totalActivelyInvested, currency)}</span></span>
+                    <span>Value: <span className="font-medium text-foreground">{formatCurrency(totalActiveCurrentValue, currency)}</span></span>
                   </div>
                   <div className="flex gap-2 flex-wrap items-center">
                     <div className="relative">
