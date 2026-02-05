@@ -29,6 +29,7 @@ import { AssetExitDialog } from "@/components/AssetExitDialog";
 import { AssetValuationDialog } from "@/components/AssetValuationDialog";
 import { AssetValuationImportDialog } from "@/components/AssetValuationImportDialog";
 import { AssetValuationHoverCard } from "@/components/AssetValuationHoverCard";
+import { AssetValuationManageDialog } from "@/components/AssetValuationManageDialog";
 import { AssetInsightTabs } from "@/components/AssetInsightTabs";
 import { AssetRepaymentDialog } from "@/components/AssetRepaymentDialog";
 import type { Asset } from "@shared/schema";
@@ -567,13 +568,13 @@ export default function PlatformDetails() {
                               </div>
                             )}
                             <div>
-                              <AssetValuationHoverCard 
+                              <AssetValuationManageDialog 
                                 assetId={asset.id} 
                                 assetName={asset.name}
                                 currency={currency}
                               >
-                                <div className="font-medium cursor-pointer hover:underline truncate max-w-[150px]" title={asset.name}>{asset.name}</div>
-                              </AssetValuationHoverCard>
+                                <div className="font-medium cursor-pointer hover:underline truncate max-w-[150px]" title={asset.name} data-testid={`link-asset-valuations-${asset.id}`}>{asset.name}</div>
+                              </AssetValuationManageDialog>
                               {asset.description && (
                                 <div className="text-xs text-muted-foreground">{asset.description}</div>
                               )}
