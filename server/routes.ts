@@ -462,6 +462,21 @@ export async function registerRoutes(
     }
   });
 
+  app.delete('/api/asset-valuations/:id', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const assetId = await storage.getAssetValuationAssetId(Number(req.params.id));
+      if (!assetId) return res.status(404).json({ message: "Asset valuation not found" });
+      const isOwner = await storage.verifyAssetOwnership(assetId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Asset valuation not found" });
+      
+      await storage.deleteAssetValuation(Number(req.params.id));
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete asset valuation" });
+    }
+  });
+
   // --- CSV Import for Asset Valuations ---
   app.post('/api/platforms/:platformId/asset-valuations/import', requireAuth, upload.single('file'), async (req, res) => {
     const file = req.file;

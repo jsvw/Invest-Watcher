@@ -80,6 +80,7 @@ export interface IStorage {
   getAssetValuations(assetId: number): Promise<AssetValuation[]>;
   createAssetValuation(valuation: InsertAssetValuation): Promise<AssetValuation>;
   updateAssetValuation(id: number, valuation: Partial<InsertAssetValuation>): Promise<AssetValuation>;
+  deleteAssetValuation(id: number): Promise<void>;
   getAssetValuationAssetId(valuationId: number): Promise<number | null>;
 
   // Asset Repayments (partial principal repayments)
@@ -623,6 +624,10 @@ export class DatabaseStorage implements IStorage {
       .returning();
     if (!updated) throw new Error("Asset valuation not found");
     return updated;
+  }
+
+  async deleteAssetValuation(id: number): Promise<void> {
+    await db.delete(assetValuations).where(eq(assetValuations.id, id));
   }
 
   // === ASSET REPAYMENTS ===

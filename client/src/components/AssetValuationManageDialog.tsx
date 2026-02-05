@@ -45,7 +45,7 @@ export function AssetValuationManageDialog({ assetId, assetName, currency, child
 
   const addValuation = useMutation({
     mutationFn: async (data: { value: number; date: string; notes?: string }) => {
-      return apiRequest("POST", `/api/assets/${assetId}/valuations`, data);
+      return apiRequest("POST", `/api/asset-valuations`, { ...data, assetId });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/assets', assetId, 'valuations'] });
@@ -61,7 +61,7 @@ export function AssetValuationManageDialog({ assetId, assetName, currency, child
 
   const updateValuation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: { value: number; date: string; notes?: string } }) => {
-      return apiRequest("PATCH", `/api/assets/${assetId}/valuations/${id}`, data);
+      return apiRequest("PATCH", `/api/asset-valuations/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/assets', assetId, 'valuations'] });
@@ -77,7 +77,7 @@ export function AssetValuationManageDialog({ assetId, assetName, currency, child
 
   const deleteValuation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest("DELETE", `/api/assets/${assetId}/valuations/${id}`);
+      return apiRequest("DELETE", `/api/asset-valuations/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/assets', assetId, 'valuations'] });
