@@ -423,7 +423,14 @@ export async function registerRoutes(
   app.post('/api/asset-valuations', requireAuth, async (req, res) => {
     try {
       const userId = getAuthenticatedUserId(req)!;
-      const input = insertAssetValuationSchema.parse(req.body);
+      
+      // Convert date string to Date object if provided
+      const body = { ...req.body };
+      if (body.date && typeof body.date === 'string') {
+        body.date = new Date(body.date);
+      }
+      
+      const input = insertAssetValuationSchema.parse(body);
       const isOwner = await storage.verifyAssetOwnership(input.assetId, userId);
       if (!isOwner) return res.status(404).json({ message: "Asset not found" });
       
@@ -448,7 +455,13 @@ export async function registerRoutes(
       const isOwner = await storage.verifyAssetOwnership(assetId, userId);
       if (!isOwner) return res.status(404).json({ message: "Asset valuation not found" });
       
-      const input = insertAssetValuationSchema.partial().parse(req.body);
+      // Convert date string to Date object if provided
+      const body = { ...req.body };
+      if (body.date && typeof body.date === 'string') {
+        body.date = new Date(body.date);
+      }
+      
+      const input = insertAssetValuationSchema.partial().parse(body);
       const valuation = await storage.updateAssetValuation(Number(req.params.id), input);
       res.json(valuation);
     } catch (err) {

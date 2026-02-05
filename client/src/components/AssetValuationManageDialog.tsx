@@ -44,7 +44,7 @@ export function AssetValuationManageDialog({ assetId, assetName, currency, child
   });
 
   const addValuation = useMutation({
-    mutationFn: async (data: { value: string; date: Date; notes?: string }) => {
+    mutationFn: async (data: { value: string; date: string; notes?: string }) => {
       return apiRequest("POST", `/api/asset-valuations`, { ...data, assetId });
     },
     onSuccess: () => {
@@ -60,7 +60,7 @@ export function AssetValuationManageDialog({ assetId, assetName, currency, child
   });
 
   const updateValuation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: { value: string; date: Date; notes?: string } }) => {
+    mutationFn: async ({ id, data }: { id: number; data: { value: string; date: string; notes?: string } }) => {
       return apiRequest("PATCH", `/api/asset-valuations/${id}`, data);
     },
     onSuccess: () => {
@@ -94,7 +94,7 @@ export function AssetValuationManageDialog({ assetId, assetName, currency, child
     
     const data = {
       value: formData.value,
-      date: new Date(formData.date),
+      date: formData.date,
       notes: formData.notes || undefined,
     };
 
