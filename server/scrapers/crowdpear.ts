@@ -40,7 +40,14 @@ async function fetch2FACodeFromEmail(email: string, appPassword: string, maxAtte
   });
 
   try {
-    await client.connect();
+    try {
+      await client.connect();
+    } catch (err: any) {
+      if (err.authenticationFailed) {
+        throw new Error(`Gmail login failed for ${email}. Please check: 1) IMAP is enabled in Gmail settings, 2) 2-Step Verification is turned on, 3) App password is correct (16 characters, no spaces). Generate a new one at myaccount.google.com > Security > App passwords.`);
+      }
+      throw err;
+    }
     const searchStart = new Date();
     searchStart.setMinutes(searchStart.getMinutes() - 3);
 
