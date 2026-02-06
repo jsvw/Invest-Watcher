@@ -44,14 +44,50 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
     console.log("[Monefit Scraper] Navigating to login page...");
     await page.goto(LOGIN_URL, { waitUntil: "networkidle2", timeout: 30000 });
 
-    await page.waitForSelector('input[type="email"], input[name="email"], input[placeholder*="mail"]', { timeout: 10000 });
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    console.log("[Monefit Scraper] Dismissing cookie consent banner...");
+    try {
+      const allowAllBtn = await page.$('#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll');
+      if (allowAllBtn) {
+        await allowAllBtn.click();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } else {
+        const allowSelectionBtn = await page.$('#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowallSelection');
+        if (allowSelectionBtn) {
+          await allowSelectionBtn.click();
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } else {
+          await page.evaluate(() => {
+            const btns = Array.from(document.querySelectorAll('button, a'));
+            const allowBtn = btns.find(b =>
+              b.textContent?.toLowerCase().includes('allow all') ||
+              b.textContent?.toLowerCase().includes('accept all') ||
+              b.textContent?.toLowerCase().includes('allow selection')
+            );
+            if (allowBtn) (allowBtn as HTMLElement).click();
+          });
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+    } catch (cookieErr) {
+      console.log("[Monefit Scraper] Cookie banner handling skipped:", cookieErr);
+    }
+
+    console.log("[Monefit Scraper] Waiting for login form...");
+    await page.waitForSelector('input[name="identificator"], input[aria-label="email"]', { timeout: 15000 });
 
     console.log("[Monefit Scraper] Filling login form...");
-    const emailInput = await page.$('input[type="email"]') || await page.$('input[name="email"]');
-    const passwordInput = await page.$('input[type="password"]');
+    const emailInput = await page.$('input[name="identificator"]') || await page.$('input[aria-label="email"]');
+    const passwordInput = await page.$('input[name="password"]') || await page.$('input[type="password"]');
 
     if (!emailInput || !passwordInput) {
-      throw new Error("Could not find email or password input fields on login page");
+      const availableInputs = await page.evaluate(() => {
+        return Array.from(document.querySelectorAll('input')).map(i => ({
+          name: i.name, type: i.type, ariaLabel: i.getAttribute('aria-label')
+        }));
+      });
+      throw new Error(`Could not find login fields. Available inputs: ${JSON.stringify(availableInputs)}`);
     }
 
     await emailInput.click({ clickCount: 3 });
@@ -60,15 +96,26 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
     await passwordInput.type(password, { delay: 50 });
 
     console.log("[Monefit Scraper] Submitting login...");
-    const submitButton = await page.$('button[type="submit"]') || await page.$('button:not([type])');
-    if (submitButton) {
-      await submitButton.click();
-    } else {
+    const submitButton = await page.evaluate(() => {
+      const buttons = Array.from(document.querySelectorAll('button[type="submit"]'));
+      const loginBtn = buttons.find(b => b.textContent?.trim().toLowerCase() === 'log in');
+      if (loginBtn) {
+        (loginBtn as HTMLElement).click();
+        return true;
+      }
+      if (buttons.length > 0) {
+        const lastSubmit = buttons[buttons.length - 1];
+        (lastSubmit as HTMLElement).click();
+        return true;
+      }
+      return false;
+    });
+
+    if (!submitButton) {
       await page.keyboard.press("Enter");
     }
 
     await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 }).catch(() => {});
-
     await new Promise(resolve => setTimeout(resolve, 3000));
 
     const currentUrl = page.url();
