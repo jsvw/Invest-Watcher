@@ -7,6 +7,7 @@ export interface GoldRepublicScrapedData {
 
 const CHROMIUM_PATH = process.env.CHROMIUM_PATH || "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
 const LOGIN_URL = "https://www.goldrepublic.com/nl-nl/inloggen";
+const ACCOUNT_URL = "https://www.goldrepublic.com/nl-nl/account";
 
 export async function scrapeGoldRepublic(username: string, password: string): Promise<GoldRepublicScrapedData> {
   if (!username || !password) {
@@ -108,7 +109,7 @@ export async function scrapeGoldRepublic(username: string, password: string): Pr
     const currentUrl = page.url();
     console.log(`[GoldRepublic Scraper] Current URL after login: ${currentUrl}`);
 
-    if (currentUrl.includes("login")) {
+    if (currentUrl.includes("inloggen") || currentUrl.includes("login")) {
       const errorText = await page.evaluate(`(function() {
         var errorEl = document.querySelector('.error, .alert, [class*="error"], [class*="alert"], [class*="Error"]');
         return errorEl ? errorEl.textContent.trim() : null;
@@ -116,8 +117,15 @@ export async function scrapeGoldRepublic(username: string, password: string): Pr
       throw new Error(`Login failed${errorText ? `: ${errorText}` : ". Check your username and password."}`);
     }
 
-    console.log("[GoldRepublic Scraper] Extracting portfolio value...");
+    console.log("[GoldRepublic Scraper] Navigating to account dashboard...");
+    await page.goto(ACCOUNT_URL, { waitUntil: "networkidle2", timeout: 30000 });
     await new Promise(resolve => setTimeout(resolve, 3000));
+
+    const accountUrl = page.url();
+    console.log(`[GoldRepublic Scraper] Account page URL: ${accountUrl}`);
+
+    console.log("[GoldRepublic Scraper] Extracting portfolio value...");
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
     const portfolioData = await page.evaluate(`(function() {
       var extractEuroNumber = function(text) {
