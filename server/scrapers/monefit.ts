@@ -145,7 +145,21 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
     const summaryData = await page.evaluate(`(function() {
       var extractNumber = function(text) {
         if (!text) return null;
-        var cleaned = text.replace(/[^0-9.,\\-]/g, "").replace(/,/g, ".");
+        var cleaned = text.replace(/[^0-9.,\\-]/g, "");
+        if (cleaned.indexOf(",") > -1 && cleaned.indexOf(".") > -1) {
+          if (cleaned.lastIndexOf(",") > cleaned.lastIndexOf(".")) {
+            cleaned = cleaned.replace(/\\./g, "").replace(",", ".");
+          } else {
+            cleaned = cleaned.replace(/,/g, "");
+          }
+        } else if (cleaned.indexOf(",") > -1) {
+          var parts = cleaned.split(",");
+          if (parts.length === 2 && parts[1].length <= 2) {
+            cleaned = cleaned.replace(",", ".");
+          } else {
+            cleaned = cleaned.replace(/,/g, "");
+          }
+        }
         var match = cleaned.match(/-?\\d+\\.?\\d*/);
         return match ? parseFloat(match[0]) : null;
       };
@@ -213,7 +227,21 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
 
         var extractNum = function(text) {
           if (!text) return null;
-          var cleaned = text.replace(/[^0-9.,\\-]/g, "").replace(/,/g, ".");
+          var cleaned = text.replace(/[^0-9.,\\-]/g, "");
+          if (cleaned.indexOf(",") > -1 && cleaned.indexOf(".") > -1) {
+            if (cleaned.lastIndexOf(",") > cleaned.lastIndexOf(".")) {
+              cleaned = cleaned.replace(/\\./g, "").replace(",", ".");
+            } else {
+              cleaned = cleaned.replace(/,/g, "");
+            }
+          } else if (cleaned.indexOf(",") > -1) {
+            var parts = cleaned.split(",");
+            if (parts.length === 2 && parts[1].length <= 2) {
+              cleaned = cleaned.replace(",", ".");
+            } else {
+              cleaned = cleaned.replace(/,/g, "");
+            }
+          }
           var match = cleaned.match(/-?\\d+\\.?\\d*/);
           return match ? parseFloat(match[0]) : null;
         };
