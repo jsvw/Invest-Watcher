@@ -1,3 +1,9 @@
+export interface DividendRecord {
+  amount: number;
+  paidOn: string;
+  quantity: number;
+}
+
 export interface Trading212Instrument {
   ticker: string;
   shares: number;
@@ -12,6 +18,7 @@ export interface Trading212Instrument {
   dividendsReceived?: number;
   lastDividendDate?: string;
   dividendCount?: number;
+  dividendHistory?: DividendRecord[];
 }
 
 export interface Trading212PieData {
@@ -161,9 +168,16 @@ interface DividendItem {
   reference: string;
 }
 
-export async function fetchDividends(apiKey: string, apiSecret: string): Promise<Map<string, { total: number; count: number; lastDate: string }>> {
+export interface TickerDividendData {
+  total: number;
+  count: number;
+  lastDate: string;
+  history: DividendRecord[];
+}
+
+export async function fetchDividends(apiKey: string, apiSecret: string): Promise<Map<string, TickerDividendData>> {
   console.log("[Trading212] Fetching dividend history...");
-  const divMap = new Map<string, { total: number; count: number; lastDate: string }>();
+  const divMap = new Map<string, TickerDividendData>();
 
   let nextPath: string | null = "/equity/history/dividends?limit=50";
 
@@ -174,10 +188,16 @@ export async function fetchDividends(apiKey: string, apiSecret: string): Promise
     };
 
     for (const item of response.items) {
+      const record: DividendRecord = {
+        amount: item.amount,
+        paidOn: item.paidOn,
+        quantity: item.quantity,
+      };
       const existing = divMap.get(item.ticker);
       if (existing) {
         existing.total += item.amount;
         existing.count += 1;
+        existing.history.push(record);
         if (item.paidOn > existing.lastDate) {
           existing.lastDate = item.paidOn;
         }
@@ -186,6 +206,7 @@ export async function fetchDividends(apiKey: string, apiSecret: string): Promise
           total: item.amount,
           count: 1,
           lastDate: item.paidOn,
+          history: [record],
         });
       }
     }
@@ -199,6 +220,10 @@ export async function fetchDividends(apiKey: string, apiSecret: string): Promise
     }
   }
 
+  divMap.forEach((data) => {
+    data.history.sort((a: DividendRecord, b: DividendRecord) => a.paidOn.localeCompare(b.paidOn));
+  });
+
   console.log(`[Trading212] Found dividends for ${divMap.size} ticker(s)`);
   return divMap;
 }
@@ -209,7 +234,7 @@ export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: s
   await new Promise(resolve => setTimeout(resolve, 5000));
   const posMap = await fetchPositions(apiKey, apiSecret);
 
-  let divMap = new Map<string, { total: number; count: number; lastDate: string }>();
+  let divMap = new Map<string, TickerDividendData>();
   try {
     await new Promise(resolve => setTimeout(resolve, 5000));
     divMap = await fetchDividends(apiKey, apiSecret);
@@ -232,6 +257,7 @@ export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: s
         inst.dividendsReceived = div.total;
         inst.dividendCount = div.count;
         inst.lastDividendDate = div.lastDate;
+        inst.dividendHistory = div.history;
       }
     }
   }

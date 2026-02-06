@@ -35,7 +35,8 @@ import { AssetRepaymentDialog } from "@/components/AssetRepaymentDialog";
 import type { Asset } from "@shared/schema";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { ScraperConfigDialog } from "@/components/ScraperConfigDialog";
-import { Tooltip as ShadTooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { BarChart as RechartsBarChart, Bar, XAxis as BarXAxis, YAxis as BarYAxis, Tooltip as BarTooltip, ResponsiveContainer as BarContainer } from "recharts";
 
 function AssetActionsMenu({ asset, platformId, platformMode, currency }: { asset: Asset; platformId: number; platformMode: "asset_returns" | "item_valuations"; currency: string }) {
   const [editOpen, setEditOpen] = useState(false);
@@ -1026,21 +1027,53 @@ export default function PlatformDetails() {
                                     </td>
                                     <td className="text-right p-3 tabular-nums">
                                       {inst.dividendsReceived != null ? (
-                                        <ShadTooltip>
-                                          <TooltipTrigger asChild>
-                                            <span className="text-green-600 dark:text-green-400 cursor-default">
+                                        <Popover>
+                                          <PopoverTrigger asChild>
+                                            <button className="text-green-600 dark:text-green-400 underline decoration-dotted underline-offset-2 cursor-pointer bg-transparent border-none p-0 font-inherit tabular-nums" data-testid={`button-dividend-${idx}`}>
                                               {formatCurrency(inst.dividendsReceived, currency)}
-                                            </span>
-                                          </TooltipTrigger>
-                                          <TooltipContent>
-                                            <div className="text-xs space-y-1">
-                                              <p>{inst.dividendCount} payment{inst.dividendCount !== 1 ? 's' : ''} received</p>
-                                              {inst.lastDividendDate && (
-                                                <p className="text-muted-foreground">Last: {format(new Date(inst.lastDividendDate), 'MMM d, yyyy')}</p>
+                                            </button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-80" align="end">
+                                            <div className="space-y-3">
+                                              <div className="flex items-center justify-between gap-2">
+                                                <p className="font-medium text-sm">{inst.ticker} Dividends</p>
+                                                <Badge variant="secondary" className="text-xs">{inst.dividendCount} payment{inst.dividendCount !== 1 ? 's' : ''}</Badge>
+                                              </div>
+                                              <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                                                {formatCurrency(inst.dividendsReceived, currency)} total
+                                              </p>
+                                              {inst.dividendHistory && inst.dividendHistory.length > 1 && (
+                                                <div className="h-24">
+                                                  <BarContainer width="100%" height="100%">
+                                                    <RechartsBarChart data={inst.dividendHistory.map((d: any) => ({ date: format(new Date(d.paidOn), 'MMM yy'), amount: d.amount }))} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                                                      <BarXAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                                                      <BarTooltip formatter={(val: number) => formatCurrency(val, currency)} labelStyle={{ fontSize: 11 }} contentStyle={{ fontSize: 12, borderRadius: 6 }} />
+                                                      <Bar dataKey="amount" fill="hsl(var(--chart-2))" radius={[3, 3, 0, 0]} />
+                                                    </RechartsBarChart>
+                                                  </BarContainer>
+                                                </div>
                                               )}
+                                              <div className="max-h-40 overflow-y-auto">
+                                                <table className="w-full text-xs">
+                                                  <thead>
+                                                    <tr className="border-b">
+                                                      <th className="text-left py-1 font-medium">Date</th>
+                                                      <th className="text-right py-1 font-medium">Amount</th>
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody>
+                                                    {inst.dividendHistory?.slice().reverse().map((d: any, dIdx: number) => (
+                                                      <tr key={dIdx} className="border-b last:border-0">
+                                                        <td className="py-1 text-muted-foreground">{format(new Date(d.paidOn), 'MMM d, yyyy')}</td>
+                                                        <td className="text-right py-1 text-green-600 dark:text-green-400 tabular-nums">{formatCurrency(d.amount, currency)}</td>
+                                                      </tr>
+                                                    ))}
+                                                  </tbody>
+                                                </table>
+                                              </div>
                                             </div>
-                                          </TooltipContent>
-                                        </ShadTooltip>
+                                          </PopoverContent>
+                                        </Popover>
                                       ) : '-'}
                                     </td>
                                     <td className="text-right p-3 tabular-nums">{inst.currentShare?.toFixed(1)}%</td>
