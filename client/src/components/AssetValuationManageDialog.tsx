@@ -76,7 +76,7 @@ function AssetValuationHoverContent({ assetId, assetName, currency }: { assetId:
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(value) => format(new Date(value), 'MMM yy')} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 10 }} domain={[yMin, yMax]} tickFormatter={(value) => value >= 1000 ? `${currencySymbol}${(value / 1000).toFixed(0)}k` : `${currencySymbol}${Math.round(value)}`} width={40} />
                 <Tooltip formatter={(value: number) => [`${currencySymbol}${value.toLocaleString()}${currencySuffix}`, "Value"]} labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')} contentStyle={{ fontSize: '12px' }} />
-                <Line type="monotone" dataKey="value" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
