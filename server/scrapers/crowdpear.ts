@@ -1,4 +1,5 @@
 import puppeteer from "puppeteer-core";
+import { ImapFlow } from "imapflow";
 
 export interface CrowdPearScrapedData {
   totalBalance: number;
@@ -8,7 +9,108 @@ export interface CrowdPearScrapedData {
 const CHROMIUM_PATH = process.env.CHROMIUM_PATH || "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
 const LOGIN_URL = "https://crowdpear.com/en/client";
 
-export async function scrapeCrowdPear(email: string, password: string): Promise<CrowdPearScrapedData> {
+async function fetch2FACodeFromGmail(email: string, gmailAppPassword: string, maxAttempts = 12): Promise<string> {
+  console.log("[CrowdPear 2FA] Connecting to Gmail IMAP to fetch verification code...");
+  const client = new ImapFlow({
+    host: "imap.gmail.com",
+    port: 993,
+    secure: true,
+    auth: {
+      user: email,
+      pass: gmailAppPassword,
+    },
+    logger: false,
+  });
+
+  try {
+    await client.connect();
+    const searchStart = new Date();
+    searchStart.setMinutes(searchStart.getMinutes() - 3);
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      console.log(`[CrowdPear 2FA] Checking inbox, attempt ${attempt}/${maxAttempts}...`);
+
+      const lock = await client.getMailboxLock("INBOX");
+      try {
+        const searchResult = await client.search({
+          since: searchStart,
+          or: [
+            { from: "crowdpear" },
+            { from: "noreply" },
+            { subject: "verification" },
+            { subject: "login code" },
+            { subject: "security code" },
+            { subject: "crowdpear" },
+          ],
+        });
+
+        const uids = Array.isArray(searchResult) ? searchResult : [];
+
+        if (uids.length > 0) {
+          const latestUid = uids[uids.length - 1];
+          const msg = await client.fetchOne(latestUid, { source: true, uid: true });
+          if (msg && msg.source) {
+            const rawEmail = msg.source.toString();
+            const lowerEmail = rawEmail.toLowerCase();
+
+            if (!lowerEmail.includes("crowdpear") && !lowerEmail.includes("verification") && !lowerEmail.includes("login code")) {
+              console.log("[CrowdPear 2FA] Email found but doesn't appear to be from CrowdPear, skipping...");
+            } else {
+              const codePatterns = [
+                /(?:verification|login|confirm|security|auth)\s*(?:code|pin|number)\s*[:\s]\s*(\d{4,8})/i,
+                /(?:your\s+)?(?:code|pin)\s*(?:is)?[:\s]\s*(\d{4,8})/i,
+                />\s*(\d{6})\s*</,
+                /(?:^|\s)(\d{6})(?:\s|$)/m,
+              ];
+
+              for (const pattern of codePatterns) {
+                const match = rawEmail.match(pattern);
+                if (match) {
+                  console.log(`[CrowdPear 2FA] Found verification code: ${match[1]}`);
+                  return match[1];
+                }
+              }
+
+              const standaloneCodePattern = /(?:^|[\s>])(\d{4,6})(?:[\s<]|$)/gm;
+              let codeMatch;
+              const potentialCodes: string[] = [];
+              while ((codeMatch = standaloneCodePattern.exec(rawEmail)) !== null) {
+                const code = codeMatch[1].trim();
+                if (code.length >= 4 && code.length <= 6 && !/^(19|20)\d{2}$/.test(code)) {
+                  potentialCodes.push(code);
+                }
+              }
+
+              if (potentialCodes.length > 0) {
+                const sixDigit = potentialCodes.find(c => c.length === 6);
+                const fourDigit = potentialCodes.find(c => c.length === 4);
+                const chosen = sixDigit || fourDigit || potentialCodes[0];
+                console.log(`[CrowdPear 2FA] Found potential code: ${chosen} (from ${potentialCodes.length} candidates)`);
+                return chosen;
+              }
+
+              console.log("[CrowdPear 2FA] CrowdPear email found but could not extract code, will retry...");
+            }
+          }
+        }
+      } finally {
+        lock.release();
+      }
+
+      if (attempt < maxAttempts) {
+        const waitTime = attempt <= 3 ? 5000 : 3000;
+        console.log(`[CrowdPear 2FA] Code not found yet, waiting ${waitTime / 1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+
+    throw new Error("Could not find CrowdPear verification code in email after multiple attempts. Please check your Gmail app password and ensure CrowdPear emails are not filtered.");
+  } finally {
+    await client.logout().catch(() => {});
+  }
+}
+
+export async function scrapeCrowdPear(email: string, password: string, gmailAppPassword?: string): Promise<CrowdPearScrapedData> {
   let browser;
   try {
     browser = await puppeteer.launch({
@@ -107,12 +209,87 @@ export async function scrapeCrowdPear(email: string, password: string): Promise<
     await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 15000 }).catch(() => {
       console.log("[CrowdPear Scraper] Navigation event not fired (SPA), continuing...");
     });
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    const pageTextAfterLogin = await page.evaluate(`document.body.innerText.substring(0, 1000)`) as string;
+    console.log(`[CrowdPear Scraper] Page text after login: ${pageTextAfterLogin.substring(0, 300)}`);
+
+    const has2FA = await page.evaluate(`(function() {
+      var text = document.body.innerText.toLowerCase();
+      var has2faText = text.includes('verification') || text.includes('verify') || 
+                       text.includes('2fa') || text.includes('two-factor') ||
+                       text.includes('login code') || text.includes('security code') ||
+                       text.includes('confirm') || text.includes('one-time');
+      var hasCodeInput = document.querySelector('input[type="text"]:not([type="email"]), input[type="number"], input[inputmode="numeric"], input[maxlength="6"], input[maxlength="4"]');
+      var hasMultipleCodeInputs = document.querySelectorAll('input[maxlength="1"]').length >= 4;
+      return has2faText || !!hasCodeInput || hasMultipleCodeInputs;
+    })()`) as boolean;
+
+    if (has2FA) {
+      console.log("[CrowdPear Scraper] 2FA verification detected!");
+
+      if (!gmailAppPassword) {
+        throw new Error("2FA verification required but no Gmail app password configured. Please add your Gmail app password in the scraper settings.");
+      }
+
+      const code = await fetch2FACodeFromGmail(email, gmailAppPassword);
+      console.log(`[CrowdPear Scraper] Entering 2FA code: ${code}`);
+
+      const multiInputs = await page.$$('input[maxlength="1"]');
+      if (multiInputs.length >= 4) {
+        for (let i = 0; i < Math.min(code.length, multiInputs.length); i++) {
+          await multiInputs[i].click();
+          await multiInputs[i].type(code[i], { delay: 30 });
+        }
+      } else {
+        const codeInput = await page.$('input[type="text"]:not([type="email"])')
+          || await page.$('input[type="number"]')
+          || await page.$('input[inputmode="numeric"]')
+          || await page.$('input[maxlength="6"]')
+          || await page.$('input[maxlength="4"]');
+
+        if (codeInput) {
+          await codeInput.click({ clickCount: 3 });
+          await codeInput.type(code, { delay: 50 });
+        } else {
+          throw new Error("Could not find 2FA code input field on the page");
+        }
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      const submitResult = await page.evaluate(`(function() {
+        var buttons = Array.from(document.querySelectorAll('button[type="submit"], button'));
+        for (var i = 0; i < buttons.length; i++) {
+          var t = buttons[i].textContent ? buttons[i].textContent.trim().toLowerCase() : "";
+          if (t.includes('verify') || t.includes('confirm') || t.includes('submit') || t.includes('continue') || t.includes('sign in') || t.includes('log in')) {
+            buttons[i].click();
+            return true;
+          }
+        }
+        var submitBtns = document.querySelectorAll('button[type="submit"]');
+        if (submitBtns.length > 0) {
+          submitBtns[0].click();
+          return true;
+        }
+        return false;
+      })()`);
+
+      if (!submitResult) {
+        await page.keyboard.press("Enter");
+      }
+
+      await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 20000 }).catch(() => {
+        console.log("[CrowdPear Scraper] Navigation after 2FA not fired (SPA), continuing...");
+      });
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      console.log("[CrowdPear Scraper] 2FA code submitted, checking for authenticated content...");
+    }
 
     console.log("[CrowdPear Scraper] Waiting for authenticated content to appear...");
     let authenticated = false;
     try {
       await page.waitForFunction(`(function() {
-        var signInForm = document.querySelector('button');
         var btns = Array.from(document.querySelectorAll('button'));
         var hasSignIn = btns.some(function(b) { 
           var t = (b.textContent || '').trim().toLowerCase();
@@ -130,7 +307,7 @@ export async function scrapeCrowdPear(email: string, password: string): Promise<
     await new Promise(resolve => setTimeout(resolve, 3000));
 
     const currentUrl = page.url();
-    console.log(`[CrowdPear Scraper] Current URL after login: ${currentUrl}`);
+    console.log(`[CrowdPear Scraper] Current URL: ${currentUrl}`);
 
     if (!authenticated) {
       const pageText = await page.evaluate(`document.body.innerText.substring(0, 500)`) as string;
@@ -192,7 +369,7 @@ export async function scrapeCrowdPear(email: string, password: string): Promise<
       var candidates = [];
       for (var j = 0; j < antTypoEls.length; j++) {
         var txt = antTypoEls[j].textContent || "";
-        if (txt.match(/[\\d.,]+/) && (txt.includes("€") || txt.includes("EUR"))) {
+        if (txt.match(/[\\d.,]+/) && (txt.includes("\\u20ac") || txt.includes("EUR"))) {
           var amount = extractNumber(txt);
           if (amount !== null && amount > 0) {
             candidates.push(amount);
@@ -211,7 +388,7 @@ export async function scrapeCrowdPear(email: string, password: string): Promise<
       }
 
       var pageContent = document.body.innerHTML;
-      var euroPattern = /€\\s*([\\d.,]+)/g;
+      var euroPattern = /\\u20ac\\s*([\\d.,]+)/g;
       var euroMatches = [];
       var m;
       while ((m = euroPattern.exec(pageContent)) !== null) {

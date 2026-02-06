@@ -29,6 +29,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
   const [pieName, setPieName] = useState("");
+  const [gmailAppPassword, setGmailAppPassword] = useState("");
   const [scraperType, setScraperType] = useState("monefit");
   const { toast } = useToast();
 
@@ -49,7 +50,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
     mutationFn: async () => {
       const body = isApiKeyType
         ? { scraperType, apiKey, apiSecret, pieName: pieName || undefined }
-        : { scraperType, email, password };
+        : { scraperType, email, password, ...(scraperType === "crowdpear" && gmailAppPassword ? { gmailAppPassword } : {}) };
       return apiRequest("POST", `/api/platforms/${platformId}/scraper-config`, body);
     },
     onSuccess: () => {
@@ -60,6 +61,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
       setApiKey("");
       setApiSecret("");
       setPieName("");
+      setGmailAppPassword("");
     },
     onError: () => {
       toast({ title: "Failed to save credentials", variant: "destructive" });
@@ -268,6 +270,20 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                         data-testid="input-scraper-password"
                       />
                     </div>
+                    {config?.scraperType === "crowdpear" && (
+                      <div>
+                        <Label htmlFor="scraper-gmail-app-password">Gmail App Password (for 2FA)</Label>
+                        <Input
+                          id="scraper-gmail-app-password"
+                          type="password"
+                          value={gmailAppPassword}
+                          onChange={e => setGmailAppPassword(e.target.value)}
+                          placeholder="Your Gmail app password"
+                          data-testid="input-scraper-gmail-app-password"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">Required to read 2FA codes from your Gmail. Generate one at Google Account &gt; Security &gt; App Passwords.</p>
+                      </div>
+                    )}
                   </>
                 )}
                 <Button
@@ -365,6 +381,20 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                       data-testid="input-scraper-password-new"
                     />
                   </div>
+                  {scraperType === "crowdpear" && (
+                    <div>
+                      <Label htmlFor="scraper-gmail-app-password-new">Gmail App Password (for 2FA)</Label>
+                      <Input
+                        id="scraper-gmail-app-password-new"
+                        type="password"
+                        value={gmailAppPassword}
+                        onChange={e => setGmailAppPassword(e.target.value)}
+                        placeholder="Your Gmail app password"
+                        data-testid="input-scraper-gmail-app-password-new"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Required to read 2FA codes from your Gmail. Generate one at Google Account &gt; Security &gt; App Passwords.</p>
+                    </div>
+                  )}
                 </>
               )}
               <Button
