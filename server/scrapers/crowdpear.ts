@@ -9,7 +9,10 @@ export interface CrowdPearScrapedData {
 const CHROMIUM_PATH = process.env.CHROMIUM_PATH || "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
 const LOGIN_URL = "https://crowdpear.com/en/client";
 
-async function fetch2FACodeFromGmail(email: string, gmailAppPassword: string, maxAttempts = 12): Promise<string> {
+async function fetch2FACodeFromGmail(email: string, gmailAppPassword: string, maxAttempts = 12, waitBeforeStart = 60000): Promise<string> {
+  console.log(`[CrowdPear 2FA] Waiting ${waitBeforeStart / 1000}s before checking Gmail for verification code...`);
+  await new Promise(resolve => setTimeout(resolve, waitBeforeStart));
+
   console.log("[CrowdPear 2FA] Connecting to Gmail IMAP to fetch verification code...");
   const client = new ImapFlow({
     host: "imap.gmail.com",
