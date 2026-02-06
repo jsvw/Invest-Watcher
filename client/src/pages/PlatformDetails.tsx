@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search, ArrowUpDown, Trash2, RotateCcw } from "lucide-react";
+import { ArrowLeft, TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search, ArrowUpDown, Trash2, RotateCcw, BarChart3, RefreshCw, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -158,6 +158,34 @@ export default function PlatformDetails() {
   
   const platformMode = (platform as any)?.platformMode || "standard";
   const { data: assets, isLoading: isAssetsLoading } = useAssets(id);
+
+  const { data: scraperConfig } = useQuery({
+    queryKey: ['/api/platforms', id, 'scraper-config'],
+    queryFn: async () => {
+      const res = await fetch(`/api/platforms/${id}/scraper-config`, { credentials: 'include' });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!id,
+  });
+
+  const isTrading212 = scraperConfig?.scraperType === "trading212";
+
+  const [holdingsRefreshKey, setHoldingsRefreshKey] = useState(0);
+  const { data: holdingsData, isLoading: isHoldingsLoading, isFetching: isHoldingsFetching, error: holdingsError } = useQuery({
+    queryKey: ['/api/platforms', id, 'trading212-holdings', holdingsRefreshKey],
+    queryFn: async () => {
+      const res = await fetch(`/api/platforms/${id}/trading212-holdings`, { credentials: 'include' });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to fetch holdings");
+      }
+      return res.json();
+    },
+    enabled: isTrading212,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
   
   const [assetNameFilter, setAssetNameFilter] = useState("");
   const [assetSort, setAssetSort] = useState<"name" | "name-desc" | "date" | "date-asc" | "invested" | "invested-asc" | "value" | "value-asc" | "return" | "return-asc" | "exit" | "exit-desc">("date");
@@ -438,6 +466,9 @@ export default function PlatformDetails() {
             <TabsTrigger value="chart" className="gap-2"><TrendingUp className="h-4 w-4" /> Performance</TabsTrigger>
             <TabsTrigger value="investments" className="gap-2"><DollarSign className="h-4 w-4" /> Investments</TabsTrigger>
             <TabsTrigger value="valuations" className="gap-2"><History className="h-4 w-4" /> Valuations</TabsTrigger>
+            {isTrading212 && (
+              <TabsTrigger value="holdings" className="gap-2" data-testid="tab-holdings"><BarChart3 className="h-4 w-4" /> Holdings</TabsTrigger>
+            )}
           </TabsList>
 
           {/* Assets Tab for non-standard modes */}
@@ -886,6 +917,111 @@ export default function PlatformDetails() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {isTrading212 && (
+            <TabsContent value="holdings" className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-4">
+                  <div>
+                    <CardTitle>Holdings</CardTitle>
+                    <CardDescription>
+                      {holdingsData ? `${holdingsData.pieName} - ${holdingsData.instruments?.length || 0} instruments` : "Live instrument data from Trading 212"}
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid="button-refresh-holdings"
+                    onClick={() => setHoldingsRefreshKey(k => k + 1)}
+                    disabled={isHoldingsFetching}
+                  >
+                    {isHoldingsFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {isHoldingsLoading ? (
+                    <div className="space-y-3">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Skeleton key={i} className="h-12 w-full" />
+                      ))}
+                    </div>
+                  ) : holdingsData ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">Current Value</p>
+                          <p className="text-lg font-semibold" data-testid="text-holdings-value">
+                            {formatCurrency(holdingsData.currentValue, currency)}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">Invested</p>
+                          <p className="text-lg font-semibold" data-testid="text-holdings-invested">
+                            {formatCurrency(holdingsData.investedValue, currency)}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">P/L</p>
+                          <p className={`text-lg font-semibold ${holdingsData.result >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} data-testid="text-holdings-result">
+                            {holdingsData.result >= 0 ? '+' : ''}{formatCurrency(holdingsData.result, currency)} ({holdingsData.resultPercent >= 0 ? '+' : ''}{holdingsData.resultPercent?.toFixed(2)}%)
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">Dividends</p>
+                          <p className="text-lg font-semibold text-green-600 dark:text-green-400" data-testid="text-holdings-dividends">
+                            {formatCurrency(holdingsData.dividendsGained || 0, currency)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {holdingsData.cash > 0.01 && (
+                        <div className="text-sm text-muted-foreground">
+                          Cash in pie: {formatCurrency(holdingsData.cash, currency)}
+                        </div>
+                      )}
+
+                      <div className="rounded-md border overflow-x-auto">
+                        <table className="w-full text-sm" data-testid="table-holdings">
+                          <thead>
+                            <tr className="border-b bg-muted/50">
+                              <th className="text-left p-3 font-medium">Ticker</th>
+                              <th className="text-right p-3 font-medium">Shares</th>
+                              <th className="text-right p-3 font-medium">P/L</th>
+                              <th className="text-right p-3 font-medium">Target</th>
+                              <th className="text-right p-3 font-medium">Actual</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {holdingsData.instruments
+                              ?.sort((a: any, b: any) => (b.currentShare || 0) - (a.currentShare || 0))
+                              .map((inst: any, idx: number) => (
+                                <tr key={idx} className="border-b last:border-0" data-testid={`row-holding-${idx}`}>
+                                  <td className="p-3 font-medium" data-testid={`text-ticker-${idx}`}>{inst.ticker}</td>
+                                  <td className="text-right p-3 tabular-nums">{inst.shares?.toFixed(inst.shares < 1 ? 6 : 4)}</td>
+                                  <td className={`text-right p-3 tabular-nums ${(inst.result || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    {inst.result != null ? `${inst.result >= 0 ? '+' : ''}${formatCurrency(inst.result, currency)}` : '-'}
+                                  </td>
+                                  <td className="text-right p-3 tabular-nums">{inst.expectedShare?.toFixed(1)}%</td>
+                                  <td className="text-right p-3 tabular-nums">{inst.currentShare?.toFixed(1)}%</td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      {holdingsError ? (
+                        <p className="text-red-600 dark:text-red-400">{(holdingsError as Error).message}</p>
+                      ) : (
+                        <p className="text-muted-foreground">No holdings data available. Click refresh to fetch from Trading 212.</p>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </Layout>

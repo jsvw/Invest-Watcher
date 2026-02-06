@@ -1702,6 +1702,59 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/platforms/:platformId/trading212-holdings', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.platformId);
+
+      const config = await storage.getScraperConfig(platformId, userId);
+      if (!config || config.scraperType !== "trading212") {
+        return res.status(404).json({ message: "No Trading 212 configuration found for this platform" });
+      }
+
+      const creds = JSON.parse(decrypt(config.credentials));
+      if (!creds.apiKey || !creds.apiSecret) {
+        return res.status(400).json({ message: "Missing API credentials" });
+      }
+
+      const platform = await storage.getPlatform(platformId, userId);
+      if (!platform) return res.status(404).json({ message: "Platform not found" });
+
+      const { scrapeTrading212 } = await import("./scrapers/trading212");
+      const t212Data = await scrapeTrading212(creds.apiKey, creds.apiSecret);
+
+      const pieName = creds.pieName || "";
+      const matchedPie = t212Data.pies.find(p => {
+        if (pieName) {
+          return p.pieName.toLowerCase().includes(pieName.toLowerCase()) ||
+                 pieName.toLowerCase().includes(p.pieName.toLowerCase());
+        }
+        return p.pieName.toLowerCase().includes(platform.name.toLowerCase()) ||
+               platform.name.toLowerCase().includes(p.pieName.toLowerCase());
+      });
+
+      if (!matchedPie) {
+        return res.status(404).json({ message: "No matching pie found" });
+      }
+
+      res.json({
+        pieName: matchedPie.pieName,
+        currentValue: matchedPie.currentValue,
+        investedValue: matchedPie.investedValue,
+        cash: matchedPie.cash,
+        result: matchedPie.result,
+        resultPercent: matchedPie.resultPercent,
+        dividendsGained: matchedPie.dividendsGained,
+        dividendsReinvested: matchedPie.dividendsReinvested,
+        dividendsInCash: matchedPie.dividendsInCash,
+        instruments: matchedPie.instruments,
+      });
+    } catch (err: any) {
+      console.error("T212 holdings error:", err);
+      res.status(500).json({ message: err.message || "Failed to fetch holdings" });
+    }
+  });
+
   await seedDatabase();
   // removed importInvestmentData() call to prevent duplicates on restart
 

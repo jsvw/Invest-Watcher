@@ -1,3 +1,11 @@
+export interface Trading212Instrument {
+  ticker: string;
+  shares: number;
+  expectedShare: number;
+  currentShare: number;
+  result: number;
+}
+
 export interface Trading212PieData {
   pieId: number;
   pieName: string;
@@ -7,6 +15,9 @@ export interface Trading212PieData {
   result: number;
   resultPercent: number;
   dividendsGained: number;
+  dividendsReinvested: number;
+  dividendsInCash: number;
+  instruments: Trading212Instrument[];
   scrapedAt: Date;
 }
 
@@ -77,6 +88,13 @@ export async function scrapeTrading212(apiKey: string, apiSecret: string): Promi
     console.log(`[Trading212] Fetching details for pie ${pie.id}...`);
     const detail = await makeRequest(`/equity/pies/${pie.id}`, apiKey, apiSecret) as {
       settings: { name: string; id: number };
+      instruments: Array<{
+        ticker: string;
+        shares: number;
+        expectedShare: number;
+        currentShare: number;
+        result: number;
+      }>;
     };
 
     const actualDeposited = pie.result.priceAvgInvestedValue - pie.dividendDetails.gained;
@@ -90,6 +108,9 @@ export async function scrapeTrading212(apiKey: string, apiSecret: string): Promi
       result: pie.result.priceAvgResult,
       resultPercent: pie.result.priceAvgResultCoef * 100,
       dividendsGained: pie.dividendDetails.gained,
+      dividendsReinvested: pie.dividendDetails.reinvested,
+      dividendsInCash: pie.dividendDetails.inCash,
+      instruments: detail.instruments || [],
       scrapedAt: new Date(),
     });
 
