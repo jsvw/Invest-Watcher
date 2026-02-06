@@ -52,7 +52,7 @@ function AssetValuationHoverContent({ assetId, assetName, currency }: { assetId:
   const yMax = maxValue + padding;
 
   return (
-    <HoverCardContent className="w-80" side="top" onPointerDownOutside={(e) => e.preventDefault()}>
+    <HoverCardContent className="w-80" side="top" sideOffset={8}>
       <div className="space-y-2">
         <h4 className="text-sm font-semibold truncate">{assetName}</h4>
         <p className="text-xs text-muted-foreground">Valuation History</p>
@@ -94,6 +94,7 @@ function AssetValuationHoverContent({ assetId, assetName, currency }: { assetId:
 
 export function AssetValuationManageDialog({ assetId, assetName, currency, children }: AssetValuationManageDialogProps) {
   const [open, setOpen] = useState(false);
+  const [hoverOpen, setHoverOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({ value: "", date: "", notes: "" });
@@ -194,16 +195,15 @@ export function AssetValuationManageDialog({ assetId, assetName, currency, child
   ) || [];
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <HoverCard openDelay={400} closeDelay={150}>
+    <HoverCard open={hoverOpen && !open} onOpenChange={setHoverOpen} openDelay={400} closeDelay={150}>
+      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (v) setHoverOpen(false); }}>
         <HoverCardTrigger asChild>
           <DialogTrigger asChild>
             {children}
           </DialogTrigger>
         </HoverCardTrigger>
         <AssetValuationHoverContent assetId={assetId} assetName={assetName} currency={currency} />
-      </HoverCard>
-      <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5" />
@@ -346,6 +346,7 @@ export function AssetValuationManageDialog({ assetId, assetName, currency, child
           )}
         </div>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+    </HoverCard>
   );
 }
