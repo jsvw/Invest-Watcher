@@ -209,8 +209,13 @@ export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: s
   await new Promise(resolve => setTimeout(resolve, 5000));
   const posMap = await fetchPositions(apiKey, apiSecret);
 
-  await new Promise(resolve => setTimeout(resolve, 5000));
-  const divMap = await fetchDividends(apiKey, apiSecret);
+  let divMap = new Map<string, { total: number; count: number; lastDate: string }>();
+  try {
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    divMap = await fetchDividends(apiKey, apiSecret);
+  } catch (err: any) {
+    console.log(`[Trading212] Dividend history unavailable (${err.message}), skipping`);
+  }
 
   for (const pie of data.pies) {
     for (const inst of pie.instruments) {
