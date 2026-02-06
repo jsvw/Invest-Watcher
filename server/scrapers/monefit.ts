@@ -138,27 +138,27 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
     console.log("[Monefit Scraper] Extracting balance data...");
     const pageContent = await page.content();
 
-    const data = await page.evaluate(() => {
-      const extractNumber = (text: string | null | undefined): number | null => {
+    const data = await page.evaluate(`(function() {
+      var extractNumber = function(text) {
         if (!text) return null;
-        const cleaned = text.replace(/[^0-9.,\-]/g, "").replace(/,/g, ".");
-        const match = cleaned.match(/-?\d+\.?\d*/);
+        var cleaned = text.replace(/[^0-9.,\\-]/g, "").replace(/,/g, ".");
+        var match = cleaned.match(/-?\\d+\\.?\\d*/);
         return match ? parseFloat(match[0]) : null;
       };
 
-      const allText = document.body.innerText;
-      const result = {
+      var allText = document.body.innerText;
+      var result = {
         mainBalance: 0,
         totalBalance: 0,
-        vaultTexts: [] as string[],
+        vaultTexts: [],
         debugText: allText.substring(0, 2000),
       };
 
-      const balanceElements = Array.from(document.querySelectorAll('h1, h2, h3, [class*="balance"], [class*="total"], [class*="amount"], [data-testid*="balance"]'));
-      for (const el of balanceElements) {
-        const text = el.textContent?.trim() || "";
-        if (text.includes("€") || text.match(/\d+[.,]\d{2}/)) {
-          const num = extractNumber(text);
+      var balanceElements = Array.from(document.querySelectorAll('h1, h2, h3, [class*="balance"], [class*="total"], [class*="amount"], [data-testid*="balance"]'));
+      for (var i = 0; i < balanceElements.length; i++) {
+        var text = balanceElements[i].textContent ? balanceElements[i].textContent.trim() : "";
+        if (text.includes("\\u20ac") || text.match(/\\d+[.,]\\d{2}/)) {
+          var num = extractNumber(text);
           if (num !== null && num > 0) {
             if (num > result.totalBalance) {
               result.totalBalance = num;
@@ -167,16 +167,16 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
         }
       }
 
-      const allElements = Array.from(document.querySelectorAll("*"));
-      for (const el of allElements) {
-        const text = (el as HTMLElement).innerText?.trim() || "";
-        if (text.toLowerCase().includes("vault") || text.toLowerCase().includes("smart saver")) {
-          result.vaultTexts.push(text.substring(0, 500));
+      var allElements = Array.from(document.querySelectorAll("*"));
+      for (var j = 0; j < allElements.length; j++) {
+        var elText = allElements[j].innerText ? allElements[j].innerText.trim() : "";
+        if (elText.toLowerCase().includes("vault") || elText.toLowerCase().includes("smart saver")) {
+          result.vaultTexts.push(elText.substring(0, 500));
         }
       }
 
       return result;
-    });
+    })()`) as { mainBalance: number; totalBalance: number; vaultTexts: string[]; debugText: string };
 
     console.log(`[Monefit Scraper] Raw extracted data - total: ${data.totalBalance}`);
     console.log(`[Monefit Scraper] Debug text: ${data.debugText.substring(0, 500)}`);
