@@ -9,6 +9,9 @@ const CHROMIUM_PATH = process.env.CHROMIUM_PATH || "/nix/store/zi4f80l169xlmivz8
 const LOGIN_URL = "https://www.goldrepublic.com/nl-nl/inloggen";
 
 export async function scrapeGoldRepublic(username: string, password: string): Promise<GoldRepublicScrapedData> {
+  if (!username || !password) {
+    throw new Error("Missing username or password. Please re-save your GoldRepublic credentials with all three fields (username, email, password).");
+  }
   let browser;
   try {
     browser = await puppeteer.launch({
