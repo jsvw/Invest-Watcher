@@ -57,7 +57,8 @@ async function makeRequest(path: string, apiKey: string, apiSecret: string, retr
     if (response.status === 429) {
       if (attempt < retries) {
         const retryAfter = response.headers.get("retry-after");
-        const waitTime = retryAfter ? parseInt(retryAfter, 10) * 1000 : Math.min(attempt * 15000, 90000);
+        const parsedRetry = retryAfter ? parseInt(retryAfter, 10) * 1000 : 0;
+        const waitTime = Math.max(parsedRetry, attempt * 5000);
         console.log(`[Trading212] Rate limited, waiting ${Math.round(waitTime / 1000)}s before retry ${attempt + 1}/${retries}...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
@@ -231,16 +232,18 @@ export async function fetchDividends(apiKey: string, apiSecret: string): Promise
   return divMap;
 }
 
-export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: string): Promise<Trading212ScrapedData> {
+export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: string): Promise<Trading212ScrapedData & { dividendsLoaded: boolean }> {
   const data = await scrapeTrading212(apiKey, apiSecret);
 
   await new Promise(resolve => setTimeout(resolve, API_DELAY_MS));
   const posMap = await fetchPositions(apiKey, apiSecret);
 
   let divMap = new Map<string, TickerDividendData>();
+  let dividendsLoaded = false;
   try {
     await new Promise(resolve => setTimeout(resolve, API_DELAY_MS));
     divMap = await fetchDividends(apiKey, apiSecret);
+    dividendsLoaded = true;
   } catch (err: any) {
     console.log(`[Trading212] Dividend history unavailable (${err.message}), skipping`);
   }
@@ -265,5 +268,5 @@ export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: s
     }
   }
 
-  return data;
+  return { ...data, dividendsLoaded };
 }

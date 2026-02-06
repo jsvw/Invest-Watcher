@@ -1731,7 +1731,8 @@ export async function registerRoutes(
       if (!platform) return res.status(404).json({ message: "Platform not found" });
 
       const { scrapeTrading212WithPositions } = await import("./scrapers/trading212");
-      const t212Data = await scrapeTrading212WithPositions(creds.apiKey, creds.apiSecret);
+      const t212Result = await scrapeTrading212WithPositions(creds.apiKey, creds.apiSecret);
+      const t212Data = t212Result;
 
       const pieName = creds.pieName || "";
       const matchedPie = t212Data.pies.find(p => {
@@ -1789,7 +1790,9 @@ export async function registerRoutes(
         instruments: matchedPie.instruments,
       };
 
-      holdingsCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
+      if (t212Data.dividendsLoaded) {
+        holdingsCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
+      }
 
       res.json(responseData);
     } catch (err: any) {
