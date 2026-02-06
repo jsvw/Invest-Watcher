@@ -79,7 +79,7 @@ export async function scrapeTrading212(apiKey: string, apiSecret: string): Promi
       settings: { name: string; id: number };
     };
 
-    const actualDeposited = pie.result.priceAvgInvestedValue - pie.dividendDetails.reinvested;
+    const actualDeposited = pie.result.priceAvgInvestedValue - pie.dividendDetails.gained;
 
     pieDetails.push({
       pieId: pie.id,
@@ -93,7 +93,7 @@ export async function scrapeTrading212(apiKey: string, apiSecret: string): Promi
       scrapedAt: new Date(),
     });
 
-    console.log(`[Trading212] Pie "${detail.settings.name}": deposited=${actualDeposited.toFixed(2)} (raw invested=${pie.result.priceAvgInvestedValue}, reinvested dividends=${pie.dividendDetails.reinvested}), value=${(pie.result.priceAvgValue + pie.cash).toFixed(2)}`);
+    console.log(`[Trading212] Pie "${detail.settings.name}": deposited=${actualDeposited.toFixed(2)} (raw invested=${pie.result.priceAvgInvestedValue}, dividends: gained=${pie.dividendDetails.gained}, reinvested=${pie.dividendDetails.reinvested}, inCash=${pie.dividendDetails.inCash}, cash in pie=${pie.cash}), value=${(pie.result.priceAvgValue + pie.cash).toFixed(2)}`);
   }
 
   return {
