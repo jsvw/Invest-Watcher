@@ -190,54 +190,64 @@ export async function scrapeGoldRepublic(username: string, email: string, passwo
 
       var result = {
         totalBalance: 0,
-        debugText: document.body.innerText.substring(0, 3000),
+        debugText: document.body.innerText.substring(0, 5000),
+        allEuroValues: [],
       };
 
-      var table = document.querySelector('.condensed-table.portfolio-table') || document.querySelector('.portfolio-table');
-      if (table) {
-        var cells = table.querySelectorAll('td, th');
-        for (var i = 0; i < cells.length; i++) {
-          var text = cells[i].textContent ? cells[i].textContent.trim() : "";
-          if (text.match(/€\\s*[\\d.,]+/)) {
-            var num = extractEuroNumber(text.replace(/€\\s*/, ""));
-            if (num !== null && num > result.totalBalance) {
-              result.totalBalance = num;
-            }
-          }
-        }
-        if (result.totalBalance > 0) return result;
-
-        var tableText = table.textContent || "";
-        var euroMatch = tableText.match(/€\\s*([\\d.,]+)/);
-        if (euroMatch) {
-          var num = extractEuroNumber(euroMatch[1]);
-          if (num !== null && num > 0) {
-            result.totalBalance = num;
-            return result;
-          }
-        }
-      }
-
       var allText = document.body.innerText;
-      var euroMatches = [];
       var re = /€\\s*([\\d.,]+)/g;
       var m;
       while ((m = re.exec(allText)) !== null) {
         var val = extractEuroNumber(m[1]);
         if (val !== null && val > 0) {
-          euroMatches.push(val);
+          result.allEuroValues.push(val);
         }
       }
-      if (euroMatches.length > 0) {
-        euroMatches.sort(function(a, b) { return b - a; });
-        result.totalBalance = euroMatches[0];
+
+      var table = document.querySelector('.condensed-table.portfolio-table') || document.querySelector('.portfolio-table');
+      if (table) {
+        var rows = table.querySelectorAll('tr');
+        var lastRow = rows.length > 0 ? rows[rows.length - 1] : null;
+        if (lastRow) {
+          var lastRowText = lastRow.textContent || "";
+          var lastRowMatch = lastRowText.match(/€\\s*([\\d.,]+)/);
+          if (lastRowMatch) {
+            var totalVal = extractEuroNumber(lastRowMatch[1]);
+            if (totalVal !== null && totalVal > 0) {
+              result.totalBalance = totalVal;
+              return result;
+            }
+          }
+        }
+
+        var cells = table.querySelectorAll('td, th');
+        var tableValues = [];
+        for (var i = 0; i < cells.length; i++) {
+          var text = cells[i].textContent ? cells[i].textContent.trim() : "";
+          if (text.match(/€\\s*[\\d.,]+/)) {
+            var num = extractEuroNumber(text.replace(/€\\s*/, ""));
+            if (num !== null && num > 0) {
+              tableValues.push(num);
+            }
+          }
+        }
+        if (tableValues.length > 0) {
+          result.totalBalance = tableValues[tableValues.length - 1];
+          return result;
+        }
+      }
+
+      if (result.allEuroValues.length > 0) {
+        result.allEuroValues.sort(function(a, b) { return b - a; });
+        result.totalBalance = result.allEuroValues[0];
       }
 
       return result;
-    })()`) as { totalBalance: number; debugText: string };
+    })()`) as { totalBalance: number; debugText: string; allEuroValues: number[] };
 
     console.log(`[GoldRepublic Scraper] Extracted total balance: ${portfolioData.totalBalance}`);
-    console.log(`[GoldRepublic Scraper] Page text preview: ${portfolioData.debugText.substring(0, 500)}`);
+    console.log(`[GoldRepublic Scraper] All euro values found: ${JSON.stringify(portfolioData.allEuroValues)}`);
+    console.log(`[GoldRepublic Scraper] Page text preview: ${portfolioData.debugText.substring(0, 2000)}`);
 
     return {
       totalBalance: portfolioData.totalBalance,
