@@ -9,18 +9,32 @@ export interface CrowdPearScrapedData {
 const CHROMIUM_PATH = process.env.CHROMIUM_PATH || "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
 const LOGIN_URL = "https://crowdpear.com/en/client";
 
-async function fetch2FACodeFromGmail(email: string, gmailAppPassword: string, maxAttempts = 12, waitBeforeStart = 60000): Promise<string> {
-  console.log(`[CrowdPear 2FA] Waiting ${waitBeforeStart / 1000}s before checking Gmail for verification code...`);
+function getImapServer(email: string): { host: string; port: number } {
+  const domain = email.split("@")[1]?.toLowerCase() || "";
+  const outlookDomains = ["outlook.com", "hotmail.com", "live.com", "live.nl", "live.co.uk", "live.fr", "live.de", "live.it", "live.be", "msn.com", "passport.com", "outlook.co.uk", "outlook.de", "outlook.fr", "outlook.it", "outlook.nl", "outlook.be"];
+  const yahooDomains = ["yahoo.com", "yahoo.co.uk", "yahoo.fr", "yahoo.de", "ymail.com", "rocketmail.com"];
+
+  if (outlookDomains.includes(domain) || domain.endsWith(".outlook.com") || domain.startsWith("live.")) {
+    return { host: "outlook.office365.com", port: 993 };
+  } else if (yahooDomains.includes(domain)) {
+    return { host: "imap.mail.yahoo.com", port: 993 };
+  }
+  return { host: "imap.gmail.com", port: 993 };
+}
+
+async function fetch2FACodeFromEmail(email: string, appPassword: string, maxAttempts = 12, waitBeforeStart = 60000): Promise<string> {
+  console.log(`[CrowdPear 2FA] Waiting ${waitBeforeStart / 1000}s before checking email for verification code...`);
   await new Promise(resolve => setTimeout(resolve, waitBeforeStart));
 
-  console.log("[CrowdPear 2FA] Connecting to Gmail IMAP to fetch verification code...");
+  const imapServer = getImapServer(email);
+  console.log(`[CrowdPear 2FA] Connecting to ${imapServer.host} IMAP to fetch verification code...`);
   const client = new ImapFlow({
-    host: "imap.gmail.com",
-    port: 993,
+    host: imapServer.host,
+    port: imapServer.port,
     secure: true,
     auth: {
       user: email,
-      pass: gmailAppPassword,
+      pass: appPassword,
     },
     logger: false,
   });
