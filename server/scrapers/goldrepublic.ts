@@ -45,16 +45,29 @@ export async function scrapeGoldRepublic(username: string, password: string): Pr
         var btns = Array.from(document.querySelectorAll('button, a, [class*="cookie"], [class*="consent"]'));
         for (var i = 0; i < btns.length; i++) {
           var t = btns[i].textContent ? btns[i].textContent.toLowerCase().trim() : "";
-          if (t.includes('accept') || t.includes('allow') || t.includes('agree') || t === 'ok') {
+          if (t.includes('accept') || t.includes('allow') || t.includes('agree') || t.includes('toestaan') || t.includes('accepteren') || t.includes('akkoord') || t === 'ok') {
             btns[i].click();
+            console.log('Cookie button clicked: ' + t);
             break;
           }
         }
       })()`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log("[GoldRepublic Scraper] Cookie banner handled");
     } catch (cookieErr) {
       console.log("[GoldRepublic Scraper] Cookie banner handling skipped:", cookieErr);
     }
+
+    try {
+      await page.evaluate(`(function() {
+        var overlays = document.querySelectorAll('[class*="cookie"], [class*="consent"], [class*="banner"], [id*="cookie"], [id*="consent"]');
+        overlays.forEach(function(el) {
+          if (el.offsetHeight > 100 || getComputedStyle(el).position === 'fixed') {
+            el.style.display = 'none';
+          }
+        });
+      })()`);
+    } catch (e) {}
 
     console.log("[GoldRepublic Scraper] Waiting for login form...");
     await page.waitForSelector('input[name="username"], input[type="text"], input[id*="user"]', { timeout: 15000 });
@@ -86,25 +99,26 @@ export async function scrapeGoldRepublic(username: string, password: string): Pr
       for (var i = 0; i < buttons.length; i++) {
         var t = buttons[i].textContent ? buttons[i].textContent.trim().toLowerCase() : "";
         var v = buttons[i].value ? buttons[i].value.trim().toLowerCase() : "";
-        if (t === 'log in' || t === 'login' || t === 'sign in' || v === 'log in' || v === 'login') {
+        if (t === 'log in' || t === 'login' || t === 'sign in' || t === 'inloggen' || v === 'log in' || v === 'login' || v === 'inloggen') {
           buttons[i].click();
-          return true;
+          return 'clicked: ' + t;
         }
       }
       var submitBtns = document.querySelectorAll('button[type="submit"], input[type="submit"]');
       if (submitBtns.length > 0) {
         submitBtns[submitBtns.length - 1].click();
-        return true;
+        return 'clicked submit fallback';
       }
       return false;
     })()`);
+    console.log(`[GoldRepublic Scraper] Submit result: ${submitClicked}`);
 
     if (!submitClicked) {
       await page.keyboard.press("Enter");
     }
 
     await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 }).catch(() => {});
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await new Promise(resolve => setTimeout(resolve, 5000));
 
     const currentUrl = page.url();
     console.log(`[GoldRepublic Scraper] Current URL after login: ${currentUrl}`);
@@ -123,6 +137,30 @@ export async function scrapeGoldRepublic(username: string, password: string): Pr
 
     const accountUrl = page.url();
     console.log(`[GoldRepublic Scraper] Account page URL: ${accountUrl}`);
+
+    if (accountUrl.includes("inloggen") || accountUrl.includes("login")) {
+      throw new Error("Login session not maintained. Redirected back to login page. Check your credentials.");
+    }
+
+    try {
+      await page.evaluate(`(function() {
+        var btns = Array.from(document.querySelectorAll('button, a, [class*="cookie"], [class*="consent"]'));
+        for (var i = 0; i < btns.length; i++) {
+          var t = btns[i].textContent ? btns[i].textContent.toLowerCase().trim() : "";
+          if (t.includes('accept') || t.includes('allow') || t.includes('toestaan') || t.includes('accepteren') || t.includes('akkoord') || t === 'ok') {
+            btns[i].click();
+            break;
+          }
+        }
+        var overlays = document.querySelectorAll('[class*="cookie"], [class*="consent"], [class*="banner"], [id*="cookie"], [id*="consent"]');
+        overlays.forEach(function(el) {
+          if (el.offsetHeight > 100 || getComputedStyle(el).position === 'fixed') {
+            el.style.display = 'none';
+          }
+        });
+      })()`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (e) {}
 
     console.log("[GoldRepublic Scraper] Extracting portfolio value...");
     await new Promise(resolve => setTimeout(resolve, 2000));
