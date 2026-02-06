@@ -28,7 +28,10 @@ import {
   type EmailSettings,
   type InsertEmailSettings,
   type EmailImport,
-  type InsertEmailImport
+  type InsertEmailImport,
+  scraperConfigs,
+  type ScraperConfig,
+  type InsertScraperConfig
 } from "@shared/schema";
 import { eq, desc, sql, and, or } from "drizzle-orm";
 
@@ -110,6 +113,13 @@ export interface IStorage {
   updateEmailImport(id: number, userId: number, data: Partial<EmailImport>): Promise<EmailImport>;
   dismissEmailImport(id: number, userId: number): Promise<void>;
   approveEmailImport(id: number, userId: number): Promise<void>;
+
+  // Scraper Configs
+  getScraperConfig(platformId: number, userId: number): Promise<ScraperConfig | undefined>;
+  getScraperConfigsByUser(userId: number): Promise<ScraperConfig[]>;
+  saveScraperConfig(config: InsertScraperConfig): Promise<ScraperConfig>;
+  updateScraperConfig(id: number, userId: number, data: Partial<ScraperConfig>): Promise<ScraperConfig>;
+  deleteScraperConfig(platformId: number, userId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1056,6 +1066,53 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(emailImports.id, id),
         eq(emailImports.userId, userId)
+      ));
+  }
+
+  // Scraper Configs
+  async getScraperConfig(platformId: number, userId: number): Promise<ScraperConfig | undefined> {
+    const [config] = await db.select().from(scraperConfigs)
+      .where(and(
+        eq(scraperConfigs.platformId, platformId),
+        eq(scraperConfigs.userId, userId)
+      ));
+    return config;
+  }
+
+  async getScraperConfigsByUser(userId: number): Promise<ScraperConfig[]> {
+    return db.select().from(scraperConfigs)
+      .where(eq(scraperConfigs.userId, userId));
+  }
+
+  async saveScraperConfig(config: InsertScraperConfig): Promise<ScraperConfig> {
+    const existing = await this.getScraperConfig(config.platformId, config.userId);
+    if (existing) {
+      const [updated] = await db.update(scraperConfigs)
+        .set({ credentials: config.credentials, scraperType: config.scraperType, enabled: config.enabled })
+        .where(eq(scraperConfigs.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(scraperConfigs).values(config).returning();
+    return created;
+  }
+
+  async updateScraperConfig(id: number, userId: number, data: Partial<ScraperConfig>): Promise<ScraperConfig> {
+    const [updated] = await db.update(scraperConfigs)
+      .set(data)
+      .where(and(
+        eq(scraperConfigs.id, id),
+        eq(scraperConfigs.userId, userId)
+      ))
+      .returning();
+    return updated;
+  }
+
+  async deleteScraperConfig(platformId: number, userId: number): Promise<void> {
+    await db.delete(scraperConfigs)
+      .where(and(
+        eq(scraperConfigs.platformId, platformId),
+        eq(scraperConfigs.userId, userId)
       ));
   }
 }

@@ -34,6 +34,7 @@ import { AssetInsightTabs } from "@/components/AssetInsightTabs";
 import { AssetRepaymentDialog } from "@/components/AssetRepaymentDialog";
 import type { Asset } from "@shared/schema";
 import { PlatformIcon } from "@/components/PlatformIcon";
+import { ScraperConfigDialog } from "@/components/ScraperConfigDialog";
 
 function AssetActionsMenu({ asset, platformId, platformMode, currency }: { asset: Asset; platformId: number; platformMode: "asset_returns" | "item_valuations"; currency: string }) {
   const [editOpen, setEditOpen] = useState(false);
@@ -386,6 +387,7 @@ export default function PlatformDetails() {
                   mode={platformMode as "asset_returns" | "item_valuations"} 
                 />
               )}
+              <ScraperConfigDialog platformId={id} platformName={platform.name} />
               <PlatformSettingsDialog platform={platform} />
             </div>
           </div>

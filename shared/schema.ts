@@ -137,6 +137,20 @@ export const emailImports = pgTable("email_imports", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// === SCRAPER CONFIGS (for automated valuation scraping from platform websites) ===
+export const scraperConfigs = pgTable("scraper_configs", {
+  id: serial("id").primaryKey(),
+  platformId: integer("platform_id").notNull().references(() => platforms.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  scraperType: text("scraper_type").notNull(), // 'monefit', etc.
+  credentials: text("credentials").notNull(), // JSON encrypted credentials (email, password)
+  enabled: boolean("enabled").notNull().default(true),
+  lastScrapeAt: timestamp("last_scrape_at"),
+  lastScrapeStatus: text("last_scrape_status"), // 'success', 'error'
+  lastScrapeMessage: text("last_scrape_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === BASE SCHEMAS ===
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertPlatformSchema = createInsertSchema(platforms).omit({ id: true, createdAt: true });
@@ -148,6 +162,7 @@ export const insertAssetValuationSchema = createInsertSchema(assetValuations).om
 export const insertAssetRepaymentSchema = createInsertSchema(assetRepayments).omit({ id: true, createdAt: true });
 export const insertEmailSettingsSchema = createInsertSchema(emailSettings).omit({ id: true, createdAt: true, lastPollAt: true });
 export const insertEmailImportSchema = createInsertSchema(emailImports).omit({ id: true, createdAt: true });
+export const insertScraperConfigSchema = createInsertSchema(scraperConfigs).omit({ id: true, createdAt: true, lastScrapeAt: true, lastScrapeStatus: true, lastScrapeMessage: true });
 
 // === EXPLICIT API CONTRACT TYPES ===
 
@@ -162,6 +177,7 @@ export type AssetValuation = typeof assetValuations.$inferSelect;
 export type AssetRepayment = typeof assetRepayments.$inferSelect;
 export type EmailSettings = typeof emailSettings.$inferSelect;
 export type EmailImport = typeof emailImports.$inferSelect;
+export type ScraperConfig = typeof scraperConfigs.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertPlatform = z.infer<typeof insertPlatformSchema>;
@@ -173,6 +189,7 @@ export type InsertAssetValuation = z.infer<typeof insertAssetValuationSchema>;
 export type InsertAssetRepayment = z.infer<typeof insertAssetRepaymentSchema>;
 export type InsertEmailSettings = z.infer<typeof insertEmailSettingsSchema>;
 export type InsertEmailImport = z.infer<typeof insertEmailImportSchema>;
+export type InsertScraperConfig = z.infer<typeof insertScraperConfigSchema>;
 
 // Request types
 export type CreatePlatformRequest = InsertPlatform;

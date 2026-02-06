@@ -44,13 +44,22 @@ Key files:
 - `client/src/App.tsx`: AuthContext provider with session-based auth check
 
 ### Data Model
-The application tracks six main entities:
+The application tracks seven main entities:
 1. **Users**: User accounts with email, hashed password, and optional name
 2. **Platforms**: Investment sources with configurable tracking modes (scoped by userId)
 3. **Investments**: Individual deposit/contribution records tied to platforms (standard mode)
 4. **Valuations**: Point-in-time value snapshots for each platform (standard mode)
 5. **Assets**: Individual investment items within a platform (asset_returns/item_valuations modes)
 6. **AssetValuations**: Point-in-time value snapshots for individual assets
+7. **ScraperConfigs**: Web scraping configurations per platform (credentials, scraper type, last status)
+
+### Web Scraping
+- **Puppeteer + Chromium**: Headless browser automation for scraping login-protected investment platforms
+- **Chromium path**: `/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium`
+- **Supported scrapers**: Monefit SmartSaver (`server/scrapers/monefit.ts`)
+- **Flow**: Store credentials in `scraper_configs` table → Trigger scrape from UI → Puppeteer logs into platform → Extracts balance data → Creates valuations automatically
+- **UI**: ScraperConfigDialog component accessible from platform details page ("Web Scraper" button)
+- **API routes**: `GET/POST/DELETE /api/platforms/:id/scraper-config`, `POST /api/platforms/:id/scrape`
 
 ### Platform Tracking Modes
 Platforms support three tracking modes selected during creation:

@@ -15,6 +15,7 @@ import multer from "multer";
 import Papa from "papaparse";
 import fs from "fs";
 import { setupAuth, requireAuth, getAuthenticatedUserId } from "./auth";
+import { encrypt, decrypt } from "./encryption";
 
 // Configure multer for file uploads
 const upload = multer({ dest: "/tmp/uploads/" });
@@ -1340,6 +1341,196 @@ export async function registerRoutes(
     } catch (err) {
       console.error("Error approving email import:", err);
       res.status(500).json({ message: "Failed to approve import" });
+    }
+  });
+
+  // === SCRAPER CONFIG ROUTES ===
+  app.get('/api/platforms/:platformId/scraper-config', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.platformId);
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+
+      const config = await storage.getScraperConfig(platformId, userId);
+      if (!config) return res.json(null);
+      
+      const safeConfig = { ...config, credentials: "***" };
+      res.json(safeConfig);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch scraper config" });
+    }
+  });
+
+  app.post('/api/platforms/:platformId/scraper-config', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.platformId);
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+
+      const { scraperType, email, password } = req.body;
+      if (!scraperType || !email || !password) {
+        return res.status(400).json({ message: "scraperType, email, and password are required" });
+      }
+      if (typeof email !== "string" || typeof password !== "string" || !email.includes("@")) {
+        return res.status(400).json({ message: "Invalid email or password format" });
+      }
+
+      const credentials = encrypt(JSON.stringify({ email, password }));
+
+      const config = await storage.saveScraperConfig({
+        platformId,
+        userId,
+        scraperType,
+        credentials,
+        enabled: true,
+      });
+
+      res.json({ ...config, credentials: "***" });
+    } catch (err) {
+      console.error("Error saving scraper config:", err);
+      res.status(500).json({ message: "Failed to save scraper config" });
+    }
+  });
+
+  app.delete('/api/platforms/:platformId/scraper-config', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.platformId);
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+
+      await storage.deleteScraperConfig(platformId, userId);
+      res.json({ message: "Scraper config deleted" });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete scraper config" });
+    }
+  });
+
+  app.post('/api/platforms/:platformId/scrape', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.platformId);
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+
+      const config = await storage.getScraperConfig(platformId, userId);
+      if (!config) return res.status(404).json({ message: "No scraper configured for this platform" });
+
+      let creds;
+      try {
+        const decrypted = decrypt(config.credentials);
+        creds = JSON.parse(decrypted);
+      } catch {
+        try {
+          creds = JSON.parse(config.credentials);
+        } catch {
+          return res.status(500).json({ message: "Failed to decrypt credentials. Please re-save your credentials." });
+        }
+      }
+
+      let scraperResult;
+      if (config.scraperType === "monefit") {
+        const { scrapeMonefit } = await import("./scrapers/monefit");
+        scraperResult = await scrapeMonefit(creds.email, creds.password);
+      } else {
+        return res.status(400).json({ message: `Unknown scraper type: ${config.scraperType}` });
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const platform = await storage.getPlatform(platformId, userId);
+      if (!platform) return res.status(404).json({ message: "Platform not found" });
+
+      if (platform.platformMode === "standard" && scraperResult.totalBalance > 0) {
+        const existingVals = await storage.getValuations(platformId);
+        const todayStr = today.toISOString().split("T")[0];
+        const sameDayVal = existingVals.find(v => 
+          new Date(v.date).toISOString().split("T")[0] === todayStr
+        );
+        if (sameDayVal) {
+          await storage.updateValuation(sameDayVal.id, { value: scraperResult.totalBalance.toFixed(2) });
+        } else {
+          await storage.createValuation({
+            platformId,
+            value: scraperResult.totalBalance.toFixed(2),
+            date: today,
+          });
+        }
+      }
+
+      if ((platform.platformMode === "asset_returns" || platform.platformMode === "item_valuations") && scraperResult.totalBalance > 0) {
+        const existingAssets = await storage.getAssets(platformId);
+        const todayStr = today.toISOString().split("T")[0];
+        
+        const upsertAssetValuation = async (assetId: number, value: number) => {
+          const existingVals = await storage.getAssetValuations(assetId);
+          const sameDayVal = existingVals.find(v => 
+            new Date(v.date).toISOString().split("T")[0] === todayStr
+          );
+          if (sameDayVal) {
+            await storage.updateAssetValuation(sameDayVal.id, { value: value.toFixed(2) });
+          } else {
+            await storage.createAssetValuation({
+              assetId,
+              value: value.toFixed(2),
+              date: today,
+              notes: "Auto-scraped from Monefit",
+            });
+          }
+        };
+
+        for (const vault of scraperResult.vaults) {
+          const matchedAsset = existingAssets.find(a => 
+            a.name.toLowerCase().includes(vault.name.toLowerCase()) || 
+            vault.name.toLowerCase().includes(a.name.toLowerCase())
+          );
+          
+          if (matchedAsset) {
+            await upsertAssetValuation(matchedAsset.id, vault.currentValue);
+          }
+        }
+
+        if (scraperResult.mainBalance > 0) {
+          const mainAsset = existingAssets.find(a => 
+            a.name.toLowerCase().includes("main") || 
+            a.name.toLowerCase().includes("smart saver") ||
+            a.name.toLowerCase().includes("smartsaver")
+          );
+          if (mainAsset) {
+            await upsertAssetValuation(mainAsset.id, scraperResult.mainBalance);
+          }
+        }
+      }
+
+      await storage.updateScraperConfig(config.id, userId, {
+        lastScrapeAt: new Date(),
+        lastScrapeStatus: "success",
+        lastScrapeMessage: `Total: €${scraperResult.totalBalance.toFixed(2)}, Vaults: ${scraperResult.vaults.length}`,
+      });
+
+      res.json({
+        success: true,
+        data: scraperResult,
+        message: `Successfully scraped. Total balance: €${scraperResult.totalBalance.toFixed(2)}`,
+      });
+    } catch (err: any) {
+      console.error("Scrape error:", err);
+      
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.platformId);
+      const config = await storage.getScraperConfig(platformId, userId);
+      if (config) {
+        await storage.updateScraperConfig(config.id, userId, {
+          lastScrapeAt: new Date(),
+          lastScrapeStatus: "error",
+          lastScrapeMessage: err.message || "Unknown error",
+        });
+      }
+      
+      res.status(500).json({ message: err.message || "Scraping failed" });
     }
   });
 
