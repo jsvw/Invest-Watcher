@@ -82,10 +82,43 @@ export function useUpdateInvestment() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [api.investments.list.path, data.platformId] });
-      queryClient.invalidateQueries({ queryKey: [api.platforms.list.path] }); // Refresh totals
+      queryClient.invalidateQueries({ queryKey: [api.platforms.list.path] });
       toast({
         title: "Success",
         description: "Investment updated successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useDeleteInvestment() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, platformId }: { id: number; platformId: number }) => {
+      const res = await fetch(api.investments.delete.path.replace(':id', String(id)), {
+        method: api.investments.delete.method,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        throw new Error("Failed to delete investment");
+      }
+      return { id, platformId };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [api.investments.list.path, data.platformId] });
+      queryClient.invalidateQueries({ queryKey: [api.platforms.list.path] });
+      toast({
+        title: "Success",
+        description: "Investment deleted successfully",
       });
     },
     onError: (error) => {

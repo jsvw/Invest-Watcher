@@ -146,6 +146,20 @@ export async function registerRoutes(
     }
   });
 
+  app.delete('/api/investments/:id', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = await storage.getInvestmentPlatformId(Number(req.params.id));
+      if (!platformId) return res.status(404).json({ message: "Investment not found" });
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Investment not found" });
+      await storage.deleteInvestment(Number(req.params.id));
+      res.status(204).send();
+    } catch (err) {
+      res.status(404).json({ message: "Investment not found" });
+    }
+  });
+
   // --- Withdrawals ---
   app.get(api.withdrawals.list.path, requireAuth, async (req, res) => {
     const userId = getAuthenticatedUserId(req)!;

@@ -158,6 +158,10 @@ export class DatabaseStorage implements IStorage {
     return this.verifyPlatformOwnership(result[0].platformId, userId);
   }
 
+  async deleteInvestment(id: number): Promise<void> {
+    await db.delete(investments).where(eq(investments.id, id));
+  }
+
   async getInvestmentPlatformId(investmentId: number): Promise<number | null> {
     const [investment] = await db.select({ platformId: investments.platformId })
       .from(investments)

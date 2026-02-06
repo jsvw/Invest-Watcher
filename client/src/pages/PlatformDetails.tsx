@@ -2,9 +2,9 @@ import { Layout } from "@/components/Layout";
 import { AddTransactionDialog } from "@/components/AddTransactionDialog";
 import { PlatformSettingsDialog } from "@/components/PlatformSettingsDialog";
 import { usePlatform, usePlatforms } from "@/hooks/use-platforms";
-import { useInvestments } from "@/hooks/use-investments";
+import { useInvestments, useDeleteInvestment } from "@/hooks/use-investments";
 import { useValuations, useDeleteValuation } from "@/hooks/use-valuations";
-import { useWithdrawals } from "@/hooks/use-withdrawals";
+import { useWithdrawals, useDeleteWithdrawal } from "@/hooks/use-withdrawals";
 import { useAssets, useUpdateAsset } from "@/hooks/use-assets";
 import { useAuth } from "@/App";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
@@ -156,6 +156,8 @@ export default function PlatformDetails() {
   const { data: investments, isLoading: isInvestmentsLoading } = useInvestments(id);
   const { data: valuations, isLoading: isValuationsLoading } = useValuations(id);
   const deleteValuation = useDeleteValuation();
+  const deleteInvestment = useDeleteInvestment();
+  const deleteWithdrawal = useDeleteWithdrawal();
   const { data: withdrawals, isLoading: isWithdrawalsLoading } = useWithdrawals(id);
   
   const platformMode = (platform as any)?.platformMode || "standard";
@@ -885,7 +887,7 @@ export default function PlatformDetails() {
                             )}
                           </div>
                           <div className="text-muted-foreground truncate">{item.notes || "-"}</div>
-                          <div className="flex justify-end">
+                          <div className="flex justify-end gap-1">
                             <AddTransactionDialog 
                               platformId={id} 
                               type={item.type} 
@@ -895,6 +897,24 @@ export default function PlatformDetails() {
                                 date: new Date(item.date).toISOString().split('T')[0]
                               }} 
                             />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => {
+                                if (confirm(`Are you sure you want to delete this ${item.type === 'investment' ? 'deposit' : 'withdrawal'}?`)) {
+                                  if (item.type === 'investment') {
+                                    deleteInvestment.mutate({ id: item.id, platformId: id });
+                                  } else {
+                                    deleteWithdrawal.mutate({ id: item.id, platformId: id });
+                                  }
+                                }
+                              }}
+                              disabled={deleteInvestment.isPending || deleteWithdrawal.isPending}
+                              data-testid={`button-delete-${item.type}-${item.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
                       ))
