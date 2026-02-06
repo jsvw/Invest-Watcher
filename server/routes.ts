@@ -1459,6 +1459,23 @@ export async function registerRoutes(
             date: today,
           });
         }
+
+        if (scraperResult.totalInvested > 0) {
+          const existingInvestments = await storage.getInvestments(platformId);
+          const scrapedInv = existingInvestments.find(i => 
+            i.notes === "Auto-scraped total invested"
+          );
+          if (scrapedInv) {
+            await storage.updateInvestment(scrapedInv.id, { amount: scraperResult.totalInvested.toFixed(2) });
+          } else if (existingInvestments.length === 0) {
+            await storage.createInvestment({
+              platformId,
+              amount: scraperResult.totalInvested.toFixed(2),
+              date: today,
+              notes: "Auto-scraped total invested",
+            });
+          }
+        }
       }
 
       if ((platform.platformMode === "asset_returns" || platform.platformMode === "item_valuations") && scraperResult.totalBalance > 0) {
@@ -1508,13 +1525,13 @@ export async function registerRoutes(
       await storage.updateScraperConfig(config.id, userId, {
         lastScrapeAt: new Date(),
         lastScrapeStatus: "success",
-        lastScrapeMessage: `Total: €${scraperResult.totalBalance.toFixed(2)}, Vaults: ${scraperResult.vaults.length}`,
+        lastScrapeMessage: `Total: €${scraperResult.totalBalance.toFixed(2)}, Invested: €${scraperResult.totalInvested.toFixed(2)}, Vaults: ${scraperResult.vaults.length}`,
       });
 
       res.json({
         success: true,
         data: scraperResult,
-        message: `Successfully scraped. Total balance: €${scraperResult.totalBalance.toFixed(2)}`,
+        message: `Successfully scraped. Total balance: €${scraperResult.totalBalance.toFixed(2)}, Total invested: €${scraperResult.totalInvested.toFixed(2)}`,
       });
     } catch (err: any) {
       console.error("Scrape error:", err);

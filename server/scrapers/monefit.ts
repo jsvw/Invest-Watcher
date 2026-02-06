@@ -10,6 +10,7 @@ export interface MonefitScrapedData {
     maturityDate?: string;
   }>;
   totalBalance: number;
+  totalInvested: number;
   scrapedAt: Date;
 }
 
@@ -167,6 +168,7 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
       var allText = document.body.innerText;
       var result = {
         totalBalance: 0,
+        totalInvested: 0,
         debugText: allText.substring(0, 2000),
       };
 
@@ -175,6 +177,14 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
         var num = extractNumber(balanceEl.textContent);
         if (num !== null && num > 0) {
           result.totalBalance = num;
+        }
+      }
+
+      var depositEl = document.querySelector('[data-target="#deposit-modal"]');
+      if (depositEl) {
+        var investedNum = extractNumber(depositEl.textContent);
+        if (investedNum !== null && investedNum > 0) {
+          result.totalInvested = investedNum;
         }
       }
 
@@ -192,12 +202,14 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
       }
 
       return result;
-    })()`) as { totalBalance: number; debugText: string };
+    })()`) as { totalBalance: number; totalInvested: number; debugText: string };
 
     console.log(`[Monefit Scraper] Extracted total balance: ${summaryData.totalBalance}`);
+    console.log(`[Monefit Scraper] Extracted total invested: ${summaryData.totalInvested}`);
     console.log(`[Monefit Scraper] Summary page text: ${summaryData.debugText.substring(0, 500)}`);
 
     let totalBalance = summaryData.totalBalance;
+    let totalInvested = summaryData.totalInvested;
 
     if (totalBalance === 0) {
       const pageContent = await page.content();
@@ -289,10 +301,11 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
       mainBalance: Math.max(0, mainBalance),
       vaults,
       totalBalance,
+      totalInvested,
       scrapedAt: new Date(),
     };
 
-    console.log(`[Monefit Scraper] Scraping complete. Total balance: €${totalBalance}, Vaults: ${vaults.length}`);
+    console.log(`[Monefit Scraper] Scraping complete. Total balance: €${totalBalance}, Total invested: €${totalInvested}, Vaults: ${vaults.length}`);
     return result;
 
   } finally {
