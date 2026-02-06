@@ -11,8 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Globe, Loader2, Settings2, CheckCircle, XCircle, Trash2 } from "lucide-react";
 
 const SCRAPER_TYPES = [
-  { value: "monefit", label: "Monefit SmartSaver" },
-  { value: "robocash", label: "RoboCash" },
+  { value: "monefit", label: "Monefit SmartSaver", credentialType: "email" },
+  { value: "robocash", label: "RoboCash", credentialType: "email" },
+  { value: "trading212", label: "Trading 212 API", credentialType: "apikey" },
 ];
 
 interface ScraperConfigDialogProps {
@@ -24,8 +25,14 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [apiSecret, setApiSecret] = useState("");
+  const [pieName, setPieName] = useState("");
   const [scraperType, setScraperType] = useState("monefit");
   const { toast } = useToast();
+
+  const selectedType = SCRAPER_TYPES.find(st => st.value === scraperType);
+  const isApiKeyType = selectedType?.credentialType === "apikey";
 
   const { data: config, isLoading: configLoading } = useQuery({
     queryKey: ['/api/platforms', platformId, 'scraper-config'],
@@ -39,17 +46,19 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
 
   const saveConfig = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", `/api/platforms/${platformId}/scraper-config`, {
-        scraperType,
-        email,
-        password,
-      });
+      const body = isApiKeyType
+        ? { scraperType, apiKey, apiSecret, pieName: pieName || undefined }
+        : { scraperType, email, password };
+      return apiRequest("POST", `/api/platforms/${platformId}/scraper-config`, body);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/platforms', platformId, 'scraper-config'] });
       toast({ title: "Scraper credentials saved" });
       setEmail("");
       setPassword("");
+      setApiKey("");
+      setApiSecret("");
+      setPieName("");
     },
     onError: () => {
       toast({ title: "Failed to save credentials", variant: "destructive" });
@@ -97,6 +106,15 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
   });
 
   const hasConfig = config && config.id;
+  const isConfigApiKeyType = config?.scraperType === "trading212";
+
+  const canSaveNew = isApiKeyType
+    ? apiKey.length > 0 && apiSecret.length > 0
+    : email.length > 0 && password.length > 0;
+
+  const canUpdateCredentials = isConfigApiKeyType
+    ? apiKey.length > 0 && apiSecret.length > 0
+    : email.length > 0 && password.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -113,7 +131,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
             Web Scraper - {platformName}
           </DialogTitle>
           <DialogDescription>
-            Automatically fetch your latest balance from the platform website.
+            Automatically fetch your latest balance from the platform.
           </DialogDescription>
         </DialogHeader>
 
@@ -189,32 +207,72 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
             <div className="border-t pt-4">
               <p className="text-sm font-medium mb-2">Update credentials</p>
               <div className="space-y-3">
-                <div>
-                  <Label htmlFor="scraper-email">Email</Label>
-                  <Input
-                    id="scraper-email"
-                    type="email"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="your@email.com"
-                    data-testid="input-scraper-email"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="scraper-password">Password</Label>
-                  <Input
-                    id="scraper-password"
-                    type="password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="Your platform password"
-                    data-testid="input-scraper-password"
-                  />
-                </div>
+                {isConfigApiKeyType ? (
+                  <>
+                    <div>
+                      <Label htmlFor="scraper-apikey">API Key</Label>
+                      <Input
+                        id="scraper-apikey"
+                        type="password"
+                        value={apiKey}
+                        onChange={e => setApiKey(e.target.value)}
+                        placeholder="Your Trading 212 API key"
+                        data-testid="input-scraper-apikey"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="scraper-apisecret">API Secret</Label>
+                      <Input
+                        id="scraper-apisecret"
+                        type="password"
+                        value={apiSecret}
+                        onChange={e => setApiSecret(e.target.value)}
+                        placeholder="Your Trading 212 API secret"
+                        data-testid="input-scraper-apisecret"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="scraper-piename">Pie Name (optional)</Label>
+                      <Input
+                        id="scraper-piename"
+                        value={pieName}
+                        onChange={e => setPieName(e.target.value)}
+                        placeholder="e.g. Dividend pie (matches by name)"
+                        data-testid="input-scraper-piename"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">If set, only data for this pie will be synced. Leave empty to match by platform name.</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <Label htmlFor="scraper-email">Email</Label>
+                      <Input
+                        id="scraper-email"
+                        type="email"
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        placeholder="your@email.com"
+                        data-testid="input-scraper-email"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="scraper-password">Password</Label>
+                      <Input
+                        id="scraper-password"
+                        type="password"
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        placeholder="Your platform password"
+                        data-testid="input-scraper-password"
+                      />
+                    </div>
+                  </>
+                )}
                 <Button
                   variant="outline"
                   onClick={() => saveConfig.mutate()}
-                  disabled={saveConfig.isPending || !email || !password}
+                  disabled={saveConfig.isPending || !canUpdateCredentials}
                   data-testid="button-update-credentials"
                 >
                   {saveConfig.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
@@ -226,8 +284,9 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Enter your login credentials to enable automatic balance scraping. 
-              Your credentials are stored securely and only used to log into the platform.
+              {isApiKeyType
+                ? "Enter your API credentials to enable automatic portfolio syncing via the Trading 212 API."
+                : "Enter your login credentials to enable automatic balance scraping. Your credentials are stored securely and only used to log into the platform."}
             </p>
             <div className="space-y-3">
               <div>
@@ -245,36 +304,76 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label htmlFor="scraper-email-new">Email</Label>
-                <Input
-                  id="scraper-email-new"
-                  type="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  data-testid="input-scraper-email-new"
-                />
-              </div>
-              <div>
-                <Label htmlFor="scraper-password-new">Password</Label>
-                <Input
-                  id="scraper-password-new"
-                  type="password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="Your platform password"
-                  data-testid="input-scraper-password-new"
-                />
-              </div>
+              {isApiKeyType ? (
+                <>
+                  <div>
+                    <Label htmlFor="scraper-apikey-new">API Key</Label>
+                    <Input
+                      id="scraper-apikey-new"
+                      type="password"
+                      value={apiKey}
+                      onChange={e => setApiKey(e.target.value)}
+                      placeholder="Your Trading 212 API key"
+                      data-testid="input-scraper-apikey-new"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="scraper-apisecret-new">API Secret</Label>
+                    <Input
+                      id="scraper-apisecret-new"
+                      type="password"
+                      value={apiSecret}
+                      onChange={e => setApiSecret(e.target.value)}
+                      placeholder="Your Trading 212 API secret"
+                      data-testid="input-scraper-apisecret-new"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="scraper-piename-new">Pie Name (optional)</Label>
+                    <Input
+                      id="scraper-piename-new"
+                      value={pieName}
+                      onChange={e => setPieName(e.target.value)}
+                      placeholder="e.g. Dividend pie (matches by name)"
+                      data-testid="input-scraper-piename-new"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">If set, only data for this pie will be synced. Leave empty to match by platform name.</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <Label htmlFor="scraper-email-new">Email</Label>
+                    <Input
+                      id="scraper-email-new"
+                      type="email"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      data-testid="input-scraper-email-new"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="scraper-password-new">Password</Label>
+                    <Input
+                      id="scraper-password-new"
+                      type="password"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      placeholder="Your platform password"
+                      data-testid="input-scraper-password-new"
+                    />
+                  </div>
+                </>
+              )}
               <Button
                 onClick={() => saveConfig.mutate()}
-                disabled={saveConfig.isPending || !email || !password}
+                disabled={saveConfig.isPending || !canSaveNew}
                 className="w-full"
                 data-testid="button-save-credentials"
               >
                 {saveConfig.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
-                Save Credentials & Enable Scraper
+                {isApiKeyType ? "Save API Credentials & Enable" : "Save Credentials & Enable Scraper"}
               </Button>
             </div>
           </div>

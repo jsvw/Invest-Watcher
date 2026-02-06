@@ -1369,15 +1369,32 @@ export async function registerRoutes(
       const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
       if (!isOwner) return res.status(404).json({ message: "Platform not found" });
 
-      const { scraperType, email, password } = req.body;
-      if (!scraperType || !email || !password) {
-        return res.status(400).json({ message: "scraperType, email, and password are required" });
-      }
-      if (typeof email !== "string" || typeof password !== "string" || !email.includes("@")) {
-        return res.status(400).json({ message: "Invalid email or password format" });
+      const { scraperType } = req.body;
+      if (!scraperType) {
+        return res.status(400).json({ message: "scraperType is required" });
       }
 
-      const credentials = encrypt(JSON.stringify({ email, password }));
+      let credentialData: Record<string, string>;
+
+      if (scraperType === "trading212") {
+        const { apiKey, apiSecret, pieName } = req.body;
+        if (!apiKey || !apiSecret) {
+          return res.status(400).json({ message: "apiKey and apiSecret are required for Trading 212" });
+        }
+        credentialData = { apiKey, apiSecret };
+        if (pieName) credentialData.pieName = pieName;
+      } else {
+        const { email, password } = req.body;
+        if (!email || !password) {
+          return res.status(400).json({ message: "email and password are required" });
+        }
+        if (typeof email !== "string" || typeof password !== "string" || !email.includes("@")) {
+          return res.status(400).json({ message: "Invalid email or password format" });
+        }
+        credentialData = { email, password };
+      }
+
+      const credentials = encrypt(JSON.stringify(credentialData));
 
       const config = await storage.saveScraperConfig({
         platformId,
@@ -1435,6 +1452,66 @@ export async function registerRoutes(
 
       const platform = await storage.getPlatform(platformId, userId);
       if (!platform) return res.status(404).json({ message: "Platform not found" });
+
+      if (config.scraperType === "trading212") {
+        if (!creds.apiKey || !creds.apiSecret) {
+          return res.status(400).json({ message: "Missing API key or secret. Please re-save your Trading 212 credentials." });
+        }
+        const { scrapeTrading212 } = await import("./scrapers/trading212");
+        const t212Data = await scrapeTrading212(creds.apiKey, creds.apiSecret);
+
+        const todayStr = today.toISOString().split("T")[0];
+        const pieName = creds.pieName || "";
+        const matchedPie = t212Data.pies.find(p => {
+          if (pieName) {
+            return p.pieName.toLowerCase().includes(pieName.toLowerCase()) ||
+                   pieName.toLowerCase().includes(p.pieName.toLowerCase());
+          }
+          return p.pieName.toLowerCase().includes(platform!.name.toLowerCase()) ||
+                 platform!.name.toLowerCase().includes(p.pieName.toLowerCase());
+        });
+
+        if (!matchedPie) {
+          const availablePies = t212Data.pies.map(p => p.pieName).join(", ");
+          await storage.updateScraperConfig(config.id, userId, {
+            lastScrapeAt: new Date(),
+            lastScrapeStatus: "error",
+            lastScrapeMessage: `No matching pie found. Available pies: ${availablePies}`,
+          });
+          return res.status(400).json({
+            message: `No matching pie found for "${pieName || platform!.name}". Available pies: ${availablePies}`,
+          });
+        }
+
+        const totalValue = matchedPie.currentValue;
+        if (totalValue > 0) {
+          const existingVals = await storage.getValuations(platformId);
+          const sameDayVal = existingVals.find(v =>
+            new Date(v.date).toISOString().split("T")[0] === todayStr
+          );
+          if (sameDayVal) {
+            await storage.updateValuation(sameDayVal.id, { value: totalValue.toFixed(2) });
+          } else {
+            await storage.createValuation({
+              platformId,
+              value: totalValue.toFixed(2),
+              date: today,
+            });
+          }
+        }
+
+        await storage.updateScraperConfig(config.id, userId, {
+          lastScrapeAt: new Date(),
+          lastScrapeStatus: "success",
+          lastScrapeMessage: `Pie "${matchedPie.pieName}": Value=${totalValue.toFixed(2)}, Invested=${matchedPie.investedValue.toFixed(2)}, P/L=${matchedPie.result.toFixed(2)} (${matchedPie.resultPercent.toFixed(1)}%)`,
+        });
+
+        return res.json({
+          success: true,
+          data: matchedPie,
+          message: `Synced "${matchedPie.pieName}": Value=${totalValue.toFixed(2)}, Invested=${matchedPie.investedValue.toFixed(2)}`,
+        });
+      }
 
       if (config.scraperType === "robocash") {
         const { scrapeRoboCash } = await import("./scrapers/robocash");

@@ -36,6 +36,67 @@ async function runScrapeForConfig(config: any) {
       return;
     }
 
+    if (scraperType === "trading212") {
+      if (!creds.apiKey || !creds.apiSecret) {
+        console.error(`[Scheduler] Missing API credentials for Trading 212 platform ${platformId}`);
+        await storage.updateScraperConfig(id, userId, {
+          lastScrapeAt: new Date(),
+          lastScrapeStatus: "error",
+          lastScrapeMessage: "Missing API key or secret. Please re-save credentials.",
+        });
+        return;
+      }
+      const { scrapeTrading212 } = await import("./scrapers/trading212");
+      const t212Data = await scrapeTrading212(creds.apiKey, creds.apiSecret);
+
+      const pieName = creds.pieName || "";
+      const matchedPie = t212Data.pies.find(p => {
+        if (pieName) {
+          return p.pieName.toLowerCase().includes(pieName.toLowerCase()) ||
+                 pieName.toLowerCase().includes(p.pieName.toLowerCase());
+        }
+        return p.pieName.toLowerCase().includes(platform.name.toLowerCase()) ||
+               platform.name.toLowerCase().includes(p.pieName.toLowerCase());
+      });
+
+      if (!matchedPie) {
+        const availablePies = t212Data.pies.map(p => p.pieName).join(", ");
+        await storage.updateScraperConfig(id, userId, {
+          lastScrapeAt: new Date(),
+          lastScrapeStatus: "error",
+          lastScrapeMessage: `No matching pie found. Available: ${availablePies}`,
+        });
+        console.log(`[Scheduler] No matching pie for platform ${platformId}`);
+        return;
+      }
+
+      const totalValue = matchedPie.currentValue;
+      if (totalValue > 0) {
+        const existingVals = await storage.getValuations(platformId);
+        const sameDayVal = existingVals.find(v =>
+          new Date(v.date).toISOString().split("T")[0] === todayStr
+        );
+        if (sameDayVal) {
+          await storage.updateValuation(sameDayVal.id, { value: totalValue.toFixed(2) });
+        } else {
+          await storage.createValuation({
+            platformId,
+            value: totalValue.toFixed(2),
+            date: today,
+          });
+        }
+      }
+
+      await storage.updateScraperConfig(id, userId, {
+        lastScrapeAt: new Date(),
+        lastScrapeStatus: "success",
+        lastScrapeMessage: `Pie "${matchedPie.pieName}": Value=${totalValue.toFixed(2)}, Invested=${matchedPie.investedValue.toFixed(2)}`,
+      });
+
+      console.log(`[Scheduler] T212 sync complete for platform ${platformId}: ${totalValue.toFixed(2)}`);
+      return;
+    }
+
     if (scraperType === "robocash") {
       const { scrapeRoboCash } = await import("./scrapers/robocash");
       const robocashData = await scrapeRoboCash(creds.email, creds.password);

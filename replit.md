@@ -53,12 +53,13 @@ The application tracks seven main entities:
 6. **AssetValuations**: Point-in-time value snapshots for individual assets
 7. **ScraperConfigs**: Web scraping configurations per platform (credentials, scraper type, last status)
 
-### Web Scraping
+### Web Scraping & API Integrations
 - **Puppeteer + Chromium**: Headless browser automation for scraping login-protected investment platforms
 - **Chromium path**: `/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium`
-- **Supported scrapers**: Monefit SmartSaver (`server/scrapers/monefit.ts`), RoboCash (`server/scrapers/robocash.ts`)
-- **Flow**: Store credentials in `scraper_configs` table → Trigger scrape from UI → Puppeteer logs into platform → Extracts balance data → Creates valuations automatically
-- **UI**: ScraperConfigDialog component accessible from platform details page ("Web Scraper" button)
+- **Supported scrapers**: Monefit SmartSaver (`server/scrapers/monefit.ts`), RoboCash (`server/scrapers/robocash.ts`), Trading 212 API (`server/scrapers/trading212.ts`)
+- **Trading 212 Integration**: Uses HTTP Basic Auth (API Key + API Secret) to fetch pie portfolio data via REST API. Matches pies by name to platforms. Valuation-only mode. Rate-limited with 2-second delays between requests.
+- **Flow**: Store credentials in `scraper_configs` table → Trigger scrape from UI → Scraper fetches data → Creates valuations automatically
+- **UI**: ScraperConfigDialog component accessible from platform details page ("Web Scraper" button). Shows different credential fields based on scraper type (email/password for Monefit/RoboCash, API key/secret for Trading 212).
 - **API routes**: `GET/POST/DELETE /api/platforms/:id/scraper-config`, `POST /api/platforms/:id/scrape`
 
 ### Platform Tracking Modes
