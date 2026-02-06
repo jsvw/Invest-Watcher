@@ -89,24 +89,6 @@ interface PositionData {
   pieQuantity: number;
 }
 
-export async function fetchExchangeRate(from: string, to: string): Promise<number> {
-  if (from === to) return 1;
-  try {
-    const response = await fetch(`https://api.exchangerate-api.com/v4/latest/${from}`);
-    if (!response.ok) throw new Error(`Exchange rate API error: ${response.status}`);
-    const data = await response.json() as { rates: Record<string, number> };
-    const rate = data.rates[to];
-    if (!rate) throw new Error(`No rate found for ${from} -> ${to}`);
-    console.log(`[Trading212] Exchange rate ${from}->${to}: ${rate}`);
-    return rate;
-  } catch (err: any) {
-    console.error(`[Trading212] Failed to fetch exchange rate: ${err.message}, using fallback`);
-    if (from === "USD" && to === "EUR") return 0.92;
-    if (from === "EUR" && to === "USD") return 1.09;
-    return 1;
-  }
-}
-
 export async function fetchPositions(apiKey: string, apiSecret: string): Promise<Map<string, PositionData>> {
   console.log("[Trading212] Fetching all positions...");
   const positions = await makeRequest("/equity/portfolio", apiKey, apiSecret) as PositionData[];
@@ -250,88 +232,6 @@ export async function fetchDividends(apiKey: string, apiSecret: string): Promise
   return divMap;
 }
 
-export interface OrderHistoryResult {
-  totalInvestedEur: number;
-  orderCount: number;
-  orders: Array<{
-    side: string;
-    quantity: number;
-    priceUsd: number;
-    eurValue: number;
-    fxRate: number;
-    filledAt: string;
-  }>;
-}
-
-export async function fetchOrderHistoryForTicker(apiKey: string, apiSecret: string, ticker: string): Promise<OrderHistoryResult> {
-  console.log(`[Trading212] Fetching order history for ticker ${ticker}...`);
-  const result: OrderHistoryResult = { totalInvestedEur: 0, orderCount: 0, orders: [] };
-
-  let nextPath: string | null = "/equity/history/orders?limit=50";
-  let pageCount = 0;
-
-  while (nextPath) {
-    pageCount++;
-    const response = await makeRequest(nextPath, apiKey, apiSecret) as {
-      items: Array<{
-        order: {
-          id: number;
-          ticker: string;
-          status: string;
-          side: string;
-        };
-        fill?: {
-          quantity: number;
-          price: number;
-          filledAt: string;
-          walletImpact?: {
-            currency: string;
-            netValue: number;
-            fxRate: number;
-          };
-        };
-      }>;
-      nextPagePath?: string | null;
-    };
-
-    for (const item of response.items) {
-      if (item.order.ticker === ticker && item.order.status === "FILLED" && item.fill?.walletImpact) {
-        const eurValue = Math.abs(item.fill.walletImpact.netValue);
-        const orderRecord = {
-          side: item.order.side,
-          quantity: item.fill.quantity,
-          priceUsd: item.fill.price,
-          eurValue,
-          fxRate: item.fill.walletImpact.fxRate,
-          filledAt: item.fill.filledAt,
-        };
-        result.orders.push(orderRecord);
-        result.orderCount++;
-
-        if (item.order.side === "BUY") {
-          result.totalInvestedEur += eurValue;
-        } else if (item.order.side === "SELL") {
-          result.totalInvestedEur -= eurValue;
-        }
-      }
-    }
-
-    if (response.nextPagePath) {
-      const cleanPath = response.nextPagePath.replace(/^\/api\/v0/, "");
-      await new Promise(resolve => setTimeout(resolve, API_DELAY_MS));
-      nextPath = cleanPath;
-    } else {
-      nextPath = null;
-    }
-
-    if (pageCount % 5 === 0) {
-      console.log(`[Trading212] Order history: scanned ${pageCount} pages, found ${result.orderCount} ${ticker} orders so far...`);
-    }
-  }
-
-  console.log(`[Trading212] Order history complete: ${result.orderCount} ${ticker} orders across ${pageCount} pages, total EUR invested: ${result.totalInvestedEur.toFixed(2)}`);
-  return result;
-}
 
 export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: string, options?: { skipDividends?: boolean }): Promise<Trading212ScrapedData & { dividendsLoaded: boolean; rawDividends?: Map<string, TickerDividendData> }> {
   const data = await scrapeTrading212(apiKey, apiSecret);

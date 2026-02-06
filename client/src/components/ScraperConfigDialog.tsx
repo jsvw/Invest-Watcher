@@ -31,7 +31,6 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
   const [pieName, setPieName] = useState("");
-  const [ticker, setTicker] = useState("");
   const [gmailAppPassword, setGmailAppPassword] = useState("");
   const [gmailEmail, setGmailEmail] = useState("");
   const [scraperType, setScraperType] = useState("monefit");
@@ -55,7 +54,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
     mutationFn: async () => {
       let body: Record<string, any>;
       if (isApiKeyType) {
-        body = { scraperType, apiKey, apiSecret, pieName: pieName || undefined, ticker: ticker || undefined };
+        body = { scraperType, apiKey, apiSecret, pieName: pieName || undefined };
       } else if (isUsernameEmailType) {
         body = { scraperType, username, email, password };
       } else {
@@ -72,7 +71,6 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
       setApiKey("");
       setApiSecret("");
       setPieName("");
-      setTicker("");
       setGmailAppPassword("");
       setGmailEmail("");
     },
@@ -260,21 +258,8 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                         onChange={e => setPieName(e.target.value)}
                         placeholder="e.g. Dividend pie (matches by name)"
                         data-testid="input-scraper-piename"
-                        disabled={ticker.length > 0}
                       />
                       <p className="text-xs text-muted-foreground mt-1">If set, only data for this pie will be synced. Leave empty to match by platform name.</p>
-                    </div>
-                    <div>
-                      <Label htmlFor="scraper-ticker">Ticker (for single stock)</Label>
-                      <Input
-                        id="scraper-ticker"
-                        value={ticker}
-                        onChange={e => setTicker(e.target.value.toUpperCase())}
-                        placeholder="e.g. NIO_US_EQ"
-                        data-testid="input-scraper-ticker"
-                        disabled={pieName.length > 0}
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">Track a single stock by its Trading 212 ticker. Use this instead of Pie Name for individual stocks.</p>
                     </div>
                   </>
                 ) : isConfigUsernameEmailType ? (
@@ -433,21 +418,8 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                       onChange={e => setPieName(e.target.value)}
                       placeholder="e.g. Dividend pie (matches by name)"
                       data-testid="input-scraper-piename-new"
-                      disabled={ticker.length > 0}
                     />
                     <p className="text-xs text-muted-foreground mt-1">If set, only data for this pie will be synced. Leave empty to match by platform name.</p>
-                  </div>
-                  <div>
-                    <Label htmlFor="scraper-ticker-new">Ticker (for single stock)</Label>
-                    <Input
-                      id="scraper-ticker-new"
-                      value={ticker}
-                      onChange={e => setTicker(e.target.value.toUpperCase())}
-                      placeholder="e.g. NIO_US_EQ"
-                      data-testid="input-scraper-ticker-new"
-                      disabled={pieName.length > 0}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">Track a single stock by its Trading 212 ticker. Use this instead of Pie Name for individual stocks.</p>
                   </div>
                 </>
               ) : isUsernameEmailType ? (
