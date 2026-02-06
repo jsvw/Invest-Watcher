@@ -153,6 +153,40 @@ export async function scrapeRoboCash(email: string, password: string): Promise<R
         return match ? parseFloat(match[0]) : null;
       };
 
+      var findValueNearLabel = function(labelText) {
+        var allElements = document.querySelectorAll('*');
+        for (var i = 0; i < allElements.length; i++) {
+          var el = allElements[i];
+          if (el.children.length > 0) continue;
+          var txt = el.textContent ? el.textContent.trim().toLowerCase() : "";
+          if (txt.indexOf(labelText.toLowerCase()) === -1) continue;
+          if (txt.length > labelText.length * 3) continue;
+
+          var container = el.parentElement;
+          for (var lvl = 0; lvl < 5 && container; lvl++) {
+            var vals = container.querySelectorAll('.value_roundings');
+            if (vals.length > 0) {
+              var num = extractNumber(vals[0].textContent);
+              if (num !== null && num > 0) return num;
+            }
+            container = container.parentElement;
+          }
+
+          var sibling = el.nextElementSibling;
+          for (var s = 0; s < 5 && sibling; s++) {
+            var sVals = sibling.querySelectorAll('.value_roundings');
+            if (sVals.length > 0) {
+              var sNum = extractNumber(sVals[0].textContent);
+              if (sNum !== null && sNum > 0) return sNum;
+            }
+            var directNum = extractNumber(sibling.textContent);
+            if (sibling.classList.contains('value_roundings') && directNum !== null && directNum > 0) return directNum;
+            sibling = sibling.nextElementSibling;
+          }
+        }
+        return null;
+      };
+
       var result = {
         interestByToday: 0,
         totalFunds: 0,
@@ -164,40 +198,31 @@ export async function scrapeRoboCash(email: string, password: string): Promise<R
       for (var i = 0; i < valueElements.length; i++) {
         var el = valueElements[i];
         var val = extractNumber(el.textContent);
-        var parent = el.parentElement;
-        var grandparent = parent ? parent.parentElement : null;
+        var ancestor = el;
         var context = "";
-        if (parent) context += parent.textContent ? parent.textContent.trim().substring(0, 100) : "";
-        if (grandparent) context += " | " + (grandparent.textContent ? grandparent.textContent.trim().substring(0, 100) : "");
+        for (var a = 0; a < 5; a++) {
+          ancestor = ancestor.parentElement;
+          if (!ancestor) break;
+        }
+        if (ancestor) context = ancestor.textContent ? ancestor.textContent.trim().substring(0, 200) : "";
 
         result.debugElements.push({
           index: i,
           text: el.textContent ? el.textContent.trim() : "",
           value: val,
-          context: context
+          context: context.substring(0, 200)
         });
-
-        var surroundingText = context.toLowerCase();
-        if (surroundingText.indexOf("interest") > -1 && surroundingText.indexOf("today") > -1) {
-          if (val !== null) result.interestByToday = val;
-        } else if (surroundingText.indexOf("total funds") > -1 || surroundingText.indexOf("total balance") > -1) {
-          if (val !== null) result.totalFunds = val;
-        }
       }
 
-      if (result.totalFunds === 0 || result.interestByToday === 0) {
-        for (var j = 0; j < valueElements.length; j++) {
-          var elem = valueElements[j];
-          var num = extractNumber(elem.textContent);
-          if (num !== null && num > 0) {
-            if (result.totalFunds === 0 && num > result.interestByToday) {
-              result.totalFunds = num;
-            } else if (result.interestByToday === 0 && num < result.totalFunds) {
-              result.interestByToday = num;
-            }
-          }
-        }
-      }
+      var totalFundsVal = findValueNearLabel("Total funds");
+      if (!totalFundsVal) totalFundsVal = findValueNearLabel("Total balance");
+      if (!totalFundsVal) totalFundsVal = findValueNearLabel("Portfolio value");
+      var interestVal = findValueNearLabel("Interest by today");
+      if (!interestVal) interestVal = findValueNearLabel("Interest earned today");
+      if (!interestVal) interestVal = findValueNearLabel("Interest today");
+
+      if (totalFundsVal) result.totalFunds = totalFundsVal;
+      if (interestVal) result.interestByToday = interestVal;
 
       result.debugText = document.body.innerText.substring(0, 3000);
 
