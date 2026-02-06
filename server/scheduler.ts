@@ -48,7 +48,7 @@ async function runScrapeForConfig(config: any) {
       }
 
       if (creds.ticker) {
-        const { fetchPositions, fetchDividends } = await import("./scrapers/trading212");
+        const { fetchPositions, fetchDividends, fetchExchangeRate } = await import("./scrapers/trading212");
         const posMap = await fetchPositions(creds.apiKey, creds.apiSecret);
         const pos = posMap.get(creds.ticker);
 
@@ -62,8 +62,14 @@ async function runScrapeForConfig(config: any) {
           return;
         }
 
-        const totalValue = pos.quantity * pos.currentPrice;
-        const totalInvested = pos.quantity * pos.averagePrice;
+        const tickerCurrency = creds.ticker.includes("_US_") ? "USD" : (creds.ticker.includes("_GB_") ? "GBP" : "USD");
+        const platformCurrency = platform.currency || "EUR";
+        const fxRate = await fetchExchangeRate(tickerCurrency, platformCurrency);
+
+        const totalValueRaw = pos.quantity * pos.currentPrice;
+        const totalInvestedRaw = pos.quantity * pos.averagePrice;
+        const totalValue = totalValueRaw * fxRate;
+        const totalInvested = totalInvestedRaw * fxRate;
 
         if (totalValue > 0) {
           const existingVals = await storage.getValuations(platformId);
@@ -106,17 +112,18 @@ async function runScrapeForConfig(config: any) {
           }
         }
 
+        const pplConverted = (pos.ppl || (totalValueRaw - totalInvestedRaw)) * fxRate;
         try {
           await storage.saveTrading212Holdings(platformId, userId, today, [{
             ticker: creds.ticker,
             shares: pos.quantity.toString(),
-            currentPrice: pos.currentPrice.toString(),
-            averagePrice: pos.averagePrice.toString(),
+            currentPrice: (pos.currentPrice * fxRate).toString(),
+            averagePrice: (pos.averagePrice * fxRate).toString(),
             value: totalValue.toFixed(2),
-            ppl: pos.ppl?.toString() ?? null,
+            ppl: pplConverted.toString(),
             currentShare: "100",
             expectedShare: "100",
-            result: (pos.ppl || (totalValue - totalInvested)).toString(),
+            result: pplConverted.toString(),
           }]);
           console.log(`[Scheduler] Saved T212 single-ticker holdings snapshot for platform ${platformId}`);
         } catch (holdingsErr: any) {
@@ -145,12 +152,12 @@ async function runScrapeForConfig(config: any) {
           console.error(`[Scheduler] Failed to save T212 dividends for platform ${platformId}:`, divErr.message);
         }
 
-        const ppl = pos.ppl || (totalValue - totalInvested);
-        const pplPercent = totalInvested > 0 ? ((totalValue - totalInvested) / totalInvested) * 100 : 0;
+        const pplPercent = totalInvestedRaw > 0 ? ((totalValueRaw - totalInvestedRaw) / totalInvestedRaw) * 100 : 0;
+        const fxNote = fxRate !== 1 ? ` (FX: ${fxRate.toFixed(4)})` : "";
         await storage.updateScraperConfig(id, userId, {
           lastScrapeAt: new Date(),
           lastScrapeStatus: "success",
-          lastScrapeMessage: `${creds.ticker}: Value=${totalValue.toFixed(2)}, Invested=${totalInvested.toFixed(2)}, P/L=${ppl.toFixed(2)} (${pplPercent.toFixed(1)}%)`,
+          lastScrapeMessage: `${creds.ticker}: Value=${totalValue.toFixed(2)}, Invested=${totalInvested.toFixed(2)}, P/L=${pplConverted.toFixed(2)} (${pplPercent.toFixed(1)}%)${fxNote}`,
         });
 
         console.log(`[Scheduler] T212 single-ticker sync complete for platform ${platformId}: ${creds.ticker}=${totalValue.toFixed(2)}`);

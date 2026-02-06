@@ -1486,7 +1486,7 @@ export async function registerRoutes(
         const todayStr = today.toISOString().split("T")[0];
 
         if (creds.ticker) {
-          const { fetchPositions } = await import("./scrapers/trading212");
+          const { fetchPositions, fetchExchangeRate } = await import("./scrapers/trading212");
           const posMap = await fetchPositions(creds.apiKey, creds.apiSecret);
           const pos = posMap.get(creds.ticker);
 
@@ -1502,8 +1502,14 @@ export async function registerRoutes(
             });
           }
 
-          const totalValue = pos.quantity * pos.currentPrice;
-          const totalInvested = pos.quantity * pos.averagePrice;
+          const tickerCurrency = creds.ticker.includes("_US_") ? "USD" : (creds.ticker.includes("_GB_") ? "GBP" : "USD");
+          const platformCurrency = platform.currency || "EUR";
+          const fxRate = await fetchExchangeRate(tickerCurrency, platformCurrency);
+
+          const totalValueRaw = pos.quantity * pos.currentPrice;
+          const totalInvestedRaw = pos.quantity * pos.averagePrice;
+          const totalValue = totalValueRaw * fxRate;
+          const totalInvested = totalInvestedRaw * fxRate;
 
           if (totalValue > 0) {
             const existingVals = await storage.getValuations(platformId);
@@ -1550,19 +1556,20 @@ export async function registerRoutes(
             }
           }
 
-          const ppl = pos.ppl || (totalValue - totalInvested);
-          const pplPercent = totalInvested > 0 ? ((totalValue - totalInvested) / totalInvested) * 100 : 0;
+          const ppl = (totalValueRaw - totalInvestedRaw) * fxRate;
+          const pplPercent = totalInvestedRaw > 0 ? ((totalValueRaw - totalInvestedRaw) / totalInvestedRaw) * 100 : 0;
+          const fxNote = fxRate !== 1 ? ` (FX: ${fxRate.toFixed(4)})` : "";
 
           await storage.updateScraperConfig(config.id, userId, {
             lastScrapeAt: new Date(),
             lastScrapeStatus: "success",
-            lastScrapeMessage: `${creds.ticker}: Value=${totalValue.toFixed(2)}, Invested=${totalInvested.toFixed(2)}, P/L=${ppl.toFixed(2)} (${pplPercent.toFixed(1)}%), Qty=${pos.quantity}`,
+            lastScrapeMessage: `${creds.ticker}: Value=${totalValue.toFixed(2)}, Invested=${totalInvested.toFixed(2)}, P/L=${ppl.toFixed(2)} (${pplPercent.toFixed(1)}%), Qty=${pos.quantity}${fxNote}`,
           });
 
           return res.json({
             success: true,
-            data: { ticker: creds.ticker, currentValue: totalValue, investedValue: totalInvested, ppl, pplPercent, quantity: pos.quantity, currentPrice: pos.currentPrice, averagePrice: pos.averagePrice },
-            message: `Synced ${creds.ticker}: Value=${totalValue.toFixed(2)}, Invested=${totalInvested.toFixed(2)}`,
+            data: { ticker: creds.ticker, currentValue: totalValue, investedValue: totalInvested, ppl, pplPercent, quantity: pos.quantity, currentPrice: pos.currentPrice * fxRate, averagePrice: pos.averagePrice * fxRate },
+            message: `Synced ${creds.ticker}: Value=${totalValue.toFixed(2)}, Invested=${totalInvested.toFixed(2)}${fxNote}`,
           });
         }
 
@@ -1872,7 +1879,7 @@ export async function registerRoutes(
       if (!platform) return res.status(404).json({ message: "Platform not found" });
 
       if (creds.ticker) {
-        const { fetchPositions, fetchDividends } = await import("./scrapers/trading212");
+        const { fetchPositions, fetchDividends, fetchExchangeRate } = await import("./scrapers/trading212");
         const posMap = await fetchPositions(creds.apiKey, creds.apiSecret);
         const pos = posMap.get(creds.ticker);
 
@@ -1880,10 +1887,16 @@ export async function registerRoutes(
           return res.status(404).json({ message: `Ticker "${creds.ticker}" not found in portfolio` });
         }
 
-        const totalValue = pos.quantity * pos.currentPrice;
-        const totalInvested = pos.quantity * pos.averagePrice;
-        const ppl = pos.ppl || (totalValue - totalInvested);
-        const pplPercent = totalInvested > 0 ? ((totalValue - totalInvested) / totalInvested) * 100 : 0;
+        const tickerCurrency = creds.ticker.includes("_US_") ? "USD" : (creds.ticker.includes("_GB_") ? "GBP" : "USD");
+        const platformCurrency = platform.currency || "EUR";
+        const fxRate = await fetchExchangeRate(tickerCurrency, platformCurrency);
+
+        const totalValueRaw = pos.quantity * pos.currentPrice;
+        const totalInvestedRaw = pos.quantity * pos.averagePrice;
+        const totalValue = totalValueRaw * fxRate;
+        const totalInvested = totalInvestedRaw * fxRate;
+        const ppl = (pos.ppl || (totalValueRaw - totalInvestedRaw)) * fxRate;
+        const pplPercent = totalInvestedRaw > 0 ? ((totalValueRaw - totalInvestedRaw) / totalInvestedRaw) * 100 : 0;
 
         const dbDividends = await storage.getTrading212Dividends(platformId, userId);
         const hasDbDividends = dbDividends.length > 0;
@@ -1930,23 +1943,26 @@ export async function registerRoutes(
           }
         }
 
+        const convertedCurrentPrice = pos.currentPrice * fxRate;
+        const convertedAvgPrice = pos.averagePrice * fxRate;
+
         const instrument: any = {
           ticker: creds.ticker,
           shares: pos.quantity,
           expectedShare: 100,
           currentShare: 100,
           result: ppl,
-          currentPrice: pos.currentPrice,
-          averagePrice: pos.averagePrice,
+          currentPrice: convertedCurrentPrice,
+          averagePrice: convertedAvgPrice,
           quantity: pos.quantity,
-          ppl: pos.ppl,
-          fxPpl: pos.fxPpl,
+          ppl: ppl,
+          fxPpl: pos.fxPpl ? pos.fxPpl * fxRate : 0,
         };
         if (tickerDivData) {
-          instrument.dividendsReceived = tickerDivData.total;
+          instrument.dividendsReceived = tickerDivData.total * fxRate;
           instrument.dividendCount = tickerDivData.count;
           instrument.lastDividendDate = tickerDivData.lastDate;
-          instrument.dividendHistory = tickerDivData.history;
+          instrument.dividendHistory = tickerDivData.history.map(h => ({ ...h, amount: h.amount * fxRate }));
         }
 
         const today = new Date();
@@ -1960,10 +1976,10 @@ export async function registerRoutes(
           await storage.saveTrading212Holdings(platformId, userId, today, [{
             ticker: creds.ticker,
             shares: toNumStr(pos.quantity),
-            currentPrice: toNumStr(pos.currentPrice),
-            averagePrice: toNumStr(pos.averagePrice),
+            currentPrice: toNumStr(convertedCurrentPrice),
+            averagePrice: toNumStr(convertedAvgPrice),
             value: totalValue.toFixed(2),
-            ppl: toNumStr(pos.ppl),
+            ppl: toNumStr(ppl),
             currentShare: "100",
             expectedShare: "100",
             result: toNumStr(ppl),
@@ -1972,6 +1988,8 @@ export async function registerRoutes(
           console.error("T212 single-ticker holdings snapshot save error:", saveErr.message);
         }
 
+        const divTotal = tickerDivData ? tickerDivData.total * fxRate : 0;
+
         const responseData = {
           pieName: creds.ticker,
           currentValue: totalValue,
@@ -1979,9 +1997,9 @@ export async function registerRoutes(
           cash: 0,
           result: ppl,
           resultPercent: pplPercent,
-          dividendsGained: tickerDivData?.total || 0,
+          dividendsGained: divTotal,
           dividendsReinvested: 0,
-          dividendsInCash: tickerDivData?.total || 0,
+          dividendsInCash: divTotal,
           instruments: [instrument],
         };
 

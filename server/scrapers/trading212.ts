@@ -89,6 +89,24 @@ interface PositionData {
   pieQuantity: number;
 }
 
+export async function fetchExchangeRate(from: string, to: string): Promise<number> {
+  if (from === to) return 1;
+  try {
+    const response = await fetch(`https://api.exchangerate-api.com/v4/latest/${from}`);
+    if (!response.ok) throw new Error(`Exchange rate API error: ${response.status}`);
+    const data = await response.json() as { rates: Record<string, number> };
+    const rate = data.rates[to];
+    if (!rate) throw new Error(`No rate found for ${from} -> ${to}`);
+    console.log(`[Trading212] Exchange rate ${from}->${to}: ${rate}`);
+    return rate;
+  } catch (err: any) {
+    console.error(`[Trading212] Failed to fetch exchange rate: ${err.message}, using fallback`);
+    if (from === "USD" && to === "EUR") return 0.92;
+    if (from === "EUR" && to === "USD") return 1.09;
+    return 1;
+  }
+}
+
 export async function fetchPositions(apiKey: string, apiSecret: string): Promise<Map<string, PositionData>> {
   console.log("[Trading212] Fetching all positions...");
   const positions = await makeRequest("/equity/portfolio", apiKey, apiSecret) as PositionData[];
