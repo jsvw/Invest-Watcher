@@ -1702,10 +1702,20 @@ export async function registerRoutes(
     }
   });
 
+  const holdingsCache = new Map<string, { data: any; timestamp: number }>();
+  const HOLDINGS_CACHE_TTL = 5 * 60 * 1000;
+
   app.get('/api/platforms/:platformId/trading212-holdings', requireAuth, async (req, res) => {
     try {
       const userId = getAuthenticatedUserId(req)!;
       const platformId = Number(req.params.platformId);
+      const forceRefresh = req.query.refresh === "true";
+
+      const cacheKey = `${userId}:${platformId}`;
+      const cached = holdingsCache.get(cacheKey);
+      if (cached && !forceRefresh && (Date.now() - cached.timestamp) < HOLDINGS_CACHE_TTL) {
+        return res.json(cached.data);
+      }
 
       const config = await storage.getScraperConfig(platformId, userId);
       if (!config || config.scraperType !== "trading212") {
@@ -1740,19 +1750,25 @@ export async function registerRoutes(
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       try {
+        const toNumStr = (v: any): string | null => {
+          if (v == null) return null;
+          if (typeof v === 'object') return null;
+          const n = Number(v);
+          return isNaN(n) ? null : n.toString();
+        };
         const holdingsToSave = matchedPie.instruments.map(inst => {
           const qty = inst.quantity ?? inst.shares;
           const val = qty && inst.currentPrice ? (qty * inst.currentPrice) : null;
           return {
             ticker: inst.ticker,
-            shares: (inst.quantity ?? inst.shares)?.toString() ?? null,
-            currentPrice: inst.currentPrice?.toString() ?? null,
-            averagePrice: inst.averagePrice?.toString() ?? null,
+            shares: toNumStr(inst.quantity ?? inst.shares),
+            currentPrice: toNumStr(inst.currentPrice),
+            averagePrice: toNumStr(inst.averagePrice),
             value: val != null ? val.toFixed(2) : null,
-            ppl: inst.ppl?.toString() ?? null,
-            currentShare: inst.currentShare?.toString() ?? null,
-            expectedShare: inst.expectedShare?.toString() ?? null,
-            result: inst.result?.toString() ?? null,
+            ppl: toNumStr(inst.ppl),
+            currentShare: toNumStr(inst.currentShare),
+            expectedShare: toNumStr(inst.expectedShare),
+            result: toNumStr(inst.result),
           };
         });
         await storage.saveTrading212Holdings(platformId, userId, today, holdingsToSave);
@@ -1760,7 +1776,7 @@ export async function registerRoutes(
         console.error("T212 holdings snapshot save error:", saveErr.message);
       }
 
-      res.json({
+      const responseData = {
         pieName: matchedPie.pieName,
         currentValue: matchedPie.currentValue,
         investedValue: matchedPie.investedValue,
@@ -1771,7 +1787,11 @@ export async function registerRoutes(
         dividendsReinvested: matchedPie.dividendsReinvested,
         dividendsInCash: matchedPie.dividendsInCash,
         instruments: matchedPie.instruments,
-      });
+      };
+
+      holdingsCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
+
+      res.json(responseData);
     } catch (err: any) {
       console.error("T212 holdings error:", err);
       res.status(500).json({ message: err.message || "Failed to fetch holdings" });

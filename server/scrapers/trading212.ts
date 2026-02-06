@@ -76,7 +76,7 @@ async function makeRequest(path: string, apiKey: string, apiSecret: string, retr
   throw new Error("Trading 212 API request failed: no response received");
 }
 
-const API_DELAY_MS = 10000;
+const API_DELAY_MS = 5000;
 
 interface PositionData {
   ticker: string;

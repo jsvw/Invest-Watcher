@@ -177,7 +177,8 @@ export default function PlatformDetails() {
   const { data: holdingsData, isLoading: isHoldingsLoading, isFetching: isHoldingsFetching, error: holdingsError } = useQuery({
     queryKey: ['/api/platforms', id, 'trading212-holdings', holdingsRefreshKey],
     queryFn: async () => {
-      const res = await fetch(`/api/platforms/${id}/trading212-holdings`, { credentials: 'include' });
+      const refreshParam = holdingsRefreshKey > 0 ? "?refresh=true" : "";
+      const res = await fetch(`/api/platforms/${id}/trading212-holdings${refreshParam}`, { credentials: 'include' });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.message || "Failed to fetch holdings");
