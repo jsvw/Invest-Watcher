@@ -23,6 +23,7 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
     browser = await puppeteer.launch({
       executablePath: getChromiumPath(),
       headless: true,
+      protocolTimeout: 120000,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -32,6 +33,12 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
         "--no-zygote",
         "--single-process",
         "--disable-extensions",
+        "--disable-background-networking",
+        "--disable-default-apps",
+        "--disable-sync",
+        "--disable-translate",
+        "--mute-audio",
+        "--hide-scrollbars",
       ],
     });
 
