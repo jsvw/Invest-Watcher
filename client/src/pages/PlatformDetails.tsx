@@ -35,6 +35,7 @@ import { AssetRepaymentDialog } from "@/components/AssetRepaymentDialog";
 import type { Asset } from "@shared/schema";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { ScraperConfigDialog } from "@/components/ScraperConfigDialog";
+import { Tooltip as ShadTooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 function AssetActionsMenu({ asset, platformId, platformMode, currency }: { asset: Asset; platformId: number; platformMode: "asset_returns" | "item_valuations"; currency: string }) {
   const [editOpen, setEditOpen] = useState(false);
@@ -1025,9 +1026,21 @@ export default function PlatformDetails() {
                                     </td>
                                     <td className="text-right p-3 tabular-nums">
                                       {inst.dividendsReceived != null ? (
-                                        <span className="text-green-600 dark:text-green-400" title={inst.dividendCount ? `${inst.dividendCount} payment(s)` : undefined}>
-                                          {formatCurrency(inst.dividendsReceived, currency)}
-                                        </span>
+                                        <ShadTooltip>
+                                          <TooltipTrigger asChild>
+                                            <span className="text-green-600 dark:text-green-400 cursor-default">
+                                              {formatCurrency(inst.dividendsReceived, currency)}
+                                            </span>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <div className="text-xs space-y-1">
+                                              <p>{inst.dividendCount} payment{inst.dividendCount !== 1 ? 's' : ''} received</p>
+                                              {inst.lastDividendDate && (
+                                                <p className="text-muted-foreground">Last: {format(new Date(inst.lastDividendDate), 'MMM d, yyyy')}</p>
+                                              )}
+                                            </div>
+                                          </TooltipContent>
+                                        </ShadTooltip>
                                       ) : '-'}
                                     </td>
                                     <td className="text-right p-3 tabular-nums">{inst.currentShare?.toFixed(1)}%</td>
