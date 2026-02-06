@@ -17,22 +17,36 @@ export interface Trading212ScrapedData {
 
 const BASE_URL = "https://live.trading212.com/api/v0";
 
-async function makeRequest(path: string, apiKey: string, apiSecret: string): Promise<any> {
+async function makeRequest(path: string, apiKey: string, apiSecret: string, retries = 3): Promise<any> {
   const credentials = Buffer.from(`${apiKey}:${apiSecret}`).toString("base64");
   const url = `${BASE_URL}${path}`;
 
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Basic ${credentials}`,
-    },
-  });
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Basic ${credentials}`,
+      },
+    });
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Trading 212 API error (${response.status}): ${text}`);
+    if (response.status === 429) {
+      if (attempt < retries) {
+        const waitTime = attempt * 5000;
+        console.log(`[Trading212] Rate limited, waiting ${waitTime / 1000}s before retry ${attempt + 1}/${retries}...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      const text = await response.text();
+      throw new Error(`Trading 212 API rate limit exceeded after ${retries} attempts: ${text}`);
+    }
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Trading 212 API error (${response.status}): ${text}`);
+    }
+
+    return response.json();
   }
-
-  return response.json();
+  throw new Error("Trading 212 API request failed: no response received");
 }
 
 export async function scrapeTrading212(apiKey: string, apiSecret: string): Promise<Trading212ScrapedData> {
@@ -57,7 +71,7 @@ export async function scrapeTrading212(apiKey: string, apiSecret: string): Promi
     const pie = pies[i];
 
     if (i > 0) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 5000));
     }
 
     console.log(`[Trading212] Fetching details for pie ${pie.id}...`);

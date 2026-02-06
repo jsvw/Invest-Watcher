@@ -1500,6 +1500,36 @@ export async function registerRoutes(
           }
         }
 
+        const t212Invested = matchedPie.investedValue;
+        if (t212Invested > 0) {
+          const existingInvestments = await storage.getInvestments(platformId);
+          const existingWithdrawals = await storage.getWithdrawals(platformId);
+          const nonSyncInvestments = existingInvestments.filter(inv => !inv.notes?.startsWith("Trading 212 sync adjustment"));
+          const totalDeposited = nonSyncInvestments.reduce((sum, inv) => sum + parseFloat(inv.amount), 0);
+          const totalWithdrawn = existingWithdrawals.reduce((sum, w) => sum + parseFloat(w.amount), 0);
+          const currentNetInvested = totalDeposited - totalWithdrawn;
+          const diff = t212Invested - currentNetInvested;
+
+          const existingSyncAdj = existingInvestments.filter(inv => inv.notes?.startsWith("Trading 212 sync adjustment"));
+          if (existingSyncAdj.length > 0) {
+            const adjId = existingSyncAdj[existingSyncAdj.length - 1].id;
+            if (Math.abs(diff) >= 0.01) {
+              await storage.updateInvestment(adjId, {
+                amount: diff.toFixed(2),
+                date: today,
+                notes: `Trading 212 sync adjustment (T212 total: ${t212Invested.toFixed(2)})`,
+              });
+            }
+          } else if (Math.abs(diff) >= 0.01) {
+            await storage.createInvestment({
+              platformId,
+              amount: diff.toFixed(2),
+              date: today,
+              notes: `Trading 212 sync adjustment (T212 total: ${t212Invested.toFixed(2)})`,
+            });
+          }
+        }
+
         await storage.updateScraperConfig(config.id, userId, {
           lastScrapeAt: new Date(),
           lastScrapeStatus: "success",
