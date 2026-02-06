@@ -137,7 +137,7 @@ export async function scrapeTrading212(apiKey: string, apiSecret: string): Promi
       }>;
     };
 
-    const actualDeposited = pie.result.priceAvgInvestedValue - pie.dividendDetails.gained;
+    const actualDeposited = pie.result.priceAvgInvestedValue - pie.dividendDetails.reinvested;
 
     pieDetails.push({
       pieId: pie.id,
