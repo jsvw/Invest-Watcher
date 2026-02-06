@@ -7,7 +7,7 @@ export interface GoldRepublicScrapedData {
 
 const CHROMIUM_PATH = process.env.CHROMIUM_PATH || "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
 const LOGIN_URL = "https://www.goldrepublic.com/nl-nl/inloggen";
-const ACCOUNT_URL = "https://www.goldrepublic.com/nl-nl/account";
+const PERFORMANCE_URL = "https://www.goldrepublic.com/nl-nl/performance";
 
 export async function scrapeGoldRepublic(username: string, email: string, password: string): Promise<GoldRepublicScrapedData> {
   if (!username || !email || !password) {
@@ -47,7 +47,6 @@ export async function scrapeGoldRepublic(username: string, email: string, passwo
           var t = btns[i].textContent ? btns[i].textContent.toLowerCase().trim() : "";
           if (t.includes('accept') || t.includes('allow') || t.includes('agree') || t.includes('toestaan') || t.includes('accepteren') || t.includes('akkoord') || t === 'ok') {
             btns[i].click();
-            console.log('Cookie button clicked: ' + t);
             break;
           }
         }
@@ -55,7 +54,7 @@ export async function scrapeGoldRepublic(username: string, email: string, passwo
       await new Promise(resolve => setTimeout(resolve, 2000));
       console.log("[GoldRepublic Scraper] Cookie banner handled");
     } catch (cookieErr) {
-      console.log("[GoldRepublic Scraper] Cookie banner handling skipped:", cookieErr);
+      console.log("[GoldRepublic Scraper] Cookie banner handling skipped");
     }
 
     try {
@@ -72,23 +71,25 @@ export async function scrapeGoldRepublic(username: string, email: string, passwo
     console.log("[GoldRepublic Scraper] Waiting for login form...");
     await page.waitForSelector('input', { timeout: 15000 });
 
-    const availableInputs = await page.evaluate(`(function() {
-      return Array.from(document.querySelectorAll('input')).map(function(i) {
-        return { name: i.name, type: i.type, id: i.id, placeholder: i.placeholder };
-      });
-    })()`) as Array<{name: string; type: string; id: string; placeholder: string}>;
-    console.log(`[GoldRepublic Scraper] Available inputs: ${JSON.stringify(availableInputs)}`);
-
-    const usernameInput = await page.$('input[name="username"]')
-      || await page.$('input[id*="username"]')
+    const usernameInput = await page.$('input[name="LoginForm[username]"]')
+      || await page.$('input#LoginForm_username')
+      || await page.$('input[name="username"]')
       || await page.$('input[type="text"]');
-    const emailInput = await page.$('input[name="email"]')
-      || await page.$('input[type="email"]')
-      || await page.$('input[id*="email"]');
-    const passwordInput = await page.$('input[name="password"]')
+    const emailInput = await page.$('input[name="LoginForm[email]"]')
+      || await page.$('input#LoginForm_email')
+      || await page.$('input[name="email"]')
+      || await page.$('input[type="email"]');
+    const passwordInput = await page.$('input[name="LoginForm[password]"]')
+      || await page.$('input#LoginForm_password')
+      || await page.$('input[name="password"]')
       || await page.$('input[type="password"]');
 
     if (!usernameInput || !passwordInput) {
+      const availableInputs = await page.evaluate(`(function() {
+        return Array.from(document.querySelectorAll('input')).map(function(i) {
+          return { name: i.name, type: i.type, id: i.id, placeholder: i.placeholder };
+        });
+      })()`);
       throw new Error(`Could not find login fields. Available inputs: ${JSON.stringify(availableInputs)}`);
     }
 
@@ -97,11 +98,8 @@ export async function scrapeGoldRepublic(username: string, email: string, passwo
     await usernameInput.type(username, { delay: 50 });
 
     if (emailInput) {
-      console.log("[GoldRepublic Scraper] Filling email field...");
       await emailInput.click({ clickCount: 3 });
       await emailInput.type(email, { delay: 50 });
-    } else {
-      console.log("[GoldRepublic Scraper] No separate email field found, skipping...");
     }
 
     await passwordInput.click({ clickCount: 3 });
@@ -109,23 +107,13 @@ export async function scrapeGoldRepublic(username: string, email: string, passwo
 
     console.log("[GoldRepublic Scraper] Submitting login...");
     const submitClicked = await page.evaluate(`(function() {
-      var buttons = Array.from(document.querySelectorAll('button[type="submit"], input[type="submit"], button'));
-      for (var i = 0; i < buttons.length; i++) {
-        var t = buttons[i].textContent ? buttons[i].textContent.trim().toLowerCase() : "";
-        var v = buttons[i].value ? buttons[i].value.trim().toLowerCase() : "";
-        if (t === 'log in' || t === 'login' || t === 'sign in' || t === 'inloggen' || v === 'log in' || v === 'login' || v === 'inloggen') {
-          buttons[i].click();
-          return 'clicked: ' + t;
-        }
-      }
       var submitBtns = document.querySelectorAll('button[type="submit"], input[type="submit"]');
       if (submitBtns.length > 0) {
-        submitBtns[submitBtns.length - 1].click();
-        return 'clicked submit fallback';
+        submitBtns[0].click();
+        return true;
       }
       return false;
     })()`);
-    console.log(`[GoldRepublic Scraper] Submit result: ${submitClicked}`);
 
     if (!submitClicked) {
       await page.keyboard.press("Enter");
@@ -145,14 +133,14 @@ export async function scrapeGoldRepublic(username: string, email: string, passwo
       throw new Error(`Login failed${errorText ? `: ${errorText}` : ". Check your username and password."}`);
     }
 
-    console.log("[GoldRepublic Scraper] Navigating to account dashboard...");
-    await page.goto(ACCOUNT_URL, { waitUntil: "networkidle2", timeout: 30000 });
+    console.log("[GoldRepublic Scraper] Navigating to performance page...");
+    await page.goto(PERFORMANCE_URL, { waitUntil: "networkidle2", timeout: 30000 });
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    const accountUrl = page.url();
-    console.log(`[GoldRepublic Scraper] Account page URL: ${accountUrl}`);
+    const perfUrl = page.url();
+    console.log(`[GoldRepublic Scraper] Performance page URL: ${perfUrl}`);
 
-    if (accountUrl.includes("inloggen") || accountUrl.includes("login")) {
+    if (perfUrl.includes("inloggen") || perfUrl.includes("login")) {
       throw new Error("Login session not maintained. Redirected back to login page. Check your credentials.");
     }
 
@@ -161,7 +149,7 @@ export async function scrapeGoldRepublic(username: string, email: string, passwo
         var btns = Array.from(document.querySelectorAll('button, a, [class*="cookie"], [class*="consent"]'));
         for (var i = 0; i < btns.length; i++) {
           var t = btns[i].textContent ? btns[i].textContent.toLowerCase().trim() : "";
-          if (t.includes('accept') || t.includes('allow') || t.includes('toestaan') || t.includes('accepteren') || t.includes('akkoord') || t === 'ok') {
+          if (t.includes('toestaan') || t.includes('accepteren') || t.includes('akkoord') || t.includes('accept') || t.includes('allow') || t === 'ok') {
             btns[i].click();
             break;
           }
@@ -176,81 +164,61 @@ export async function scrapeGoldRepublic(username: string, email: string, passwo
       await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (e) {}
 
-    console.log("[GoldRepublic Scraper] Extracting portfolio value...");
+    console.log("[GoldRepublic Scraper] Extracting portfolio value from performance page...");
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    const portfolioData = await page.evaluate(`(function() {
-      var extractEuroNumber = function(text) {
-        if (!text) return null;
-        var cleaned = text.replace(/[^0-9.,\\-]/g, "");
-        cleaned = cleaned.replace(/\\./g, "").replace(",", ".");
-        var match = cleaned.match(/-?\\d+\\.?\\d*/);
-        return match ? parseFloat(match[0]) : null;
-      };
+    const extractEuroNumber = (text: string): number | null => {
+      if (!text) return null;
+      const cleaned = text.replace(/[^0-9.,\-]/g, "");
+      const normalized = cleaned.replace(/\./g, "").replace(",", ".");
+      const match = normalized.match(/-?\d+\.?\d*/);
+      return match ? parseFloat(match[0]) : null;
+    };
 
+    const portfolioData = await page.evaluate(`(function() {
       var result = {
-        totalBalance: 0,
+        portfolioValue: null,
         debugText: document.body.innerText.substring(0, 5000),
-        allEuroValues: [],
       };
 
       var allText = document.body.innerText;
-      var re = /€\\s*([\\d.,]+)/g;
-      var m;
-      while ((m = re.exec(allText)) !== null) {
-        var val = extractEuroNumber(m[1]);
-        if (val !== null && val > 0) {
-          result.allEuroValues.push(val);
-        }
-      }
 
-      var table = document.querySelector('.condensed-table.portfolio-table') || document.querySelector('.portfolio-table');
-      if (table) {
-        var rows = table.querySelectorAll('tr');
-        var lastRow = rows.length > 0 ? rows[rows.length - 1] : null;
-        if (lastRow) {
-          var lastRowText = lastRow.textContent || "";
-          var lastRowMatch = lastRowText.match(/€\\s*([\\d.,]+)/);
-          if (lastRowMatch) {
-            var totalVal = extractEuroNumber(lastRowMatch[1]);
-            if (totalVal !== null && totalVal > 0) {
-              result.totalBalance = totalVal;
-              return result;
-            }
-          }
-        }
+      var patterns = [
+        /Huidige\\s+portefeuillewaarde[\\s\\S]*?€\\s*([\\d.,]+)/i,
+        /Current\\s+portfolio\\s+value[\\s\\S]*?€\\s*([\\d.,]+)/i,
+        /portefeuillewaarde[\\s\\S]*?€\\s*([\\d.,]+)/i,
+      ];
 
-        var cells = table.querySelectorAll('td, th');
-        var tableValues = [];
-        for (var i = 0; i < cells.length; i++) {
-          var text = cells[i].textContent ? cells[i].textContent.trim() : "";
-          if (text.match(/€\\s*[\\d.,]+/)) {
-            var num = extractEuroNumber(text.replace(/€\\s*/, ""));
-            if (num !== null && num > 0) {
-              tableValues.push(num);
-            }
-          }
+      for (var i = 0; i < patterns.length; i++) {
+        var match = allText.match(patterns[i]);
+        if (match) {
+          result.portfolioValue = match[1];
+          break;
         }
-        if (tableValues.length > 0) {
-          result.totalBalance = tableValues[tableValues.length - 1];
-          return result;
-        }
-      }
-
-      if (result.allEuroValues.length > 0) {
-        result.allEuroValues.sort(function(a, b) { return b - a; });
-        result.totalBalance = result.allEuroValues[0];
       }
 
       return result;
-    })()`) as { totalBalance: number; debugText: string; allEuroValues: number[] };
+    })()`) as { portfolioValue: string | null; debugText: string };
 
-    console.log(`[GoldRepublic Scraper] Extracted total balance: ${portfolioData.totalBalance}`);
-    console.log(`[GoldRepublic Scraper] All euro values found: ${JSON.stringify(portfolioData.allEuroValues)}`);
+    console.log(`[GoldRepublic Scraper] Raw portfolio value text: ${portfolioData.portfolioValue}`);
     console.log(`[GoldRepublic Scraper] Page text preview: ${portfolioData.debugText.substring(0, 2000)}`);
 
+    let totalBalance = 0;
+    if (portfolioData.portfolioValue) {
+      const parsed = extractEuroNumber(portfolioData.portfolioValue);
+      if (parsed !== null && parsed > 0) {
+        totalBalance = parsed;
+      }
+    }
+
+    if (totalBalance === 0) {
+      throw new Error("Could not extract portfolio value from performance page. Page content may have changed.");
+    }
+
+    console.log(`[GoldRepublic Scraper] Final portfolio value: €${totalBalance}`);
+
     return {
-      totalBalance: portfolioData.totalBalance,
+      totalBalance,
       scrapedAt: new Date(),
     };
 
