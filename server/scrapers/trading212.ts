@@ -43,7 +43,7 @@ export interface Trading212ScrapedData {
 
 const BASE_URL = "https://live.trading212.com/api/v0";
 
-async function makeRequest(path: string, apiKey: string, apiSecret: string, retries = 3): Promise<any> {
+async function makeRequest(path: string, apiKey: string, apiSecret: string, retries = 5): Promise<any> {
   const credentials = Buffer.from(`${apiKey}:${apiSecret}`).toString("base64");
   const url = `${BASE_URL}${path}`;
 
@@ -56,8 +56,9 @@ async function makeRequest(path: string, apiKey: string, apiSecret: string, retr
 
     if (response.status === 429) {
       if (attempt < retries) {
-        const waitTime = attempt * 5000;
-        console.log(`[Trading212] Rate limited, waiting ${waitTime / 1000}s before retry ${attempt + 1}/${retries}...`);
+        const retryAfter = response.headers.get("retry-after");
+        const waitTime = retryAfter ? parseInt(retryAfter, 10) * 1000 : Math.min(attempt * 15000, 90000);
+        console.log(`[Trading212] Rate limited, waiting ${Math.round(waitTime / 1000)}s before retry ${attempt + 1}/${retries}...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
@@ -74,6 +75,8 @@ async function makeRequest(path: string, apiKey: string, apiSecret: string, retr
   }
   throw new Error("Trading 212 API request failed: no response received");
 }
+
+const API_DELAY_MS = 10000;
 
 interface PositionData {
   ticker: string;
@@ -118,7 +121,7 @@ export async function scrapeTrading212(apiKey: string, apiSecret: string): Promi
     const pie = pies[i];
 
     if (i > 0) {
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise(resolve => setTimeout(resolve, API_DELAY_MS));
     }
 
     console.log(`[Trading212] Fetching details for pie ${pie.id}...`);
@@ -213,7 +216,7 @@ export async function fetchDividends(apiKey: string, apiSecret: string): Promise
 
     if (response.nextPagePath) {
       const cleanPath = response.nextPagePath.replace(/^\/api\/v0/, "");
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise(resolve => setTimeout(resolve, API_DELAY_MS));
       nextPath = cleanPath;
     } else {
       nextPath = null;
@@ -231,12 +234,12 @@ export async function fetchDividends(apiKey: string, apiSecret: string): Promise
 export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: string): Promise<Trading212ScrapedData> {
   const data = await scrapeTrading212(apiKey, apiSecret);
 
-  await new Promise(resolve => setTimeout(resolve, 5000));
+  await new Promise(resolve => setTimeout(resolve, API_DELAY_MS));
   const posMap = await fetchPositions(apiKey, apiSecret);
 
   let divMap = new Map<string, TickerDividendData>();
   try {
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    await new Promise(resolve => setTimeout(resolve, API_DELAY_MS));
     divMap = await fetchDividends(apiKey, apiSecret);
   } catch (err: any) {
     console.log(`[Trading212] Dividend history unavailable (${err.message}), skipping`);
