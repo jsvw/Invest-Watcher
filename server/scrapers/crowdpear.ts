@@ -139,15 +139,14 @@ export async function scrapeCrowdPear(email: string, password: string, gmailAppP
     browser = await puppeteer.launch({
       executablePath: getChromiumPath(),
       headless: true,
-      protocolTimeout: 120000,
+      protocolTimeout: 180000,
+      timeout: 120000,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
         "--disable-gpu",
         "--no-first-run",
-        "--no-zygote",
-        "--single-process",
         "--disable-extensions",
         "--disable-background-networking",
         "--disable-default-apps",
@@ -155,6 +154,9 @@ export async function scrapeCrowdPear(email: string, password: string, gmailAppP
         "--disable-translate",
         "--mute-audio",
         "--hide-scrollbars",
+        "--disable-software-rasterizer",
+        "--disable-features=site-per-process",
+        "--js-flags=--max-old-space-size=256",
       ],
     });
 
