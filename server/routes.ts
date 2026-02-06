@@ -1466,8 +1466,8 @@ export async function registerRoutes(
             i.notes === "Auto-scraped total invested"
           );
           if (scrapedInv) {
-            await storage.updateInvestment(scrapedInv.id, { amount: scraperResult.totalInvested.toFixed(2) });
-          } else if (existingInvestments.length === 0) {
+            await storage.updateInvestment(scrapedInv.id, { amount: scraperResult.totalInvested.toFixed(2), date: today });
+          } else {
             await storage.createInvestment({
               platformId,
               amount: scraperResult.totalInvested.toFixed(2),
