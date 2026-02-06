@@ -1444,7 +1444,7 @@ export async function registerRoutes(
       const platform = await storage.getPlatform(platformId, userId);
       if (!platform) return res.status(404).json({ message: "Platform not found" });
 
-      if (platform.platformMode === "standard" && scraperResult.totalBalance > 0) {
+      if (scraperResult.totalBalance > 0) {
         const existingVals = await storage.getValuations(platformId);
         const todayStr = today.toISOString().split("T")[0];
         const sameDayVal = existingVals.find(v => 
@@ -1459,22 +1459,22 @@ export async function registerRoutes(
             date: today,
           });
         }
+      }
 
-        if (scraperResult.totalInvested > 0) {
-          const existingInvestments = await storage.getInvestments(platformId);
-          const scrapedInv = existingInvestments.find(i => 
-            i.notes === "Auto-scraped total invested"
-          );
-          if (scrapedInv) {
-            await storage.updateInvestment(scrapedInv.id, { amount: scraperResult.totalInvested.toFixed(2), date: today });
-          } else {
-            await storage.createInvestment({
-              platformId,
-              amount: scraperResult.totalInvested.toFixed(2),
-              date: today,
-              notes: "Auto-scraped total invested",
-            });
-          }
+      if (scraperResult.totalInvested > 0) {
+        const existingInvestments = await storage.getInvestments(platformId);
+        const scrapedInv = existingInvestments.find(i => 
+          i.notes === "Auto-scraped total invested"
+        );
+        if (scrapedInv) {
+          await storage.updateInvestment(scrapedInv.id, { amount: scraperResult.totalInvested.toFixed(2), date: today });
+        } else {
+          await storage.createInvestment({
+            platformId,
+            amount: scraperResult.totalInvested.toFixed(2),
+            date: today,
+            notes: "Auto-scraped total invested",
+          });
         }
       }
 

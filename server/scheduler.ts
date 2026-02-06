@@ -55,7 +55,7 @@ async function runScrapeForConfig(config: any) {
       return;
     }
 
-    if (platform.platformMode === "standard" && scraperResult.totalBalance > 0) {
+    if (scraperResult.totalBalance > 0) {
       const existingVals = await storage.getValuations(platformId);
       const sameDayVal = existingVals.find(v =>
         new Date(v.date).toISOString().split("T")[0] === todayStr
@@ -69,22 +69,22 @@ async function runScrapeForConfig(config: any) {
           date: today,
         });
       }
+    }
 
-      if (scraperResult.totalInvested > 0) {
-        const existingInvestments = await storage.getInvestments(platformId);
-        const scrapedInv = existingInvestments.find(i =>
-          i.notes === "Auto-scraped total invested"
-        );
-        if (scrapedInv) {
-          await storage.updateInvestment(scrapedInv.id, { amount: scraperResult.totalInvested.toFixed(2), date: today });
-        } else {
-          await storage.createInvestment({
-            platformId,
-            amount: scraperResult.totalInvested.toFixed(2),
-            date: today,
-            notes: "Auto-scraped total invested",
-          });
-        }
+    if (scraperResult.totalInvested > 0) {
+      const existingInvestments = await storage.getInvestments(platformId);
+      const scrapedInv = existingInvestments.find(i =>
+        i.notes === "Auto-scraped total invested"
+      );
+      if (scrapedInv) {
+        await storage.updateInvestment(scrapedInv.id, { amount: scraperResult.totalInvested.toFixed(2), date: today });
+      } else {
+        await storage.createInvestment({
+          platformId,
+          amount: scraperResult.totalInvested.toFixed(2),
+          date: today,
+          notes: "Auto-scraped total invested",
+        });
       }
     }
 
