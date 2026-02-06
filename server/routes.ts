@@ -1554,7 +1554,7 @@ export async function registerRoutes(
       }
 
       if (config.scraperType === "robocash" || config.scraperType === "crowdpear" || config.scraperType === "goldrepublic") {
-        let balanceData: { totalBalance: number; scrapedAt: Date };
+        let balanceData: { totalBalance: number; totalInvested?: number | null; scrapedAt: Date };
         if (config.scraperType === "robocash") {
           const { scrapeRoboCash } = await import("./scrapers/robocash");
           balanceData = await scrapeRoboCash(creds.email, creds.password);
@@ -1583,16 +1583,40 @@ export async function registerRoutes(
           }
         }
 
+        if (balanceData.totalInvested && balanceData.totalInvested > 0) {
+          const existingInvestments = await storage.getInvestments(platformId);
+          const totalExisting = existingInvestments.reduce((sum, inv) => sum + parseFloat(inv.amount), 0);
+          const diff = Math.round((balanceData.totalInvested - totalExisting) * 100) / 100;
+          if (Math.abs(diff) >= 0.01) {
+            if (diff > 0) {
+              await storage.createInvestment({
+                platformId,
+                amount: diff.toFixed(2),
+                date: today,
+                notes: `Auto-adjusted from GoldRepublic (total invested: €${balanceData.totalInvested.toFixed(2)})`,
+              });
+              console.log(`[GoldRepublic] Added investment adjustment of €${diff.toFixed(2)} to match scraped total of €${balanceData.totalInvested.toFixed(2)}`);
+            } else {
+              console.log(`[GoldRepublic] Scraped total invested (€${balanceData.totalInvested.toFixed(2)}) is less than recorded (€${totalExisting.toFixed(2)}). Manual review needed.`);
+            }
+          }
+        }
+
+        const msgParts = [`Total: €${balanceData.totalBalance.toFixed(2)}`];
+        if (balanceData.totalInvested) {
+          msgParts.push(`Invested: €${balanceData.totalInvested.toFixed(2)}`);
+        }
+
         await storage.updateScraperConfig(config.id, userId, {
           lastScrapeAt: new Date(),
           lastScrapeStatus: "success",
-          lastScrapeMessage: `Total: €${balanceData.totalBalance.toFixed(2)}`,
+          lastScrapeMessage: msgParts.join(", "),
         });
 
         return res.json({
           success: true,
           data: balanceData,
-          message: `Successfully scraped. Total balance: €${balanceData.totalBalance.toFixed(2)}`,
+          message: `Successfully scraped. Total balance: €${balanceData.totalBalance.toFixed(2)}${balanceData.totalInvested ? `, Invested: €${balanceData.totalInvested.toFixed(2)}` : ""}`,
         });
       }
 

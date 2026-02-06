@@ -2,6 +2,7 @@ import puppeteer from "puppeteer-core";
 
 export interface GoldRepublicScrapedData {
   totalBalance: number;
+  totalInvested: number | null;
   scrapedAt: Date;
 }
 
@@ -178,29 +179,45 @@ export async function scrapeGoldRepublic(username: string, email: string, passwo
     const portfolioData = await page.evaluate(`(function() {
       var result = {
         portfolioValue: null,
+        totalInvested: null,
         debugText: document.body.innerText.substring(0, 5000),
       };
 
       var allText = document.body.innerText;
 
-      var patterns = [
+      var valuePatterns = [
         /Huidige\\s+portefeuillewaarde[\\s\\S]*?€\\s*([\\d.,]+)/i,
         /Current\\s+portfolio\\s+value[\\s\\S]*?€\\s*([\\d.,]+)/i,
         /portefeuillewaarde[\\s\\S]*?€\\s*([\\d.,]+)/i,
       ];
 
-      for (var i = 0; i < patterns.length; i++) {
-        var match = allText.match(patterns[i]);
+      for (var i = 0; i < valuePatterns.length; i++) {
+        var match = allText.match(valuePatterns[i]);
         if (match) {
           result.portfolioValue = match[1];
           break;
         }
       }
 
+      var investedPatterns = [
+        /Totale\\s+investering\\/edelmetaalstorting[\\s\\S]*?€\\s*([\\d.,]+)/i,
+        /Totale\\s+investering[\\s\\S]*?€\\s*([\\d.,]+)/i,
+        /Total\\s+investment[\\s\\S]*?€\\s*([\\d.,]+)/i,
+      ];
+
+      for (var i = 0; i < investedPatterns.length; i++) {
+        var match = allText.match(investedPatterns[i]);
+        if (match) {
+          result.totalInvested = match[1];
+          break;
+        }
+      }
+
       return result;
-    })()`) as { portfolioValue: string | null; debugText: string };
+    })()`) as { portfolioValue: string | null; totalInvested: string | null; debugText: string };
 
     console.log(`[GoldRepublic Scraper] Raw portfolio value text: ${portfolioData.portfolioValue}`);
+    console.log(`[GoldRepublic Scraper] Raw total invested text: ${portfolioData.totalInvested}`);
     console.log(`[GoldRepublic Scraper] Page text preview: ${portfolioData.debugText.substring(0, 2000)}`);
 
     let totalBalance = 0;
@@ -215,10 +232,20 @@ export async function scrapeGoldRepublic(username: string, email: string, passwo
       throw new Error("Could not extract portfolio value from performance page. Page content may have changed.");
     }
 
+    let totalInvested: number | null = null;
+    if (portfolioData.totalInvested) {
+      const parsed = extractEuroNumber(portfolioData.totalInvested);
+      if (parsed !== null && parsed > 0) {
+        totalInvested = parsed;
+      }
+    }
+
     console.log(`[GoldRepublic Scraper] Final portfolio value: €${totalBalance}`);
+    console.log(`[GoldRepublic Scraper] Final total invested: €${totalInvested}`);
 
     return {
       totalBalance,
+      totalInvested,
       scrapedAt: new Date(),
     };
 
