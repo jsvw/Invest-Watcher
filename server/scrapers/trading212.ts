@@ -4,6 +4,11 @@ export interface Trading212Instrument {
   expectedShare: number;
   currentShare: number;
   result: number;
+  currentPrice?: number;
+  averagePrice?: number;
+  ppl?: number;
+  fxPpl?: number;
+  quantity?: number;
 }
 
 export interface Trading212PieData {
@@ -58,6 +63,27 @@ async function makeRequest(path: string, apiKey: string, apiSecret: string, retr
     return response.json();
   }
   throw new Error("Trading 212 API request failed: no response received");
+}
+
+interface PositionData {
+  ticker: string;
+  quantity: number;
+  averagePrice: number;
+  currentPrice: number;
+  ppl: number;
+  fxPpl: number;
+  pieQuantity: number;
+}
+
+export async function fetchPositions(apiKey: string, apiSecret: string): Promise<Map<string, PositionData>> {
+  console.log("[Trading212] Fetching all positions...");
+  const positions = await makeRequest("/equity/portfolio", apiKey, apiSecret) as PositionData[];
+  const posMap = new Map<string, PositionData>();
+  for (const pos of positions) {
+    posMap.set(pos.ticker, pos);
+  }
+  console.log(`[Trading212] Found ${positions.length} position(s)`);
+  return posMap;
 }
 
 export async function scrapeTrading212(apiKey: string, apiSecret: string): Promise<Trading212ScrapedData> {
@@ -121,4 +147,27 @@ export async function scrapeTrading212(apiKey: string, apiSecret: string): Promi
     pies: pieDetails,
     scrapedAt: new Date(),
   };
+}
+
+export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: string): Promise<Trading212ScrapedData> {
+  const data = await scrapeTrading212(apiKey, apiSecret);
+
+  await new Promise(resolve => setTimeout(resolve, 5000));
+
+  const posMap = await fetchPositions(apiKey, apiSecret);
+
+  for (const pie of data.pies) {
+    for (const inst of pie.instruments) {
+      const pos = posMap.get(inst.ticker);
+      if (pos) {
+        inst.currentPrice = pos.currentPrice;
+        inst.averagePrice = pos.averagePrice;
+        inst.quantity = pos.pieQuantity || pos.quantity;
+        inst.ppl = pos.ppl;
+        inst.fxPpl = pos.fxPpl;
+      }
+    }
+  }
+
+  return data;
 }

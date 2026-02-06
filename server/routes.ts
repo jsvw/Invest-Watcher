@@ -1720,8 +1720,8 @@ export async function registerRoutes(
       const platform = await storage.getPlatform(platformId, userId);
       if (!platform) return res.status(404).json({ message: "Platform not found" });
 
-      const { scrapeTrading212 } = await import("./scrapers/trading212");
-      const t212Data = await scrapeTrading212(creds.apiKey, creds.apiSecret);
+      const { scrapeTrading212WithPositions } = await import("./scrapers/trading212");
+      const t212Data = await scrapeTrading212WithPositions(creds.apiKey, creds.apiSecret);
 
       const pieName = creds.pieName || "";
       const matchedPie = t212Data.pies.find(p => {

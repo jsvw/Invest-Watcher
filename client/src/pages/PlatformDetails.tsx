@@ -986,25 +986,39 @@ export default function PlatformDetails() {
                             <tr className="border-b bg-muted/50">
                               <th className="text-left p-3 font-medium">Ticker</th>
                               <th className="text-right p-3 font-medium">Shares</th>
+                              <th className="text-right p-3 font-medium">Avg Price</th>
+                              <th className="text-right p-3 font-medium">Price</th>
+                              <th className="text-right p-3 font-medium">Value</th>
                               <th className="text-right p-3 font-medium">P/L</th>
-                              <th className="text-right p-3 font-medium">Target</th>
-                              <th className="text-right p-3 font-medium">Actual</th>
+                              <th className="text-right p-3 font-medium">Allocation</th>
                             </tr>
                           </thead>
                           <tbody>
                             {holdingsData.instruments
                               ?.sort((a: any, b: any) => (b.currentShare || 0) - (a.currentShare || 0))
-                              .map((inst: any, idx: number) => (
-                                <tr key={idx} className="border-b last:border-0" data-testid={`row-holding-${idx}`}>
-                                  <td className="p-3 font-medium" data-testid={`text-ticker-${idx}`}>{inst.ticker}</td>
-                                  <td className="text-right p-3 tabular-nums">{inst.shares?.toFixed(inst.shares < 1 ? 6 : 4)}</td>
-                                  <td className={`text-right p-3 tabular-nums ${(inst.result || 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                    {inst.result != null ? `${inst.result >= 0 ? '+' : ''}${formatCurrency(inst.result, currency)}` : '-'}
-                                  </td>
-                                  <td className="text-right p-3 tabular-nums">{inst.expectedShare?.toFixed(1)}%</td>
-                                  <td className="text-right p-3 tabular-nums">{inst.currentShare?.toFixed(1)}%</td>
-                                </tr>
-                              ))}
+                              .map((inst: any, idx: number) => {
+                                const qty = inst.quantity ?? inst.shares;
+                                const value = qty && inst.currentPrice ? qty * inst.currentPrice : null;
+                                return (
+                                  <tr key={idx} className="border-b last:border-0" data-testid={`row-holding-${idx}`}>
+                                    <td className="p-3 font-medium" data-testid={`text-ticker-${idx}`}>{inst.ticker}</td>
+                                    <td className="text-right p-3 tabular-nums">{qty?.toFixed(qty < 1 ? 6 : 4) ?? '-'}</td>
+                                    <td className="text-right p-3 tabular-nums">
+                                      {inst.averagePrice != null ? formatCurrency(inst.averagePrice, currency) : '-'}
+                                    </td>
+                                    <td className="text-right p-3 tabular-nums">
+                                      {inst.currentPrice != null ? formatCurrency(inst.currentPrice, currency) : '-'}
+                                    </td>
+                                    <td className="text-right p-3 tabular-nums font-medium">
+                                      {value != null ? formatCurrency(value, currency) : '-'}
+                                    </td>
+                                    <td className={`text-right p-3 tabular-nums ${(inst.ppl ?? inst.result ?? 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                      {(inst.ppl ?? inst.result) != null ? `${(inst.ppl ?? inst.result) >= 0 ? '+' : ''}${formatCurrency(inst.ppl ?? inst.result, currency)}` : '-'}
+                                    </td>
+                                    <td className="text-right p-3 tabular-nums">{inst.currentShare?.toFixed(1)}%</td>
+                                  </tr>
+                                );
+                              })}
                           </tbody>
                         </table>
                       </div>
