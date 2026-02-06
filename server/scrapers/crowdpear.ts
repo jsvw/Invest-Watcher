@@ -64,6 +64,7 @@ async function fetch2FACodeFromEmail(email: string, appPassword: string, maxAtte
             { subject: "login code" },
             { subject: "security code" },
             { subject: "crowdpear" },
+            { subject: "login attempt" },
           ],
         });
 
@@ -76,7 +77,7 @@ async function fetch2FACodeFromEmail(email: string, appPassword: string, maxAtte
             const rawEmail = msg.source.toString();
             const lowerEmail = rawEmail.toLowerCase();
 
-            if (!lowerEmail.includes("crowdpear") && !lowerEmail.includes("verification") && !lowerEmail.includes("login code")) {
+            if (!lowerEmail.includes("crowdpear") && !lowerEmail.includes("verification") && !lowerEmail.includes("login code") && !lowerEmail.includes("login attempt")) {
               console.log("[CrowdPear 2FA] Email found but doesn't appear to be from CrowdPear, skipping...");
             } else {
               const codePatterns = [
