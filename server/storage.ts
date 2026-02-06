@@ -117,6 +117,7 @@ export interface IStorage {
   // Scraper Configs
   getScraperConfig(platformId: number, userId: number): Promise<ScraperConfig | undefined>;
   getScraperConfigsByUser(userId: number): Promise<ScraperConfig[]>;
+  getAllEnabledScraperConfigs(): Promise<ScraperConfig[]>;
   saveScraperConfig(config: InsertScraperConfig): Promise<ScraperConfig>;
   updateScraperConfig(id: number, userId: number, data: Partial<ScraperConfig>): Promise<ScraperConfig>;
   deleteScraperConfig(platformId: number, userId: number): Promise<void>;
@@ -1082,6 +1083,11 @@ export class DatabaseStorage implements IStorage {
   async getScraperConfigsByUser(userId: number): Promise<ScraperConfig[]> {
     return db.select().from(scraperConfigs)
       .where(eq(scraperConfigs.userId, userId));
+  }
+
+  async getAllEnabledScraperConfigs(): Promise<ScraperConfig[]> {
+    return db.select().from(scraperConfigs)
+      .where(eq(scraperConfigs.enabled, true));
   }
 
   async saveScraperConfig(config: InsertScraperConfig): Promise<ScraperConfig> {
