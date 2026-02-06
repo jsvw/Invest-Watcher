@@ -6,7 +6,7 @@ export interface GoldRepublicScrapedData {
 }
 
 const CHROMIUM_PATH = process.env.CHROMIUM_PATH || "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
-const LOGIN_URL = "https://www.goldrepublic.com/en-us/login";
+const LOGIN_URL = "https://www.goldrepublic.com/nl-nl/inloggen";
 
 export async function scrapeGoldRepublic(username: string, password: string): Promise<GoldRepublicScrapedData> {
   let browser;
