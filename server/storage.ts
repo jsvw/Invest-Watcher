@@ -58,6 +58,7 @@ export interface IStorage {
   getAllInvestmentsForUser(userId: number): Promise<Investment[]>;
   createInvestment(investment: InsertInvestment): Promise<Investment>;
   updateInvestment(id: number, investment: Partial<InsertInvestment>): Promise<Investment>;
+  deleteInvestment(id: number): Promise<void>;
   getInvestmentPlatformId(investmentId: number): Promise<number | null>;
 
   // Withdrawals (require platform ownership verification in routes)
