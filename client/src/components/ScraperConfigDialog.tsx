@@ -13,6 +13,7 @@ import { Globe, Loader2, Settings2, CheckCircle, XCircle, Trash2 } from "lucide-
 const SCRAPER_TYPES = [
   { value: "monefit", label: "Monefit SmartSaver", credentialType: "email" },
   { value: "robocash", label: "RoboCash", credentialType: "email" },
+  { value: "crowdpear", label: "CrowdPear", credentialType: "email" },
   { value: "trading212", label: "Trading 212 API", credentialType: "apikey" },
 ];
 

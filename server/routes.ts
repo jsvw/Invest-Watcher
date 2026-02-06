@@ -1543,22 +1543,28 @@ export async function registerRoutes(
         });
       }
 
-      if (config.scraperType === "robocash") {
-        const { scrapeRoboCash } = await import("./scrapers/robocash");
-        const robocashData = await scrapeRoboCash(creds.email, creds.password);
+      if (config.scraperType === "robocash" || config.scraperType === "crowdpear") {
+        let balanceData: { totalBalance: number; scrapedAt: Date };
+        if (config.scraperType === "robocash") {
+          const { scrapeRoboCash } = await import("./scrapers/robocash");
+          balanceData = await scrapeRoboCash(creds.email, creds.password);
+        } else {
+          const { scrapeCrowdPear } = await import("./scrapers/crowdpear");
+          balanceData = await scrapeCrowdPear(creds.email, creds.password);
+        }
 
-        if (robocashData.totalBalance > 0) {
+        if (balanceData.totalBalance > 0) {
           const existingVals = await storage.getValuations(platformId);
           const todayStr = today.toISOString().split("T")[0];
           const sameDayVal = existingVals.find(v =>
             new Date(v.date).toISOString().split("T")[0] === todayStr
           );
           if (sameDayVal) {
-            await storage.updateValuation(sameDayVal.id, { value: robocashData.totalBalance.toFixed(2) });
+            await storage.updateValuation(sameDayVal.id, { value: balanceData.totalBalance.toFixed(2) });
           } else {
             await storage.createValuation({
               platformId,
-              value: robocashData.totalBalance.toFixed(2),
+              value: balanceData.totalBalance.toFixed(2),
               date: today,
             });
           }
@@ -1567,13 +1573,13 @@ export async function registerRoutes(
         await storage.updateScraperConfig(config.id, userId, {
           lastScrapeAt: new Date(),
           lastScrapeStatus: "success",
-          lastScrapeMessage: `Total: €${robocashData.totalBalance.toFixed(2)}`,
+          lastScrapeMessage: `Total: €${balanceData.totalBalance.toFixed(2)}`,
         });
 
         return res.json({
           success: true,
-          data: robocashData,
-          message: `Successfully scraped. Total balance: €${robocashData.totalBalance.toFixed(2)}`,
+          data: balanceData,
+          message: `Successfully scraped. Total balance: €${balanceData.totalBalance.toFixed(2)}`,
         });
       }
 

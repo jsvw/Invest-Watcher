@@ -170,21 +170,27 @@ async function runScrapeForConfig(config: any) {
       return;
     }
 
-    if (scraperType === "robocash") {
-      const { scrapeRoboCash } = await import("./scrapers/robocash");
-      const robocashData = await scrapeRoboCash(creds.email, creds.password);
+    if (scraperType === "robocash" || scraperType === "crowdpear") {
+      let balanceData: { totalBalance: number; scrapedAt: Date };
+      if (scraperType === "robocash") {
+        const { scrapeRoboCash } = await import("./scrapers/robocash");
+        balanceData = await scrapeRoboCash(creds.email, creds.password);
+      } else {
+        const { scrapeCrowdPear } = await import("./scrapers/crowdpear");
+        balanceData = await scrapeCrowdPear(creds.email, creds.password);
+      }
 
-      if (robocashData.totalBalance > 0) {
+      if (balanceData.totalBalance > 0) {
         const existingVals = await storage.getValuations(platformId);
         const sameDayVal = existingVals.find(v =>
           new Date(v.date).toISOString().split("T")[0] === todayStr
         );
         if (sameDayVal) {
-          await storage.updateValuation(sameDayVal.id, { value: robocashData.totalBalance.toFixed(2) });
+          await storage.updateValuation(sameDayVal.id, { value: balanceData.totalBalance.toFixed(2) });
         } else {
           await storage.createValuation({
             platformId,
-            value: robocashData.totalBalance.toFixed(2),
+            value: balanceData.totalBalance.toFixed(2),
             date: today,
           });
         }
@@ -193,10 +199,10 @@ async function runScrapeForConfig(config: any) {
       await storage.updateScraperConfig(id, userId, {
         lastScrapeAt: new Date(),
         lastScrapeStatus: "success",
-        lastScrapeMessage: `Total: €${robocashData.totalBalance.toFixed(2)}`,
+        lastScrapeMessage: `Total: €${balanceData.totalBalance.toFixed(2)}`,
       });
 
-      console.log(`[Scheduler] Scrape complete for platform ${platformId}: €${robocashData.totalBalance.toFixed(2)}`);
+      console.log(`[Scheduler] Scrape complete for platform ${platformId}: €${balanceData.totalBalance.toFixed(2)}`);
       return;
     }
 
