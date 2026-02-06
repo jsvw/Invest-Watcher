@@ -1560,7 +1560,7 @@ export async function registerRoutes(
           balanceData = await scrapeRoboCash(creds.email, creds.password);
         } else if (config.scraperType === "goldrepublic") {
           const { scrapeGoldRepublic } = await import("./scrapers/goldrepublic");
-          balanceData = await scrapeGoldRepublic(creds.username, creds.password);
+          balanceData = await scrapeGoldRepublic(creds.username, creds.email, creds.password);
         } else {
           const { scrapeCrowdPear } = await import("./scrapers/crowdpear");
           balanceData = await scrapeCrowdPear(creds.email, creds.password, creds.gmailAppPassword, creds.gmailEmail);

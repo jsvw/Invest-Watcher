@@ -9,9 +9,9 @@ const CHROMIUM_PATH = process.env.CHROMIUM_PATH || "/nix/store/zi4f80l169xlmivz8
 const LOGIN_URL = "https://www.goldrepublic.com/nl-nl/inloggen";
 const ACCOUNT_URL = "https://www.goldrepublic.com/nl-nl/account";
 
-export async function scrapeGoldRepublic(username: string, password: string): Promise<GoldRepublicScrapedData> {
-  if (!username || !password) {
-    throw new Error("Missing username or password. Please re-save your GoldRepublic credentials with all three fields (username, email, password).");
+export async function scrapeGoldRepublic(username: string, email: string, password: string): Promise<GoldRepublicScrapedData> {
+  if (!username || !email || !password) {
+    throw new Error("Missing credentials. Please re-save your GoldRepublic credentials with all three fields (username, email, password).");
   }
   let browser;
   try {
@@ -70,26 +70,40 @@ export async function scrapeGoldRepublic(username: string, password: string): Pr
     } catch (e) {}
 
     console.log("[GoldRepublic Scraper] Waiting for login form...");
-    await page.waitForSelector('input[name="username"], input[type="text"], input[id*="user"]', { timeout: 15000 });
+    await page.waitForSelector('input', { timeout: 15000 });
+
+    const availableInputs = await page.evaluate(`(function() {
+      return Array.from(document.querySelectorAll('input')).map(function(i) {
+        return { name: i.name, type: i.type, id: i.id, placeholder: i.placeholder };
+      });
+    })()`) as Array<{name: string; type: string; id: string; placeholder: string}>;
+    console.log(`[GoldRepublic Scraper] Available inputs: ${JSON.stringify(availableInputs)}`);
 
     const usernameInput = await page.$('input[name="username"]')
       || await page.$('input[id*="username"]')
       || await page.$('input[type="text"]');
+    const emailInput = await page.$('input[name="email"]')
+      || await page.$('input[type="email"]')
+      || await page.$('input[id*="email"]');
     const passwordInput = await page.$('input[name="password"]')
       || await page.$('input[type="password"]');
 
     if (!usernameInput || !passwordInput) {
-      const availableInputs = await page.evaluate(`(function() {
-        return Array.from(document.querySelectorAll('input')).map(function(i) {
-          return { name: i.name, type: i.type, id: i.id, placeholder: i.placeholder };
-        });
-      })()`);
       throw new Error(`Could not find login fields. Available inputs: ${JSON.stringify(availableInputs)}`);
     }
 
     console.log("[GoldRepublic Scraper] Filling login form...");
     await usernameInput.click({ clickCount: 3 });
     await usernameInput.type(username, { delay: 50 });
+
+    if (emailInput) {
+      console.log("[GoldRepublic Scraper] Filling email field...");
+      await emailInput.click({ clickCount: 3 });
+      await emailInput.type(email, { delay: 50 });
+    } else {
+      console.log("[GoldRepublic Scraper] No separate email field found, skipping...");
+    }
+
     await passwordInput.click({ clickCount: 3 });
     await passwordInput.type(password, { delay: 50 });
 
