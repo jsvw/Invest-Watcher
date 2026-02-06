@@ -169,6 +169,18 @@ export const trading212Holdings = pgTable("trading212_holdings", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// === TRADING 212 DIVIDENDS (per-ticker dividend records) ===
+export const trading212Dividends = pgTable("trading212_dividends", {
+  id: serial("id").primaryKey(),
+  platformId: integer("platform_id").notNull().references(() => platforms.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  ticker: text("ticker").notNull(),
+  amount: numeric("amount").notNull(),
+  paidOn: text("paid_on").notNull(),
+  quantity: numeric("quantity"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === BASE SCHEMAS ===
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertPlatformSchema = createInsertSchema(platforms).omit({ id: true, createdAt: true });
@@ -182,6 +194,7 @@ export const insertEmailSettingsSchema = createInsertSchema(emailSettings).omit(
 export const insertEmailImportSchema = createInsertSchema(emailImports).omit({ id: true, createdAt: true });
 export const insertScraperConfigSchema = createInsertSchema(scraperConfigs).omit({ id: true, createdAt: true, lastScrapeAt: true, lastScrapeStatus: true, lastScrapeMessage: true });
 export const insertTrading212HoldingSchema = createInsertSchema(trading212Holdings).omit({ id: true, createdAt: true });
+export const insertTrading212DividendSchema = createInsertSchema(trading212Dividends).omit({ id: true, createdAt: true });
 
 // === EXPLICIT API CONTRACT TYPES ===
 
@@ -198,6 +211,7 @@ export type EmailSettings = typeof emailSettings.$inferSelect;
 export type EmailImport = typeof emailImports.$inferSelect;
 export type ScraperConfig = typeof scraperConfigs.$inferSelect;
 export type Trading212Holding = typeof trading212Holdings.$inferSelect;
+export type Trading212Dividend = typeof trading212Dividends.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertPlatform = z.infer<typeof insertPlatformSchema>;
@@ -211,6 +225,7 @@ export type InsertEmailSettings = z.infer<typeof insertEmailSettingsSchema>;
 export type InsertEmailImport = z.infer<typeof insertEmailImportSchema>;
 export type InsertScraperConfig = z.infer<typeof insertScraperConfigSchema>;
 export type InsertTrading212Holding = z.infer<typeof insertTrading212HoldingSchema>;
+export type InsertTrading212Dividend = z.infer<typeof insertTrading212DividendSchema>;
 
 // Request types
 export type CreatePlatformRequest = InsertPlatform;

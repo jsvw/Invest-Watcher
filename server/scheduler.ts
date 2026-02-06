@@ -46,7 +46,7 @@ async function runScrapeForConfig(config: any) {
         });
         return;
       }
-      const { scrapeTrading212, fetchPositions } = await import("./scrapers/trading212");
+      const { scrapeTrading212, fetchPositions, fetchDividends } = await import("./scrapers/trading212");
       const t212Data = await scrapeTrading212(creds.apiKey, creds.apiSecret);
 
       const pieName = creds.pieName || "";
@@ -138,6 +138,26 @@ async function runScrapeForConfig(config: any) {
         console.log(`[Scheduler] Saved ${holdingsToSave.length} T212 holdings snapshots for platform ${platformId}`);
       } catch (holdingsErr: any) {
         console.error(`[Scheduler] Failed to save T212 holdings for platform ${platformId}:`, holdingsErr.message);
+      }
+
+      try {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        const divMap = await fetchDividends(creds.apiKey, creds.apiSecret);
+        const allDivRecords: { ticker: string; amount: string; paidOn: string; quantity: string | null }[] = [];
+        divMap.forEach((data, ticker) => {
+          for (const record of data.history) {
+            allDivRecords.push({
+              ticker,
+              amount: record.amount.toString(),
+              paidOn: record.paidOn,
+              quantity: record.quantity != null ? record.quantity.toString() : null,
+            });
+          }
+        });
+        await storage.saveTrading212Dividends(platformId, userId, allDivRecords);
+        console.log(`[Scheduler] Saved ${allDivRecords.length} T212 dividend records for platform ${platformId}`);
+      } catch (divErr: any) {
+        console.error(`[Scheduler] Failed to save T212 dividends for platform ${platformId}:`, divErr.message);
       }
 
       await storage.updateScraperConfig(id, userId, {

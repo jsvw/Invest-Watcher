@@ -34,7 +34,10 @@ import {
   type InsertScraperConfig,
   trading212Holdings,
   type Trading212Holding,
-  type InsertTrading212Holding
+  type InsertTrading212Holding,
+  trading212Dividends,
+  type Trading212Dividend,
+  type InsertTrading212Dividend
 } from "@shared/schema";
 import { eq, desc, sql, and, or } from "drizzle-orm";
 
@@ -130,6 +133,10 @@ export interface IStorage {
   getTrading212Holdings(platformId: number, userId: number): Promise<Trading212Holding[]>;
   getTrading212HoldingsDates(platformId: number, userId: number): Promise<string[]>;
   getTrading212HoldingsByDate(platformId: number, userId: number, date: string): Promise<Trading212Holding[]>;
+
+  // Trading 212 Dividends
+  saveTrading212Dividends(platformId: number, userId: number, dividends: { ticker: string; amount: string; paidOn: string; quantity?: string | null }[]): Promise<void>;
+  getTrading212Dividends(platformId: number, userId: number): Promise<Trading212Dividend[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1188,6 +1195,39 @@ export class DatabaseStorage implements IStorage {
         sql`${trading212Holdings.date} <= ${dayEnd}`
       ))
       .orderBy(desc(trading212Holdings.value));
+  }
+
+  async saveTrading212Dividends(platformId: number, userId: number, dividends: { ticker: string; amount: string; paidOn: string; quantity?: string | null }[]): Promise<void> {
+    if (dividends.length === 0) return; // Never delete existing data if incoming is empty
+    await db.transaction(async (tx) => {
+      await tx.delete(trading212Dividends)
+        .where(and(
+          eq(trading212Dividends.platformId, platformId),
+          eq(trading212Dividends.userId, userId)
+        ));
+      const rows = dividends.map(d => ({
+        platformId,
+        userId,
+        ticker: d.ticker,
+        amount: d.amount,
+        paidOn: d.paidOn,
+        quantity: d.quantity ?? null,
+      }));
+      const batchSize = 100;
+      for (let i = 0; i < rows.length; i += batchSize) {
+        await tx.insert(trading212Dividends).values(rows.slice(i, i + batchSize));
+      }
+    });
+  }
+
+  async getTrading212Dividends(platformId: number, userId: number): Promise<Trading212Dividend[]> {
+    return db.select()
+      .from(trading212Dividends)
+      .where(and(
+        eq(trading212Dividends.platformId, platformId),
+        eq(trading212Dividends.userId, userId)
+      ))
+      .orderBy(trading212Dividends.paidOn);
   }
 }
 

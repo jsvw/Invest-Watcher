@@ -1731,8 +1731,14 @@ export async function registerRoutes(
       if (!platform) return res.status(404).json({ message: "Platform not found" });
 
       const { scrapeTrading212WithPositions } = await import("./scrapers/trading212");
-      const t212Result = await scrapeTrading212WithPositions(creds.apiKey, creds.apiSecret);
-      const t212Data = t212Result;
+
+      const dbDividends = await storage.getTrading212Dividends(platformId, userId);
+      const hasDbDividends = dbDividends.length > 0;
+      const shouldFetchDividends = forceRefresh || !hasDbDividends;
+
+      const t212Data = await scrapeTrading212WithPositions(creds.apiKey, creds.apiSecret, {
+        skipDividends: !shouldFetchDividends,
+      });
 
       const pieName = creds.pieName || "";
       const matchedPie = t212Data.pies.find(p => {
@@ -1746,6 +1752,55 @@ export async function registerRoutes(
 
       if (!matchedPie) {
         return res.status(404).json({ message: "No matching pie found" });
+      }
+
+      if (t212Data.dividendsLoaded && t212Data.rawDividends && t212Data.rawDividends.size > 0) {
+        try {
+          const allDivRecords: { ticker: string; amount: string; paidOn: string; quantity: string | null }[] = [];
+          t212Data.rawDividends.forEach((data, ticker) => {
+            for (const record of data.history) {
+              allDivRecords.push({
+                ticker,
+                amount: record.amount.toString(),
+                paidOn: record.paidOn,
+                quantity: record.quantity != null ? record.quantity.toString() : null,
+              });
+            }
+          });
+          await storage.saveTrading212Dividends(platformId, userId, allDivRecords);
+          console.log(`[Trading212] Saved ${allDivRecords.length} dividend records to DB`);
+        } catch (divSaveErr: any) {
+          console.error("T212 dividend save error:", divSaveErr.message);
+        }
+      }
+
+      const needDbDividendFallback = !t212Data.dividendsLoaded || (t212Data.dividendsLoaded && (!t212Data.rawDividends || t212Data.rawDividends.size === 0));
+      const dividendsAlreadyOnInstruments = matchedPie.instruments.some(i => i.dividendsReceived != null && i.dividendsReceived > 0);
+      if (needDbDividendFallback && !dividendsAlreadyOnInstruments && hasDbDividends) {
+        const divMap = new Map<string, { total: number; count: number; lastDate: string; history: { amount: number; paidOn: string; quantity: number }[] }>();
+        for (const row of dbDividends) {
+          const existing = divMap.get(row.ticker);
+          const amt = Number(row.amount);
+          const qty = row.quantity ? Number(row.quantity) : 0;
+          const record = { amount: amt, paidOn: row.paidOn, quantity: qty };
+          if (existing) {
+            existing.total += amt;
+            existing.count += 1;
+            existing.history.push(record);
+            if (row.paidOn > existing.lastDate) existing.lastDate = row.paidOn;
+          } else {
+            divMap.set(row.ticker, { total: amt, count: 1, lastDate: row.paidOn, history: [record] });
+          }
+        }
+        for (const inst of matchedPie.instruments) {
+          const div = divMap.get(inst.ticker);
+          if (div) {
+            inst.dividendsReceived = div.total;
+            inst.dividendCount = div.count;
+            inst.lastDividendDate = div.lastDate;
+            inst.dividendHistory = div.history;
+          }
+        }
       }
 
       const today = new Date();
@@ -1790,9 +1845,7 @@ export async function registerRoutes(
         instruments: matchedPie.instruments,
       };
 
-      if (t212Data.dividendsLoaded) {
-        holdingsCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
-      }
+      holdingsCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
 
       res.json(responseData);
     } catch (err: any) {

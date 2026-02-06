@@ -232,7 +232,7 @@ export async function fetchDividends(apiKey: string, apiSecret: string): Promise
   return divMap;
 }
 
-export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: string): Promise<Trading212ScrapedData & { dividendsLoaded: boolean }> {
+export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: string, options?: { skipDividends?: boolean }): Promise<Trading212ScrapedData & { dividendsLoaded: boolean; rawDividends?: Map<string, TickerDividendData> }> {
   const data = await scrapeTrading212(apiKey, apiSecret);
 
   await new Promise(resolve => setTimeout(resolve, API_DELAY_MS));
@@ -240,12 +240,14 @@ export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: s
 
   let divMap = new Map<string, TickerDividendData>();
   let dividendsLoaded = false;
-  try {
-    await new Promise(resolve => setTimeout(resolve, API_DELAY_MS));
-    divMap = await fetchDividends(apiKey, apiSecret);
-    dividendsLoaded = true;
-  } catch (err: any) {
-    console.log(`[Trading212] Dividend history unavailable (${err.message}), skipping`);
+  if (!options?.skipDividends) {
+    try {
+      await new Promise(resolve => setTimeout(resolve, API_DELAY_MS));
+      divMap = await fetchDividends(apiKey, apiSecret);
+      dividendsLoaded = true;
+    } catch (err: any) {
+      console.log(`[Trading212] Dividend history unavailable (${err.message}), skipping`);
+    }
   }
 
   for (const pie of data.pies) {
@@ -268,5 +270,5 @@ export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: s
     }
   }
 
-  return { ...data, dividendsLoaded };
+  return { ...data, dividendsLoaded, rawDividends: dividendsLoaded ? divMap : undefined };
 }
