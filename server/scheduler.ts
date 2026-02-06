@@ -170,11 +170,14 @@ async function runScrapeForConfig(config: any) {
       return;
     }
 
-    if (scraperType === "robocash" || scraperType === "crowdpear") {
+    if (scraperType === "robocash" || scraperType === "crowdpear" || scraperType === "goldrepublic") {
       let balanceData: { totalBalance: number; scrapedAt: Date };
       if (scraperType === "robocash") {
         const { scrapeRoboCash } = await import("./scrapers/robocash");
         balanceData = await scrapeRoboCash(creds.email, creds.password);
+      } else if (scraperType === "goldrepublic") {
+        const { scrapeGoldRepublic } = await import("./scrapers/goldrepublic");
+        balanceData = await scrapeGoldRepublic(creds.username, creds.password);
       } else {
         const { scrapeCrowdPear } = await import("./scrapers/crowdpear");
         balanceData = await scrapeCrowdPear(creds.email, creds.password, creds.gmailAppPassword, creds.gmailEmail);

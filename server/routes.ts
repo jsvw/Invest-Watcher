@@ -1383,6 +1383,12 @@ export async function registerRoutes(
         }
         credentialData = { apiKey, apiSecret };
         if (pieName) credentialData.pieName = pieName;
+      } else if (scraperType === "goldrepublic") {
+        const { username, email, password } = req.body;
+        if (!username || !email || !password) {
+          return res.status(400).json({ message: "username, email, and password are required for GoldRepublic" });
+        }
+        credentialData = { username, email, password };
       } else {
         const { email, password, gmailAppPassword, gmailEmail } = req.body;
         if (!email || !password) {
@@ -1547,11 +1553,14 @@ export async function registerRoutes(
         });
       }
 
-      if (config.scraperType === "robocash" || config.scraperType === "crowdpear") {
+      if (config.scraperType === "robocash" || config.scraperType === "crowdpear" || config.scraperType === "goldrepublic") {
         let balanceData: { totalBalance: number; scrapedAt: Date };
         if (config.scraperType === "robocash") {
           const { scrapeRoboCash } = await import("./scrapers/robocash");
           balanceData = await scrapeRoboCash(creds.email, creds.password);
+        } else if (config.scraperType === "goldrepublic") {
+          const { scrapeGoldRepublic } = await import("./scrapers/goldrepublic");
+          balanceData = await scrapeGoldRepublic(creds.username, creds.password);
         } else {
           const { scrapeCrowdPear } = await import("./scrapers/crowdpear");
           balanceData = await scrapeCrowdPear(creds.email, creds.password, creds.gmailAppPassword, creds.gmailEmail);

@@ -14,6 +14,7 @@ const SCRAPER_TYPES = [
   { value: "monefit", label: "Monefit SmartSaver", credentialType: "email" },
   { value: "robocash", label: "RoboCash", credentialType: "email" },
   { value: "crowdpear", label: "CrowdPear", credentialType: "email" },
+  { value: "goldrepublic", label: "GoldRepublic", credentialType: "username_email" },
   { value: "trading212", label: "Trading 212 API", credentialType: "apikey" },
 ];
 
@@ -25,6 +26,7 @@ interface ScraperConfigDialogProps {
 export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigDialogProps) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
@@ -36,6 +38,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
 
   const selectedType = SCRAPER_TYPES.find(st => st.value === scraperType);
   const isApiKeyType = selectedType?.credentialType === "apikey";
+  const isUsernameEmailType = selectedType?.credentialType === "username_email";
 
   const { data: config, isLoading: configLoading } = useQuery({
     queryKey: ['/api/platforms', platformId, 'scraper-config'],
@@ -49,15 +52,21 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
 
   const saveConfig = useMutation({
     mutationFn: async () => {
-      const body = isApiKeyType
-        ? { scraperType, apiKey, apiSecret, pieName: pieName || undefined }
-        : { scraperType, email, password, ...(scraperType === "crowdpear" ? { ...(gmailAppPassword ? { gmailAppPassword } : {}), ...(gmailEmail ? { gmailEmail } : {}) } : {}) };
+      let body: Record<string, any>;
+      if (isApiKeyType) {
+        body = { scraperType, apiKey, apiSecret, pieName: pieName || undefined };
+      } else if (isUsernameEmailType) {
+        body = { scraperType, username, email, password };
+      } else {
+        body = { scraperType, email, password, ...(scraperType === "crowdpear" ? { ...(gmailAppPassword ? { gmailAppPassword } : {}), ...(gmailEmail ? { gmailEmail } : {}) } : {}) };
+      }
       return apiRequest("POST", `/api/platforms/${platformId}/scraper-config`, body);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/platforms', platformId, 'scraper-config'] });
       toast({ title: "Scraper credentials saved" });
       setEmail("");
+      setUsername("");
       setPassword("");
       setApiKey("");
       setApiSecret("");
@@ -112,13 +121,18 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
 
   const hasConfig = config && config.id;
   const isConfigApiKeyType = config?.scraperType === "trading212";
+  const isConfigUsernameEmailType = config?.scraperType === "goldrepublic";
 
   const canSaveNew = isApiKeyType
     ? apiKey.length > 0 && apiSecret.length > 0
+    : isUsernameEmailType
+    ? username.length > 0 && email.length > 0 && password.length > 0
     : email.length > 0 && password.length > 0;
 
   const canUpdateCredentials = isConfigApiKeyType
     ? apiKey.length > 0 && apiSecret.length > 0
+    : isConfigUsernameEmailType
+    ? username.length > 0 && email.length > 0 && password.length > 0
     : email.length > 0 && password.length > 0;
 
   return (
@@ -248,6 +262,41 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                       <p className="text-xs text-muted-foreground mt-1">If set, only data for this pie will be synced. Leave empty to match by platform name.</p>
                     </div>
                   </>
+                ) : isConfigUsernameEmailType ? (
+                  <>
+                    <div>
+                      <Label htmlFor="scraper-username">Username</Label>
+                      <Input
+                        id="scraper-username"
+                        value={username}
+                        onChange={e => setUsername(e.target.value)}
+                        placeholder="Your GoldRepublic username"
+                        data-testid="input-scraper-username"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="scraper-email">Email</Label>
+                      <Input
+                        id="scraper-email"
+                        type="email"
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        placeholder="your@email.com"
+                        data-testid="input-scraper-email"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="scraper-password">Password</Label>
+                      <Input
+                        id="scraper-password"
+                        type="password"
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        placeholder="Your GoldRepublic password"
+                        data-testid="input-scraper-password"
+                      />
+                    </div>
+                  </>
                 ) : (
                   <>
                     <div>
@@ -371,6 +420,41 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                       data-testid="input-scraper-piename-new"
                     />
                     <p className="text-xs text-muted-foreground mt-1">If set, only data for this pie will be synced. Leave empty to match by platform name.</p>
+                  </div>
+                </>
+              ) : isUsernameEmailType ? (
+                <>
+                  <div>
+                    <Label htmlFor="scraper-username-new">Username</Label>
+                    <Input
+                      id="scraper-username-new"
+                      value={username}
+                      onChange={e => setUsername(e.target.value)}
+                      placeholder="Your GoldRepublic username"
+                      data-testid="input-scraper-username-new"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="scraper-email-new">Email</Label>
+                    <Input
+                      id="scraper-email-new"
+                      type="email"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      data-testid="input-scraper-email-new"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="scraper-password-new">Password</Label>
+                    <Input
+                      id="scraper-password-new"
+                      type="password"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      placeholder="Your GoldRepublic password"
+                      data-testid="input-scraper-password-new"
+                    />
                   </div>
                 </>
               ) : (
