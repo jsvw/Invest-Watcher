@@ -25,35 +25,6 @@ async function runScrapeForConfig(config: any) {
     }
   }
 
-  let scraperResult;
-  try {
-    if (scraperType === "monefit") {
-      const { scrapeMonefit } = await import("./scrapers/monefit");
-      scraperResult = await scrapeMonefit(creds.email, creds.password);
-    } else if (scraperType === "robocash") {
-      const { scrapeRoboCash } = await import("./scrapers/robocash");
-      const robocashData = await scrapeRoboCash(creds.email, creds.password);
-      scraperResult = {
-        totalBalance: robocashData.totalBalance,
-        totalInvested: robocashData.totalInvested,
-        mainBalance: robocashData.totalBalance,
-        vaults: [],
-        scrapedAt: robocashData.scrapedAt,
-      };
-    } else {
-      console.log(`[Scheduler] Unknown scraper type: ${scraperType}`);
-      return;
-    }
-  } catch (err: any) {
-    console.error(`[Scheduler] Scrape failed for platform ${platformId}:`, err.message);
-    await storage.updateScraperConfig(id, userId, {
-      lastScrapeAt: new Date(),
-      lastScrapeStatus: "error",
-      lastScrapeMessage: err.message || "Scrape failed",
-    });
-    return;
-  }
-
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayStr = today.toISOString().split("T")[0];
@@ -62,6 +33,45 @@ async function runScrapeForConfig(config: any) {
     const platform = await storage.getPlatform(platformId, userId);
     if (!platform) {
       console.log(`[Scheduler] Platform ${platformId} not found for user ${userId}`);
+      return;
+    }
+
+    if (scraperType === "robocash") {
+      const { scrapeRoboCash } = await import("./scrapers/robocash");
+      const robocashData = await scrapeRoboCash(creds.email, creds.password);
+
+      if (robocashData.totalBalance > 0) {
+        const existingVals = await storage.getValuations(platformId);
+        const sameDayVal = existingVals.find(v =>
+          new Date(v.date).toISOString().split("T")[0] === todayStr
+        );
+        if (sameDayVal) {
+          await storage.updateValuation(sameDayVal.id, { value: robocashData.totalBalance.toFixed(2) });
+        } else {
+          await storage.createValuation({
+            platformId,
+            value: robocashData.totalBalance.toFixed(2),
+            date: today,
+          });
+        }
+      }
+
+      await storage.updateScraperConfig(id, userId, {
+        lastScrapeAt: new Date(),
+        lastScrapeStatus: "success",
+        lastScrapeMessage: `Total: €${robocashData.totalBalance.toFixed(2)}`,
+      });
+
+      console.log(`[Scheduler] Scrape complete for platform ${platformId}: €${robocashData.totalBalance.toFixed(2)}`);
+      return;
+    }
+
+    let scraperResult;
+    if (scraperType === "monefit") {
+      const { scrapeMonefit } = await import("./scrapers/monefit");
+      scraperResult = await scrapeMonefit(creds.email, creds.password);
+    } else {
+      console.log(`[Scheduler] Unknown scraper type: ${scraperType}`);
       return;
     }
 
@@ -123,7 +133,7 @@ async function runScrapeForConfig(config: any) {
             assetId,
             value: value.toFixed(2),
             date: today,
-            notes: "Auto-scraped from Monefit",
+            notes: "Auto-scraped",
           });
         }
       };
@@ -158,11 +168,11 @@ async function runScrapeForConfig(config: any) {
 
     console.log(`[Scheduler] Scrape complete for platform ${platformId}: €${scraperResult.totalBalance.toFixed(2)}`);
   } catch (err: any) {
-    console.error(`[Scheduler] Error saving scrape results for platform ${platformId}:`, err.message);
+    console.error(`[Scheduler] Scrape failed for platform ${platformId}:`, err.message);
     await storage.updateScraperConfig(id, userId, {
       lastScrapeAt: new Date(),
       lastScrapeStatus: "error",
-      lastScrapeMessage: err.message || "Failed to save results",
+      lastScrapeMessage: err.message || "Scrape failed",
     });
   }
 }

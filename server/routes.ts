@@ -1430,29 +1430,53 @@ export async function registerRoutes(
         }
       }
 
-      let scraperResult;
-      if (config.scraperType === "monefit") {
-        const { scrapeMonefit } = await import("./scrapers/monefit");
-        scraperResult = await scrapeMonefit(creds.email, creds.password);
-      } else if (config.scraperType === "robocash") {
-        const { scrapeRoboCash } = await import("./scrapers/robocash");
-        const robocashData = await scrapeRoboCash(creds.email, creds.password);
-        scraperResult = {
-          totalBalance: robocashData.totalBalance,
-          totalInvested: robocashData.totalInvested,
-          mainBalance: robocashData.totalBalance,
-          vaults: [],
-          scrapedAt: robocashData.scrapedAt,
-        };
-      } else {
-        return res.status(400).json({ message: `Unknown scraper type: ${config.scraperType}` });
-      }
-
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
       const platform = await storage.getPlatform(platformId, userId);
       if (!platform) return res.status(404).json({ message: "Platform not found" });
+
+      if (config.scraperType === "robocash") {
+        const { scrapeRoboCash } = await import("./scrapers/robocash");
+        const robocashData = await scrapeRoboCash(creds.email, creds.password);
+
+        if (robocashData.totalBalance > 0) {
+          const existingVals = await storage.getValuations(platformId);
+          const todayStr = today.toISOString().split("T")[0];
+          const sameDayVal = existingVals.find(v =>
+            new Date(v.date).toISOString().split("T")[0] === todayStr
+          );
+          if (sameDayVal) {
+            await storage.updateValuation(sameDayVal.id, { value: robocashData.totalBalance.toFixed(2) });
+          } else {
+            await storage.createValuation({
+              platformId,
+              value: robocashData.totalBalance.toFixed(2),
+              date: today,
+            });
+          }
+        }
+
+        await storage.updateScraperConfig(config.id, userId, {
+          lastScrapeAt: new Date(),
+          lastScrapeStatus: "success",
+          lastScrapeMessage: `Total: €${robocashData.totalBalance.toFixed(2)}`,
+        });
+
+        return res.json({
+          success: true,
+          data: robocashData,
+          message: `Successfully scraped. Total balance: €${robocashData.totalBalance.toFixed(2)}`,
+        });
+      }
+
+      let scraperResult;
+      if (config.scraperType === "monefit") {
+        const { scrapeMonefit } = await import("./scrapers/monefit");
+        scraperResult = await scrapeMonefit(creds.email, creds.password);
+      } else {
+        return res.status(400).json({ message: `Unknown scraper type: ${config.scraperType}` });
+      }
 
       if (scraperResult.totalBalance > 0) {
         const existingVals = await storage.getValuations(platformId);
@@ -1514,7 +1538,7 @@ export async function registerRoutes(
               assetId,
               value: value.toFixed(2),
               date: today,
-              notes: "Auto-scraped from Monefit",
+              notes: "Auto-scraped",
             });
           }
         };

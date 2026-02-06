@@ -1,10 +1,7 @@
 import puppeteer from "puppeteer-core";
 
 export interface RoboCashScrapedData {
-  totalFunds: number;
-  interestByToday: number;
   totalBalance: number;
-  totalInvested: number;
   scrapedAt: Date;
 }
 
@@ -126,12 +123,12 @@ export async function scrapeRoboCash(email: string, password: string): Promise<R
       await new Promise(resolve => setTimeout(resolve, 3000));
     }
 
-    console.log("[RoboCash Scraper] Extracting data from summary page...");
+    console.log("[RoboCash Scraper] Extracting total funds from summary page...");
     await page.waitForSelector('.value_roundings', { timeout: 15000 }).catch(() => {
       console.log("[RoboCash Scraper] .value_roundings not found, will try fallbacks");
     });
 
-    const summaryData = await page.evaluate(`(function() {
+    const totalBalance = await page.evaluate(`(function() {
       var extractNumber = function(text) {
         if (!text) return null;
         var cleaned = text.replace(/[^0-9.,\\-]/g, "");
@@ -179,75 +176,45 @@ export async function scrapeRoboCash(email: string, password: string): Promise<R
               var sNum = extractNumber(sVals[0].textContent);
               if (sNum !== null && sNum > 0) return sNum;
             }
-            var directNum = extractNumber(sibling.textContent);
-            if (sibling.classList.contains('value_roundings') && directNum !== null && directNum > 0) return directNum;
+            if (sibling.classList.contains('value_roundings')) {
+              var directNum = extractNumber(sibling.textContent);
+              if (directNum !== null && directNum > 0) return directNum;
+            }
             sibling = sibling.nextElementSibling;
           }
         }
         return null;
       };
 
-      var result = {
-        interestByToday: 0,
-        totalFunds: 0,
-        debugText: "",
-        debugElements: []
-      };
+      var total = findValueNearLabel("Total funds");
+      if (!total) total = findValueNearLabel("Total balance");
+      if (!total) total = findValueNearLabel("Portfolio value");
 
-      var valueElements = document.querySelectorAll('.value_roundings');
-      for (var i = 0; i < valueElements.length; i++) {
-        var el = valueElements[i];
-        var val = extractNumber(el.textContent);
-        var ancestor = el;
-        var context = "";
-        for (var a = 0; a < 5; a++) {
-          ancestor = ancestor.parentElement;
-          if (!ancestor) break;
+      if (!total) {
+        var valueElements = document.querySelectorAll('.value_roundings');
+        var candidates = [];
+        for (var i = 0; i < valueElements.length; i++) {
+          var num = extractNumber(valueElements[i].textContent);
+          if (num !== null && num > 100) {
+            candidates.push(num);
+          }
         }
-        if (ancestor) context = ancestor.textContent ? ancestor.textContent.trim().substring(0, 200) : "";
-
-        result.debugElements.push({
-          index: i,
-          text: el.textContent ? el.textContent.trim() : "",
-          value: val,
-          context: context.substring(0, 200)
-        });
+        if (candidates.length > 0) {
+          candidates.sort(function(a, b) { return b - a; });
+          total = candidates[0];
+        }
       }
 
-      var totalFundsVal = findValueNearLabel("Total funds");
-      if (!totalFundsVal) totalFundsVal = findValueNearLabel("Total balance");
-      if (!totalFundsVal) totalFundsVal = findValueNearLabel("Portfolio value");
-      var interestVal = findValueNearLabel("Interest by today");
-      if (!interestVal) interestVal = findValueNearLabel("Interest earned today");
-      if (!interestVal) interestVal = findValueNearLabel("Interest today");
+      console.log("[RoboCash Scraper] Extracted total: " + total);
+      return total || 0;
+    })()`) as number;
 
-      if (totalFundsVal) result.totalFunds = totalFundsVal;
-      if (interestVal) result.interestByToday = interestVal;
+    console.log(`[RoboCash Scraper] Scraping complete. Total balance: €${totalBalance}`);
 
-      result.debugText = document.body.innerText.substring(0, 3000);
-
-      return result;
-    })()`) as { interestByToday: number; totalFunds: number; debugText: string; debugElements: any[] };
-
-    console.log(`[RoboCash Scraper] Debug elements found:`, JSON.stringify(summaryData.debugElements));
-    console.log(`[RoboCash Scraper] Interest by today: ${summaryData.interestByToday}`);
-    console.log(`[RoboCash Scraper] Total funds: ${summaryData.totalFunds}`);
-
-    const totalFunds = summaryData.totalFunds;
-    const interestByToday = summaryData.interestByToday;
-    const totalBalance = totalFunds;
-    const totalInvested = totalFunds - interestByToday;
-
-    const result: RoboCashScrapedData = {
-      totalFunds,
-      interestByToday,
+    return {
       totalBalance,
-      totalInvested: totalInvested > 0 ? totalInvested : 0,
       scrapedAt: new Date(),
     };
-
-    console.log(`[RoboCash Scraper] Scraping complete. Total funds: €${totalFunds}, Interest: €${interestByToday}, Invested: €${result.totalInvested}`);
-    return result;
 
   } finally {
     if (browser) {
