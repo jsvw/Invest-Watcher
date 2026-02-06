@@ -56,7 +56,7 @@ The application tracks seven main entities:
 ### Web Scraping
 - **Puppeteer + Chromium**: Headless browser automation for scraping login-protected investment platforms
 - **Chromium path**: `/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium`
-- **Supported scrapers**: Monefit SmartSaver (`server/scrapers/monefit.ts`)
+- **Supported scrapers**: Monefit SmartSaver (`server/scrapers/monefit.ts`), RoboCash (`server/scrapers/robocash.ts`)
 - **Flow**: Store credentials in `scraper_configs` table → Trigger scrape from UI → Puppeteer logs into platform → Extracts balance data → Creates valuations automatically
 - **UI**: ScraperConfigDialog component accessible from platform details page ("Web Scraper" button)
 - **API routes**: `GET/POST/DELETE /api/platforms/:id/scraper-config`, `POST /api/platforms/:id/scrape`

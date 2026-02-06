@@ -30,6 +30,16 @@ async function runScrapeForConfig(config: any) {
     if (scraperType === "monefit") {
       const { scrapeMonefit } = await import("./scrapers/monefit");
       scraperResult = await scrapeMonefit(creds.email, creds.password);
+    } else if (scraperType === "robocash") {
+      const { scrapeRoboCash } = await import("./scrapers/robocash");
+      const robocashData = await scrapeRoboCash(creds.email, creds.password);
+      scraperResult = {
+        totalBalance: robocashData.totalBalance,
+        totalInvested: robocashData.totalInvested,
+        mainBalance: robocashData.totalBalance,
+        vaults: [],
+        scrapedAt: robocashData.scrapedAt,
+      };
     } else {
       console.log(`[Scheduler] Unknown scraper type: ${scraperType}`);
       return;

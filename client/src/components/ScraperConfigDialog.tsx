@@ -7,7 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Globe, Loader2, Settings2, CheckCircle, XCircle, Trash2 } from "lucide-react";
+
+const SCRAPER_TYPES = [
+  { value: "monefit", label: "Monefit SmartSaver" },
+  { value: "robocash", label: "RoboCash" },
+];
 
 interface ScraperConfigDialogProps {
   platformId: number;
@@ -18,6 +24,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [scraperType, setScraperType] = useState("monefit");
   const { toast } = useToast();
 
   const { data: config, isLoading: configLoading } = useQuery({
@@ -33,7 +40,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
   const saveConfig = useMutation({
     mutationFn: async () => {
       return apiRequest("POST", `/api/platforms/${platformId}/scraper-config`, {
-        scraperType: "monefit",
+        scraperType,
         email,
         password,
       });
@@ -121,7 +128,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                 <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
                 <span className="text-sm truncate">Scraper configured</span>
               </div>
-              <Badge variant="secondary">{config.scraperType}</Badge>
+              <Badge variant="secondary">{SCRAPER_TYPES.find(st => st.value === config.scraperType)?.label || config.scraperType}</Badge>
             </div>
 
             {config.lastScrapeAt && (
@@ -219,10 +226,25 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Enter your Monefit login credentials to enable automatic balance scraping. 
+              Enter your login credentials to enable automatic balance scraping. 
               Your credentials are stored securely and only used to log into the platform.
             </p>
             <div className="space-y-3">
+              <div>
+                <Label htmlFor="scraper-type-new">Scraper Type</Label>
+                <Select value={scraperType} onValueChange={setScraperType}>
+                  <SelectTrigger data-testid="select-scraper-type">
+                    <SelectValue placeholder="Select scraper type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SCRAPER_TYPES.map(st => (
+                      <SelectItem key={st.value} value={st.value} data-testid={`option-scraper-${st.value}`}>
+                        {st.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div>
                 <Label htmlFor="scraper-email-new">Email</Label>
                 <Input

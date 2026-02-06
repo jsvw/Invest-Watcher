@@ -1,0 +1,232 @@
+import puppeteer from "puppeteer-core";
+
+export interface RoboCashScrapedData {
+  totalFunds: number;
+  interestByToday: number;
+  totalBalance: number;
+  totalInvested: number;
+  scrapedAt: Date;
+}
+
+const CHROMIUM_PATH = process.env.CHROMIUM_PATH || "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
+const LOGIN_URL = "https://robo.cash/login";
+const SUMMARY_URL = "https://robo.cash/cabinet/summary";
+
+export async function scrapeRoboCash(email: string, password: string): Promise<RoboCashScrapedData> {
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      executablePath: CHROMIUM_PATH,
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--no-first-run",
+        "--no-zygote",
+        "--single-process",
+        "--disable-extensions",
+      ],
+    });
+
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 800 });
+    await page.setUserAgent(
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+    );
+
+    console.log("[RoboCash Scraper] Navigating to login page...");
+    await page.goto(LOGIN_URL, { waitUntil: "networkidle2", timeout: 30000 });
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    console.log("[RoboCash Scraper] Dismissing cookie consent if present...");
+    try {
+      await page.evaluate(`(function() {
+        var btns = Array.from(document.querySelectorAll('button, a'));
+        for (var i = 0; i < btns.length; i++) {
+          var t = btns[i].textContent ? btns[i].textContent.toLowerCase().trim() : "";
+          if (t.includes('accept') || t.includes('allow all') || t.includes('agree') || t.includes('ok')) {
+            btns[i].click();
+            break;
+          }
+        }
+      })()`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (cookieErr) {
+      console.log("[RoboCash Scraper] Cookie banner handling skipped");
+    }
+
+    console.log("[RoboCash Scraper] Waiting for login form...");
+    await page.waitForSelector('input[type="email"], input[name="email"], input[name="login"]', { timeout: 15000 }).catch(() => {});
+
+    const availableInputs = await page.evaluate(`(function() {
+      return Array.from(document.querySelectorAll('input')).map(function(i) {
+        return { name: i.name, type: i.type, id: i.id, placeholder: i.placeholder };
+      });
+    })()`) as Array<{ name: string; type: string; id: string; placeholder: string }>;
+    console.log("[RoboCash Scraper] Available inputs:", JSON.stringify(availableInputs));
+
+    console.log("[RoboCash Scraper] Filling login form...");
+    const emailSelector = 'input[type="email"], input[name="email"], input[name="login"], input[name="username"]';
+    const passwordSelector = 'input[type="password"], input[name="password"]';
+
+    const emailInput = await page.$(emailSelector);
+    const passwordInput = await page.$(passwordSelector);
+
+    if (!emailInput || !passwordInput) {
+      throw new Error(`Could not find login fields. Available inputs: ${JSON.stringify(availableInputs)}`);
+    }
+
+    await emailInput.click({ clickCount: 3 });
+    await emailInput.type(email, { delay: 50 });
+    await passwordInput.click({ clickCount: 3 });
+    await passwordInput.type(password, { delay: 50 });
+
+    console.log("[RoboCash Scraper] Submitting login...");
+    const submitted = await page.evaluate(`(function() {
+      var buttons = Array.from(document.querySelectorAll('button[type="submit"], input[type="submit"], button'));
+      for (var i = 0; i < buttons.length; i++) {
+        var t = buttons[i].textContent ? buttons[i].textContent.trim().toLowerCase() : "";
+        var val = buttons[i].value ? buttons[i].value.toLowerCase() : "";
+        if (t === 'log in' || t === 'login' || t === 'sign in' || val === 'log in' || val === 'login') {
+          buttons[i].click();
+          return true;
+        }
+      }
+      var submitBtns = document.querySelectorAll('button[type="submit"], input[type="submit"]');
+      if (submitBtns.length > 0) {
+        submitBtns[0].click();
+        return true;
+      }
+      return false;
+    })()`);
+
+    if (!submitted) {
+      await page.keyboard.press("Enter");
+    }
+
+    await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 }).catch(() => {});
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    const currentUrl = page.url();
+    console.log(`[RoboCash Scraper] Current URL after login: ${currentUrl}`);
+
+    if (currentUrl.includes("login")) {
+      const errorText = await page.evaluate(`(function() {
+        var errorEl = document.querySelector('.error, .alert-danger, .alert, [class*="error"], [class*="alert"]');
+        return errorEl ? errorEl.textContent.trim() : null;
+      })()`);
+      throw new Error(`Login failed${errorText ? `: ${errorText}` : ". Check your credentials."}`);
+    }
+
+    if (!currentUrl.includes("summary")) {
+      console.log("[RoboCash Scraper] Navigating to summary page...");
+      await page.goto(SUMMARY_URL, { waitUntil: "networkidle2", timeout: 30000 });
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+
+    console.log("[RoboCash Scraper] Extracting data from summary page...");
+    await page.waitForSelector('.value_roundings', { timeout: 15000 }).catch(() => {
+      console.log("[RoboCash Scraper] .value_roundings not found, will try fallbacks");
+    });
+
+    const summaryData = await page.evaluate(`(function() {
+      var extractNumber = function(text) {
+        if (!text) return null;
+        var cleaned = text.replace(/[^0-9.,\\-]/g, "");
+        if (cleaned.indexOf(",") > -1 && cleaned.indexOf(".") > -1) {
+          if (cleaned.lastIndexOf(",") > cleaned.lastIndexOf(".")) {
+            cleaned = cleaned.replace(/\\./g, "").replace(",", ".");
+          } else {
+            cleaned = cleaned.replace(/,/g, "");
+          }
+        } else if (cleaned.indexOf(",") > -1) {
+          var parts = cleaned.split(",");
+          if (parts.length === 2 && parts[1].length <= 2) {
+            cleaned = cleaned.replace(",", ".");
+          } else {
+            cleaned = cleaned.replace(/,/g, "");
+          }
+        }
+        var match = cleaned.match(/-?\\d+\\.?\\d*/);
+        return match ? parseFloat(match[0]) : null;
+      };
+
+      var result = {
+        interestByToday: 0,
+        totalFunds: 0,
+        debugText: "",
+        debugElements: []
+      };
+
+      var valueElements = document.querySelectorAll('.value_roundings');
+      for (var i = 0; i < valueElements.length; i++) {
+        var el = valueElements[i];
+        var val = extractNumber(el.textContent);
+        var parent = el.parentElement;
+        var grandparent = parent ? parent.parentElement : null;
+        var context = "";
+        if (parent) context += parent.textContent ? parent.textContent.trim().substring(0, 100) : "";
+        if (grandparent) context += " | " + (grandparent.textContent ? grandparent.textContent.trim().substring(0, 100) : "");
+
+        result.debugElements.push({
+          index: i,
+          text: el.textContent ? el.textContent.trim() : "",
+          value: val,
+          context: context
+        });
+
+        var surroundingText = context.toLowerCase();
+        if (surroundingText.indexOf("interest") > -1 && surroundingText.indexOf("today") > -1) {
+          if (val !== null) result.interestByToday = val;
+        } else if (surroundingText.indexOf("total funds") > -1 || surroundingText.indexOf("total balance") > -1) {
+          if (val !== null) result.totalFunds = val;
+        }
+      }
+
+      if (result.totalFunds === 0 || result.interestByToday === 0) {
+        for (var j = 0; j < valueElements.length; j++) {
+          var elem = valueElements[j];
+          var num = extractNumber(elem.textContent);
+          if (num !== null && num > 0) {
+            if (result.totalFunds === 0 && num > result.interestByToday) {
+              result.totalFunds = num;
+            } else if (result.interestByToday === 0 && num < result.totalFunds) {
+              result.interestByToday = num;
+            }
+          }
+        }
+      }
+
+      result.debugText = document.body.innerText.substring(0, 3000);
+
+      return result;
+    })()`) as { interestByToday: number; totalFunds: number; debugText: string; debugElements: any[] };
+
+    console.log(`[RoboCash Scraper] Debug elements found:`, JSON.stringify(summaryData.debugElements));
+    console.log(`[RoboCash Scraper] Interest by today: ${summaryData.interestByToday}`);
+    console.log(`[RoboCash Scraper] Total funds: ${summaryData.totalFunds}`);
+
+    const totalFunds = summaryData.totalFunds;
+    const interestByToday = summaryData.interestByToday;
+    const totalBalance = totalFunds;
+    const totalInvested = totalFunds - interestByToday;
+
+    const result: RoboCashScrapedData = {
+      totalFunds,
+      interestByToday,
+      totalBalance,
+      totalInvested: totalInvested > 0 ? totalInvested : 0,
+      scrapedAt: new Date(),
+    };
+
+    console.log(`[RoboCash Scraper] Scraping complete. Total funds: €${totalFunds}, Interest: €${interestByToday}, Invested: €${result.totalInvested}`);
+    return result;
+
+  } finally {
+    if (browser) {
+      await browser.close().catch(() => {});
+    }
+  }
+}
