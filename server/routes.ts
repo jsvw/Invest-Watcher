@@ -1391,12 +1391,13 @@ export async function registerRoutes(
       let credentialData: Record<string, string>;
 
       if (scraperType === "trading212") {
-        const { apiKey, apiSecret, pieName } = req.body;
+        const { apiKey, apiSecret, pieName, ticker } = req.body;
         if (!apiKey || !apiSecret) {
           return res.status(400).json({ message: "apiKey and apiSecret are required for Trading 212" });
         }
         credentialData = { apiKey, apiSecret };
         if (pieName) credentialData.pieName = pieName;
+        if (ticker) credentialData.ticker = ticker;
       } else if (scraperType === "goldrepublic") {
         const { username, email, password } = req.body;
         if (!username || !email || !password) {
@@ -1481,10 +1482,93 @@ export async function registerRoutes(
         if (!creds.apiKey || !creds.apiSecret) {
           return res.status(400).json({ message: "Missing API key or secret. Please re-save your Trading 212 credentials." });
         }
+
+        const todayStr = today.toISOString().split("T")[0];
+
+        if (creds.ticker) {
+          const { fetchPositions } = await import("./scrapers/trading212");
+          const posMap = await fetchPositions(creds.apiKey, creds.apiSecret);
+          const pos = posMap.get(creds.ticker);
+
+          if (!pos) {
+            const availableTickers = Array.from(posMap.keys()).join(", ");
+            await storage.updateScraperConfig(config.id, userId, {
+              lastScrapeAt: new Date(),
+              lastScrapeStatus: "error",
+              lastScrapeMessage: `Ticker "${creds.ticker}" not found in portfolio. Available: ${availableTickers}`,
+            });
+            return res.status(400).json({
+              message: `Ticker "${creds.ticker}" not found in your portfolio. Available tickers: ${availableTickers}`,
+            });
+          }
+
+          const totalValue = pos.quantity * pos.currentPrice;
+          const totalInvested = pos.quantity * pos.averagePrice;
+
+          if (totalValue > 0) {
+            const existingVals = await storage.getValuations(platformId);
+            const sameDayVal = existingVals.find(v =>
+              new Date(v.date).toISOString().split("T")[0] === todayStr
+            );
+            if (sameDayVal) {
+              await storage.updateValuation(sameDayVal.id, { value: totalValue.toFixed(2) });
+            } else {
+              await storage.createValuation({
+                platformId,
+                value: totalValue.toFixed(2),
+                date: today,
+              });
+            }
+          }
+
+          if (totalInvested > 0) {
+            const existingInvestments = await storage.getInvestments(platformId);
+            const existingWithdrawals = await storage.getWithdrawals(platformId);
+            const nonSyncInvestments = existingInvestments.filter(inv => !inv.notes?.startsWith("Trading 212 sync adjustment"));
+            const totalDeposited = nonSyncInvestments.reduce((sum, inv) => sum + parseFloat(inv.amount), 0);
+            const totalWithdrawn = existingWithdrawals.reduce((sum, w) => sum + parseFloat(w.amount), 0);
+            const currentNetInvested = totalDeposited - totalWithdrawn;
+            const diff = totalInvested - currentNetInvested;
+
+            const existingSyncAdj = existingInvestments.filter(inv => inv.notes?.startsWith("Trading 212 sync adjustment"));
+            if (existingSyncAdj.length > 0) {
+              const adjId = existingSyncAdj[existingSyncAdj.length - 1].id;
+              if (Math.abs(diff) >= 0.01) {
+                await storage.updateInvestment(adjId, {
+                  amount: diff.toFixed(2),
+                  date: today,
+                  notes: `Trading 212 sync adjustment (T212 total: ${totalInvested.toFixed(2)})`,
+                });
+              }
+            } else if (Math.abs(diff) >= 0.01) {
+              await storage.createInvestment({
+                platformId,
+                amount: diff.toFixed(2),
+                date: today,
+                notes: `Trading 212 sync adjustment (T212 total: ${totalInvested.toFixed(2)})`,
+              });
+            }
+          }
+
+          const ppl = pos.ppl || (totalValue - totalInvested);
+          const pplPercent = totalInvested > 0 ? ((totalValue - totalInvested) / totalInvested) * 100 : 0;
+
+          await storage.updateScraperConfig(config.id, userId, {
+            lastScrapeAt: new Date(),
+            lastScrapeStatus: "success",
+            lastScrapeMessage: `${creds.ticker}: Value=${totalValue.toFixed(2)}, Invested=${totalInvested.toFixed(2)}, P/L=${ppl.toFixed(2)} (${pplPercent.toFixed(1)}%), Qty=${pos.quantity}`,
+          });
+
+          return res.json({
+            success: true,
+            data: { ticker: creds.ticker, currentValue: totalValue, investedValue: totalInvested, ppl, pplPercent, quantity: pos.quantity, currentPrice: pos.currentPrice, averagePrice: pos.averagePrice },
+            message: `Synced ${creds.ticker}: Value=${totalValue.toFixed(2)}, Invested=${totalInvested.toFixed(2)}`,
+          });
+        }
+
         const { scrapeTrading212 } = await import("./scrapers/trading212");
         const t212Data = await scrapeTrading212(creds.apiKey, creds.apiSecret);
 
-        const todayStr = today.toISOString().split("T")[0];
         const pieName = creds.pieName || "";
         const matchedPie = t212Data.pies.find(p => {
           if (pieName) {
@@ -1786,6 +1870,124 @@ export async function registerRoutes(
 
       const platform = await storage.getPlatform(platformId, userId);
       if (!platform) return res.status(404).json({ message: "Platform not found" });
+
+      if (creds.ticker) {
+        const { fetchPositions, fetchDividends } = await import("./scrapers/trading212");
+        const posMap = await fetchPositions(creds.apiKey, creds.apiSecret);
+        const pos = posMap.get(creds.ticker);
+
+        if (!pos) {
+          return res.status(404).json({ message: `Ticker "${creds.ticker}" not found in portfolio` });
+        }
+
+        const totalValue = pos.quantity * pos.currentPrice;
+        const totalInvested = pos.quantity * pos.averagePrice;
+        const ppl = pos.ppl || (totalValue - totalInvested);
+        const pplPercent = totalInvested > 0 ? ((totalValue - totalInvested) / totalInvested) * 100 : 0;
+
+        const dbDividends = await storage.getTrading212Dividends(platformId, userId);
+        const hasDbDividends = dbDividends.length > 0;
+        const shouldFetchDividends = forceRefresh || !hasDbDividends;
+
+        let tickerDivData: { total: number; count: number; lastDate: string; history: { amount: number; paidOn: string; quantity: number }[] } | null = null;
+
+        if (shouldFetchDividends) {
+          try {
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            const divMap = await fetchDividends(creds.apiKey, creds.apiSecret);
+            const allDivRecords: { ticker: string; amount: string; paidOn: string; quantity: string | null }[] = [];
+            divMap.forEach((data, ticker) => {
+              for (const record of data.history) {
+                allDivRecords.push({
+                  ticker,
+                  amount: record.amount.toString(),
+                  paidOn: record.paidOn,
+                  quantity: record.quantity != null ? record.quantity.toString() : null,
+                });
+              }
+            });
+            if (allDivRecords.length > 0) {
+              await storage.saveTrading212Dividends(platformId, userId, allDivRecords);
+            }
+            const td = divMap.get(creds.ticker);
+            if (td) tickerDivData = td;
+          } catch (err: any) {
+            console.log(`[Trading212] Dividend fetch error: ${err.message}`);
+          }
+        }
+
+        if (!tickerDivData && hasDbDividends) {
+          const tickerDivs = dbDividends.filter(d => d.ticker === creds.ticker);
+          if (tickerDivs.length > 0) {
+            tickerDivData = { total: 0, count: tickerDivs.length, lastDate: "", history: [] };
+            for (const row of tickerDivs) {
+              const amt = Number(row.amount);
+              tickerDivData.total += amt;
+              tickerDivData.history.push({ amount: amt, paidOn: row.paidOn, quantity: row.quantity ? Number(row.quantity) : 0 });
+              if (row.paidOn > tickerDivData.lastDate) tickerDivData.lastDate = row.paidOn;
+            }
+            tickerDivData.history.sort((a, b) => a.paidOn.localeCompare(b.paidOn));
+          }
+        }
+
+        const instrument: any = {
+          ticker: creds.ticker,
+          shares: pos.quantity,
+          expectedShare: 100,
+          currentShare: 100,
+          result: ppl,
+          currentPrice: pos.currentPrice,
+          averagePrice: pos.averagePrice,
+          quantity: pos.quantity,
+          ppl: pos.ppl,
+          fxPpl: pos.fxPpl,
+        };
+        if (tickerDivData) {
+          instrument.dividendsReceived = tickerDivData.total;
+          instrument.dividendCount = tickerDivData.count;
+          instrument.lastDividendDate = tickerDivData.lastDate;
+          instrument.dividendHistory = tickerDivData.history;
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        try {
+          const toNumStr = (v: any): string | null => {
+            if (v == null) return null;
+            const n = Number(v);
+            return isNaN(n) ? null : n.toString();
+          };
+          await storage.saveTrading212Holdings(platformId, userId, today, [{
+            ticker: creds.ticker,
+            shares: toNumStr(pos.quantity),
+            currentPrice: toNumStr(pos.currentPrice),
+            averagePrice: toNumStr(pos.averagePrice),
+            value: totalValue.toFixed(2),
+            ppl: toNumStr(pos.ppl),
+            currentShare: "100",
+            expectedShare: "100",
+            result: toNumStr(ppl),
+          }]);
+        } catch (saveErr: any) {
+          console.error("T212 single-ticker holdings snapshot save error:", saveErr.message);
+        }
+
+        const responseData = {
+          pieName: creds.ticker,
+          currentValue: totalValue,
+          investedValue: totalInvested,
+          cash: 0,
+          result: ppl,
+          resultPercent: pplPercent,
+          dividendsGained: tickerDivData?.total || 0,
+          dividendsReinvested: 0,
+          dividendsInCash: tickerDivData?.total || 0,
+          instruments: [instrument],
+        };
+
+        holdingsCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
+        return res.json(responseData);
+      }
 
       const { scrapeTrading212WithPositions } = await import("./scrapers/trading212");
 

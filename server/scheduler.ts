@@ -46,6 +46,117 @@ async function runScrapeForConfig(config: any) {
         });
         return;
       }
+
+      if (creds.ticker) {
+        const { fetchPositions, fetchDividends } = await import("./scrapers/trading212");
+        const posMap = await fetchPositions(creds.apiKey, creds.apiSecret);
+        const pos = posMap.get(creds.ticker);
+
+        if (!pos) {
+          await storage.updateScraperConfig(id, userId, {
+            lastScrapeAt: new Date(),
+            lastScrapeStatus: "error",
+            lastScrapeMessage: `Ticker "${creds.ticker}" not found in portfolio`,
+          });
+          console.log(`[Scheduler] Ticker ${creds.ticker} not found for platform ${platformId}`);
+          return;
+        }
+
+        const totalValue = pos.quantity * pos.currentPrice;
+        const totalInvested = pos.quantity * pos.averagePrice;
+
+        if (totalValue > 0) {
+          const existingVals = await storage.getValuations(platformId);
+          const sameDayVal = existingVals.find(v =>
+            new Date(v.date).toISOString().split("T")[0] === todayStr
+          );
+          if (sameDayVal) {
+            await storage.updateValuation(sameDayVal.id, { value: totalValue.toFixed(2) });
+          } else {
+            await storage.createValuation({ platformId, value: totalValue.toFixed(2), date: today });
+          }
+        }
+
+        if (totalInvested > 0) {
+          const existingInvestments = await storage.getInvestments(platformId);
+          const existingWithdrawals = await storage.getWithdrawals(platformId);
+          const nonSyncInvestments = existingInvestments.filter(inv => !inv.notes?.startsWith("Trading 212 sync adjustment"));
+          const totalDeposited = nonSyncInvestments.reduce((sum, inv) => sum + parseFloat(inv.amount), 0);
+          const totalWithdrawn = existingWithdrawals.reduce((sum, w) => sum + parseFloat(w.amount), 0);
+          const currentNetInvested = totalDeposited - totalWithdrawn;
+          const diff = totalInvested - currentNetInvested;
+
+          const existingSyncAdj = existingInvestments.filter(inv => inv.notes?.startsWith("Trading 212 sync adjustment"));
+          if (existingSyncAdj.length > 0) {
+            const adjId = existingSyncAdj[existingSyncAdj.length - 1].id;
+            if (Math.abs(diff) >= 0.01) {
+              await storage.updateInvestment(adjId, {
+                amount: diff.toFixed(2),
+                date: today,
+                notes: `Trading 212 sync adjustment (T212 total: ${totalInvested.toFixed(2)})`,
+              });
+            }
+          } else if (Math.abs(diff) >= 0.01) {
+            await storage.createInvestment({
+              platformId,
+              amount: diff.toFixed(2),
+              date: today,
+              notes: `Trading 212 sync adjustment (T212 total: ${totalInvested.toFixed(2)})`,
+            });
+          }
+        }
+
+        try {
+          await storage.saveTrading212Holdings(platformId, userId, today, [{
+            ticker: creds.ticker,
+            shares: pos.quantity.toString(),
+            currentPrice: pos.currentPrice.toString(),
+            averagePrice: pos.averagePrice.toString(),
+            value: totalValue.toFixed(2),
+            ppl: pos.ppl?.toString() ?? null,
+            currentShare: "100",
+            expectedShare: "100",
+            result: (pos.ppl || (totalValue - totalInvested)).toString(),
+          }]);
+          console.log(`[Scheduler] Saved T212 single-ticker holdings snapshot for platform ${platformId}`);
+        } catch (holdingsErr: any) {
+          console.error(`[Scheduler] Failed to save T212 holdings for platform ${platformId}:`, holdingsErr.message);
+        }
+
+        try {
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          const divMap = await fetchDividends(creds.apiKey, creds.apiSecret);
+          const allDivRecords: { ticker: string; amount: string; paidOn: string; quantity: string | null }[] = [];
+          divMap.forEach((data, ticker) => {
+            for (const record of data.history) {
+              allDivRecords.push({
+                ticker,
+                amount: record.amount.toString(),
+                paidOn: record.paidOn,
+                quantity: record.quantity != null ? record.quantity.toString() : null,
+              });
+            }
+          });
+          if (allDivRecords.length > 0) {
+            await storage.saveTrading212Dividends(platformId, userId, allDivRecords);
+            console.log(`[Scheduler] Saved ${allDivRecords.length} T212 dividend records for platform ${platformId}`);
+          }
+        } catch (divErr: any) {
+          console.error(`[Scheduler] Failed to save T212 dividends for platform ${platformId}:`, divErr.message);
+        }
+
+        const ppl = pos.ppl || (totalValue - totalInvested);
+        const pplPercent = totalInvested > 0 ? ((totalValue - totalInvested) / totalInvested) * 100 : 0;
+        await storage.updateScraperConfig(id, userId, {
+          lastScrapeAt: new Date(),
+          lastScrapeStatus: "success",
+          lastScrapeMessage: `${creds.ticker}: Value=${totalValue.toFixed(2)}, Invested=${totalInvested.toFixed(2)}, P/L=${ppl.toFixed(2)} (${pplPercent.toFixed(1)}%)`,
+        });
+
+        console.log(`[Scheduler] T212 single-ticker sync complete for platform ${platformId}: ${creds.ticker}=${totalValue.toFixed(2)}`);
+        return;
+      }
+
       const { scrapeTrading212, fetchPositions, fetchDividends } = await import("./scrapers/trading212");
       const t212Data = await scrapeTrading212(creds.apiKey, creds.apiSecret);
 
