@@ -46,7 +46,7 @@ async function runScrapeForConfig(config: any) {
         });
         return;
       }
-      const { scrapeTrading212 } = await import("./scrapers/trading212");
+      const { scrapeTrading212, fetchPositions } = await import("./scrapers/trading212");
       const t212Data = await scrapeTrading212(creds.apiKey, creds.apiSecret);
 
       const pieName = creds.pieName || "";
@@ -115,6 +115,29 @@ async function runScrapeForConfig(config: any) {
             notes: `Trading 212 sync adjustment (T212 total: ${t212Invested.toFixed(2)})`,
           });
         }
+      }
+
+      try {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        const posMap = await fetchPositions(creds.apiKey, creds.apiSecret);
+        const holdingsToSave = matchedPie.instruments.map(inst => {
+          const pos = posMap.get(inst.ticker);
+          return {
+            ticker: inst.ticker,
+            shares: inst.shares?.toString() ?? null,
+            currentPrice: pos?.currentPrice?.toString() ?? null,
+            averagePrice: pos?.averagePrice?.toString() ?? null,
+            value: pos ? ((pos.pieQuantity || pos.quantity) * pos.currentPrice).toFixed(2) : null,
+            ppl: pos?.ppl?.toString() ?? null,
+            currentShare: inst.currentShare?.toString() ?? null,
+            expectedShare: inst.expectedShare?.toString() ?? null,
+            result: inst.result?.toString() ?? null,
+          };
+        });
+        await storage.saveTrading212Holdings(platformId, userId, today, holdingsToSave);
+        console.log(`[Scheduler] Saved ${holdingsToSave.length} T212 holdings snapshots for platform ${platformId}`);
+      } catch (holdingsErr: any) {
+        console.error(`[Scheduler] Failed to save T212 holdings for platform ${platformId}:`, holdingsErr.message);
       }
 
       await storage.updateScraperConfig(id, userId, {

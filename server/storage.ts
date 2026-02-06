@@ -31,7 +31,10 @@ import {
   type InsertEmailImport,
   scraperConfigs,
   type ScraperConfig,
-  type InsertScraperConfig
+  type InsertScraperConfig,
+  trading212Holdings,
+  type Trading212Holding,
+  type InsertTrading212Holding
 } from "@shared/schema";
 import { eq, desc, sql, and, or } from "drizzle-orm";
 
@@ -121,6 +124,12 @@ export interface IStorage {
   saveScraperConfig(config: InsertScraperConfig): Promise<ScraperConfig>;
   updateScraperConfig(id: number, userId: number, data: Partial<ScraperConfig>): Promise<ScraperConfig>;
   deleteScraperConfig(platformId: number, userId: number): Promise<void>;
+
+  // Trading 212 Holdings Snapshots
+  saveTrading212Holdings(platformId: number, userId: number, date: Date, holdings: Omit<InsertTrading212Holding, 'platformId' | 'userId' | 'date'>[]): Promise<void>;
+  getTrading212Holdings(platformId: number, userId: number): Promise<Trading212Holding[]>;
+  getTrading212HoldingsDates(platformId: number, userId: number): Promise<string[]>;
+  getTrading212HoldingsByDate(platformId: number, userId: number, date: string): Promise<Trading212Holding[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1120,6 +1129,65 @@ export class DatabaseStorage implements IStorage {
         eq(scraperConfigs.platformId, platformId),
         eq(scraperConfigs.userId, userId)
       ));
+  }
+
+  async saveTrading212Holdings(platformId: number, userId: number, date: Date, holdings: Omit<InsertTrading212Holding, 'platformId' | 'userId' | 'date'>[]): Promise<void> {
+    const dateStr = date.toISOString().split("T")[0];
+    const dayStart = new Date(dateStr + "T00:00:00.000Z");
+    const dayEnd = new Date(dateStr + "T23:59:59.999Z");
+
+    await db.delete(trading212Holdings)
+      .where(and(
+        eq(trading212Holdings.platformId, platformId),
+        eq(trading212Holdings.userId, userId),
+        sql`${trading212Holdings.date} >= ${dayStart}`,
+        sql`${trading212Holdings.date} <= ${dayEnd}`
+      ));
+
+    if (holdings.length > 0) {
+      const rows = holdings.map(h => ({
+        ...h,
+        platformId,
+        userId,
+        date,
+      }));
+      await db.insert(trading212Holdings).values(rows);
+    }
+  }
+
+  async getTrading212Holdings(platformId: number, userId: number): Promise<Trading212Holding[]> {
+    return await db.select()
+      .from(trading212Holdings)
+      .where(and(
+        eq(trading212Holdings.platformId, platformId),
+        eq(trading212Holdings.userId, userId)
+      ))
+      .orderBy(desc(trading212Holdings.date));
+  }
+
+  async getTrading212HoldingsDates(platformId: number, userId: number): Promise<string[]> {
+    const results = await db.selectDistinct({ date: sql<string>`DATE(${trading212Holdings.date})` })
+      .from(trading212Holdings)
+      .where(and(
+        eq(trading212Holdings.platformId, platformId),
+        eq(trading212Holdings.userId, userId)
+      ))
+      .orderBy(sql`DATE(${trading212Holdings.date}) DESC`);
+    return results.map(r => r.date);
+  }
+
+  async getTrading212HoldingsByDate(platformId: number, userId: number, date: string): Promise<Trading212Holding[]> {
+    const dayStart = new Date(date + "T00:00:00.000Z");
+    const dayEnd = new Date(date + "T23:59:59.999Z");
+    return await db.select()
+      .from(trading212Holdings)
+      .where(and(
+        eq(trading212Holdings.platformId, platformId),
+        eq(trading212Holdings.userId, userId),
+        sql`${trading212Holdings.date} >= ${dayStart}`,
+        sql`${trading212Holdings.date} <= ${dayEnd}`
+      ))
+      .orderBy(desc(trading212Holdings.value));
   }
 }
 

@@ -1737,6 +1737,29 @@ export async function registerRoutes(
         return res.status(404).json({ message: "No matching pie found" });
       }
 
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      try {
+        const holdingsToSave = matchedPie.instruments.map(inst => {
+          const qty = inst.quantity ?? inst.shares;
+          const val = qty && inst.currentPrice ? (qty * inst.currentPrice) : null;
+          return {
+            ticker: inst.ticker,
+            shares: (inst.quantity ?? inst.shares)?.toString() ?? null,
+            currentPrice: inst.currentPrice?.toString() ?? null,
+            averagePrice: inst.averagePrice?.toString() ?? null,
+            value: val != null ? val.toFixed(2) : null,
+            ppl: inst.ppl?.toString() ?? null,
+            currentShare: inst.currentShare?.toString() ?? null,
+            expectedShare: inst.expectedShare?.toString() ?? null,
+            result: inst.result?.toString() ?? null,
+          };
+        });
+        await storage.saveTrading212Holdings(platformId, userId, today, holdingsToSave);
+      } catch (saveErr: any) {
+        console.error("T212 holdings snapshot save error:", saveErr.message);
+      }
+
       res.json({
         pieName: matchedPie.pieName,
         currentValue: matchedPie.currentValue,
@@ -1752,6 +1775,55 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error("T212 holdings error:", err);
       res.status(500).json({ message: err.message || "Failed to fetch holdings" });
+    }
+  });
+
+  app.get('/api/platforms/:platformId/trading212-holdings-history', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.platformId);
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+
+      const date = req.query.date as string | undefined;
+      if (date) {
+        const holdings = await storage.getTrading212HoldingsByDate(platformId, userId, date);
+        return res.json({ date, holdings });
+      }
+
+      const dates = await storage.getTrading212HoldingsDates(platformId, userId);
+      res.json({ dates });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to fetch holdings history" });
+    }
+  });
+
+  app.get('/api/platforms/:platformId/trading212-holdings-chart', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.platformId);
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+
+      const allHoldings = await storage.getTrading212Holdings(platformId, userId);
+
+      const dateMap = new Map<string, { date: string; instruments: Record<string, { value: number; ppl: number }> }>();
+      for (const h of allHoldings) {
+        const dateStr = new Date(h.date).toISOString().split("T")[0];
+        if (!dateMap.has(dateStr)) {
+          dateMap.set(dateStr, { date: dateStr, instruments: {} });
+        }
+        const entry = dateMap.get(dateStr)!;
+        entry.instruments[h.ticker] = {
+          value: parseFloat(h.value || "0"),
+          ppl: parseFloat(h.ppl || "0"),
+        };
+      }
+
+      const chartData = Array.from(dateMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+      res.json({ chartData });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Failed to fetch holdings chart data" });
     }
   });
 

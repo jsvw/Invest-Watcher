@@ -188,6 +188,41 @@ export default function PlatformDetails() {
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
+
+  const [selectedHistoryDate, setSelectedHistoryDate] = useState<string | null>(null);
+
+  const { data: holdingsHistoryDates } = useQuery({
+    queryKey: ['/api/platforms', id, 'trading212-holdings-history'],
+    queryFn: async () => {
+      const res = await fetch(`/api/platforms/${id}/trading212-holdings-history`, { credentials: 'include' });
+      if (!res.ok) return { dates: [] };
+      return res.json();
+    },
+    enabled: isTrading212,
+    staleTime: 60 * 1000,
+  });
+
+  const { data: holdingsHistorySnapshot } = useQuery({
+    queryKey: ['/api/platforms', id, 'trading212-holdings-history', selectedHistoryDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/platforms/${id}/trading212-holdings-history?date=${selectedHistoryDate}`, { credentials: 'include' });
+      if (!res.ok) return { holdings: [] };
+      return res.json();
+    },
+    enabled: isTrading212 && !!selectedHistoryDate,
+    staleTime: 60 * 1000,
+  });
+
+  const { data: holdingsChartData } = useQuery({
+    queryKey: ['/api/platforms', id, 'trading212-holdings-chart'],
+    queryFn: async () => {
+      const res = await fetch(`/api/platforms/${id}/trading212-holdings-chart`, { credentials: 'include' });
+      if (!res.ok) return { chartData: [] };
+      return res.json();
+    },
+    enabled: isTrading212,
+    staleTime: 60 * 1000,
+  });
   
   const [assetNameFilter, setAssetNameFilter] = useState("");
   const [assetSort, setAssetSort] = useState<"name" | "name-desc" | "date" | "date-asc" | "invested" | "invested-asc" | "value" | "value-asc" | "return" | "return-asc" | "exit" | "exit-desc">("date");
@@ -1095,6 +1130,140 @@ export default function PlatformDetails() {
                   )}
                 </CardContent>
               </Card>
+
+              {holdingsChartData?.chartData?.length > 1 && (() => {
+                const tickers = new Set<string>();
+                holdingsChartData.chartData.forEach((d: any) => {
+                  Object.keys(d.instruments || {}).forEach((t: string) => tickers.add(t));
+                });
+                const tickerList = Array.from(tickers);
+                const chartColors = [
+                  "hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))",
+                  "#f97316", "#06b6d4", "#8b5cf6", "#ec4899", "#14b8a6",
+                ];
+                const stackedData = holdingsChartData.chartData.map((d: any) => {
+                  const row: Record<string, any> = { date: d.date };
+                  let totalPpl = 0;
+                  for (const t of tickerList) {
+                    row[t] = d.instruments?.[t]?.value || 0;
+                    totalPpl += d.instruments?.[t]?.ppl || 0;
+                  }
+                  row.totalPpl = totalPpl;
+                  return row;
+                });
+                return (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Holdings Value Over Time</CardTitle>
+                      <CardDescription>Daily breakdown by instrument</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={stackedData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                            <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(val) => format(new Date(val), 'MMM d')} />
+                            <YAxis tick={{ fontSize: 11 }} tickFormatter={(val) => `${getCurrencySymbol(currency)}${val.toFixed(0)}`} width={60} />
+                            <Tooltip
+                              formatter={(val: number, name: string) => [formatCurrency(val, currency), name]}
+                              labelFormatter={(label) => format(new Date(label), 'MMM d, yyyy')}
+                              contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                            />
+                            {tickerList.map((ticker, i) => (
+                              <Area
+                                key={ticker}
+                                type="monotone"
+                                dataKey={ticker}
+                                stackId="1"
+                                fill={chartColors[i % chartColors.length]}
+                                stroke={chartColors[i % chartColors.length]}
+                                fillOpacity={0.6}
+                              />
+                            ))}
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
+
+              {holdingsHistoryDates?.dates?.length > 0 && (
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-4">
+                    <div>
+                      <CardTitle>Holdings History</CardTitle>
+                      <CardDescription>Browse past snapshots ({holdingsHistoryDates.dates.length} day{holdingsHistoryDates.dates.length !== 1 ? 's' : ''} recorded)</CardDescription>
+                    </div>
+                    <Select
+                      value={selectedHistoryDate || ""}
+                      onValueChange={(val) => setSelectedHistoryDate(val || null)}
+                    >
+                      <SelectTrigger className="w-[180px]" data-testid="select-history-date">
+                        <SelectValue placeholder="Select date" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {holdingsHistoryDates.dates.map((d: string) => (
+                          <SelectItem key={d} value={d} data-testid={`option-date-${d}`}>
+                            {format(new Date(d), 'MMM d, yyyy')}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedHistoryDate && holdingsHistorySnapshot?.holdings?.length > 0 ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="secondary">
+                            {format(new Date(selectedHistoryDate), 'EEEE, MMM d, yyyy')}
+                          </Badge>
+                          <Badge variant="outline">
+                            {holdingsHistorySnapshot.holdings.length} instrument{holdingsHistorySnapshot.holdings.length !== 1 ? 's' : ''}
+                          </Badge>
+                          <Badge variant="outline" className="text-green-600 dark:text-green-400">
+                            Total: {formatCurrency(holdingsHistorySnapshot.holdings.reduce((s: number, h: any) => s + parseFloat(h.value || "0"), 0), currency)}
+                          </Badge>
+                        </div>
+                        <div className="rounded-md border overflow-x-auto">
+                          <table className="w-full text-sm" data-testid="table-holdings-history">
+                            <thead>
+                              <tr className="border-b bg-muted/50">
+                                <th className="text-left p-3 font-medium">Ticker</th>
+                                <th className="text-right p-3 font-medium">Shares</th>
+                                <th className="text-right p-3 font-medium">Avg Price</th>
+                                <th className="text-right p-3 font-medium">Price</th>
+                                <th className="text-right p-3 font-medium">Value</th>
+                                <th className="text-right p-3 font-medium">P/L</th>
+                                <th className="text-right p-3 font-medium">Allocation</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {holdingsHistorySnapshot.holdings.map((h: any, idx: number) => (
+                                <tr key={idx} className="border-b last:border-0" data-testid={`row-history-holding-${idx}`}>
+                                  <td className="p-3 font-medium">{h.ticker}</td>
+                                  <td className="text-right p-3 tabular-nums">{h.shares ? parseFloat(h.shares).toFixed(parseFloat(h.shares) < 1 ? 6 : 4) : '-'}</td>
+                                  <td className="text-right p-3 tabular-nums">{h.averagePrice ? formatCurrency(parseFloat(h.averagePrice), currency) : '-'}</td>
+                                  <td className="text-right p-3 tabular-nums">{h.currentPrice ? formatCurrency(parseFloat(h.currentPrice), currency) : '-'}</td>
+                                  <td className="text-right p-3 tabular-nums font-medium">{h.value ? formatCurrency(parseFloat(h.value), currency) : '-'}</td>
+                                  <td className={`text-right p-3 tabular-nums ${parseFloat(h.ppl || "0") >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                    {h.ppl ? `${parseFloat(h.ppl) >= 0 ? '+' : ''}${formatCurrency(parseFloat(h.ppl), currency)}` : '-'}
+                                  </td>
+                                  <td className="text-right p-3 tabular-nums">{h.currentShare ? `${parseFloat(h.currentShare).toFixed(1)}%` : '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : selectedHistoryDate ? (
+                      <p className="text-center py-4 text-muted-foreground">No snapshot data for this date</p>
+                    ) : (
+                      <p className="text-center py-4 text-muted-foreground">Select a date to view the holdings snapshot</p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
           )}
         </Tabs>

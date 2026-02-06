@@ -151,6 +151,24 @@ export const scraperConfigs = pgTable("scraper_configs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// === TRADING 212 HOLDINGS SNAPSHOTS (daily instrument-level data) ===
+export const trading212Holdings = pgTable("trading212_holdings", {
+  id: serial("id").primaryKey(),
+  platformId: integer("platform_id").notNull().references(() => platforms.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  date: timestamp("date").notNull(),
+  ticker: text("ticker").notNull(),
+  shares: numeric("shares"),
+  currentPrice: numeric("current_price"),
+  averagePrice: numeric("average_price"),
+  value: numeric("value"),
+  ppl: numeric("ppl"),
+  currentShare: numeric("current_share"),
+  expectedShare: numeric("expected_share"),
+  result: numeric("result"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === BASE SCHEMAS ===
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertPlatformSchema = createInsertSchema(platforms).omit({ id: true, createdAt: true });
@@ -163,6 +181,7 @@ export const insertAssetRepaymentSchema = createInsertSchema(assetRepayments).om
 export const insertEmailSettingsSchema = createInsertSchema(emailSettings).omit({ id: true, createdAt: true, lastPollAt: true });
 export const insertEmailImportSchema = createInsertSchema(emailImports).omit({ id: true, createdAt: true });
 export const insertScraperConfigSchema = createInsertSchema(scraperConfigs).omit({ id: true, createdAt: true, lastScrapeAt: true, lastScrapeStatus: true, lastScrapeMessage: true });
+export const insertTrading212HoldingSchema = createInsertSchema(trading212Holdings).omit({ id: true, createdAt: true });
 
 // === EXPLICIT API CONTRACT TYPES ===
 
@@ -178,6 +197,7 @@ export type AssetRepayment = typeof assetRepayments.$inferSelect;
 export type EmailSettings = typeof emailSettings.$inferSelect;
 export type EmailImport = typeof emailImports.$inferSelect;
 export type ScraperConfig = typeof scraperConfigs.$inferSelect;
+export type Trading212Holding = typeof trading212Holdings.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertPlatform = z.infer<typeof insertPlatformSchema>;
@@ -190,6 +210,7 @@ export type InsertAssetRepayment = z.infer<typeof insertAssetRepaymentSchema>;
 export type InsertEmailSettings = z.infer<typeof insertEmailSettingsSchema>;
 export type InsertEmailImport = z.infer<typeof insertEmailImportSchema>;
 export type InsertScraperConfig = z.infer<typeof insertScraperConfigSchema>;
+export type InsertTrading212Holding = z.infer<typeof insertTrading212HoldingSchema>;
 
 // Request types
 export type CreatePlatformRequest = InsertPlatform;
