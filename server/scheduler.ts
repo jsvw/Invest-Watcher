@@ -73,18 +73,28 @@ async function runScrapeForConfig(config: any) {
 
     if (scraperResult.totalInvested > 0) {
       const existingInvestments = await storage.getInvestments(platformId);
-      const scrapedInv = existingInvestments.find(i =>
-        i.notes === "Auto-scraped total invested"
-      );
-      if (scrapedInv) {
-        await storage.updateInvestment(scrapedInv.id, { amount: scraperResult.totalInvested.toFixed(2), date: today });
-      } else {
-        await storage.createInvestment({
-          platformId,
-          amount: scraperResult.totalInvested.toFixed(2),
-          date: today,
-          notes: "Auto-scraped total invested",
-        });
+      const existingWithdrawals = await storage.getWithdrawals(platformId);
+      const currentTotalInvested = existingInvestments.reduce((sum, i) => sum + Number(i.amount), 0);
+      const currentTotalWithdrawn = existingWithdrawals.reduce((sum, w) => sum + Number(w.amount), 0);
+      const currentNet = currentTotalInvested - currentTotalWithdrawn;
+      const difference = scraperResult.totalInvested - currentNet;
+
+      if (Math.abs(difference) >= 0.01) {
+        if (difference > 0) {
+          await storage.createInvestment({
+            platformId,
+            amount: difference.toFixed(2),
+            date: today,
+            notes: "Auto-scraped adjustment",
+          });
+        } else {
+          await storage.createWithdrawal({
+            platformId,
+            amount: Math.abs(difference).toFixed(2),
+            date: today,
+            notes: "Auto-scraped adjustment",
+          });
+        }
       }
     }
 
