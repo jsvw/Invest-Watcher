@@ -69,6 +69,7 @@
     "framer-motion": "^11.13.1",
     "google-auth-library": "^10.5.0",
     "imap": "^0.8.19",
+    "imapflow": "^1.2.8",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.453.0",
     "mailparser": "^3.9.3",
