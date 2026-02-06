@@ -1384,7 +1384,7 @@ export async function registerRoutes(
         credentialData = { apiKey, apiSecret };
         if (pieName) credentialData.pieName = pieName;
       } else {
-        const { email, password, gmailAppPassword } = req.body;
+        const { email, password, gmailAppPassword, gmailEmail } = req.body;
         if (!email || !password) {
           return res.status(400).json({ message: "email and password are required" });
         }
@@ -1392,8 +1392,9 @@ export async function registerRoutes(
           return res.status(400).json({ message: "Invalid email or password format" });
         }
         credentialData = { email, password };
-        if (gmailAppPassword && scraperType === "crowdpear") {
-          credentialData.gmailAppPassword = gmailAppPassword;
+        if (scraperType === "crowdpear") {
+          if (gmailAppPassword) credentialData.gmailAppPassword = gmailAppPassword;
+          if (gmailEmail) credentialData.gmailEmail = gmailEmail;
         }
       }
 
@@ -1553,7 +1554,7 @@ export async function registerRoutes(
           balanceData = await scrapeRoboCash(creds.email, creds.password);
         } else {
           const { scrapeCrowdPear } = await import("./scrapers/crowdpear");
-          balanceData = await scrapeCrowdPear(creds.email, creds.password, creds.gmailAppPassword);
+          balanceData = await scrapeCrowdPear(creds.email, creds.password, creds.gmailAppPassword, creds.gmailEmail);
         }
 
         if (balanceData.totalBalance > 0) {

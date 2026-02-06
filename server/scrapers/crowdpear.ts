@@ -127,7 +127,7 @@ async function fetch2FACodeFromEmail(email: string, appPassword: string, maxAtte
   }
 }
 
-export async function scrapeCrowdPear(email: string, password: string, gmailAppPassword?: string): Promise<CrowdPearScrapedData> {
+export async function scrapeCrowdPear(email: string, password: string, gmailAppPassword?: string, gmailEmail?: string): Promise<CrowdPearScrapedData> {
   let browser;
   try {
     browser = await puppeteer.launch({
@@ -249,7 +249,8 @@ export async function scrapeCrowdPear(email: string, password: string, gmailAppP
         throw new Error("2FA verification required but no Gmail app password configured. Please add your Gmail app password in the scraper settings.");
       }
 
-      const code = await fetch2FACodeFromGmail(email, gmailAppPassword);
+      const imapEmail = gmailEmail || email;
+      const code = await fetch2FACodeFromEmail(imapEmail, gmailAppPassword);
       console.log(`[CrowdPear Scraper] Entering 2FA code: ${code}`);
 
       const multiInputs = await page.$$('input[maxlength="1"]');

@@ -177,7 +177,7 @@ async function runScrapeForConfig(config: any) {
         balanceData = await scrapeRoboCash(creds.email, creds.password);
       } else {
         const { scrapeCrowdPear } = await import("./scrapers/crowdpear");
-        balanceData = await scrapeCrowdPear(creds.email, creds.password, creds.gmailAppPassword);
+        balanceData = await scrapeCrowdPear(creds.email, creds.password, creds.gmailAppPassword, creds.gmailEmail);
       }
 
       if (balanceData.totalBalance > 0) {
