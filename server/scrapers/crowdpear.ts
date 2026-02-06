@@ -22,7 +22,7 @@ function getImapServer(email: string): { host: string; port: number } {
   return { host: "imap.gmail.com", port: 993 };
 }
 
-async function fetch2FACodeFromEmail(email: string, appPassword: string, maxAttempts = 12, waitBeforeStart = 60000): Promise<string> {
+async function fetch2FACodeFromEmail(email: string, appPassword: string, maxAttempts = 12, waitBeforeStart = 10000): Promise<string> {
   console.log(`[CrowdPear 2FA] Waiting ${waitBeforeStart / 1000}s before checking email for verification code...`);
   await new Promise(resolve => setTimeout(resolve, waitBeforeStart));
 
