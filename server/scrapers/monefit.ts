@@ -1,4 +1,5 @@
 import puppeteer from "puppeteer-core";
+import { getChromiumPath } from "./chromium";
 
 export interface MonefitScrapedData {
   mainBalance: number;
@@ -13,8 +14,6 @@ export interface MonefitScrapedData {
   totalInvested: number;
   scrapedAt: Date;
 }
-
-const CHROMIUM_PATH = process.env.CHROMIUM_PATH || "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
 const LOGIN_URL = "https://smartsaver.monefit.com/en/login";
 const DASHBOARD_URL = "https://smartsaver.monefit.com/en/overview";
 
@@ -22,7 +21,7 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
   let browser;
   try {
     browser = await puppeteer.launch({
-      executablePath: CHROMIUM_PATH,
+      executablePath: getChromiumPath(),
       headless: true,
       args: [
         "--no-sandbox",

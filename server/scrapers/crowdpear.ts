@@ -1,12 +1,11 @@
 import puppeteer from "puppeteer-core";
 import { ImapFlow } from "imapflow";
+import { getChromiumPath } from "./chromium";
 
 export interface CrowdPearScrapedData {
   totalBalance: number;
   scrapedAt: Date;
 }
-
-const CHROMIUM_PATH = process.env.CHROMIUM_PATH || "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
 const LOGIN_URL = "https://crowdpear.com/en/client";
 
 function getImapServer(email: string): { host: string; port: number } {
@@ -138,7 +137,7 @@ export async function scrapeCrowdPear(email: string, password: string, gmailAppP
   let browser;
   try {
     browser = await puppeteer.launch({
-      executablePath: CHROMIUM_PATH,
+      executablePath: getChromiumPath(),
       headless: true,
       args: [
         "--no-sandbox",

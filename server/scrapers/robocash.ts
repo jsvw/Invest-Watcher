@@ -1,11 +1,10 @@
 import puppeteer from "puppeteer-core";
+import { getChromiumPath } from "./chromium";
 
 export interface RoboCashScrapedData {
   totalBalance: number;
   scrapedAt: Date;
 }
-
-const CHROMIUM_PATH = process.env.CHROMIUM_PATH || "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
 const LOGIN_URL = "https://robo.cash/login";
 const SUMMARY_URL = "https://robo.cash/cabinet/summary";
 
@@ -13,7 +12,7 @@ export async function scrapeRoboCash(email: string, password: string): Promise<R
   let browser;
   try {
     browser = await puppeteer.launch({
-      executablePath: CHROMIUM_PATH,
+      executablePath: getChromiumPath(),
       headless: true,
       args: [
         "--no-sandbox",

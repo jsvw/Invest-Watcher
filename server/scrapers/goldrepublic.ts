@@ -1,12 +1,11 @@
 import puppeteer from "puppeteer-core";
+import { getChromiumPath } from "./chromium";
 
 export interface GoldRepublicScrapedData {
   totalBalance: number;
   totalInvested: number | null;
   scrapedAt: Date;
 }
-
-const CHROMIUM_PATH = process.env.CHROMIUM_PATH || "/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium";
 const LOGIN_URL = "https://www.goldrepublic.com/nl-nl/inloggen";
 const PERFORMANCE_URL = "https://www.goldrepublic.com/nl-nl/performance";
 
@@ -17,7 +16,7 @@ export async function scrapeGoldRepublic(username: string, email: string, passwo
   let browser;
   try {
     browser = await puppeteer.launch({
-      executablePath: CHROMIUM_PATH,
+      executablePath: getChromiumPath(),
       headless: true,
       args: [
         "--no-sandbox",
