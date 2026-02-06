@@ -971,6 +971,13 @@ export default function PlatformDetails() {
                           <p className="text-lg font-semibold text-green-600 dark:text-green-400" data-testid="text-holdings-dividends">
                             {formatCurrency(holdingsData.dividendsGained || 0, currency)}
                           </p>
+                          {(holdingsData.dividendsReinvested > 0 || holdingsData.dividendsInCash > 0) && (
+                            <p className="text-xs text-muted-foreground">
+                              {holdingsData.dividendsReinvested > 0 && `Reinvested: ${formatCurrency(holdingsData.dividendsReinvested, currency)}`}
+                              {holdingsData.dividendsReinvested > 0 && holdingsData.dividendsInCash > 0 && ' / '}
+                              {holdingsData.dividendsInCash > 0 && `Cash: ${formatCurrency(holdingsData.dividendsInCash, currency)}`}
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -990,6 +997,7 @@ export default function PlatformDetails() {
                               <th className="text-right p-3 font-medium">Price</th>
                               <th className="text-right p-3 font-medium">Value</th>
                               <th className="text-right p-3 font-medium">P/L</th>
+                              <th className="text-right p-3 font-medium">Dividends</th>
                               <th className="text-right p-3 font-medium">Allocation</th>
                             </tr>
                           </thead>
@@ -1014,6 +1022,13 @@ export default function PlatformDetails() {
                                     </td>
                                     <td className={`text-right p-3 tabular-nums ${(inst.ppl ?? inst.result ?? 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                                       {(inst.ppl ?? inst.result) != null ? `${(inst.ppl ?? inst.result) >= 0 ? '+' : ''}${formatCurrency(inst.ppl ?? inst.result, currency)}` : '-'}
+                                    </td>
+                                    <td className="text-right p-3 tabular-nums">
+                                      {inst.dividendsReceived != null ? (
+                                        <span className="text-green-600 dark:text-green-400" title={inst.dividendCount ? `${inst.dividendCount} payment(s)` : undefined}>
+                                          {formatCurrency(inst.dividendsReceived, currency)}
+                                        </span>
+                                      ) : '-'}
                                     </td>
                                     <td className="text-right p-3 tabular-nums">{inst.currentShare?.toFixed(1)}%</td>
                                   </tr>

@@ -9,6 +9,9 @@ export interface Trading212Instrument {
   ppl?: number;
   fxPpl?: number;
   quantity?: number;
+  dividendsReceived?: number;
+  lastDividendDate?: string;
+  dividendCount?: number;
 }
 
 export interface Trading212PieData {
@@ -149,12 +152,65 @@ export async function scrapeTrading212(apiKey: string, apiSecret: string): Promi
   };
 }
 
+interface DividendItem {
+  ticker: string;
+  amount: number;
+  paidOn: string;
+  quantity: number;
+  type: string;
+  reference: string;
+}
+
+export async function fetchDividends(apiKey: string, apiSecret: string): Promise<Map<string, { total: number; count: number; lastDate: string }>> {
+  console.log("[Trading212] Fetching dividend history...");
+  const divMap = new Map<string, { total: number; count: number; lastDate: string }>();
+
+  let nextPath: string | null = "/equity/history/dividends?limit=50";
+
+  while (nextPath) {
+    const response = await makeRequest(nextPath, apiKey, apiSecret) as {
+      items: DividendItem[];
+      nextPagePath?: string | null;
+    };
+
+    for (const item of response.items) {
+      const existing = divMap.get(item.ticker);
+      if (existing) {
+        existing.total += item.amount;
+        existing.count += 1;
+        if (item.paidOn > existing.lastDate) {
+          existing.lastDate = item.paidOn;
+        }
+      } else {
+        divMap.set(item.ticker, {
+          total: item.amount,
+          count: 1,
+          lastDate: item.paidOn,
+        });
+      }
+    }
+
+    if (response.nextPagePath) {
+      const cleanPath = response.nextPagePath.replace(/^\/api\/v0/, "");
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      nextPath = cleanPath;
+    } else {
+      nextPath = null;
+    }
+  }
+
+  console.log(`[Trading212] Found dividends for ${divMap.size} ticker(s)`);
+  return divMap;
+}
+
 export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: string): Promise<Trading212ScrapedData> {
   const data = await scrapeTrading212(apiKey, apiSecret);
 
   await new Promise(resolve => setTimeout(resolve, 5000));
-
   const posMap = await fetchPositions(apiKey, apiSecret);
+
+  await new Promise(resolve => setTimeout(resolve, 5000));
+  const divMap = await fetchDividends(apiKey, apiSecret);
 
   for (const pie of data.pies) {
     for (const inst of pie.instruments) {
@@ -165,6 +221,12 @@ export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: s
         inst.quantity = pos.pieQuantity || pos.quantity;
         inst.ppl = pos.ppl;
         inst.fxPpl = pos.fxPpl;
+      }
+      const div = divMap.get(inst.ticker);
+      if (div) {
+        inst.dividendsReceived = div.total;
+        inst.dividendCount = div.count;
+        inst.lastDividendDate = div.lastDate;
       }
     }
   }
