@@ -58,15 +58,16 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
           await allowSelectionBtn.click();
           await new Promise(resolve => setTimeout(resolve, 1000));
         } else {
-          await page.evaluate(() => {
-            const btns = Array.from(document.querySelectorAll('button, a'));
-            const allowBtn = btns.find(b =>
-              b.textContent?.toLowerCase().includes('allow all') ||
-              b.textContent?.toLowerCase().includes('accept all') ||
-              b.textContent?.toLowerCase().includes('allow selection')
-            );
-            if (allowBtn) (allowBtn as HTMLElement).click();
-          });
+          await page.evaluate(`(function() {
+            var btns = Array.from(document.querySelectorAll('button, a'));
+            for (var i = 0; i < btns.length; i++) {
+              var t = btns[i].textContent ? btns[i].textContent.toLowerCase() : "";
+              if (t.includes('allow all') || t.includes('accept all') || t.includes('allow selection')) {
+                btns[i].click();
+                break;
+              }
+            }
+          })()`);
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
@@ -82,11 +83,11 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
     const passwordInput = await page.$('input[name="password"]') || await page.$('input[type="password"]');
 
     if (!emailInput || !passwordInput) {
-      const availableInputs = await page.evaluate(() => {
-        return Array.from(document.querySelectorAll('input')).map(i => ({
-          name: i.name, type: i.type, ariaLabel: i.getAttribute('aria-label')
-        }));
-      });
+      const availableInputs = await page.evaluate(`(function() {
+        return Array.from(document.querySelectorAll('input')).map(function(i) {
+          return { name: i.name, type: i.type, ariaLabel: i.getAttribute('aria-label') };
+        });
+      })()`);
       throw new Error(`Could not find login fields. Available inputs: ${JSON.stringify(availableInputs)}`);
     }
 
@@ -96,20 +97,21 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
     await passwordInput.type(password, { delay: 50 });
 
     console.log("[Monefit Scraper] Submitting login...");
-    const submitButton = await page.evaluate(() => {
-      const buttons = Array.from(document.querySelectorAll('button[type="submit"]'));
-      const loginBtn = buttons.find(b => b.textContent?.trim().toLowerCase() === 'log in');
-      if (loginBtn) {
-        (loginBtn as HTMLElement).click();
-        return true;
+    const submitButton = await page.evaluate(`(function() {
+      var buttons = Array.from(document.querySelectorAll('button[type="submit"]'));
+      for (var i = 0; i < buttons.length; i++) {
+        var t = buttons[i].textContent ? buttons[i].textContent.trim().toLowerCase() : "";
+        if (t === 'log in') {
+          buttons[i].click();
+          return true;
+        }
       }
       if (buttons.length > 0) {
-        const lastSubmit = buttons[buttons.length - 1];
-        (lastSubmit as HTMLElement).click();
+        buttons[buttons.length - 1].click();
         return true;
       }
       return false;
-    });
+    })()`);
 
     if (!submitButton) {
       await page.keyboard.press("Enter");
@@ -122,10 +124,10 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
     console.log(`[Monefit Scraper] Current URL after login: ${currentUrl}`);
 
     if (currentUrl.includes("login")) {
-      const errorText = await page.evaluate(() => {
-        const errorEl = document.querySelector('.error, .alert, [class*="error"], [class*="alert"]');
-        return errorEl ? errorEl.textContent?.trim() : null;
-      });
+      const errorText = await page.evaluate(`(function() {
+        var errorEl = document.querySelector('.error, .alert, [class*="error"], [class*="alert"]');
+        return errorEl ? errorEl.textContent.trim() : null;
+      })()`);
       throw new Error(`Login failed${errorText ? `: ${errorText}` : ". Check your credentials."}`);
     }
 
@@ -148,53 +150,54 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
 
       var allText = document.body.innerText;
       var result = {
-        mainBalance: 0,
         totalBalance: 0,
-        vaultTexts: [],
         debugText: allText.substring(0, 2000),
       };
 
-      var balanceElements = Array.from(document.querySelectorAll('h1, h2, h3, [class*="balance"], [class*="total"], [class*="amount"], [data-testid*="balance"]'));
-      for (var i = 0; i < balanceElements.length; i++) {
-        var text = balanceElements[i].textContent ? balanceElements[i].textContent.trim() : "";
-        if (text.includes("\\u20ac") || text.match(/\\d+[.,]\\d{2}/)) {
-          var num = extractNumber(text);
-          if (num !== null && num > 0) {
-            if (num > result.totalBalance) {
-              result.totalBalance = num;
+      var balanceEl = document.querySelector('.summary-content-balance');
+      if (balanceEl) {
+        var num = extractNumber(balanceEl.textContent);
+        if (num !== null && num > 0) {
+          result.totalBalance = num;
+        }
+      }
+
+      if (result.totalBalance === 0) {
+        var fallbackEls = Array.from(document.querySelectorAll('h1, h2, h3, [class*="balance"], [class*="total"], [class*="amount"]'));
+        for (var i = 0; i < fallbackEls.length; i++) {
+          var text = fallbackEls[i].textContent ? fallbackEls[i].textContent.trim() : "";
+          if (text.match(/\\d+[.,]\\d{2}/)) {
+            var n = extractNumber(text);
+            if (n !== null && n > result.totalBalance) {
+              result.totalBalance = n;
             }
           }
         }
       }
 
-      var allElements = Array.from(document.querySelectorAll("*"));
-      for (var j = 0; j < allElements.length; j++) {
-        var elText = allElements[j].innerText ? allElements[j].innerText.trim() : "";
-        if (elText.toLowerCase().includes("vault") || elText.toLowerCase().includes("smart saver")) {
-          result.vaultTexts.push(elText.substring(0, 500));
-        }
-      }
-
       return result;
-    })()`) as { mainBalance: number; totalBalance: number; vaultTexts: string[]; debugText: string };
+    })()`) as { totalBalance: number; debugText: string };
 
-    console.log(`[Monefit Scraper] Raw extracted data - total: ${data.totalBalance}`);
+    console.log(`[Monefit Scraper] Extracted total balance: ${data.totalBalance}`);
     console.log(`[Monefit Scraper] Debug text: ${data.debugText.substring(0, 500)}`);
 
-    const moneyPattern = /€\s*([\d.,]+)/g;
-    const matches: RegExpExecArray[] = [];
-    let m: RegExpExecArray | null;
-    while ((m = moneyPattern.exec(pageContent)) !== null) {
-      matches.push(m);
+    let totalBalance = data.totalBalance;
+
+    if (totalBalance === 0) {
+      const moneyPattern = /€\s*([\d.,]+)/g;
+      const matches: RegExpExecArray[] = [];
+      let m: RegExpExecArray | null;
+      while ((m = moneyPattern.exec(pageContent)) !== null) {
+        matches.push(m);
+      }
+      const amounts = matches
+        .map(m => parseFloat(m[1].replace(/,/g, ".")))
+        .filter(n => !isNaN(n) && n > 0)
+        .sort((a, b) => b - a);
+
+      console.log(`[Monefit Scraper] Fallback amounts from HTML: ${JSON.stringify(amounts.slice(0, 10))}`);
+      totalBalance = amounts.length > 0 ? amounts[0] : 0;
     }
-    const amounts = matches
-      .map(m => parseFloat(m[1].replace(/,/g, ".")))
-      .filter(n => !isNaN(n) && n > 0)
-      .sort((a, b) => b - a);
-
-    console.log(`[Monefit Scraper] Found amounts in page: ${JSON.stringify(amounts.slice(0, 10))}`);
-
-    const totalBalance = data.totalBalance > 0 ? data.totalBalance : (amounts.length > 0 ? amounts[0] : 0);
 
     let vaults: MonefitScrapedData["vaults"] = [];
     try {
@@ -204,43 +207,46 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
         await new Promise(resolve => setTimeout(resolve, 3000));
       }
 
-      const vaultData = await page.evaluate(() => {
-        const vaults: Array<{ name: string; value: number; yield?: number; maturity?: string }> = [];
+      const vaultData = await page.evaluate(`(function() {
+        var vaults = [];
 
-        const extractNum = (text: string | null | undefined): number | null => {
+        var extractNum = function(text) {
           if (!text) return null;
-          const cleaned = text.replace(/[^0-9.,\-]/g, "").replace(/,/g, ".");
-          const match = cleaned.match(/-?\d+\.?\d*/);
+          var cleaned = text.replace(/[^0-9.,\\-]/g, "").replace(/,/g, ".");
+          var match = cleaned.match(/-?\\d+\\.?\\d*/);
           return match ? parseFloat(match[0]) : null;
         };
 
-        const vaultElements = Array.from(document.querySelectorAll('[class*="vault"], [class*="Vault"], [data-testid*="vault"]'));
-        for (const el of vaultElements) {
-          const name = el.querySelector('h3, h4, [class*="title"], [class*="name"]')?.textContent?.trim();
-          const valueText = el.querySelector('[class*="value"], [class*="amount"], [class*="balance"]')?.textContent?.trim();
-          const value = extractNum(valueText);
+        var vaultElements = Array.from(document.querySelectorAll('[class*="vault"], [class*="Vault"], [data-testid*="vault"]'));
+        for (var i = 0; i < vaultElements.length; i++) {
+          var el = vaultElements[i];
+          var nameEl = el.querySelector('h3, h4, [class*="title"], [class*="name"]');
+          var name = nameEl ? nameEl.textContent.trim() : null;
+          var valueEl = el.querySelector('[class*="value"], [class*="amount"], [class*="balance"]');
+          var valueText = valueEl ? valueEl.textContent.trim() : null;
+          var value = extractNum(valueText);
 
           if (name && value !== null && value > 0) {
-            const yieldText = el.textContent?.match(/(\d+\.?\d*)\s*%/);
-            const maturityText = el.textContent?.match(/(\d{1,2}[./]\d{1,2}[./]\d{2,4})/);
+            var yieldMatch = el.textContent.match(/(\\d+\\.?\\d*)\\s*%/);
+            var maturityMatch = el.textContent.match(/(\\d{1,2}[\\.\/]\\d{1,2}[\\.\/]\\d{2,4})/);
 
             vaults.push({
-              name,
-              value,
-              yield: yieldText ? parseFloat(yieldText[1]) : undefined,
-              maturity: maturityText ? maturityText[1] : undefined,
+              name: name,
+              value: value,
+              yieldPct: yieldMatch ? parseFloat(yieldMatch[1]) : null,
+              maturity: maturityMatch ? maturityMatch[1] : null,
             });
           }
         }
 
         return vaults;
-      });
+      })()`) as Array<{ name: string; value: number; yieldPct?: number | null; maturity?: string | null }>;
 
       vaults = vaultData.map(v => ({
         name: v.name,
         currentValue: v.value,
-        annualYield: v.yield,
-        maturityDate: v.maturity,
+        annualYield: v.yieldPct ?? undefined,
+        maturityDate: v.maturity ?? undefined,
       }));
     } catch (vaultErr) {
       console.log(`[Monefit Scraper] Could not extract vault details: ${vaultErr}`);
