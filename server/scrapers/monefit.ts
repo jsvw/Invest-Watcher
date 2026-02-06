@@ -131,16 +131,18 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
       throw new Error(`Login failed${errorText ? `: ${errorText}` : ". Check your credentials."}`);
     }
 
-    if (!currentUrl.includes("overview")) {
-      console.log("[Monefit Scraper] Navigating to overview...");
-      await page.goto(DASHBOARD_URL, { waitUntil: "networkidle2", timeout: 30000 });
+    if (!currentUrl.includes("summary")) {
+      console.log("[Monefit Scraper] Navigating to summary page...");
+      await page.goto("https://smartsaver.monefit.com/en/summary", { waitUntil: "networkidle2", timeout: 30000 });
       await new Promise(resolve => setTimeout(resolve, 3000));
     }
 
-    console.log("[Monefit Scraper] Extracting balance data...");
-    const pageContent = await page.content();
+    console.log("[Monefit Scraper] Extracting total balance from summary page...");
+    await page.waitForSelector('.summary-content-balance', { timeout: 10000 }).catch(() => {
+      console.log("[Monefit Scraper] .summary-content-balance not found, will try fallback");
+    });
 
-    const data = await page.evaluate(`(function() {
+    const summaryData = await page.evaluate(`(function() {
       var extractNumber = function(text) {
         if (!text) return null;
         var cleaned = text.replace(/[^0-9.,\\-]/g, "").replace(/,/g, ".");
@@ -178,12 +180,13 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
       return result;
     })()`) as { totalBalance: number; debugText: string };
 
-    console.log(`[Monefit Scraper] Extracted total balance: ${data.totalBalance}`);
-    console.log(`[Monefit Scraper] Debug text: ${data.debugText.substring(0, 500)}`);
+    console.log(`[Monefit Scraper] Extracted total balance: ${summaryData.totalBalance}`);
+    console.log(`[Monefit Scraper] Summary page text: ${summaryData.debugText.substring(0, 500)}`);
 
-    let totalBalance = data.totalBalance;
+    let totalBalance = summaryData.totalBalance;
 
     if (totalBalance === 0) {
+      const pageContent = await page.content();
       const moneyPattern = /€\s*([\d.,]+)/g;
       const matches: RegExpExecArray[] = [];
       let m: RegExpExecArray | null;
@@ -201,11 +204,9 @@ export async function scrapeMonefit(email: string, password: string): Promise<Mo
 
     let vaults: MonefitScrapedData["vaults"] = [];
     try {
-      const vaultUrl = "https://smartsaver.monefit.com/en/overview";
-      if (!page.url().includes("overview")) {
-        await page.goto(vaultUrl, { waitUntil: "networkidle2", timeout: 30000 });
-        await new Promise(resolve => setTimeout(resolve, 3000));
-      }
+      console.log("[Monefit Scraper] Navigating to overview for vault details...");
+      await page.goto(DASHBOARD_URL, { waitUntil: "networkidle2", timeout: 30000 });
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
       const vaultData = await page.evaluate(`(function() {
         var vaults = [];
