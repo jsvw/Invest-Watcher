@@ -633,11 +633,16 @@ export default function PlatformDetails() {
                             type="number"
                             scale="time"
                             domain={['dataMin', 'dataMax']}
+                            ticks={groupedHistory.map((d: any) => d.timestamp)}
                             stroke="hsl(var(--muted-foreground))" 
                             fontSize={12} 
                             tickLine={false} 
                             axisLine={false} 
                             tickFormatter={(ts) => format(new Date(ts), chartGrouping === "month" ? 'MMM yy' : 'MMM dd')}
+                            interval={0}
+                            angle={-45}
+                            textAnchor="end"
+                            height={60}
                           />
                           <YAxis 
                             stroke="hsl(var(--muted-foreground))" 
@@ -989,11 +994,16 @@ export default function PlatformDetails() {
                             type="number"
                             scale="time"
                             domain={['dataMin', 'dataMax']}
+                            ticks={groupedHistory.map((d: any) => d.timestamp)}
                             stroke="hsl(var(--muted-foreground))" 
                             fontSize={12} 
                             tickLine={false} 
                             axisLine={false} 
                             tickFormatter={(ts) => format(new Date(ts), chartGrouping === "month" ? 'MMM yy' : 'MMM dd')}
+                            interval={0}
+                            angle={-45}
+                            textAnchor="end"
+                            height={60}
                           />
                           <YAxis 
                             stroke="hsl(var(--muted-foreground))" 
