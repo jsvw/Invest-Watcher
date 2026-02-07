@@ -228,7 +228,7 @@ export default function PlatformDetails() {
   });
   
   const [assetNameFilter, setAssetNameFilter] = useState("");
-  const [assetSort, setAssetSort] = useState<"name" | "name-desc" | "date" | "date-asc" | "invested" | "invested-asc" | "value" | "value-asc" | "return" | "return-asc" | "exit" | "exit-desc">("date");
+  const [assetSort, setAssetSort] = useState<"name" | "name-desc" | "date" | "date-asc" | "invested" | "invested-asc" | "value" | "value-asc" | "return" | "return-asc" | "exit" | "exit-desc" | "change" | "change-asc">("date");
   
   const filteredAndSortedAssets = useMemo(() => {
     if (!assets) return [];
@@ -292,6 +292,24 @@ export default function PlatformDetails() {
           const exitA2 = a.exitDate ? new Date(a.exitDate).getTime() : -Infinity;
           const exitB2 = b.exitDate ? new Date(b.exitDate).getTime() : -Infinity;
           return exitB2 - exitA2;
+        case "change": {
+          const curA = a.currentValue || Number(a.investedAmount);
+          const prevA = (a as any).previousValue;
+          const chgA = prevA !== undefined ? curA - prevA : -Infinity;
+          const curB = b.currentValue || Number(b.investedAmount);
+          const prevB = (b as any).previousValue;
+          const chgB = prevB !== undefined ? curB - prevB : -Infinity;
+          return chgB - chgA;
+        }
+        case "change-asc": {
+          const curA3 = a.currentValue || Number(a.investedAmount);
+          const prevA3 = (a as any).previousValue;
+          const chgA3 = prevA3 !== undefined ? curA3 - prevA3 : Infinity;
+          const curB3 = b.currentValue || Number(b.investedAmount);
+          const prevB3 = (b as any).previousValue;
+          const chgB3 = prevB3 !== undefined ? curB3 - prevB3 : Infinity;
+          return chgA3 - chgB3;
+        }
         default:
           return 0;
       }
@@ -735,6 +753,13 @@ export default function PlatformDetails() {
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => setAssetSort("return-asc")} data-testid="sort-return-asc">
                           {assetSort === "return-asc" && "✓ "}Return (Lowest)
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => setAssetSort("change")} data-testid="sort-change">
+                          {assetSort === "change" && "✓ "}Change (Highest)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setAssetSort("change-asc")} data-testid="sort-change-asc">
+                          {assetSort === "change-asc" && "✓ "}Change (Lowest)
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
