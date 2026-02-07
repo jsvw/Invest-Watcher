@@ -160,7 +160,9 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
                 dataKey={cohort.cohortLabel}
                 stroke={COLORS[idx % COLORS.length]}
                 strokeWidth={2}
-                dot={{ fill: COLORS[idx % COLORS.length], r: 4 }}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                dot={{ fill: COLORS[idx % COLORS.length], r: 3.5, stroke: 'hsl(var(--card))', strokeWidth: 2 }}
                 connectNulls={false}
               />
             ))}

@@ -625,9 +625,11 @@ export default function PlatformDetails() {
                             dataKey="value" 
                             name="Current Value"
                             stroke={platform.color} 
-                            strokeWidth={3}
-                            dot={{ r: 3, fill: platform.color }}
-                            activeDot={{ r: 6 }}
+                            strokeWidth={2.5}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            dot={{ r: 3.5, fill: platform.color, stroke: 'hsl(var(--card))', strokeWidth: 2 }}
+                            activeDot={{ r: 5, stroke: platform.color, strokeWidth: 2, fill: 'hsl(var(--card))' }}
                           />
                           <Line 
                             type="monotone" 
@@ -635,8 +637,10 @@ export default function PlatformDetails() {
                             name="Total Invested"
                             stroke="#8884d8" 
                             strokeWidth={2}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
                             strokeDasharray="5 5"
-                            dot={{ r: 3, fill: '#8884d8' }}
+                            dot={{ r: 3.5, fill: '#8884d8', stroke: 'hsl(var(--card))', strokeWidth: 2 }}
                           />
                         </LineChart>
                       </ResponsiveContainer>
@@ -975,9 +979,11 @@ export default function PlatformDetails() {
                             dataKey="value" 
                             name="Current Value"
                             stroke={platform.color} 
-                            strokeWidth={3}
-                            dot={{ r: 3, fill: platform.color }}
-                            activeDot={{ r: 6 }}
+                            strokeWidth={2.5}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            dot={{ r: 3.5, fill: platform.color, stroke: 'hsl(var(--card))', strokeWidth: 2 }}
+                            activeDot={{ r: 5, stroke: platform.color, strokeWidth: 2, fill: 'hsl(var(--card))' }}
                           />
                           <Line 
                             type="monotone" 
@@ -985,8 +991,10 @@ export default function PlatformDetails() {
                             name="Total Invested"
                             stroke="#8884d8" 
                             strokeWidth={2}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
                             strokeDasharray="5 5"
-                            dot={{ r: 3, fill: '#8884d8' }}
+                            dot={{ r: 3.5, fill: '#8884d8', stroke: 'hsl(var(--card))', strokeWidth: 2 }}
                           />
                         </LineChart>
                       </ResponsiveContainer>
