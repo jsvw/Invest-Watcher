@@ -1848,10 +1848,12 @@ export async function registerRoutes(
 
       if (t212Data.dividendsLoaded && t212Data.rawDividends && t212Data.rawDividends.size > 0) {
         try {
-          const allDivRecords: { ticker: string; amount: string; paidOn: string; quantity: string | null }[] = [];
+          const pieTickers = new Set(matchedPie.instruments.map(i => i.ticker));
+          const pieDivRecords: { ticker: string; amount: string; paidOn: string; quantity: string | null }[] = [];
           t212Data.rawDividends.forEach((data, ticker) => {
+            if (!pieTickers.has(ticker)) return;
             for (const record of data.history) {
-              allDivRecords.push({
+              pieDivRecords.push({
                 ticker,
                 amount: record.amount.toString(),
                 paidOn: record.paidOn,
@@ -1859,8 +1861,8 @@ export async function registerRoutes(
               });
             }
           });
-          await storage.saveTrading212Dividends(platformId, userId, allDivRecords);
-          console.log(`[Trading212] Saved ${allDivRecords.length} dividend records to DB`);
+          await storage.saveTrading212Dividends(platformId, userId, pieDivRecords);
+          console.log(`[Trading212] Saved ${pieDivRecords.length} dividend records (filtered to ${pieTickers.size} pie tickers) to DB`);
         } catch (divSaveErr: any) {
           console.error("T212 dividend save error:", divSaveErr.message);
         }
