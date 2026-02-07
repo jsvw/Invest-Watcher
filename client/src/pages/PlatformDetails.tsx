@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { format, startOfWeek, startOfMonth, addMonths } from "date-fns";
+import { format } from "date-fns";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend } from "recharts";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -150,7 +150,6 @@ export default function PlatformDetails() {
   const [range, setRange] = useState("year");
   const [specificYear, setSpecificYear] = useState<string | null>(null);
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
-  const [chartGrouping, setChartGrouping] = useState<"day" | "week" | "month">("day");
   
   const { data: platforms } = usePlatforms();
   const { data: platform, isLoading: isPlatformLoading } = usePlatform(id);
@@ -346,54 +345,6 @@ export default function PlatformDetails() {
     },
     enabled: platformMode !== "standard"
   });
-
-  const groupedHistory = useMemo(() => {
-    if (!history || history.length === 0) {
-      return (history || []).map((e: any) => ({ ...e, timestamp: new Date(e.date).getTime() }));
-    }
-    if (chartGrouping === "day") {
-      return history.map((e: any) => ({ ...e, timestamp: new Date(e.date).getTime() }));
-    }
-    const groups = new Map<string, { value: number; invested: number; latestDate: string }>();
-    for (const entry of history) {
-      const d = new Date(entry.date);
-      let key: string;
-      if (chartGrouping === "week") {
-        const weekStart = startOfWeek(d, { weekStartsOn: 1 });
-        key = format(weekStart, 'yyyy-MM-dd');
-      } else {
-        key = format(d, 'yyyy-MM');
-      }
-      const existing = groups.get(key);
-      if (!existing || entry.date > existing.latestDate) {
-        groups.set(key, { value: entry.value, invested: entry.invested, latestDate: entry.date });
-      }
-    }
-    return Array.from(groups.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, data]) => {
-        const date = chartGrouping === "month" ? `${key}-01` : key;
-        return { date, value: data.value, invested: data.invested, timestamp: new Date(date).getTime() };
-      });
-  }, [history, chartGrouping]);
-
-  const monthlyTicks = useMemo(() => {
-    if (!groupedHistory || groupedHistory.length === 0) return [];
-    const timestamps = groupedHistory.map((d: any) => d.timestamp);
-    const minTs = Math.min(...timestamps);
-    const maxTs = Math.max(...timestamps);
-    const ticks: number[] = [];
-    let current = startOfMonth(new Date(minTs));
-    const endMonth = startOfMonth(new Date(maxTs));
-    while (current.getTime() <= endMonth.getTime()) {
-      ticks.push(current.getTime());
-      current = addMonths(current, 1);
-    }
-    if (ticks.length === 0) {
-      ticks.push(startOfMonth(new Date(minTs)).getTime());
-    }
-    return ticks;
-  }, [groupedHistory]);
 
   const years = availableFilters?.years || [];
   const monthsData = availableFilters?.months?.map((m: string) => {
@@ -628,35 +579,21 @@ export default function PlatformDetails() {
                         <TabsTrigger value="all">ALL</TabsTrigger>
                       </TabsList>
                     </Tabs>
-                    <Select value={chartGrouping} onValueChange={(val) => setChartGrouping(val as "day" | "week" | "month")}>
-                      <SelectTrigger className="w-[100px] h-9" data-testid="select-chart-grouping">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="day">Day</SelectItem>
-                        <SelectItem value="week">Week</SelectItem>
-                        <SelectItem value="month">Month</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="h-[400px] w-full">
-                    {groupedHistory && groupedHistory.length > 0 ? (
+                    {history && history.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={groupedHistory}>
+                        <LineChart data={history}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                           <XAxis 
-                            dataKey="timestamp" 
-                            type="number"
-                            scale="time"
-                            domain={['dataMin', 'dataMax']}
-                            ticks={monthlyTicks}
+                            dataKey="date" 
                             stroke="hsl(var(--muted-foreground))" 
                             fontSize={12} 
                             tickLine={false} 
                             axisLine={false} 
-                            tickFormatter={(ts) => format(new Date(ts), 'MMM yy')}
+                            tickFormatter={(date) => format(new Date(date), 'MMM yy')}
                           />
                           <YAxis 
                             stroke="hsl(var(--muted-foreground))" 
@@ -668,7 +605,7 @@ export default function PlatformDetails() {
                           <Tooltip 
                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                             formatter={(value: number) => [formatCurrency(value, currency), ""]}
-                            labelFormatter={(ts) => format(new Date(ts), 'MMM dd, yyyy')}
+                            labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
                           />
                           <Legend verticalAlign="top" height={36}/>
                           <Line 
@@ -980,35 +917,21 @@ export default function PlatformDetails() {
                         <TabsTrigger value="all">ALL</TabsTrigger>
                       </TabsList>
                     </Tabs>
-                    <Select value={chartGrouping} onValueChange={(val) => setChartGrouping(val as "day" | "week" | "month")}>
-                      <SelectTrigger className="w-[100px] h-9" data-testid="select-chart-grouping-standard">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="day">Day</SelectItem>
-                        <SelectItem value="week">Week</SelectItem>
-                        <SelectItem value="month">Month</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="h-[400px] w-full">
-                    {groupedHistory && groupedHistory.length > 0 ? (
+                    {history && history.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={groupedHistory}>
+                        <LineChart data={history}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                           <XAxis 
-                            dataKey="timestamp" 
-                            type="number"
-                            scale="time"
-                            domain={['dataMin', 'dataMax']}
-                            ticks={monthlyTicks}
+                            dataKey="date" 
                             stroke="hsl(var(--muted-foreground))" 
                             fontSize={12} 
                             tickLine={false} 
                             axisLine={false} 
-                            tickFormatter={(ts) => format(new Date(ts), 'MMM yy')}
+                            tickFormatter={(date) => format(new Date(date), 'MMM yy')}
                           />
                           <YAxis 
                             stroke="hsl(var(--muted-foreground))" 
@@ -1020,7 +943,7 @@ export default function PlatformDetails() {
                           <Tooltip 
                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                             formatter={(value: number) => [formatCurrency(value, currency), ""]}
-                            labelFormatter={(ts) => format(new Date(ts), 'MMM dd, yyyy')}
+                            labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
                           />
                           <Legend verticalAlign="top" height={36}/>
                           <Line 
