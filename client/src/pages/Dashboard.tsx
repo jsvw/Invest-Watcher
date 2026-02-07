@@ -3,14 +3,14 @@ import { StatCard } from "@/components/StatCard";
 import { usePlatforms } from "@/hooks/use-platforms";
 import { useAuth } from "@/App";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
-import { Wallet, TrendingUp, DollarSign, Check } from "lucide-react";
+import { Wallet, TrendingUp, DollarSign, Check, RefreshCw, Loader2 } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { Link } from "wouter";
 import { format } from "date-fns";
@@ -18,6 +18,8 @@ import { useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -28,6 +30,29 @@ export default function Dashboard() {
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
   const [excludedPlatforms, setExcludedPlatforms] = useState<number[]>([]);
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
+  const { toast } = useToast();
+
+  const scrapeAllMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/scrape-all', { method: 'POST', credentials: 'include' });
+      if (!res.ok) throw new Error("Scrape failed");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      const succeeded = data.results?.filter((r: any) => r.success).length || 0;
+      const failed = data.results?.filter((r: any) => !r.success).length || 0;
+      toast({
+        title: "Scraping Complete",
+        description: `${succeeded} succeeded${failed > 0 ? `, ${failed} failed` : ''}`,
+        variant: failed > 0 ? "destructive" : "default",
+      });
+      queryClient.invalidateQueries({ queryKey: [api.portfolio.history.path] });
+      queryClient.invalidateQueries({ queryKey: ['/api/platforms'] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Scraping Failed", description: err.message, variant: "destructive" });
+    },
+  });
 
   const formatAxisValue = (value: number, showSign: boolean = false) => {
     const symbol = getCurrencySymbol(currency);
@@ -140,9 +165,24 @@ export default function Dashboard() {
       <div className="space-y-8">
         
         {/* Header Section */}
-        <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground">Your financial overview at a glance.</p>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-3xl font-bold font-display tracking-tight text-foreground">Dashboard</h1>
+            <p className="text-muted-foreground">Your financial overview at a glance.</p>
+          </div>
+          <Button
+            data-testid="button-scrape-all"
+            onClick={() => scrapeAllMutation.mutate()}
+            disabled={scrapeAllMutation.isPending}
+            variant="outline"
+          >
+            {scrapeAllMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-2 h-4 w-4" />
+            )}
+            {scrapeAllMutation.isPending ? "Scraping..." : "Scrape All"}
+          </Button>
         </div>
 
         {/* Stats Grid */}

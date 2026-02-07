@@ -1747,6 +1747,53 @@ export async function registerRoutes(
     }
   });
 
+  app.post('/api/scrape-all', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const configs = await storage.getScraperConfigsByUser(userId);
+      if (!configs || configs.length === 0) {
+        return res.json({ results: [], message: "No scraper configurations found" });
+      }
+
+      const results: { platformId: number; platformName: string; success: boolean; message: string }[] = [];
+
+      for (const config of configs) {
+        const platform = await storage.getPlatform(config.platformId, userId);
+        if (!platform) continue;
+
+        try {
+          const scrapeRes = await fetch(`http://localhost:${process.env.PORT || 5000}/api/platforms/${config.platformId}/scrape`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Cookie': req.headers.cookie || '',
+            },
+          });
+          const data = await scrapeRes.json();
+          results.push({
+            platformId: config.platformId,
+            platformName: platform.name,
+            success: scrapeRes.ok,
+            message: data.message || (scrapeRes.ok ? "Success" : "Failed"),
+          });
+        } catch (err: any) {
+          results.push({
+            platformId: config.platformId,
+            platformName: platform.name,
+            success: false,
+            message: err.message || "Failed",
+          });
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+
+      res.json({ results });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Scrape all failed" });
+    }
+  });
+
   const holdingsCache = new Map<string, { data: any; timestamp: number }>();
   const HOLDINGS_CACHE_TTL = 5 * 60 * 1000;
 
