@@ -1003,23 +1003,7 @@ export async function registerRoutes(
         };
       });
       
-      let history: { date: string; value: number; invested: number }[];
-      
-      if (platformId) {
-        history = rawHistory;
-      } else {
-        const monthlyHistory = new Map<string, { date: string; value: number; invested: number }>();
-        rawHistory.forEach(entry => {
-          const dateObj = new Date(entry.date);
-          const monthKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
-          monthlyHistory.set(monthKey, entry);
-        });
-        history = Array.from(monthlyHistory.values()).sort((a, b) => 
-          new Date(a.date).getTime() - new Date(b.date).getTime()
-        );
-      }
-      
-      res.json(history);
+      res.json(rawHistory);
     } catch (error) {
       console.error("Error fetching portfolio history:", error);
       res.status(500).json({ message: "Failed to fetch portfolio history" });
