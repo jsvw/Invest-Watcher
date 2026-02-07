@@ -1078,19 +1078,38 @@ export default function PlatformDetails() {
              <Card>
               <CardContent className="p-0">
                 <div className="rounded-md border">
-                  <div className="grid grid-cols-3 p-4 bg-muted/50 font-medium text-sm">
+                  <div className="grid grid-cols-[1fr_1fr_1fr_minmax(9rem,9rem)] p-4 bg-muted/50 font-medium text-sm gap-2">
                     <div>Date</div>
                     <div>Recorded Value</div>
+                    <div>Change</div>
                     <div className="text-right">Actions</div>
                   </div>
                   <div className="divide-y">
                      {valuations?.length === 0 ? (
                        <div className="p-8 text-center text-muted-foreground">No valuations recorded yet.</div>
                     ) : (
-                      valuations?.map((v) => (
-                        <div key={v.id} className="grid grid-cols-3 p-4 text-sm hover:bg-muted/30 transition-colors items-center">
+                      valuations?.map((v, idx) => {
+                        const prevValuation = valuations && idx < valuations.length - 1 ? valuations[idx + 1] : null;
+                        const change = prevValuation ? Number(v.value) - Number(prevValuation.value) : null;
+                        const changePct = prevValuation && Number(prevValuation.value) !== 0 
+                          ? (change! / Number(prevValuation.value)) * 100 
+                          : null;
+                        return (
+                        <div key={v.id} className="grid grid-cols-[1fr_1fr_1fr_minmax(9rem,9rem)] p-4 text-sm hover:bg-muted/30 transition-colors items-center gap-2" data-testid={`row-valuation-${v.id}`}>
                           <div className="text-muted-foreground">{format(new Date(v.date), 'MMM dd, yyyy')}</div>
                           <div className="font-medium">{formatCurrency(v.value, currency)}</div>
+                          <div>
+                            {change !== null ? (
+                              <span className={change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                                {change >= 0 ? '+' : ''}{formatCurrency(change, currency)}
+                                {changePct !== null && (
+                                  <span className="text-xs ml-1">({change >= 0 ? '+' : ''}{changePct.toFixed(1)}%)</span>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </div>
                           <div className="flex justify-end gap-1">
                             <AddTransactionDialog 
                               platformId={id} 
@@ -1104,7 +1123,7 @@ export default function PlatformDetails() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              className="text-destructive hover:text-destructive"
                               onClick={() => {
                                 if (confirm("Are you sure you want to delete this valuation?")) {
                                   deleteValuation.mutate({ id: v.id, platformId: id });
@@ -1117,7 +1136,8 @@ export default function PlatformDetails() {
                             </Button>
                           </div>
                         </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>
