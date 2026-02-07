@@ -749,13 +749,14 @@ export default function PlatformDetails() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="rounded-md border">
-                    <div className={`grid ${platformMode === "asset_returns" ? "grid-cols-[0.8fr_0.8fr_1.2fr_1.2fr_0.5fr_0.8fr_1.8fr_minmax(9rem,9rem)]" : "grid-cols-[1fr_1.5fr_1fr_1fr_1.5fr_minmax(9rem,9rem)]"} p-4 bg-muted/50 font-medium text-sm gap-2`}>
+                    <div className={`grid ${platformMode === "asset_returns" ? "grid-cols-[0.8fr_0.8fr_1.2fr_1.2fr_0.5fr_0.8fr_0.8fr_1.8fr_minmax(9rem,9rem)]" : "grid-cols-[1fr_1.5fr_1fr_1fr_0.8fr_1.5fr_minmax(9rem,9rem)]"} p-4 bg-muted/50 font-medium text-sm gap-2`}>
                       <div>Date</div>
                       {platformMode === "asset_returns" && <div>Exit</div>}
                       <div>Name</div>
                       <div>Invested</div>
                       {platformMode === "asset_returns" && <div>Yield</div>}
                       <div>Value</div>
+                      <div>Change</div>
                       <div>Status</div>
                       <div className="text-right">Actions</div>
                     </div>
@@ -769,10 +770,15 @@ export default function PlatformDetails() {
                           No {platformMode === "asset_returns" ? "assets" : "items"} matching "{assetNameFilter}"
                         </div>
                       ) : (
-                        filteredAndSortedAssets.map((asset) => (
+                        filteredAndSortedAssets.map((asset) => {
+                          const assetCurrentVal = asset.currentValue || Number(asset.investedAmount);
+                          const assetPrevVal = (asset as any).previousValue;
+                          const assetChange = assetPrevVal !== undefined ? assetCurrentVal - assetPrevVal : null;
+                          const assetChangePct = assetPrevVal !== undefined && assetPrevVal !== 0 ? (assetChange! / assetPrevVal) * 100 : null;
+                          return (
                           <div 
                             key={asset.id} 
-                            className={`grid ${platformMode === "asset_returns" ? "grid-cols-[0.8fr_0.8fr_1.2fr_1.2fr_0.5fr_0.8fr_1.8fr_minmax(9rem,9rem)]" : "grid-cols-[1fr_1.5fr_1fr_1fr_1.5fr_minmax(9rem,9rem)]"} p-4 text-sm hover:bg-muted/30 transition-colors items-center gap-2`}
+                            className={`grid ${platformMode === "asset_returns" ? "grid-cols-[0.8fr_0.8fr_1.2fr_1.2fr_0.5fr_0.8fr_0.8fr_1.8fr_minmax(9rem,9rem)]" : "grid-cols-[1fr_1.5fr_1fr_1fr_0.8fr_1.5fr_minmax(9rem,9rem)]"} p-4 text-sm hover:bg-muted/30 transition-colors items-center gap-2`}
                             data-testid={`row-asset-${asset.id}`}
                           >
                             <div className="text-muted-foreground">
@@ -823,7 +829,19 @@ export default function PlatformDetails() {
                               </div>
                             )}
                             <div className="font-medium">
-                              {formatCurrency(asset.currentValue || Number(asset.investedAmount), currency)}
+                              {formatCurrency(assetCurrentVal, currency)}
+                            </div>
+                            <div>
+                              {assetChange !== null ? (
+                                <span className={assetChange >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                                  {assetChange >= 0 ? '+' : ''}{formatCurrency(assetChange, currency)}
+                                  {assetChangePct !== null && (
+                                    <span className="text-xs ml-1">({assetChange >= 0 ? '+' : ''}{assetChangePct.toFixed(1)}%)</span>
+                                  )}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
                             </div>
                             <div className="flex flex-col gap-1 items-start">
                               {asset.status === "exited" ? (
@@ -855,7 +873,8 @@ export default function PlatformDetails() {
                               currency={currency}
                             />
                           </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </div>

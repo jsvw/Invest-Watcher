@@ -506,9 +506,12 @@ export class DatabaseStorage implements IStorage {
     }
     
     const latestValuationMap = new Map<number, number>();
+    const previousValuationMap = new Map<number, number>();
     for (const row of platformAssetValuations) {
       if (!latestValuationMap.has(row.assetId)) {
         latestValuationMap.set(row.assetId, Number(row.value));
+      } else if (!previousValuationMap.has(row.assetId)) {
+        previousValuationMap.set(row.assetId, Number(row.value));
       }
     }
 
@@ -555,13 +558,15 @@ export class DatabaseStorage implements IStorage {
         currentValue = workingCapital;
       }
       
+      const previousVal = previousValuationMap.get(asset.id);
       return {
         ...asset,
         status: effectiveStatus,
         currentValue: Math.round(currentValue * 100) / 100,
         profitLoss: profitLoss !== undefined ? Math.round(profitLoss * 100) / 100 : undefined,
         totalRepaid: totalRepaid > 0 ? Math.round(totalRepaid * 100) / 100 : undefined,
-        remainingPrincipal: totalRepaid > 0 ? Math.round(remainingPrincipal * 100) / 100 : undefined
+        remainingPrincipal: totalRepaid > 0 ? Math.round(remainingPrincipal * 100) / 100 : undefined,
+        previousValue: previousVal !== undefined ? Math.round(previousVal * 100) / 100 : undefined,
       };
     });
   }
