@@ -1203,14 +1203,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async saveTrading212Dividends(platformId: number, userId: number, dividends: { ticker: string; amount: string; paidOn: string; quantity?: string | null }[]): Promise<void> {
-    if (dividends.length === 0) return; // Never delete existing data if incoming is empty
+    if (dividends.length === 0) return;
+    const seen = new Set<string>();
+    const unique = dividends.filter(d => {
+      const key = `${d.ticker}|${d.paidOn}|${d.amount}|${d.quantity ?? ''}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
     await db.transaction(async (tx) => {
       await tx.delete(trading212Dividends)
         .where(and(
           eq(trading212Dividends.platformId, platformId),
           eq(trading212Dividends.userId, userId)
         ));
-      const rows = dividends.map(d => ({
+      const rows = unique.map(d => ({
         platformId,
         userId,
         ticker: d.ticker,
