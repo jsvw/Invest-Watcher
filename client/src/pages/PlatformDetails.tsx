@@ -503,7 +503,9 @@ export default function PlatformDetails() {
             {platformMode !== "standard" && (
               <TabsTrigger value="assets" className="gap-2"><Package className="h-4 w-4" /> Assets</TabsTrigger>
             )}
-            <TabsTrigger value="chart" className="gap-2"><TrendingUp className="h-4 w-4" /> Performance</TabsTrigger>
+            {platformMode === "standard" && (
+              <TabsTrigger value="chart" className="gap-2"><TrendingUp className="h-4 w-4" /> Performance</TabsTrigger>
+            )}
             <TabsTrigger value="investments" className="gap-2"><DollarSign className="h-4 w-4" /> Investments</TabsTrigger>
             <TabsTrigger value="valuations" className="gap-2"><History className="h-4 w-4" /> Valuations</TabsTrigger>
             {isTrading212 && (
@@ -514,6 +516,127 @@ export default function PlatformDetails() {
           {/* Assets Tab for non-standard modes */}
           {platformMode !== "standard" && (
             <TabsContent value="assets" className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <CardTitle>Platform Performance</CardTitle>
+                    <CardDescription>Invested vs. Valuation over time</CardDescription>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {(range === "year" || range.startsWith("year-")) && (
+                      <Select value={specificYear || (range.startsWith("year-") ? range.split("-")[1] : "")} onValueChange={(val) => {
+                        setRange(`year-${val}`);
+                        setSpecificYear(val);
+                      }}>
+                        <SelectTrigger className="w-[100px] h-9">
+                          <SelectValue placeholder="Year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {years.map((y: string) => (
+                            <SelectItem key={y} value={y}>{y}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {(range === "month" || range.startsWith("month-")) && (
+                      <div className="flex gap-2">
+                        <Select value={specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear)} onValueChange={(val) => setSpecificYear(val)}>
+                          <SelectTrigger className="w-[100px] h-9">
+                            <SelectValue placeholder="Year" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {years.map((y: string) => (
+                              <SelectItem key={y} value={y}>{y}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select value={specificMonth || (range.startsWith("month-") ? range.split("-")[2] : "")} onValueChange={(val) => {
+                          const year = specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear);
+                          setRange(`month-${year}-${val}`);
+                          setSpecificMonth(val);
+                        }}>
+                          <SelectTrigger className="w-[120px] h-9">
+                            <SelectValue placeholder="Month" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {monthsData.filter((m: any) => m.year === (specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear))).map((m: any) => (
+                              <SelectItem key={`${m.year}-${m.value}`} value={m.value}>{m.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    <Tabs value={range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range} onValueChange={(val) => {
+                      setRange(val);
+                      setSpecificYear(null);
+                      setSpecificMonth(null);
+                    }} className="w-auto">
+                      <TabsList>
+                        <TabsTrigger value="7d">7D</TabsTrigger>
+                        <TabsTrigger value="month">1M</TabsTrigger>
+                        <TabsTrigger value="quarter">3M</TabsTrigger>
+                        <TabsTrigger value="year">1Y</TabsTrigger>
+                        <TabsTrigger value="all">ALL</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[400px] w-full">
+                    {history && history.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={history}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                          <XAxis 
+                            dataKey="date" 
+                            stroke="hsl(var(--muted-foreground))" 
+                            fontSize={12} 
+                            tickLine={false} 
+                            axisLine={false} 
+                            tickFormatter={(date) => format(new Date(date), 'MMM yy')}
+                          />
+                          <YAxis 
+                            stroke="hsl(var(--muted-foreground))" 
+                            fontSize={12} 
+                            tickLine={false} 
+                            axisLine={false} 
+                            tickFormatter={(value) => formatCurrency(value, currency)}
+                          />
+                          <Tooltip 
+                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                            formatter={(value: number) => [formatCurrency(value, currency), ""]}
+                            labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
+                          />
+                          <Legend verticalAlign="top" height={36}/>
+                          <Line 
+                            type="monotone" 
+                            dataKey="value" 
+                            name="Current Value"
+                            stroke={platform.color} 
+                            strokeWidth={3}
+                            dot={false}
+                            activeDot={{ r: 6 }}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="invested" 
+                            name="Total Invested"
+                            stroke="#8884d8" 
+                            strokeWidth={2}
+                            strokeDasharray="5 5"
+                            dot={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-muted-foreground">
+                        No performance history available.
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Combined asset insights with tabs - only for item_valuations mode */}
               {platformMode === "item_valuations" && (
                 <AssetInsightTabs
@@ -729,32 +852,20 @@ export default function PlatformDetails() {
             </TabsContent>
           )}
 
-          <TabsContent value="chart" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
-                <div>
-                  <CardTitle>Platform Performance</CardTitle>
-                  <CardDescription>Invested vs. Valuation over time</CardDescription>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {(range === "year" || range.startsWith("year-")) && (
-                    <Select value={specificYear || (range.startsWith("year-") ? range.split("-")[1] : "")} onValueChange={(val) => {
-                      setRange(`year-${val}`);
-                      setSpecificYear(val);
-                    }}>
-                      <SelectTrigger className="w-[100px] h-9">
-                        <SelectValue placeholder="Year" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {years.map((y: string) => (
-                          <SelectItem key={y} value={y}>{y}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  {(range === "month" || range.startsWith("month-")) && (
-                    <div className="flex gap-2">
-                      <Select value={specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear)} onValueChange={(val) => setSpecificYear(val)}>
+          {platformMode === "standard" && (
+            <TabsContent value="chart" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
+                  <div>
+                    <CardTitle>Platform Performance</CardTitle>
+                    <CardDescription>Invested vs. Valuation over time</CardDescription>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {(range === "year" || range.startsWith("year-")) && (
+                      <Select value={specificYear || (range.startsWith("year-") ? range.split("-")[1] : "")} onValueChange={(val) => {
+                        setRange(`year-${val}`);
+                        setSpecificYear(val);
+                      }}>
                         <SelectTrigger className="w-[100px] h-9">
                           <SelectValue placeholder="Year" />
                         </SelectTrigger>
@@ -764,93 +875,107 @@ export default function PlatformDetails() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <Select value={specificMonth || (range.startsWith("month-") ? range.split("-")[2] : "")} onValueChange={(val) => {
-                        const year = specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear);
-                        setRange(`month-${year}-${val}`);
-                        setSpecificMonth(val);
-                      }}>
-                        <SelectTrigger className="w-[120px] h-9">
-                          <SelectValue placeholder="Month" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {monthsData.filter((m: any) => m.year === (specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear))).map((m: any) => (
-                            <SelectItem key={`${m.year}-${m.value}`} value={m.value}>{m.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  <Tabs value={range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range} onValueChange={(val) => {
-                    setRange(val);
-                    setSpecificYear(null);
-                    setSpecificMonth(null);
-                  }} className="w-auto">
-                    <TabsList>
-                      <TabsTrigger value="7d">7D</TabsTrigger>
-                      <TabsTrigger value="month">1M</TabsTrigger>
-                      <TabsTrigger value="quarter">3M</TabsTrigger>
-                      <TabsTrigger value="year">1Y</TabsTrigger>
-                      <TabsTrigger value="all">ALL</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[400px] w-full">
-                  {history && history.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={history}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                        <XAxis 
-                          dataKey="date" 
-                          stroke="hsl(var(--muted-foreground))" 
-                          fontSize={12} 
-                          tickLine={false} 
-                          axisLine={false} 
-                          tickFormatter={(date) => format(new Date(date), 'MMM yy')}
-                        />
-                        <YAxis 
-                          stroke="hsl(var(--muted-foreground))" 
-                          fontSize={12} 
-                          tickLine={false} 
-                          axisLine={false} 
-                          tickFormatter={(value) => formatCurrency(value, currency)}
-                        />
-                        <Tooltip 
-                          contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                          formatter={(value: number) => [formatCurrency(value, currency), ""]}
-                          labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
-                        />
-                        <Legend verticalAlign="top" height={36}/>
-                        <Line 
-                          type="monotone" 
-                          dataKey="value" 
-                          name="Current Value"
-                          stroke={platform.color} 
-                          strokeWidth={3}
-                          dot={false}
-                          activeDot={{ r: 6 }}
-                        />
-                        <Line 
-                          type="monotone" 
-                          dataKey="invested" 
-                          name="Total Invested"
-                          stroke="#8884d8" 
-                          strokeWidth={2}
-                          strokeDasharray="5 5"
-                          dot={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="h-full flex items-center justify-center text-muted-foreground">
-                      No performance history available.
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                    )}
+                    {(range === "month" || range.startsWith("month-")) && (
+                      <div className="flex gap-2">
+                        <Select value={specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear)} onValueChange={(val) => setSpecificYear(val)}>
+                          <SelectTrigger className="w-[100px] h-9">
+                            <SelectValue placeholder="Year" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {years.map((y: string) => (
+                              <SelectItem key={y} value={y}>{y}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select value={specificMonth || (range.startsWith("month-") ? range.split("-")[2] : "")} onValueChange={(val) => {
+                          const year = specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear);
+                          setRange(`month-${year}-${val}`);
+                          setSpecificMonth(val);
+                        }}>
+                          <SelectTrigger className="w-[120px] h-9">
+                            <SelectValue placeholder="Month" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {monthsData.filter((m: any) => m.year === (specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear))).map((m: any) => (
+                              <SelectItem key={`${m.year}-${m.value}`} value={m.value}>{m.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    <Tabs value={range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range} onValueChange={(val) => {
+                      setRange(val);
+                      setSpecificYear(null);
+                      setSpecificMonth(null);
+                    }} className="w-auto">
+                      <TabsList>
+                        <TabsTrigger value="7d">7D</TabsTrigger>
+                        <TabsTrigger value="month">1M</TabsTrigger>
+                        <TabsTrigger value="quarter">3M</TabsTrigger>
+                        <TabsTrigger value="year">1Y</TabsTrigger>
+                        <TabsTrigger value="all">ALL</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[400px] w-full">
+                    {history && history.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={history}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                          <XAxis 
+                            dataKey="date" 
+                            stroke="hsl(var(--muted-foreground))" 
+                            fontSize={12} 
+                            tickLine={false} 
+                            axisLine={false} 
+                            tickFormatter={(date) => format(new Date(date), 'MMM yy')}
+                          />
+                          <YAxis 
+                            stroke="hsl(var(--muted-foreground))" 
+                            fontSize={12} 
+                            tickLine={false} 
+                            axisLine={false} 
+                            tickFormatter={(value) => formatCurrency(value, currency)}
+                          />
+                          <Tooltip 
+                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                            formatter={(value: number) => [formatCurrency(value, currency), ""]}
+                            labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
+                          />
+                          <Legend verticalAlign="top" height={36}/>
+                          <Line 
+                            type="monotone" 
+                            dataKey="value" 
+                            name="Current Value"
+                            stroke={platform.color} 
+                            strokeWidth={3}
+                            dot={false}
+                            activeDot={{ r: 6 }}
+                          />
+                          <Line 
+                            type="monotone" 
+                            dataKey="invested" 
+                            name="Total Invested"
+                            stroke="#8884d8" 
+                            strokeWidth={2}
+                            strokeDasharray="5 5"
+                            dot={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-muted-foreground">
+                        No performance history available.
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
 
           <TabsContent value="investments">
             <Card>
