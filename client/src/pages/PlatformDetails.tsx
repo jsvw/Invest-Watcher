@@ -349,7 +349,7 @@ export default function PlatformDetails() {
 
   const groupedHistory = useMemo(() => {
     if (!history || history.length === 0 || chartGrouping === "day") return history;
-    const groups = new Map<string, { value: number; invested: number; count: number }>();
+    const groups = new Map<string, { value: number; invested: number; latestDate: string }>();
     for (const entry of history) {
       const d = new Date(entry.date);
       let key: string;
@@ -360,15 +360,17 @@ export default function PlatformDetails() {
         key = format(d, 'yyyy-MM');
       }
       const existing = groups.get(key);
-      if (!existing || new Date(entry.date) >= new Date(existing.count as any)) {
-        groups.set(key, { value: entry.value, invested: entry.invested, count: entry.date });
+      if (!existing || entry.date > existing.latestDate) {
+        groups.set(key, { value: entry.value, invested: entry.invested, latestDate: entry.date });
       }
     }
-    return Array.from(groups.entries()).map(([key, data]) => ({
-      date: chartGrouping === "month" ? `${key}-01` : key,
-      value: data.value,
-      invested: data.invested,
-    }));
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, data]) => ({
+        date: chartGrouping === "month" ? `${key}-01` : key,
+        value: data.value,
+        invested: data.invested,
+      }));
   }, [history, chartGrouping]);
 
   const years = availableFilters?.years || [];

@@ -1003,21 +1003,7 @@ export async function registerRoutes(
         };
       });
       
-      // Group by month and take the last entry for each month
-      const monthlyHistory = new Map<string, { date: string; value: number; invested: number }>();
-      rawHistory.forEach(entry => {
-        const dateObj = new Date(entry.date);
-        const monthKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
-        // Always keep the latest entry for each month (since dates are sorted)
-        monthlyHistory.set(monthKey, entry);
-      });
-      
-      // Convert back to array, sorted by date
-      const history = Array.from(monthlyHistory.values()).sort((a, b) => 
-        new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
-      
-      res.json(history);
+      res.json(rawHistory);
     } catch (error) {
       console.error("Error fetching portfolio history:", error);
       res.status(500).json({ message: "Failed to fetch portfolio history" });
