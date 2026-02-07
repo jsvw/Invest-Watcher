@@ -1330,13 +1330,29 @@ export default function PlatformDetails() {
                     <CardContent>
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={stackedData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+                          <AreaChart data={stackedData.map((d: any) => ({ ...d, timestamp: new Date(d.date).getTime() }))} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                            <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(val) => format(new Date(val), 'MMM d')} />
+                            <XAxis 
+                              dataKey="timestamp" 
+                              type="number"
+                              scale="time"
+                              domain={['dataMin', 'dataMax']}
+                              tick={{ fontSize: 11 }} 
+                              tickFormatter={(ts) => format(new Date(ts), 'MMM d')}
+                              ticks={(() => {
+                                const seen = new Set<string>();
+                                return stackedData.filter((entry: any) => {
+                                  const key = format(new Date(entry.date), 'yyyy-MM');
+                                  if (seen.has(key)) return false;
+                                  seen.add(key);
+                                  return true;
+                                }).map((entry: any) => new Date(entry.date).getTime());
+                              })()}
+                            />
                             <YAxis tick={{ fontSize: 11 }} tickFormatter={(val) => `${getCurrencySymbol(currency)}${val.toFixed(0)}`} width={60} />
                             <Tooltip
                               formatter={(val: number, name: string) => [formatCurrency(val, currency), name]}
-                              labelFormatter={(label) => format(new Date(label), 'MMM d, yyyy')}
+                              labelFormatter={(ts) => format(new Date(ts), 'MMM d, yyyy')}
                               contentStyle={{ fontSize: 12, borderRadius: 8 }}
                             />
                             {tickerList.map((ticker, i) => (

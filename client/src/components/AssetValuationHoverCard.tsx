@@ -77,12 +77,23 @@ export function AssetValuationHoverCard({ assetId, assetName, currency, children
           ) : (
             <div className="h-32">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+                <LineChart data={chartData.map((d: any) => ({ ...d, timestamp: new Date(d.date).getTime() }))} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                   <XAxis 
-                    dataKey="date" 
+                    dataKey="timestamp" 
+                    type="number"
+                    scale="time"
+                    domain={['dataMin', 'dataMax']}
                     tick={{ fontSize: 10 }}
-                    tickFormatter={(value) => format(new Date(value), 'MMM yy')}
-                    interval="preserveStartEnd"
+                    tickFormatter={(ts) => format(new Date(ts), 'MMM yy')}
+                    ticks={(() => {
+                      const seen = new Set<string>();
+                      return chartData.filter((entry: any) => {
+                        const key = format(new Date(entry.date), 'yyyy-MM');
+                        if (seen.has(key)) return false;
+                        seen.add(key);
+                        return true;
+                      }).map((entry: any) => new Date(entry.date).getTime());
+                    })()}
                   />
                   <YAxis 
                     tick={{ fontSize: 10 }}
@@ -98,7 +109,7 @@ export function AssetValuationHoverCard({ assetId, assetName, currency, children
                       `${currencySymbol}${value.toLocaleString()}${currencySuffix}`,
                       "Value"
                     ]}
-                    labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
+                    labelFormatter={(ts) => format(new Date(ts), 'MMM dd, yyyy')}
                     contentStyle={{ fontSize: '12px' }}
                   />
                   <Line 
@@ -106,7 +117,7 @@ export function AssetValuationHoverCard({ assetId, assetName, currency, children
                     dataKey="value" 
                     stroke="#8884d8" 
                     strokeWidth={2}
-                    dot={{ r: 3 }}
+                    dot={{ r: 3, fill: '#8884d8' }}
                   />
                 </LineChart>
               </ResponsiveContainer>

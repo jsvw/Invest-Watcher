@@ -410,17 +410,30 @@ export default function Dashboard() {
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={history.map((h: any, i: number, arr: any[]) => ({ 
                     ...h, 
+                    timestamp: new Date(h.date).getTime(),
                     gain: h.value - h.invested,
                     monthlyChange: i === 0 ? 0 : (h.value - arr[i - 1].value) - (h.invested - arr[i - 1].invested)
                   }))}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                     <XAxis 
-                      dataKey="date" 
+                      dataKey="timestamp" 
+                      type="number"
+                      scale="time"
+                      domain={['dataMin', 'dataMax']}
                       stroke="hsl(var(--muted-foreground))" 
                       fontSize={12} 
                       tickLine={false} 
                       axisLine={false} 
-                      tickFormatter={(date) => format(new Date(date), 'MMM yy')}
+                      tickFormatter={(ts) => format(new Date(ts), 'MMM yy')}
+                      ticks={(() => {
+                        const seen = new Set<string>();
+                        return history.filter((entry: any) => {
+                          const key = format(new Date(entry.date), 'yyyy-MM');
+                          if (seen.has(key)) return false;
+                          seen.add(key);
+                          return true;
+                        }).map((entry: any) => new Date(entry.date).getTime());
+                      })()}
                     />
                     {(chartView === "overview" || chartView === "all") && (
                       <YAxis 
@@ -465,7 +478,7 @@ export default function Dashboard() {
                           : formatCurrency(value, currency), 
                         ""
                       ]}
-                      labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
+                      labelFormatter={(ts) => format(new Date(ts), 'MMM dd, yyyy')}
                     />
                     <Legend verticalAlign="top" height={36}/>
                     {(chartView === "overview" || chartView === "all") && (
@@ -477,7 +490,7 @@ export default function Dashboard() {
                           yAxisId="left"
                           stroke="hsl(var(--primary))" 
                           strokeWidth={3}
-                          dot={false}
+                          dot={{ r: 3, fill: 'hsl(var(--primary))' }}
                           activeDot={{ r: 6 }}
                         />
                         <Line 
@@ -488,7 +501,7 @@ export default function Dashboard() {
                           stroke="#8884d8" 
                           strokeWidth={2}
                           strokeDasharray="5 5"
-                          dot={false}
+                          dot={{ r: 3, fill: '#8884d8' }}
                         />
                       </>
                     )}
@@ -500,7 +513,7 @@ export default function Dashboard() {
                         yAxisId="right"
                         stroke="#10b981" 
                         strokeWidth={chartView === "all" ? 2 : 3}
-                        dot={false}
+                        dot={{ r: 3, fill: '#10b981' }}
                         activeDot={{ r: 4, fill: "#10b981" }}
                       />
                     )}
@@ -512,7 +525,7 @@ export default function Dashboard() {
                         yAxisId="monthly"
                         stroke="#f59e0b" 
                         strokeWidth={chartView === "all" ? 2 : 3}
-                        dot={false}
+                        dot={{ r: 3, fill: '#f59e0b' }}
                         activeDot={{ r: 4, fill: "#f59e0b" }}
                       />
                     )}
