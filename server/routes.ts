@@ -1003,19 +1003,21 @@ export async function registerRoutes(
         };
       });
       
-      // Group by month and take the last entry for each month
-      const monthlyHistory = new Map<string, { date: string; value: number; invested: number }>();
-      rawHistory.forEach(entry => {
-        const dateObj = new Date(entry.date);
-        const monthKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
-        // Always keep the latest entry for each month (since dates are sorted)
-        monthlyHistory.set(monthKey, entry);
-      });
+      let history: { date: string; value: number; invested: number }[];
       
-      // Convert back to array, sorted by date
-      const history = Array.from(monthlyHistory.values()).sort((a, b) => 
-        new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
+      if (platformId) {
+        history = rawHistory;
+      } else {
+        const monthlyHistory = new Map<string, { date: string; value: number; invested: number }>();
+        rawHistory.forEach(entry => {
+          const dateObj = new Date(entry.date);
+          const monthKey = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+          monthlyHistory.set(monthKey, entry);
+        });
+        history = Array.from(monthlyHistory.values()).sort((a, b) => 
+          new Date(a.date).getTime() - new Date(b.date).getTime()
+        );
+      }
       
       res.json(history);
     } catch (error) {
