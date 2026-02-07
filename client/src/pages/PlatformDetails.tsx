@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { format } from "date-fns";
+import { format, startOfWeek } from "date-fns";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend } from "recharts";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -150,6 +150,7 @@ export default function PlatformDetails() {
   const [range, setRange] = useState("year");
   const [specificYear, setSpecificYear] = useState<string | null>(null);
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
+  const [chartGrouping, setChartGrouping] = useState<"day" | "week" | "month">("day");
   
   const { data: platforms } = usePlatforms();
   const { data: platform, isLoading: isPlatformLoading } = usePlatform(id);
@@ -345,6 +346,30 @@ export default function PlatformDetails() {
     },
     enabled: platformMode !== "standard"
   });
+
+  const groupedHistory = useMemo(() => {
+    if (!history || history.length === 0 || chartGrouping === "day") return history;
+    const groups = new Map<string, { value: number; invested: number; count: number }>();
+    for (const entry of history) {
+      const d = new Date(entry.date);
+      let key: string;
+      if (chartGrouping === "week") {
+        const weekStart = startOfWeek(d, { weekStartsOn: 1 });
+        key = format(weekStart, 'yyyy-MM-dd');
+      } else {
+        key = format(d, 'yyyy-MM');
+      }
+      const existing = groups.get(key);
+      if (!existing || new Date(entry.date) >= new Date(existing.count as any)) {
+        groups.set(key, { value: entry.value, invested: entry.invested, count: entry.date });
+      }
+    }
+    return Array.from(groups.entries()).map(([key, data]) => ({
+      date: chartGrouping === "month" ? `${key}-01` : key,
+      value: data.value,
+      invested: data.invested,
+    }));
+  }, [history, chartGrouping]);
 
   const years = availableFilters?.years || [];
   const monthsData = availableFilters?.months?.map((m: string) => {
@@ -579,13 +604,23 @@ export default function PlatformDetails() {
                         <TabsTrigger value="all">ALL</TabsTrigger>
                       </TabsList>
                     </Tabs>
+                    <Select value={chartGrouping} onValueChange={(val) => setChartGrouping(val as "day" | "week" | "month")}>
+                      <SelectTrigger className="w-[100px] h-9" data-testid="select-chart-grouping">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="day">Day</SelectItem>
+                        <SelectItem value="week">Week</SelectItem>
+                        <SelectItem value="month">Month</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="h-[400px] w-full">
-                    {history && history.length > 0 ? (
+                    {groupedHistory && groupedHistory.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={history}>
+                        <LineChart data={groupedHistory}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                           <XAxis 
                             dataKey="date" 
@@ -593,7 +628,7 @@ export default function PlatformDetails() {
                             fontSize={12} 
                             tickLine={false} 
                             axisLine={false} 
-                            tickFormatter={(date) => format(new Date(date), 'MMM yy')}
+                            tickFormatter={(date) => format(new Date(date), chartGrouping === "month" ? 'MMM yy' : 'MMM dd')}
                           />
                           <YAxis 
                             stroke="hsl(var(--muted-foreground))" 
@@ -605,7 +640,11 @@ export default function PlatformDetails() {
                           <Tooltip 
                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                             formatter={(value: number) => [formatCurrency(value, currency), ""]}
-                            labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
+                            labelFormatter={(label) => {
+                              if (chartGrouping === "week") return `Week of ${format(new Date(label), 'MMM dd, yyyy')}`;
+                              if (chartGrouping === "month") return format(new Date(label), 'MMMM yyyy');
+                              return format(new Date(label), 'MMM dd, yyyy');
+                            }}
                           />
                           <Legend verticalAlign="top" height={36}/>
                           <Line 
@@ -917,13 +956,23 @@ export default function PlatformDetails() {
                         <TabsTrigger value="all">ALL</TabsTrigger>
                       </TabsList>
                     </Tabs>
+                    <Select value={chartGrouping} onValueChange={(val) => setChartGrouping(val as "day" | "week" | "month")}>
+                      <SelectTrigger className="w-[100px] h-9" data-testid="select-chart-grouping-standard">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="day">Day</SelectItem>
+                        <SelectItem value="week">Week</SelectItem>
+                        <SelectItem value="month">Month</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="h-[400px] w-full">
-                    {history && history.length > 0 ? (
+                    {groupedHistory && groupedHistory.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={history}>
+                        <LineChart data={groupedHistory}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                           <XAxis 
                             dataKey="date" 
@@ -931,7 +980,7 @@ export default function PlatformDetails() {
                             fontSize={12} 
                             tickLine={false} 
                             axisLine={false} 
-                            tickFormatter={(date) => format(new Date(date), 'MMM yy')}
+                            tickFormatter={(date) => format(new Date(date), chartGrouping === "month" ? 'MMM yy' : 'MMM dd')}
                           />
                           <YAxis 
                             stroke="hsl(var(--muted-foreground))" 
@@ -943,7 +992,11 @@ export default function PlatformDetails() {
                           <Tooltip 
                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                             formatter={(value: number) => [formatCurrency(value, currency), ""]}
-                            labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
+                            labelFormatter={(label) => {
+                              if (chartGrouping === "week") return `Week of ${format(new Date(label), 'MMM dd, yyyy')}`;
+                              if (chartGrouping === "month") return format(new Date(label), 'MMMM yyyy');
+                              return format(new Date(label), 'MMM dd, yyyy');
+                            }}
                           />
                           <Legend verticalAlign="top" height={36}/>
                           <Line 
