@@ -1471,9 +1471,8 @@ export async function registerRoutes(
         const todayStr = today.toISOString().split("T")[0];
 
         const { scrapeTrading212 } = await import("./scrapers/trading212");
-        const t212Data = await scrapeTrading212(creds.apiKey, creds.apiSecret);
-
         const pieName = creds.pieName || "";
+        const t212Data = await scrapeTrading212(creds.apiKey, creds.apiSecret, { filterPieName: pieName, platformName: platform!.name });
         const matchedPie = t212Data.pies.find(p => {
           if (pieName) {
             return p.pieName.toLowerCase().includes(pieName.toLowerCase()) ||
@@ -1900,11 +1899,12 @@ export async function registerRoutes(
       const hasDbDividends = dbDividends.length > 0;
       const shouldFetchDividends = forceRefresh || !hasDbDividends;
 
+      const pieName = creds.pieName || "";
       const t212Data = await scrapeTrading212WithPositions(creds.apiKey, creds.apiSecret, {
         skipDividends: !shouldFetchDividends,
+        filterPieName: pieName,
+        platformName: platform.name,
       });
-
-      const pieName = creds.pieName || "";
       const matchedPie = t212Data.pies.find(p => {
         if (pieName) {
           return p.pieName.toLowerCase().includes(pieName.toLowerCase()) ||

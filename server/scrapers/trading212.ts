@@ -100,7 +100,7 @@ export async function fetchPositions(apiKey: string, apiSecret: string): Promise
   return posMap;
 }
 
-export async function scrapeTrading212(apiKey: string, apiSecret: string): Promise<Trading212ScrapedData> {
+export async function scrapeTrading212(apiKey: string, apiSecret: string, options?: { filterPieName?: string; platformName?: string }): Promise<Trading212ScrapedData> {
   console.log("[Trading212] Fetching pies list...");
   const pies = await makeRequest("/equity/pies", apiKey, apiSecret) as Array<{
     id: number;
@@ -155,6 +155,18 @@ export async function scrapeTrading212(apiKey: string, apiSecret: string): Promi
     });
 
     console.log(`[Trading212] Pie "${detail.settings.name}": deposited=${actualDeposited.toFixed(2)} (raw invested=${pie.result.priceAvgInvestedValue}, dividends: gained=${pie.dividendDetails.gained}, reinvested=${pie.dividendDetails.reinvested}, inCash=${pie.dividendDetails.inCash}, cash in pie=${pie.cash}), value=${(pie.result.priceAvgValue + pie.cash).toFixed(2)}`);
+
+    if (options?.filterPieName || options?.platformName) {
+      const filterName = options.filterPieName || "";
+      const platName = options.platformName || "";
+      const pieLower = detail.settings.name.toLowerCase();
+      const matched = (filterName && (pieLower.includes(filterName.toLowerCase()) || filterName.toLowerCase().includes(pieLower))) ||
+                      (platName && (pieLower.includes(platName.toLowerCase()) || platName.toLowerCase().includes(pieLower)));
+      if (matched) {
+        console.log(`[Trading212] Found matching pie "${detail.settings.name}", skipping remaining pies`);
+        break;
+      }
+    }
   }
 
   return {
@@ -233,8 +245,8 @@ export async function fetchDividends(apiKey: string, apiSecret: string): Promise
 }
 
 
-export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: string, options?: { skipDividends?: boolean }): Promise<Trading212ScrapedData & { dividendsLoaded: boolean; rawDividends?: Map<string, TickerDividendData> }> {
-  const data = await scrapeTrading212(apiKey, apiSecret);
+export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: string, options?: { skipDividends?: boolean; filterPieName?: string; platformName?: string }): Promise<Trading212ScrapedData & { dividendsLoaded: boolean; rawDividends?: Map<string, TickerDividendData> }> {
+  const data = await scrapeTrading212(apiKey, apiSecret, { filterPieName: options?.filterPieName, platformName: options?.platformName });
 
   await new Promise(resolve => setTimeout(resolve, API_DELAY_MS));
   const posMap = await fetchPositions(apiKey, apiSecret);
