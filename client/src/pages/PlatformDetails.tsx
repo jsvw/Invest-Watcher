@@ -594,6 +594,15 @@ export default function PlatformDetails() {
                             tickLine={false} 
                             axisLine={false} 
                             tickFormatter={(date) => format(new Date(date), 'MMM yy')}
+                            ticks={history ? (() => {
+                              const seen = new Set<string>();
+                              return history.filter((entry: any) => {
+                                const key = format(new Date(entry.date), 'yyyy-MM');
+                                if (seen.has(key)) return false;
+                                seen.add(key);
+                                return true;
+                              }).map((entry: any) => entry.date);
+                            })() : undefined}
                           />
                           <YAxis 
                             stroke="hsl(var(--muted-foreground))" 
@@ -932,6 +941,15 @@ export default function PlatformDetails() {
                             tickLine={false} 
                             axisLine={false} 
                             tickFormatter={(date) => format(new Date(date), 'MMM yy')}
+                            ticks={history ? (() => {
+                              const seen = new Set<string>();
+                              return history.filter((entry: any) => {
+                                const key = format(new Date(entry.date), 'yyyy-MM');
+                                if (seen.has(key)) return false;
+                                seen.add(key);
+                                return true;
+                              }).map((entry: any) => entry.date);
+                            })() : undefined}
                           />
                           <YAxis 
                             stroke="hsl(var(--muted-foreground))" 
