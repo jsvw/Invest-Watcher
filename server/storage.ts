@@ -1204,32 +1204,36 @@ export class DatabaseStorage implements IStorage {
 
   async saveTrading212Dividends(platformId: number, userId: number, dividends: { ticker: string; amount: string; paidOn: string; quantity?: string | null }[]): Promise<void> {
     if (dividends.length === 0) return;
+
+    const existing = await db.select({ ticker: trading212Dividends.ticker, paidOn: trading212Dividends.paidOn })
+      .from(trading212Dividends)
+      .where(and(
+        eq(trading212Dividends.platformId, platformId),
+        eq(trading212Dividends.userId, userId)
+      ));
+    const existingKeys = new Set(existing.map(e => `${e.ticker}|${e.paidOn}`));
+
     const seen = new Set<string>();
-    const unique = dividends.filter(d => {
-      const key = `${d.ticker}|${d.paidOn}|${d.amount}|${d.quantity ?? ''}`;
-      if (seen.has(key)) return false;
+    const newRows = dividends.filter(d => {
+      const key = `${d.ticker}|${d.paidOn}`;
+      if (existingKeys.has(key) || seen.has(key)) return false;
       seen.add(key);
       return true;
-    });
-    await db.transaction(async (tx) => {
-      await tx.delete(trading212Dividends)
-        .where(and(
-          eq(trading212Dividends.platformId, platformId),
-          eq(trading212Dividends.userId, userId)
-        ));
-      const rows = unique.map(d => ({
-        platformId,
-        userId,
-        ticker: d.ticker,
-        amount: d.amount,
-        paidOn: d.paidOn,
-        quantity: d.quantity ?? null,
-      }));
-      const batchSize = 100;
-      for (let i = 0; i < rows.length; i += batchSize) {
-        await tx.insert(trading212Dividends).values(rows.slice(i, i + batchSize));
-      }
-    });
+    }).map(d => ({
+      platformId,
+      userId,
+      ticker: d.ticker,
+      amount: d.amount,
+      paidOn: d.paidOn,
+      quantity: d.quantity ?? null,
+    }));
+
+    if (newRows.length === 0) return;
+
+    const batchSize = 100;
+    for (let i = 0; i < newRows.length; i += batchSize) {
+      await db.insert(trading212Dividends).values(newRows.slice(i, i + batchSize));
+    }
   }
 
   async getTrading212Dividends(platformId: number, userId: number): Promise<Trading212Dividend[]> {
