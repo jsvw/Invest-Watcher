@@ -1803,24 +1803,96 @@ export async function registerRoutes(
       const platformId = Number(req.params.platformId);
       const forceRefresh = req.query.refresh === "true";
 
-      const cacheKey = `${userId}:${platformId}`;
-      const cached = holdingsCache.get(cacheKey);
-      if (cached && !forceRefresh && (Date.now() - cached.timestamp) < HOLDINGS_CACHE_TTL) {
-        return res.json(cached.data);
-      }
-
       const config = await storage.getScraperConfig(platformId, userId);
       if (!config || config.scraperType !== "trading212") {
         return res.status(404).json({ message: "No Trading 212 configuration found for this platform" });
+      }
+
+      const platform = await storage.getPlatform(platformId, userId);
+      if (!platform) return res.status(404).json({ message: "Platform not found" });
+
+      if (!forceRefresh) {
+        const latestHoldings = await storage.getTrading212Holdings(platformId, userId);
+        const dbDividends = await storage.getTrading212Dividends(platformId, userId);
+
+        if (latestHoldings.length > 0) {
+          const latestDate = latestHoldings[0].date;
+          const snapshotHoldings = latestHoldings.filter(h =>
+            new Date(h.date).getTime() === new Date(latestDate).getTime()
+          );
+
+          const divMap = new Map<string, { total: number; count: number; lastDate: string; history: { amount: number; paidOn: string; quantity: number }[] }>();
+          for (const row of dbDividends) {
+            const existing = divMap.get(row.ticker);
+            const amt = Number(row.amount);
+            const qty = row.quantity ? Number(row.quantity) : 0;
+            const record = { amount: amt, paidOn: row.paidOn, quantity: qty };
+            if (existing) {
+              existing.total += amt;
+              existing.count += 1;
+              existing.history.push(record);
+              if (row.paidOn > existing.lastDate) existing.lastDate = row.paidOn;
+            } else {
+              divMap.set(row.ticker, { total: amt, count: 1, lastDate: row.paidOn, history: [record] });
+            }
+          }
+
+          const instruments = snapshotHoldings.map(h => {
+            const div = divMap.get(h.ticker);
+            return {
+              ticker: h.ticker,
+              shares: h.shares ? Number(h.shares) : null,
+              quantity: h.shares ? Number(h.shares) : null,
+              currentPrice: h.currentPrice ? Number(h.currentPrice) : null,
+              averagePrice: h.averagePrice ? Number(h.averagePrice) : null,
+              ppl: h.ppl ? Number(h.ppl) : null,
+              currentShare: h.currentShare ? Number(h.currentShare) : null,
+              expectedShare: h.expectedShare ? Number(h.expectedShare) : null,
+              result: h.result ? Number(h.result) : null,
+              dividendsReceived: div ? div.total : null,
+              dividendCount: div ? div.count : null,
+              lastDividendDate: div ? div.lastDate : null,
+              dividendHistory: div ? div.history : null,
+            };
+          });
+
+          const totalValue = instruments.reduce((sum, i) => {
+            const qty = i.shares ?? 0;
+            const price = i.currentPrice ?? 0;
+            return sum + qty * price;
+          }, 0);
+
+          const totalInvested = instruments.reduce((sum, i) => {
+            const qty = i.shares ?? 0;
+            const avgPrice = i.averagePrice ?? 0;
+            return sum + qty * avgPrice;
+          }, 0);
+
+          const totalResult = instruments.reduce((sum, i) => sum + (i.ppl ?? 0), 0);
+
+          const creds = JSON.parse(decrypt(config.credentials));
+          const responseData = {
+            pieName: creds.pieName || platform.name,
+            currentValue: totalValue,
+            investedValue: totalInvested,
+            cash: 0,
+            result: totalResult,
+            resultPercent: totalInvested > 0 ? (totalResult / totalInvested) * 100 : 0,
+            dividendsGained: null,
+            dividendsReinvested: null,
+            dividendsInCash: null,
+            instruments,
+            fromDb: true,
+          };
+
+          return res.json(responseData);
+        }
       }
 
       const creds = JSON.parse(decrypt(config.credentials));
       if (!creds.apiKey || !creds.apiSecret) {
         return res.status(400).json({ message: "Missing API credentials" });
       }
-
-      const platform = await storage.getPlatform(platformId, userId);
-      if (!platform) return res.status(404).json({ message: "Platform not found" });
 
       const { scrapeTrading212WithPositions } = await import("./scrapers/trading212");
 
@@ -1939,7 +2011,7 @@ export async function registerRoutes(
         instruments: matchedPie.instruments,
       };
 
-      holdingsCache.set(cacheKey, { data: responseData, timestamp: Date.now() });
+      holdingsCache.set(`${userId}:${platformId}`, { data: responseData, timestamp: Date.now() });
 
       res.json(responseData);
     } catch (err: any) {
