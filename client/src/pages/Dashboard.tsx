@@ -489,11 +489,9 @@ export default function Dashboard() {
                           name="Current Value"
                           yAxisId="left"
                           stroke="hsl(var(--primary))" 
-                          strokeWidth={2.5}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          dot={{ r: 3.5, fill: 'hsl(var(--primary))', stroke: 'hsl(var(--card))', strokeWidth: 2 }}
-                          activeDot={{ r: 5, stroke: 'hsl(var(--primary))', strokeWidth: 2, fill: 'hsl(var(--card))' }}
+                          strokeWidth={2}
+                          dot={{ r: 2.5, fill: 'hsl(var(--primary))', strokeWidth: 0 }}
+                          activeDot={{ r: 5 }}
                         />
                         <Line 
                           type="monotone" 
@@ -501,11 +499,9 @@ export default function Dashboard() {
                           name="Total Invested"
                           yAxisId="left"
                           stroke="#8884d8" 
-                          strokeWidth={2}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
+                          strokeWidth={1.5}
                           strokeDasharray="5 5"
-                          dot={{ r: 3.5, fill: '#8884d8', stroke: 'hsl(var(--card))', strokeWidth: 2 }}
+                          dot={{ r: 2.5, fill: '#8884d8', strokeWidth: 0 }}
                         />
                       </>
                     )}
@@ -516,11 +512,9 @@ export default function Dashboard() {
                         name="Profit/Loss"
                         yAxisId="right"
                         stroke="#10b981" 
-                        strokeWidth={chartView === "all" ? 2 : 2.5}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        dot={{ r: 3.5, fill: '#10b981', stroke: 'hsl(var(--card))', strokeWidth: 2 }}
-                        activeDot={{ r: 5, stroke: '#10b981', strokeWidth: 2, fill: 'hsl(var(--card))' }}
+                        strokeWidth={chartView === "all" ? 1.5 : 2}
+                        dot={{ r: 2.5, fill: '#10b981', strokeWidth: 0 }}
+                        activeDot={{ r: 5 }}
                       />
                     )}
                     {(chartView === "monthly" || chartView === "all") && (
@@ -530,11 +524,9 @@ export default function Dashboard() {
                         name="Monthly Growth"
                         yAxisId="monthly"
                         stroke="#f59e0b" 
-                        strokeWidth={chartView === "all" ? 2 : 2.5}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        dot={{ r: 3.5, fill: '#f59e0b', stroke: 'hsl(var(--card))', strokeWidth: 2 }}
-                        activeDot={{ r: 5, stroke: '#f59e0b', strokeWidth: 2, fill: 'hsl(var(--card))' }}
+                        strokeWidth={chartView === "all" ? 1.5 : 2}
+                        dot={{ r: 2.5, fill: '#f59e0b', strokeWidth: 0 }}
+                        activeDot={{ r: 5 }}
                       />
                     )}
                   </LineChart>

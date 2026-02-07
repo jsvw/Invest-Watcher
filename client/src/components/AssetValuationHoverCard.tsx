@@ -117,9 +117,7 @@ export function AssetValuationHoverCard({ assetId, assetName, currency, children
                     dataKey="value" 
                     stroke="#8884d8" 
                     strokeWidth={2}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    dot={{ r: 3, fill: '#8884d8', stroke: '#fff', strokeWidth: 1.5 }}
+                    dot={{ r: 2.5, fill: '#8884d8', strokeWidth: 0 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
