@@ -348,7 +348,12 @@ export default function PlatformDetails() {
   });
 
   const groupedHistory = useMemo(() => {
-    if (!history || history.length === 0 || chartGrouping === "day") return history;
+    if (!history || history.length === 0) {
+      return (history || []).map((e: any) => ({ ...e, timestamp: new Date(e.date).getTime() }));
+    }
+    if (chartGrouping === "day") {
+      return history.map((e: any) => ({ ...e, timestamp: new Date(e.date).getTime() }));
+    }
     const groups = new Map<string, { value: number; invested: number; latestDate: string }>();
     for (const entry of history) {
       const d = new Date(entry.date);
@@ -366,11 +371,10 @@ export default function PlatformDetails() {
     }
     return Array.from(groups.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, data]) => ({
-        date: chartGrouping === "month" ? `${key}-01` : key,
-        value: data.value,
-        invested: data.invested,
-      }));
+      .map(([key, data]) => {
+        const date = chartGrouping === "month" ? `${key}-01` : key;
+        return { date, value: data.value, invested: data.invested, timestamp: new Date(date).getTime() };
+      });
   }, [history, chartGrouping]);
 
   const years = availableFilters?.years || [];
@@ -625,12 +629,15 @@ export default function PlatformDetails() {
                         <LineChart data={groupedHistory}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                           <XAxis 
-                            dataKey="date" 
+                            dataKey="timestamp" 
+                            type="number"
+                            scale="time"
+                            domain={['dataMin', 'dataMax']}
                             stroke="hsl(var(--muted-foreground))" 
                             fontSize={12} 
                             tickLine={false} 
                             axisLine={false} 
-                            tickFormatter={(date) => format(new Date(date), chartGrouping === "month" ? 'MMM yy' : 'MMM dd')}
+                            tickFormatter={(ts) => format(new Date(ts), chartGrouping === "month" ? 'MMM yy' : 'MMM dd')}
                           />
                           <YAxis 
                             stroke="hsl(var(--muted-foreground))" 
@@ -642,10 +649,11 @@ export default function PlatformDetails() {
                           <Tooltip 
                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                             formatter={(value: number) => [formatCurrency(value, currency), ""]}
-                            labelFormatter={(label) => {
-                              if (chartGrouping === "week") return `Week of ${format(new Date(label), 'MMM dd, yyyy')}`;
-                              if (chartGrouping === "month") return format(new Date(label), 'MMMM yyyy');
-                              return format(new Date(label), 'MMM dd, yyyy');
+                            labelFormatter={(ts) => {
+                              const d = new Date(ts);
+                              if (chartGrouping === "week") return `Week of ${format(d, 'MMM dd, yyyy')}`;
+                              if (chartGrouping === "month") return format(d, 'MMMM yyyy');
+                              return format(d, 'MMM dd, yyyy');
                             }}
                           />
                           <Legend verticalAlign="top" height={36}/>
@@ -977,12 +985,15 @@ export default function PlatformDetails() {
                         <LineChart data={groupedHistory}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                           <XAxis 
-                            dataKey="date" 
+                            dataKey="timestamp" 
+                            type="number"
+                            scale="time"
+                            domain={['dataMin', 'dataMax']}
                             stroke="hsl(var(--muted-foreground))" 
                             fontSize={12} 
                             tickLine={false} 
                             axisLine={false} 
-                            tickFormatter={(date) => format(new Date(date), chartGrouping === "month" ? 'MMM yy' : 'MMM dd')}
+                            tickFormatter={(ts) => format(new Date(ts), chartGrouping === "month" ? 'MMM yy' : 'MMM dd')}
                           />
                           <YAxis 
                             stroke="hsl(var(--muted-foreground))" 
@@ -994,10 +1005,11 @@ export default function PlatformDetails() {
                           <Tooltip 
                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                             formatter={(value: number) => [formatCurrency(value, currency), ""]}
-                            labelFormatter={(label) => {
-                              if (chartGrouping === "week") return `Week of ${format(new Date(label), 'MMM dd, yyyy')}`;
-                              if (chartGrouping === "month") return format(new Date(label), 'MMMM yyyy');
-                              return format(new Date(label), 'MMM dd, yyyy');
+                            labelFormatter={(ts) => {
+                              const d = new Date(ts);
+                              if (chartGrouping === "week") return `Week of ${format(d, 'MMM dd, yyyy')}`;
+                              if (chartGrouping === "month") return format(d, 'MMMM yyyy');
+                              return format(d, 'MMM dd, yyyy');
                             }}
                           />
                           <Legend verticalAlign="top" height={36}/>
