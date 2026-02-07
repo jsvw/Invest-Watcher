@@ -2,7 +2,7 @@ import cron from "node-cron";
 import { storage } from "./storage";
 import { decrypt } from "./encryption";
 
-async function runScrapeForConfig(config: any) {
+export async function runScrapeForConfig(config: any) {
   const { platformId, userId, scraperType, id } = config;
 
   console.log(`[Scheduler] Running scrape for platform ${platformId}, user ${userId}, type ${scraperType}`);
