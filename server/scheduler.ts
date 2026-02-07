@@ -2,7 +2,7 @@ import cron from "node-cron";
 import { storage } from "./storage";
 import { decrypt } from "./encryption";
 
-export async function runScrapeForConfig(config: any) {
+async function runScrapeForConfig(config: any) {
   const { platformId, userId, scraperType, id } = config;
 
   console.log(`[Scheduler] Running scrape for platform ${platformId}, user ${userId}, type ${scraperType}`);
@@ -322,8 +322,8 @@ export async function runScrapeForConfig(config: any) {
 }
 
 export function startScheduler() {
-  cron.schedule("0 13 * * *", async () => {
-    console.log("[Scheduler] Starting daily scrape at 13:00 UTC...");
+  cron.schedule("0 9 * * *", async () => {
+    console.log("[Scheduler] Starting daily scrape at 09:00...");
     try {
       const configs = await storage.getAllEnabledScraperConfigs();
       console.log(`[Scheduler] Found ${configs.length} enabled scraper config(s)`);
@@ -338,12 +338,5 @@ export function startScheduler() {
     }
   });
 
-  const keepAliveInterval = 10 * 60 * 1000;
-  setInterval(() => {
-    const port = process.env.PORT || "5000";
-    fetch(`http://localhost:${port}/api/health`).catch(() => {});
-  }, keepAliveInterval);
-
-  console.log("[Scheduler] Daily scrape scheduled for 13:00 UTC");
-  console.log("[Scheduler] Keep-alive ping every 10 minutes");
+  console.log("[Scheduler] Daily scrape scheduled for 09:00");
 }
