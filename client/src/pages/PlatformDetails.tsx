@@ -625,18 +625,18 @@ export default function PlatformDetails() {
                             dataKey="value" 
                             name="Current Value"
                             stroke={platform.color} 
-                            strokeWidth={2}
-                            dot={{ r: 2.5, fill: platform.color, strokeWidth: 0 }}
-                            activeDot={{ r: 5 }}
+                            strokeWidth={3}
+                            dot={{ r: 3, fill: platform.color, strokeWidth: 0 }}
+                            activeDot={{ r: 6 }}
                           />
                           <Line 
                             type="monotone" 
                             dataKey="invested" 
                             name="Total Invested"
                             stroke="#8884d8" 
-                            strokeWidth={1.5}
+                            strokeWidth={2.5}
                             strokeDasharray="5 5"
-                            dot={{ r: 2.5, fill: '#8884d8', strokeWidth: 0 }}
+                            dot={{ r: 3, fill: '#8884d8', strokeWidth: 0 }}
                           />
                         </LineChart>
                       </ResponsiveContainer>
@@ -975,18 +975,18 @@ export default function PlatformDetails() {
                             dataKey="value" 
                             name="Current Value"
                             stroke={platform.color} 
-                            strokeWidth={2}
-                            dot={{ r: 2.5, fill: platform.color, strokeWidth: 0 }}
-                            activeDot={{ r: 5 }}
+                            strokeWidth={3}
+                            dot={{ r: 3, fill: platform.color, strokeWidth: 0 }}
+                            activeDot={{ r: 6 }}
                           />
                           <Line 
                             type="monotone" 
                             dataKey="invested" 
                             name="Total Invested"
                             stroke="#8884d8" 
-                            strokeWidth={1.5}
+                            strokeWidth={2.5}
                             strokeDasharray="5 5"
-                            dot={{ r: 2.5, fill: '#8884d8', strokeWidth: 0 }}
+                            dot={{ r: 3, fill: '#8884d8', strokeWidth: 0 }}
                           />
                         </LineChart>
                       </ResponsiveContainer>

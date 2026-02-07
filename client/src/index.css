@@ -98,6 +98,19 @@
   }
 }
 
+/* Smooth SVG chart rendering */
+.recharts-wrapper svg {
+  shape-rendering: geometricPrecision;
+}
+.recharts-curve,
+.recharts-line-curve {
+  shape-rendering: geometricPrecision;
+}
+.recharts-dot circle,
+.recharts-active-dot circle {
+  shape-rendering: geometricPrecision;
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

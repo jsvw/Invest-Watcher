@@ -159,8 +159,8 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
                 type="monotone"
                 dataKey={cohort.cohortLabel}
                 stroke={COLORS[idx % COLORS.length]}
-                strokeWidth={2}
-                dot={{ fill: COLORS[idx % COLORS.length], r: 2.5, strokeWidth: 0 }}
+                strokeWidth={2.5}
+                dot={{ fill: COLORS[idx % COLORS.length], r: 3, strokeWidth: 0 }}
                 connectNulls={false}
               />
             ))}
