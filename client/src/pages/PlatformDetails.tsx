@@ -585,24 +585,27 @@ export default function PlatformDetails() {
                   <div className="h-[400px] w-full">
                     {history && history.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={history}>
+                        <LineChart data={history.map((h: any) => ({ ...h, timestamp: new Date(h.date).getTime() }))}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                           <XAxis 
-                            dataKey="date" 
+                            dataKey="timestamp" 
+                            type="number"
+                            scale="time"
+                            domain={['dataMin', 'dataMax']}
                             stroke="hsl(var(--muted-foreground))" 
                             fontSize={12} 
                             tickLine={false} 
                             axisLine={false} 
-                            tickFormatter={(date) => format(new Date(date), 'MMM yy')}
-                            ticks={history ? (() => {
+                            tickFormatter={(ts) => format(new Date(ts), 'MMM yy')}
+                            ticks={(() => {
                               const seen = new Set<string>();
                               return history.filter((entry: any) => {
                                 const key = format(new Date(entry.date), 'yyyy-MM');
                                 if (seen.has(key)) return false;
                                 seen.add(key);
                                 return true;
-                              }).map((entry: any) => entry.date);
-                            })() : undefined}
+                              }).map((entry: any) => new Date(entry.date).getTime());
+                            })()}
                           />
                           <YAxis 
                             stroke="hsl(var(--muted-foreground))" 
@@ -614,7 +617,7 @@ export default function PlatformDetails() {
                           <Tooltip 
                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                             formatter={(value: number) => [formatCurrency(value, currency), ""]}
-                            labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
+                            labelFormatter={(ts) => format(new Date(ts), 'MMM dd, yyyy')}
                           />
                           <Legend verticalAlign="top" height={36}/>
                           <Line 
@@ -623,7 +626,7 @@ export default function PlatformDetails() {
                             name="Current Value"
                             stroke={platform.color} 
                             strokeWidth={3}
-                            dot={false}
+                            dot={{ r: 3, fill: platform.color }}
                             activeDot={{ r: 6 }}
                           />
                           <Line 
@@ -633,7 +636,7 @@ export default function PlatformDetails() {
                             stroke="#8884d8" 
                             strokeWidth={2}
                             strokeDasharray="5 5"
-                            dot={false}
+                            dot={{ r: 3, fill: '#8884d8' }}
                           />
                         </LineChart>
                       </ResponsiveContainer>
@@ -932,24 +935,27 @@ export default function PlatformDetails() {
                   <div className="h-[400px] w-full">
                     {history && history.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={history}>
+                        <LineChart data={history.map((h: any) => ({ ...h, timestamp: new Date(h.date).getTime() }))}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                           <XAxis 
-                            dataKey="date" 
+                            dataKey="timestamp" 
+                            type="number"
+                            scale="time"
+                            domain={['dataMin', 'dataMax']}
                             stroke="hsl(var(--muted-foreground))" 
                             fontSize={12} 
                             tickLine={false} 
                             axisLine={false} 
-                            tickFormatter={(date) => format(new Date(date), 'MMM yy')}
-                            ticks={history ? (() => {
+                            tickFormatter={(ts) => format(new Date(ts), 'MMM yy')}
+                            ticks={(() => {
                               const seen = new Set<string>();
                               return history.filter((entry: any) => {
                                 const key = format(new Date(entry.date), 'yyyy-MM');
                                 if (seen.has(key)) return false;
                                 seen.add(key);
                                 return true;
-                              }).map((entry: any) => entry.date);
-                            })() : undefined}
+                              }).map((entry: any) => new Date(entry.date).getTime());
+                            })()}
                           />
                           <YAxis 
                             stroke="hsl(var(--muted-foreground))" 
@@ -961,7 +967,7 @@ export default function PlatformDetails() {
                           <Tooltip 
                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                             formatter={(value: number) => [formatCurrency(value, currency), ""]}
-                            labelFormatter={(label) => format(new Date(label), 'MMM dd, yyyy')}
+                            labelFormatter={(ts) => format(new Date(ts), 'MMM dd, yyyy')}
                           />
                           <Legend verticalAlign="top" height={36}/>
                           <Line 
@@ -970,7 +976,7 @@ export default function PlatformDetails() {
                             name="Current Value"
                             stroke={platform.color} 
                             strokeWidth={3}
-                            dot={false}
+                            dot={{ r: 3, fill: platform.color }}
                             activeDot={{ r: 6 }}
                           />
                           <Line 
@@ -980,7 +986,7 @@ export default function PlatformDetails() {
                             stroke="#8884d8" 
                             strokeWidth={2}
                             strokeDasharray="5 5"
-                            dot={false}
+                            dot={{ r: 3, fill: '#8884d8' }}
                           />
                         </LineChart>
                       </ResponsiveContainer>
