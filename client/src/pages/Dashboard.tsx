@@ -489,9 +489,9 @@ export default function Dashboard() {
                           name="Current Value"
                           yAxisId="left"
                           stroke="hsl(var(--primary))" 
-                          strokeWidth={3}
-                          dot={{ r: 3, fill: 'hsl(var(--primary))', strokeWidth: 0 }}
-                          activeDot={{ r: 6 }}
+                          strokeWidth={4}
+                          dot={{ r: 5, fill: 'hsl(var(--primary))', strokeWidth: 0 }}
+                          activeDot={{ r: 7 }}
                         />
                         <Line 
                           type="monotone" 
@@ -499,9 +499,9 @@ export default function Dashboard() {
                           name="Total Invested"
                           yAxisId="left"
                           stroke="#8884d8" 
-                          strokeWidth={2.5}
+                          strokeWidth={3}
                           strokeDasharray="5 5"
-                          dot={{ r: 3, fill: '#8884d8', strokeWidth: 0 }}
+                          dot={{ r: 5, fill: '#8884d8', strokeWidth: 0 }}
                         />
                       </>
                     )}
@@ -512,9 +512,9 @@ export default function Dashboard() {
                         name="Profit/Loss"
                         yAxisId="right"
                         stroke="#10b981" 
-                        strokeWidth={chartView === "all" ? 2.5 : 3}
-                        dot={{ r: 3, fill: '#10b981', strokeWidth: 0 }}
-                        activeDot={{ r: 6 }}
+                        strokeWidth={chartView === "all" ? 3 : 4}
+                        dot={{ r: 5, fill: '#10b981', strokeWidth: 0 }}
+                        activeDot={{ r: 7 }}
                       />
                     )}
                     {(chartView === "monthly" || chartView === "all") && (
@@ -524,9 +524,9 @@ export default function Dashboard() {
                         name="Monthly Growth"
                         yAxisId="monthly"
                         stroke="#f59e0b" 
-                        strokeWidth={chartView === "all" ? 2.5 : 3}
-                        dot={{ r: 3, fill: '#f59e0b', strokeWidth: 0 }}
-                        activeDot={{ r: 6 }}
+                        strokeWidth={chartView === "all" ? 3 : 4}
+                        dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }}
+                        activeDot={{ r: 7 }}
                       />
                     )}
                   </LineChart>
