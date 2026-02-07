@@ -338,5 +338,12 @@ export function startScheduler() {
     }
   });
 
+  const keepAliveInterval = 10 * 60 * 1000;
+  setInterval(() => {
+    const port = process.env.PORT || "5000";
+    fetch(`http://localhost:${port}/api/health`).catch(() => {});
+  }, keepAliveInterval);
+
   console.log("[Scheduler] Daily scrape scheduled for 09:00");
+  console.log("[Scheduler] Keep-alive ping every 10 minutes");
 }

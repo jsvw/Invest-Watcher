@@ -40,6 +40,10 @@ export async function registerRoutes(
   // Register object storage routes for file uploads
   registerObjectStorageRoutes(app);
 
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
   // --- Platforms (protected) ---
   app.get(api.platforms.list.path, requireAuth, async (req, res) => {
     const userId = getAuthenticatedUserId(req)!;
