@@ -1523,11 +1523,11 @@ export async function registerRoutes(
 
           const existingSyncAdj = existingInvestments.filter(inv => inv.notes?.startsWith("Trading 212 sync adjustment"));
           if (existingSyncAdj.length > 0) {
-            const adjId = existingSyncAdj[existingSyncAdj.length - 1].id;
-            if (Math.abs(diff) >= 0.01) {
-              await storage.updateInvestment(adjId, {
+            const adj = existingSyncAdj[existingSyncAdj.length - 1];
+            const currentAdjAmount = parseFloat(adj.amount);
+            if (Math.abs(diff - currentAdjAmount) >= 0.01) {
+              await storage.updateInvestment(adj.id, {
                 amount: diff.toFixed(2),
-                date: today,
                 notes: `Trading 212 sync adjustment (T212 total: ${t212Invested.toFixed(2)})`,
               });
             }
