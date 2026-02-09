@@ -151,6 +151,7 @@ export default function PlatformDetails() {
   const [specificYear, setSpecificYear] = useState<string | null>(null);
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
   const [platformChartDataMode, setPlatformChartDataMode] = useState<"daily" | "monthly">("monthly");
+  const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
   
   const { data: platforms } = usePlatforms();
   const { data: platform, isLoading: isPlatformLoading } = usePlatform(id);
@@ -371,6 +372,22 @@ export default function PlatformDetails() {
       };
     });
   }, [history, platformChartDataMode]);
+
+  const formatAxisValue = (value: number, showSign: boolean = false) => {
+    const symbol = getCurrencySymbol(currency);
+    const sign = showSign && value >= 0 ? '+' : '';
+    const absValue = Math.abs(value);
+    
+    if (absValue >= 1000000) {
+      return `${sign}${symbol}${(value / 1000000).toFixed(1)}M`;
+    } else if (absValue >= 1000) {
+      return `${sign}${symbol}${(value / 1000).toFixed(1)}k`;
+    } else if (absValue >= 1) {
+      return `${sign}${symbol}${value.toFixed(0)}`;
+    } else {
+      return `${sign}${symbol}${value.toFixed(2)}`;
+    }
+  };
 
   const { data: availableFilters } = useQuery({
     queryKey: ['/api/portfolio/available-filters', id],
@@ -1010,10 +1027,23 @@ export default function PlatformDetails() {
                   </div>
                 </CardHeader>
                 <CardContent>
+                  <Tabs value={chartView} onValueChange={(v) => setChartView(v as any)} className="mb-4">
+                    <TabsList>
+                      <TabsTrigger value="overview" data-testid="tab-platform-chart-overview">Value Overview</TabsTrigger>
+                      <TabsTrigger value="profit" data-testid="tab-platform-chart-profit">Profit/Loss</TabsTrigger>
+                      <TabsTrigger value="monthly" data-testid="tab-platform-chart-monthly">Monthly Growth</TabsTrigger>
+                      <TabsTrigger value="all" data-testid="tab-platform-chart-all">All</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
                   <div className="h-[400px] w-full">
                     {platformChartData && platformChartData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={platformChartData.map((h: any) => ({ ...h, timestamp: new Date(h.date).getTime() }))}>
+                        <LineChart data={platformChartData.map((h: any, i: number, arr: any[]) => ({ 
+                          ...h, 
+                          timestamp: new Date(h.date).getTime(),
+                          gain: h.value - h.invested,
+                          monthlyChange: i === 0 ? 0 : (h.value - arr[i - 1].value) - (h.invested - arr[i - 1].invested)
+                        }))}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                           <XAxis 
                             dataKey="timestamp" 
@@ -1035,37 +1065,100 @@ export default function PlatformDetails() {
                               }).map((entry: any) => new Date(entry.date).getTime());
                             })()}
                           />
-                          <YAxis 
-                            stroke="hsl(var(--muted-foreground))" 
-                            fontSize={12} 
-                            tickLine={false} 
-                            axisLine={false} 
-                            tickFormatter={(value) => formatCurrency(value, currency)}
-                          />
+                          {(chartView === "overview" || chartView === "all") && (
+                            <YAxis 
+                              yAxisId="left"
+                              stroke="hsl(var(--muted-foreground))" 
+                              fontSize={12} 
+                              tickLine={false} 
+                              axisLine={false} 
+                              tickFormatter={(value) => formatAxisValue(value)}
+                              domain={['auto', 'auto']}
+                            />
+                          )}
+                          {(chartView === "profit" || chartView === "all") && (
+                            <YAxis 
+                              yAxisId="right"
+                              orientation="right"
+                              stroke="#10b981" 
+                              fontSize={12} 
+                              tickLine={false} 
+                              axisLine={false} 
+                              tickFormatter={(value) => formatAxisValue(value, true)}
+                              domain={['auto', 'auto']}
+                            />
+                          )}
+                          {(chartView === "monthly" || chartView === "all") && (
+                            <YAxis 
+                              yAxisId="monthly"
+                              orientation="right"
+                              stroke="#f59e0b" 
+                              fontSize={12} 
+                              tickLine={false} 
+                              axisLine={false} 
+                              tickFormatter={(value) => formatAxisValue(value, true)}
+                              domain={['auto', 'auto']}
+                            />
+                          )}
                           <Tooltip 
                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                            formatter={(value: number) => [formatCurrency(value, currency), ""]}
+                            formatter={(value: number, name: string) => [
+                              name === "Profit/Loss" || name === "Monthly Growth"
+                                ? `${value >= 0 ? '+' : ''}${formatCurrency(value, currency)}`
+                                : formatCurrency(value, currency), 
+                              ""
+                            ]}
                             labelFormatter={(ts) => format(new Date(ts), 'MMM dd, yyyy')}
                           />
                           <Legend verticalAlign="top" height={36}/>
-                          <Line 
-                            type="monotone" 
-                            dataKey="value" 
-                            name="Current Value"
-                            stroke={platform.color} 
-                            strokeWidth={4}
-                            dot={{ r: 5, fill: platform.color, strokeWidth: 0 }}
-                            activeDot={{ r: 7 }}
-                          />
-                          <Line 
-                            type="monotone" 
-                            dataKey="invested" 
-                            name="Total Invested"
-                            stroke="#8884d8" 
-                            strokeWidth={3}
-                            strokeDasharray="5 5"
-                            dot={{ r: 5, fill: '#8884d8', strokeWidth: 0 }}
-                          />
+                          {(chartView === "overview" || chartView === "all") && (
+                            <>
+                              <Line 
+                                type="monotone" 
+                                dataKey="value" 
+                                name="Current Value"
+                                yAxisId="left"
+                                stroke={platform.color} 
+                                strokeWidth={4}
+                                dot={{ r: 5, fill: platform.color, strokeWidth: 0 }}
+                                activeDot={{ r: 7 }}
+                              />
+                              <Line 
+                                type="monotone" 
+                                dataKey="invested" 
+                                name="Total Invested"
+                                yAxisId="left"
+                                stroke="#8884d8" 
+                                strokeWidth={3}
+                                strokeDasharray="5 5"
+                                dot={{ r: 5, fill: '#8884d8', strokeWidth: 0 }}
+                              />
+                            </>
+                          )}
+                          {(chartView === "profit" || chartView === "all") && (
+                            <Line 
+                              type="monotone" 
+                              dataKey="gain" 
+                              name="Profit/Loss"
+                              yAxisId="right"
+                              stroke="#10b981" 
+                              strokeWidth={chartView === "all" ? 3 : 4}
+                              dot={{ r: 5, fill: '#10b981', strokeWidth: 0 }}
+                              activeDot={{ r: 7 }}
+                            />
+                          )}
+                          {(chartView === "monthly" || chartView === "all") && (
+                            <Line 
+                              type="monotone" 
+                              dataKey="monthlyChange" 
+                              name="Monthly Growth"
+                              yAxisId="monthly"
+                              stroke="#f59e0b" 
+                              strokeWidth={chartView === "all" ? 3 : 4}
+                              dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }}
+                              activeDot={{ r: 7 }}
+                            />
+                          )}
                         </LineChart>
                       </ResponsiveContainer>
                     ) : (
