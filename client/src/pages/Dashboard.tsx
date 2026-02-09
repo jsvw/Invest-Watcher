@@ -205,6 +205,30 @@ export default function Dashboard() {
     });
   }, [history, chartDataMode]);
 
+  const dailyGrowthData = useMemo(() => {
+    if (!chartData || chartData.length < 2) return [];
+    const result: { timestamp: number; date: string; realDailyGrowth: number }[] = [];
+    for (let i = 1; i < chartData.length; i++) {
+      const prev = chartData[i - 1];
+      const curr = chartData[i];
+      const prevDate = new Date(prev.date);
+      const currDate = new Date(curr.date);
+      const daysBetween = Math.max(1, Math.round((currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24)));
+      const totalChange = (curr.value - prev.value) - (curr.invested - prev.invested);
+      const dailyGrowth = totalChange / daysBetween;
+      for (let d = 0; d < daysBetween; d++) {
+        const dayDate = new Date(prevDate);
+        dayDate.setDate(dayDate.getDate() + d + 1);
+        result.push({
+          timestamp: dayDate.getTime(),
+          date: dayDate.toISOString().split('T')[0],
+          realDailyGrowth: dailyGrowth,
+        });
+      }
+    }
+    return result;
+  }, [chartData]);
+
   if (isPlatformsLoading || isHistoryLoading) {
     return (
       <Layout>
@@ -584,7 +608,58 @@ export default function Dashboard() {
               </TabsList>
             </Tabs>
             <div className="h-[400px] w-full">
-              {chartData && chartData.length > 0 ? (
+              {chartView === "realDaily" ? (
+                dailyGrowthData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={dailyGrowthData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                      <XAxis 
+                        dataKey="timestamp" 
+                        type="number"
+                        scale="time"
+                        domain={['dataMin', 'dataMax']}
+                        stroke="hsl(var(--muted-foreground))" 
+                        fontSize={12} 
+                        tickLine={false} 
+                        axisLine={false} 
+                        tickFormatter={(ts) => format(new Date(ts), 'MMM yy')}
+                      />
+                      <YAxis 
+                        yAxisId="realDaily"
+                        stroke="#8b5cf6" 
+                        fontSize={12} 
+                        tickLine={false} 
+                        axisLine={false} 
+                        tickFormatter={(value) => formatAxisValue(value, true)}
+                        domain={['auto', 'auto']}
+                      />
+                      <Tooltip 
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                        formatter={(value: number) => [
+                          `${value >= 0 ? '+' : ''}${formatCurrency(value, currency)}`,
+                          ""
+                        ]}
+                        labelFormatter={(ts) => format(new Date(ts), 'MMM dd, yyyy')}
+                      />
+                      <Legend verticalAlign="top" height={36}/>
+                      <Line 
+                        type="monotone" 
+                        dataKey="realDailyGrowth" 
+                        name="Avg Daily Growth"
+                        yAxisId="realDaily"
+                        stroke="#8b5cf6" 
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 5, fill: '#8b5cf6' }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">
+                    Not enough data for daily growth.
+                  </div>
+                )
+              ) : chartData && chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData.map((h: any, i: number, arr: any[]) => {
                     const totalChange = i === 0 ? 0 : (h.value - arr[i - 1].value) - (h.invested - arr[i - 1].invested);
@@ -653,18 +728,6 @@ export default function Dashboard() {
                         domain={['auto', 'auto']}
                       />
                     )}
-                    {chartView === "realDaily" && (
-                      <YAxis 
-                        yAxisId="realDaily"
-                        orientation="right"
-                        stroke="#8b5cf6" 
-                        fontSize={12} 
-                        tickLine={false} 
-                        axisLine={false} 
-                        tickFormatter={(value) => formatAxisValue(value, true)}
-                        domain={['auto', 'auto']}
-                      />
-                    )}
                     <Tooltip 
                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                       formatter={(value: number, name: string) => [
@@ -724,14 +787,14 @@ export default function Dashboard() {
                         activeDot={{ r: 7 }}
                       />
                     )}
-                    {(chartView === "realDaily" || chartView === "all") && (
+                    {chartView === "all" && (
                       <Line 
                         type="monotone" 
                         dataKey="realDailyGrowth" 
                         name="Avg Daily Growth"
-                        yAxisId={chartView === "all" ? "monthly" : "realDaily"}
+                        yAxisId="monthly"
                         stroke="#8b5cf6" 
-                        strokeWidth={chartView === "all" ? 3 : 4}
+                        strokeWidth={3}
                         dot={{ r: 5, fill: '#8b5cf6', strokeWidth: 0 }}
                         activeDot={{ r: 7 }}
                       />
