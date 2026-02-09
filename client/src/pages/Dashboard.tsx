@@ -14,7 +14,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -30,6 +30,7 @@ export default function Dashboard() {
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
   const [excludedPlatforms, setExcludedPlatforms] = useState<number[]>([]);
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
+  const [chartDataMode, setChartDataMode] = useState<"daily" | "monthly">("daily");
   const { toast } = useToast();
 
   const [scrapeLog, setScrapeLog] = useState<{ platformName: string; success: boolean; message: string }[] | null>(null);
@@ -176,6 +177,33 @@ export default function Dashboard() {
   }) || [];
 
   const currentYear = years[0] || new Date().getFullYear().toString();
+
+  const chartData = useMemo(() => {
+    if (!history || history.length === 0) return [];
+    if (chartDataMode === "daily") return history;
+
+    const monthMap = new Map<string, { values: number[]; investeds: number[]; date: string }>();
+    for (const h of history) {
+      const key = format(new Date(h.date), 'yyyy-MM');
+      if (!monthMap.has(key)) {
+        monthMap.set(key, { values: [], investeds: [], date: h.date });
+      }
+      const entry = monthMap.get(key)!;
+      entry.values.push(h.value);
+      entry.investeds.push(h.invested);
+      entry.date = h.date;
+    }
+
+    return Array.from(monthMap.entries()).map(([key, data]) => {
+      const avgValue = data.values.reduce((a, b) => a + b, 0) / data.values.length;
+      const avgInvested = data.investeds.reduce((a, b) => a + b, 0) / data.investeds.length;
+      return {
+        date: `${key}-15`,
+        value: avgValue,
+        invested: avgInvested,
+      };
+    });
+  }, [history, chartDataMode]);
 
   if (isPlatformsLoading || isHistoryLoading) {
     return (
@@ -488,6 +516,12 @@ export default function Dashboard() {
                   </Select>
                 </div>
               )}
+              <Tabs value={chartDataMode} onValueChange={(v) => setChartDataMode(v as "daily" | "monthly")} className="w-auto">
+                <TabsList>
+                  <TabsTrigger value="daily" data-testid="tab-data-daily">Daily</TabsTrigger>
+                  <TabsTrigger value="monthly" data-testid="tab-data-monthly">Monthly Avg</TabsTrigger>
+                </TabsList>
+              </Tabs>
               <Tabs value={range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range} onValueChange={(val) => {
                 setRange(val);
                 setSpecificYear(null);
@@ -549,9 +583,9 @@ export default function Dashboard() {
               </TabsList>
             </Tabs>
             <div className="h-[400px] w-full">
-              {history && history.length > 0 ? (
+              {chartData && chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={history.map((h: any, i: number, arr: any[]) => ({ 
+                  <LineChart data={chartData.map((h: any, i: number, arr: any[]) => ({ 
                     ...h, 
                     timestamp: new Date(h.date).getTime(),
                     gain: h.value - h.invested,
@@ -570,7 +604,7 @@ export default function Dashboard() {
                       tickFormatter={(ts) => format(new Date(ts), 'MMM yy')}
                       ticks={(() => {
                         const seen = new Set<string>();
-                        return history.filter((entry: any) => {
+                        return chartData.filter((entry: any) => {
                           const key = format(new Date(entry.date), 'yyyy-MM');
                           if (seen.has(key)) return false;
                           seen.add(key);
