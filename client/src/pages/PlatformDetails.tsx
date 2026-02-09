@@ -150,6 +150,7 @@ export default function PlatformDetails() {
   const [range, setRange] = useState("year");
   const [specificYear, setSpecificYear] = useState<string | null>(null);
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
+  const [platformChartDataMode, setPlatformChartDataMode] = useState<"daily" | "monthly">("daily");
   
   const { data: platforms } = usePlatforms();
   const { data: platform, isLoading: isPlatformLoading } = usePlatform(id);
@@ -343,6 +344,33 @@ export default function PlatformDetails() {
       return await res.json();
     }
   });
+
+  const platformChartData = useMemo(() => {
+    if (!history || history.length === 0) return [];
+    if (platformChartDataMode === "daily") return history;
+
+    const monthMap = new Map<string, { values: number[]; investeds: number[]; date: string }>();
+    for (const h of history) {
+      const key = format(new Date(h.date), 'yyyy-MM');
+      if (!monthMap.has(key)) {
+        monthMap.set(key, { values: [], investeds: [], date: h.date });
+      }
+      const entry = monthMap.get(key)!;
+      entry.values.push(h.value);
+      entry.investeds.push(h.invested);
+      entry.date = h.date;
+    }
+
+    return Array.from(monthMap.entries()).map(([key, data]) => {
+      const avgValue = data.values.reduce((a, b) => a + b, 0) / data.values.length;
+      const avgInvested = data.investeds.reduce((a, b) => a + b, 0) / data.investeds.length;
+      return {
+        date: `${key}-15`,
+        value: avgValue,
+        invested: avgInvested,
+      };
+    });
+  }, [history, platformChartDataMode]);
 
   const { data: availableFilters } = useQuery({
     queryKey: ['/api/portfolio/available-filters', id],
@@ -960,6 +988,12 @@ export default function PlatformDetails() {
                         </Select>
                       </div>
                     )}
+                    <Tabs value={platformChartDataMode} onValueChange={(v) => setPlatformChartDataMode(v as "daily" | "monthly")} className="w-auto">
+                      <TabsList>
+                        <TabsTrigger value="daily" data-testid="tab-platform-data-daily">Daily</TabsTrigger>
+                        <TabsTrigger value="monthly" data-testid="tab-platform-data-monthly">Monthly Avg</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
                     <Tabs value={range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range} onValueChange={(val) => {
                       setRange(val);
                       setSpecificYear(null);
@@ -977,9 +1011,9 @@ export default function PlatformDetails() {
                 </CardHeader>
                 <CardContent>
                   <div className="h-[400px] w-full">
-                    {history && history.length > 0 ? (
+                    {platformChartData && platformChartData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={history.map((h: any) => ({ ...h, timestamp: new Date(h.date).getTime() }))}>
+                        <LineChart data={platformChartData.map((h: any) => ({ ...h, timestamp: new Date(h.date).getTime() }))}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                           <XAxis 
                             dataKey="timestamp" 
@@ -993,7 +1027,7 @@ export default function PlatformDetails() {
                             tickFormatter={(ts) => format(new Date(ts), 'MMM yy')}
                             ticks={(() => {
                               const seen = new Set<string>();
-                              return history.filter((entry: any) => {
+                              return platformChartData.filter((entry: any) => {
                                 const key = format(new Date(entry.date), 'yyyy-MM');
                                 if (seen.has(key)) return false;
                                 seen.add(key);
