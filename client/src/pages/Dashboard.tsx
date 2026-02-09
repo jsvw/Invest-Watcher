@@ -578,7 +578,7 @@ export default function Dashboard() {
               <TabsList>
                 <TabsTrigger value="overview" data-testid="tab-chart-overview">Value Overview</TabsTrigger>
                 <TabsTrigger value="profit" data-testid="tab-chart-profit">Profit/Loss</TabsTrigger>
-                <TabsTrigger value="monthly" data-testid="tab-chart-monthly">Monthly Growth</TabsTrigger>
+                <TabsTrigger value="monthly" data-testid="tab-chart-monthly">{chartDataMode === "daily" ? "Daily" : "Monthly"} Growth</TabsTrigger>
                 <TabsTrigger value="all" data-testid="tab-chart-all">All</TabsTrigger>
               </TabsList>
             </Tabs>
@@ -650,7 +650,7 @@ export default function Dashboard() {
                     <Tooltip 
                       contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                       formatter={(value: number, name: string) => [
-                        name === "Profit/Loss" || name === "Monthly Growth"
+                        name === "Profit/Loss" || name.includes("Growth")
                           ? `${value >= 0 ? '+' : ''}${formatCurrency(value, currency)}`
                           : formatCurrency(value, currency), 
                         ""
@@ -698,7 +698,7 @@ export default function Dashboard() {
                       <Line 
                         type="monotone" 
                         dataKey="monthlyChange" 
-                        name="Monthly Growth"
+                        name={chartDataMode === "daily" ? "Daily Growth" : "Monthly Growth"}
                         yAxisId="monthly"
                         stroke="#f59e0b" 
                         strokeWidth={chartView === "all" ? 3 : 4}
