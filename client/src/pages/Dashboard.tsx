@@ -30,7 +30,7 @@ export default function Dashboard() {
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
   const [excludedPlatforms, setExcludedPlatforms] = useState<number[]>([]);
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
-  const [chartDataMode, setChartDataMode] = useState<"daily" | "monthly">("daily");
+  const [chartDataMode, setChartDataMode] = useState<"daily" | "monthly">("monthly");
   const { toast } = useToast();
 
   const [scrapeLog, setScrapeLog] = useState<{ platformName: string; success: boolean; message: string }[] | null>(null);

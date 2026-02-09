@@ -150,7 +150,7 @@ export default function PlatformDetails() {
   const [range, setRange] = useState("year");
   const [specificYear, setSpecificYear] = useState<string | null>(null);
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
-  const [platformChartDataMode, setPlatformChartDataMode] = useState<"daily" | "monthly">("daily");
+  const [platformChartDataMode, setPlatformChartDataMode] = useState<"daily" | "monthly">("monthly");
   
   const { data: platforms } = usePlatforms();
   const { data: platform, isLoading: isPlatformLoading } = usePlatform(id);
