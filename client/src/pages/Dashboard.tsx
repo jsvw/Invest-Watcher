@@ -3,7 +3,7 @@ import { StatCard } from "@/components/StatCard";
 import { usePlatforms } from "@/hooks/use-platforms";
 import { useAuth } from "@/App";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
-import { Wallet, TrendingUp, DollarSign, Check, RefreshCw, Loader2 } from "lucide-react";
+import { Wallet, TrendingUp, DollarSign, Check, RefreshCw, Loader2, CheckCircle, XCircle, ChevronDown, ChevronUp, X } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -32,24 +32,80 @@ export default function Dashboard() {
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
   const { toast } = useToast();
 
+  const [scrapeLog, setScrapeLog] = useState<{ platformName: string; success: boolean; message: string }[] | null>(null);
+  const [scrapeLogOpen, setScrapeLogOpen] = useState(false);
+  const scrapeLogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrapeLogRef.current) {
+      scrapeLogRef.current.scrollTop = scrapeLogRef.current.scrollHeight;
+    }
+  }, [scrapeLog]);
+
   const scrapeAllMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/scrape-all', { method: 'POST', credentials: 'include' });
-      if (!res.ok) throw new Error("Scrape failed");
-      return res.json();
+      setScrapeLog([]);
+      setScrapeLogOpen(true);
+
+      const configsRes = await fetch('/api/scraper-configs', { credentials: 'include' });
+      if (!configsRes.ok) throw new Error("Failed to fetch scraper configs");
+      const configs: { platformId: number; platformName: string }[] = await configsRes.json();
+
+      if (configs.length === 0) {
+        return { results: [] };
+      }
+
+      const results: { platformName: string; success: boolean; message: string }[] = [];
+
+      for (const config of configs) {
+        setScrapeLog(prev => [...(prev || []), { platformName: config.platformName, success: true, message: "Scraping..." }]);
+        try {
+          const scrapeRes = await fetch(`/api/platforms/${config.platformId}/scrape`, {
+            method: 'POST',
+            credentials: 'include',
+          });
+          const data = await scrapeRes.json();
+          const entry = {
+            platformName: config.platformName,
+            success: scrapeRes.ok,
+            message: data.message || (scrapeRes.ok ? "Success" : "Failed"),
+          };
+          results.push(entry);
+          setScrapeLog(prev => {
+            const updated = [...(prev || [])];
+            const idx = updated.findLastIndex(e => e.platformName === config.platformName);
+            if (idx >= 0) updated[idx] = entry;
+            return updated;
+          });
+        } catch (err: any) {
+          const entry = { platformName: config.platformName, success: false, message: err.message || "Failed" };
+          results.push(entry);
+          setScrapeLog(prev => {
+            const updated = [...(prev || [])];
+            const idx = updated.findLastIndex(e => e.platformName === config.platformName);
+            if (idx >= 0) updated[idx] = entry;
+            return updated;
+          });
+        }
+      }
+
+      return { results };
     },
     onSuccess: (data) => {
       const succeeded = data.results?.filter((r: any) => r.success).length || 0;
       const failed = data.results?.filter((r: any) => !r.success).length || 0;
-      toast({
-        title: "Scraping Complete",
-        description: `${succeeded} succeeded${failed > 0 ? `, ${failed} failed` : ''}`,
-        variant: failed > 0 ? "destructive" : "default",
-      });
+      if (data.results.length > 0) {
+        toast({
+          title: "Scraping Complete",
+          description: `${succeeded} succeeded${failed > 0 ? `, ${failed} failed` : ''}`,
+          variant: failed > 0 ? "destructive" : "default",
+        });
+      }
       queryClient.invalidateQueries({ queryKey: [api.portfolio.history.path] });
       queryClient.invalidateQueries({ queryKey: ['/api/platforms'] });
     },
     onError: (err: any) => {
+      setScrapeLog(prev => [...(prev || []), { platformName: "Error", success: false, message: err.message }]);
       toast({ title: "Scraping Failed", description: err.message, variant: "destructive" });
     },
   });
@@ -184,6 +240,53 @@ export default function Dashboard() {
             {scrapeAllMutation.isPending ? "Scraping..." : "Scrape All"}
           </Button>
         </div>
+
+        {(scrapeLogOpen && scrapeLog !== null) && (
+          <Card data-testid="card-scrape-log">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 py-3 px-4">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-sm font-medium">
+                  {scrapeAllMutation.isPending ? "Scraping in progress..." : "Scrape Results"}
+                </CardTitle>
+                {!scrapeAllMutation.isPending && scrapeLog.length > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {scrapeLog.filter(r => r.success).length} succeeded, {scrapeLog.filter(r => !r.success).length} failed
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" onClick={() => setScrapeLogOpen(false)} data-testid="button-close-scrape-log">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="px-4 pb-3 pt-0">
+              <div ref={scrapeLogRef} className="max-h-48 overflow-y-auto space-y-1">
+                {scrapeAllMutation.isPending && scrapeLog.length === 0 && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Connecting to scrapers...</span>
+                  </div>
+                )}
+                {scrapeLog.map((entry, idx) => (
+                  <div key={idx} className="flex items-start gap-2 text-sm py-1" data-testid={`scrape-log-entry-${idx}`}>
+                    {entry.message === "Scraping..." ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-0.5 shrink-0" />
+                    ) : entry.success ? (
+                      <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+                    )}
+                    <div>
+                      <span className="font-medium">{entry.platformName}</span>
+                      <span className="text-muted-foreground ml-2">{entry.message}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

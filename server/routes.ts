@@ -1793,6 +1793,23 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/scraper-configs', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const configs = await storage.getScraperConfigsByUser(userId);
+      const results = [];
+      for (const config of configs) {
+        const platform = await storage.getPlatform(config.platformId, userId);
+        if (platform) {
+          results.push({ platformId: config.platformId, platformName: platform.name });
+        }
+      }
+      res.json(results);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   const holdingsCache = new Map<string, { data: any; timestamp: number }>();
   const HOLDINGS_CACHE_TTL = 5 * 60 * 1000;
 
