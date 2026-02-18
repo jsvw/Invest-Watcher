@@ -1626,8 +1626,8 @@ export async function registerRoutes(
         const { scrapeMonefit } = await import("./scrapers/monefit");
         scraperResult = await scrapeMonefit(creds.email, creds.password);
       } else if (config.scraperType === "robocash") {
-        const { scrapeRobocash } = await import("./scrapers/robocash");
-        scraperResult = await scrapeRobocash(creds.email, creds.password);
+        const { scrapeRoboCash } = await import("./scrapers/robocash");
+        scraperResult = await scrapeRoboCash(creds.email, creds.password);
       } else if (config.scraperType === "crowdpear") {
         const { scrapeCrowdPear } = await import("./scrapers/crowdpear");
         scraperResult = await scrapeCrowdPear(creds.email, creds.password, creds.gmailAppPassword, creds.gmailEmail);
