@@ -142,7 +142,7 @@ export const scraperConfigs = pgTable("scraper_configs", {
   id: serial("id").primaryKey(),
   platformId: integer("platform_id").notNull().references(() => platforms.id),
   userId: integer("user_id").notNull().references(() => users.id),
-  scraperType: text("scraper_type").notNull(), // 'monefit', etc.
+  scraperType: text("scraper_type").notNull(), // 'monefit', 'robocash', 'crowdpear', 'goldrepublic', 'trading212', 'synvest'
   credentials: text("credentials").notNull(), // JSON encrypted credentials (email, password)
   enabled: boolean("enabled").notNull().default(true),
   lastScrapeAt: timestamp("last_scrape_at"),
