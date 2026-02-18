@@ -59,7 +59,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
       } else if (isUsernameEmailType) {
         body = { scraperType, username, email, password };
       } else {
-        body = { scraperType, email, password, ...(scraperType === "crowdpear" ? { ...(gmailAppPassword ? { gmailAppPassword } : {}), ...(gmailEmail ? { gmailEmail } : {}) } : {}) };
+        body = { scraperType, email, password, ...((scraperType === "crowdpear" || scraperType === "synvest") ? { ...(gmailAppPassword ? { gmailAppPassword } : {}), ...(gmailEmail ? { gmailEmail } : {}) } : {}) };
       }
       return apiRequest("POST", `/api/platforms/${platformId}/scraper-config`, body);
     },
@@ -322,7 +322,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                         data-testid="input-scraper-password"
                       />
                     </div>
-                    {config?.scraperType === "crowdpear" && (
+                    {(config?.scraperType === "crowdpear" || config?.scraperType === "synvest") && (
                       <>
                         <div>
                           <Label htmlFor="scraper-gmail-email">Gmail Address (for 2FA)</Label>
@@ -334,7 +334,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                             placeholder="your-gmail@gmail.com"
                             data-testid="input-scraper-gmail-email"
                           />
-                          <p className="text-xs text-muted-foreground mt-1">The Gmail address where CrowdPear sends 2FA codes.</p>
+                          <p className="text-xs text-muted-foreground mt-1">The Gmail address where verification codes are sent.</p>
                         </div>
                         <div>
                           <Label htmlFor="scraper-gmail-app-password">Gmail App Password (for 2FA)</Label>
@@ -482,7 +482,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                       data-testid="input-scraper-password-new"
                     />
                   </div>
-                  {scraperType === "crowdpear" && (
+                  {(scraperType === "crowdpear" || scraperType === "synvest") && (
                     <>
                       <div>
                         <Label htmlFor="scraper-gmail-email-new">Gmail Address (for 2FA)</Label>
@@ -494,7 +494,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                           placeholder="your-gmail@gmail.com"
                           data-testid="input-scraper-gmail-email-new"
                         />
-                        <p className="text-xs text-muted-foreground mt-1">The Gmail address where CrowdPear sends 2FA codes.</p>
+                        <p className="text-xs text-muted-foreground mt-1">The Gmail address where verification codes are sent.</p>
                       </div>
                       <div>
                         <Label htmlFor="scraper-gmail-app-password-new">Gmail App Password (for 2FA)</Label>
