@@ -1554,17 +1554,14 @@ export async function registerRoutes(
         });
       }
 
-      if (config.scraperType === "robocash" || config.scraperType === "crowdpear" || config.scraperType === "goldrepublic" || config.scraperType === "synvest") {
+      if (config.scraperType === "robocash" || config.scraperType === "crowdpear" || config.scraperType === "goldrepublic") {
         let balanceData: { totalBalance: number; totalInvested?: number | null; scrapedAt: Date };
         if (config.scraperType === "robocash") {
-          const { scrapeRobocash } = await import("./scrapers/robocash");
-          balanceData = await scrapeRobocash(creds.email, creds.password);
+          const { scrapeRoboCash } = await import("./scrapers/robocash");
+          balanceData = await scrapeRoboCash(creds.email, creds.password);
         } else if (config.scraperType === "goldrepublic") {
           const { scrapeGoldRepublic } = await import("./scrapers/goldrepublic");
           balanceData = await scrapeGoldRepublic(creds.username, creds.email, creds.password);
-        } else if (config.scraperType === "synvest") {
-          const { scrapeSynVest } = await import("./scrapers/synvest");
-          balanceData = await scrapeSynVest(creds.email, creds.password, creds.gmailAppPassword, creds.gmailEmail);
         } else {
           const { scrapeCrowdPear } = await import("./scrapers/crowdpear");
           balanceData = await scrapeCrowdPear(creds.email, creds.password, creds.gmailAppPassword, creds.gmailEmail);
@@ -1628,18 +1625,6 @@ export async function registerRoutes(
       if (config.scraperType === "monefit") {
         const { scrapeMonefit } = await import("./scrapers/monefit");
         scraperResult = await scrapeMonefit(creds.email, creds.password);
-      } else if (config.scraperType === "robocash") {
-        const { scrapeRobocash } = await import("./scrapers/robocash");
-        scraperResult = await scrapeRobocash(creds.email, creds.password);
-      } else if (config.scraperType === "crowdpear") {
-        const { scrapeCrowdPear } = await import("./scrapers/crowdpear");
-        scraperResult = await scrapeCrowdPear(creds.email, creds.password, creds.gmailAppPassword, creds.gmailEmail);
-      } else if (config.scraperType === "goldrepublic") {
-        const { scrapeGoldRepublic } = await import("./scrapers/goldrepublic");
-        scraperResult = await scrapeGoldRepublic(creds.username, creds.email, creds.password);
-      } else if (config.scraperType === "synvest") {
-        const { scrapeSynVest } = await import("./scrapers/synvest");
-        scraperResult = await scrapeSynVest(creds.email, creds.password, creds.gmailAppPassword, creds.gmailEmail);
       } else {
         return res.status(400).json({ message: `Unknown scraper type: ${config.scraperType}` });
       }

@@ -8,7 +8,7 @@ export interface RoboCashScrapedData {
 const LOGIN_URL = "https://robo.cash/login";
 const SUMMARY_URL = "https://robo.cash/cabinet/summary";
 
-export async function scrapeRobocash(email: string, password: string): Promise<RoboCashScrapedData> {
+export async function scrapeRoboCash(email: string, password: string): Promise<RoboCashScrapedData> {
   let browser;
   try {
     browser = await puppeteer.launch({
