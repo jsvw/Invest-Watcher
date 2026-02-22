@@ -37,7 +37,92 @@ import type { Asset } from "@shared/schema";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { ScraperConfigDialog } from "@/components/ScraperConfigDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { BarChart as RechartsBarChart, Bar, XAxis as BarXAxis, YAxis as BarYAxis, Tooltip as BarTooltip, ResponsiveContainer as BarContainer } from "recharts";
+
+function TickerPriceHover({ ticker, currency, children }: { ticker: string; currency: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const { data, isLoading } = useQuery({
+    queryKey: ['/api/ticker-chart', ticker],
+    queryFn: async () => {
+      const res = await fetch(`/api/ticker-chart/${encodeURIComponent(ticker)}`, { credentials: 'include' });
+      if (!res.ok) return { prices: [], symbol: ticker };
+      return res.json();
+    },
+    enabled: open,
+    staleTime: 4 * 60 * 60 * 1000,
+  });
+
+  const prices = data?.prices || [];
+  const symbol = data?.symbol || ticker.replace(/_EQ$/, '');
+  const tickerCurrency = data?.currency || currency;
+  const hasData = prices.length > 0;
+  const latestPrice = hasData ? prices[prices.length - 1].close : null;
+  const firstPrice = hasData ? prices[0].close : null;
+  const priceChange = latestPrice && firstPrice ? latestPrice - firstPrice : null;
+  const priceChangePct = priceChange && firstPrice ? (priceChange / firstPrice) * 100 : null;
+
+  return (
+    <HoverCard openDelay={300} closeDelay={100} open={open} onOpenChange={setOpen}>
+      <HoverCardTrigger asChild>
+        {children}
+      </HoverCardTrigger>
+      <HoverCardContent className="w-80" side="right" align="start">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="font-semibold text-sm">{symbol}</p>
+            {hasData && (
+              <div className="text-right">
+                <p className="text-sm font-medium">{formatCurrency(latestPrice!, tickerCurrency)}</p>
+                {priceChange !== null && (
+                  <p className={`text-xs ${priceChange >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {priceChange >= 0 ? '+' : ''}{formatCurrency(priceChange, tickerCurrency)} ({priceChangePct! >= 0 ? '+' : ''}{priceChangePct!.toFixed(2)}%)
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+          {isLoading ? (
+            <div className="h-24 flex items-center justify-center">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
+          ) : hasData ? (
+            <div className="h-24">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={prices.map((p: any) => ({ ...p, timestamp: new Date(p.date).getTime() }))} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+                  <defs>
+                    <linearGradient id={`grad-${ticker}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={priceChange! >= 0 ? '#10b981' : '#ef4444'} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={priceChange! >= 0 ? '#10b981' : '#ef4444'} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="timestamp" type="number" scale="time" domain={['dataMin', 'dataMax']} hide />
+                  <YAxis domain={['auto', 'auto']} hide />
+                  <Tooltip
+                    contentStyle={{ fontSize: 11, borderRadius: 6, padding: '4px 8px' }}
+                    formatter={(val: number) => [formatCurrency(val, tickerCurrency), 'Close']}
+                    labelFormatter={(ts) => format(new Date(ts), 'MMM d, yyyy')}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="close"
+                    stroke={priceChange! >= 0 ? '#10b981' : '#ef4444'}
+                    fill={`url(#grad-${ticker})`}
+                    strokeWidth={1.5}
+                    dot={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground text-center py-4">No price data available</p>
+          )}
+          <p className="text-[10px] text-muted-foreground text-right">90-day price history</p>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
 
 function AssetActionsMenu({ asset, platformId, platformMode, currency }: { asset: Asset; platformId: number; platformMode: "asset_returns" | "item_valuations"; currency: string }) {
   const [editOpen, setEditOpen] = useState(false);
@@ -1735,7 +1820,11 @@ export default function PlatformDetails() {
                                 const value = qty && inst.currentPrice ? qty * inst.currentPrice : null;
                                 return (
                                   <tr key={idx} className="border-b last:border-0" data-testid={`row-holding-${idx}`}>
-                                    <td className="p-3 font-medium" data-testid={`text-ticker-${idx}`}>{inst.ticker}</td>
+                                    <td className="p-3 font-medium" data-testid={`text-ticker-${idx}`}>
+                                      <TickerPriceHover ticker={inst.ticker} currency={currency}>
+                                        <span className="cursor-pointer underline decoration-dotted underline-offset-2">{inst.ticker}</span>
+                                      </TickerPriceHover>
+                                    </td>
                                     <td className="text-right p-3 tabular-nums">{qty?.toFixed(qty < 1 ? 6 : 4) ?? '-'}</td>
                                     <td className="text-right p-3 tabular-nums">
                                       {inst.averagePrice != null ? formatCurrency(inst.averagePrice, currency) : '-'}

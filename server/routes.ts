@@ -1810,6 +1810,78 @@ export async function registerRoutes(
     }
   });
 
+  const tickerChartCache = new Map<string, { data: any; timestamp: number }>();
+  const TICKER_CHART_CACHE_TTL = 4 * 60 * 60 * 1000;
+
+  function mapT212TickerToYahoo(rawTicker: string): string {
+    let ticker = rawTicker.replace(/_EQ$/, "");
+    if (ticker.endsWith("_US")) {
+      const sym = ticker.replace(/_US$/, "");
+      return sym.replace(/_/g, "-");
+    }
+    if (ticker.endsWith("l")) {
+      return ticker.slice(0, -1) + ".L";
+    }
+    if (ticker.endsWith("_DE")) {
+      return ticker.replace(/_DE$/, "") + ".DE";
+    }
+    if (ticker.endsWith("_NL")) {
+      return ticker.replace(/_NL$/, "") + ".AS";
+    }
+    return ticker.replace(/_/g, "-");
+  }
+
+  app.get('/api/ticker-chart/:ticker', requireAuth, async (req, res) => {
+    try {
+      const rawTicker = req.params.ticker;
+      const cached = tickerChartCache.get(rawTicker);
+      if (cached && Date.now() - cached.timestamp < TICKER_CHART_CACHE_TTL) {
+        return res.json(cached.data);
+      }
+
+      const yahooSymbol = mapT212TickerToYahoo(rawTicker);
+      const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=1d&range=3mo`;
+
+      const response = await fetch(yfUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      });
+
+      if (!response.ok) {
+        return res.json({ prices: [], symbol: yahooSymbol, error: "Could not fetch data from Yahoo Finance" });
+      }
+
+      const data = await response.json() as any;
+      const chart = data?.chart?.result?.[0];
+      if (!chart || !chart.timestamp || !chart.indicators?.quote?.[0]) {
+        return res.json({ prices: [], symbol: yahooSymbol, error: "No data available" });
+      }
+
+      const timestamps = chart.timestamp as number[];
+      const closes = chart.indicators.quote[0].close as (number | null)[];
+      const prices: { date: string; close: number }[] = [];
+
+      for (let i = 0; i < timestamps.length; i++) {
+        const close = closes[i];
+        if (close != null && !isNaN(close)) {
+          const d = new Date(timestamps[i] * 1000);
+          prices.push({
+            date: d.toISOString().split('T')[0],
+            close: Math.round(close * 100) / 100,
+          });
+        }
+      }
+
+      const result = { prices, symbol: yahooSymbol, currency: chart.meta?.currency || "USD" };
+      tickerChartCache.set(rawTicker, { data: result, timestamp: Date.now() });
+      res.json(result);
+    } catch (err: any) {
+      console.error("Ticker chart error:", err.message);
+      res.json({ prices: [], error: err.message });
+    }
+  });
+
   const holdingsCache = new Map<string, { data: any; timestamp: number }>();
   const HOLDINGS_CACHE_TTL = 5 * 60 * 1000;
 
