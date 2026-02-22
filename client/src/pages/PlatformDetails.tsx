@@ -87,17 +87,34 @@ function TickerPriceHover({ ticker, currency, children }: { ticker: string; curr
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             </div>
           ) : hasData ? (
-            <div className="h-24">
+            <div className="h-40">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={prices.map((p: any) => ({ ...p, timestamp: new Date(p.date).getTime() }))} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+                <AreaChart data={prices.map((p: any) => ({ ...p, timestamp: new Date(p.date).getTime() }))} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                   <defs>
                     <linearGradient id={`grad-${ticker}`} x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor={priceChange! >= 0 ? '#10b981' : '#ef4444'} stopOpacity={0.3} />
                       <stop offset="95%" stopColor={priceChange! >= 0 ? '#10b981' : '#ef4444'} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="timestamp" type="number" scale="time" domain={['dataMin', 'dataMax']} hide />
-                  <YAxis domain={['auto', 'auto']} hide />
+                  <XAxis
+                    dataKey="timestamp"
+                    type="number"
+                    scale="time"
+                    domain={['dataMin', 'dataMax']}
+                    tickFormatter={(ts) => format(new Date(ts), 'MMM d')}
+                    tick={{ fontSize: 10 }}
+                    tickLine={false}
+                    axisLine={false}
+                    minTickGap={30}
+                  />
+                  <YAxis
+                    domain={['auto', 'auto']}
+                    tickFormatter={(val) => val.toFixed(0)}
+                    tick={{ fontSize: 10 }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={40}
+                  />
                   <Tooltip
                     contentStyle={{ fontSize: 11, borderRadius: 6, padding: '4px 8px' }}
                     formatter={(val: number) => [formatCurrency(val, tickerCurrency), 'Close']}
