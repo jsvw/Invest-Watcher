@@ -248,8 +248,8 @@ function AssetActionsMenu({ asset, platformId, platformMode, currency }: { asset
 export default function PlatformDetails() {
   const { user } = useAuth();
   const currency = user?.currency || "EUR";
-  const [, params] = useRoute("/platforms/:id");
-  const id = Number(params?.id);
+  const [, params] = useRoute("/platforms/:slug");
+  const slug = params?.slug ? decodeURIComponent(params.slug) : "";
   const [range, setRange] = useState("year");
   const [specificYear, setSpecificYear] = useState<string | null>(null);
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
@@ -257,6 +257,7 @@ export default function PlatformDetails() {
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "realDaily" | "all">("overview");
   
   const { data: platforms } = usePlatforms();
+  const id = platforms?.find(p => p.name.toLowerCase().replace(/\s+/g, '-') === slug)?.id || 0;
   const { data: platform, isLoading: isPlatformLoading } = usePlatform(id);
   const { data: investments, isLoading: isInvestmentsLoading } = useInvestments(id);
   const { data: valuations, isLoading: isValuationsLoading } = useValuations(id);

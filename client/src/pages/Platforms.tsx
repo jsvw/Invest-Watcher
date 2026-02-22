@@ -36,7 +36,7 @@ export default function Platforms() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {platforms?.map((platform) => (
-              <Link key={platform.id} href={`/platforms/${platform.id}`}>
+              <Link key={platform.id} href={`/platforms/${encodeURIComponent(platform.name.toLowerCase().replace(/\s+/g, '-'))}`}>
                 <div className="group cursor-pointer">
                   <Card className="h-full hover:shadow-xl transition-all duration-300 border-t-4" style={{ borderTopColor: platform.color }}>
                     <CardHeader className="flex flex-row items-start justify-between gap-2">

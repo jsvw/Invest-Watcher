@@ -869,7 +869,7 @@ export default function Dashboard() {
                      const percent = invested > 0 ? (gain / invested) * 100 : 0;
                      
                      return (
-                       <Link key={platform.id} href={`/platforms/${platform.id}`} className="flex items-center justify-between p-4 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer group">
+                       <Link key={platform.id} href={`/platforms/${encodeURIComponent(platform.name.toLowerCase().replace(/\s+/g, '-'))}`} className="flex items-center justify-between p-4 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer group">
                          <div className="flex items-center gap-4">
                            <div className="group-hover:scale-110 transition-transform">
                              <PlatformIcon

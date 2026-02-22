@@ -111,7 +111,7 @@ function Router() {
       <Route path="/platforms">
         {(params) => <ProtectedRoute component={Platforms} {...params} />}
       </Route>
-      <Route path="/platforms/:id">
+      <Route path="/platforms/:slug">
         {(params) => <ProtectedRoute component={PlatformDetails} {...params} />}
       </Route>
       <Route path="/analytics">
