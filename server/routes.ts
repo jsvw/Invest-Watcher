@@ -1813,6 +1813,199 @@ export async function registerRoutes(
   const holdingsCache = new Map<string, { data: any; timestamp: number }>();
   const HOLDINGS_CACHE_TTL = 5 * 60 * 1000;
 
+  app.get('/api/platforms/:platformId/trading212-holdings-stream', requireAuth, async (req, res) => {
+    const userId = getAuthenticatedUserId(req)!;
+    const platformId = Number(req.params.platformId);
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+
+    let clientDisconnected = false;
+    req.on('close', () => { clientDisconnected = true; });
+
+    const sendEvent = (type: string, data: any) => {
+      if (clientDisconnected) return;
+      try {
+        res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
+      } catch (e) {}
+    };
+
+    try {
+      const config = await storage.getScraperConfig(platformId, userId);
+      if (!config || config.scraperType !== "trading212") {
+        sendEvent("error", { message: "No Trading 212 configuration found" });
+        res.end();
+        return;
+      }
+
+      const platform = await storage.getPlatform(platformId, userId);
+      if (!platform) {
+        sendEvent("error", { message: "Platform not found" });
+        res.end();
+        return;
+      }
+
+      const creds = JSON.parse(decrypt(config.credentials));
+      if (!creds.apiKey || !creds.apiSecret) {
+        sendEvent("error", { message: "Missing API credentials" });
+        res.end();
+        return;
+      }
+
+      const onProgress = (message: string) => {
+        sendEvent("progress", { message });
+      };
+
+      const { scrapeTrading212WithPositions } = await import("./scrapers/trading212");
+
+      const dbDividends = await storage.getTrading212Dividends(platformId, userId);
+      const hasDbDividends = dbDividends.length > 0;
+
+      const pieName = creds.pieName || "";
+      const t212Data = await scrapeTrading212WithPositions(creds.apiKey, creds.apiSecret, {
+        skipDividends: hasDbDividends,
+        filterPieName: pieName,
+        platformName: platform.name,
+        onProgress,
+      });
+
+      const matchedPie = t212Data.pies.find(p => {
+        if (pieName) {
+          return p.pieName.toLowerCase().includes(pieName.toLowerCase()) ||
+                 pieName.toLowerCase().includes(p.pieName.toLowerCase());
+        }
+        return p.pieName.toLowerCase().includes(platform.name.toLowerCase()) ||
+               platform.name.toLowerCase().includes(p.pieName.toLowerCase());
+      });
+
+      if (!matchedPie) {
+        sendEvent("error", { message: "No matching pie found" });
+        res.end();
+        return;
+      }
+
+      sendEvent("progress", { message: "Processing data..." });
+
+      if (t212Data.dividendsLoaded && t212Data.rawDividends && t212Data.rawDividends.size > 0) {
+        try {
+          const pieTickers = new Set(matchedPie.instruments.map(i => i.ticker));
+          const pieDivRecords: { ticker: string; amount: string; paidOn: string; quantity: string | null }[] = [];
+          t212Data.rawDividends.forEach((data, ticker) => {
+            if (!pieTickers.has(ticker)) return;
+            for (const record of data.history) {
+              pieDivRecords.push({
+                ticker,
+                amount: record.amount.toString(),
+                paidOn: record.paidOn,
+                quantity: record.quantity != null ? record.quantity.toString() : null,
+              });
+            }
+          });
+          await storage.saveTrading212Dividends(platformId, userId, pieDivRecords);
+          sendEvent("progress", { message: `Saved ${pieDivRecords.length} dividend records` });
+        } catch (divSaveErr: any) {
+          console.error("T212 dividend save error:", divSaveErr.message);
+        }
+      }
+
+      const needDbDividendFallback = !t212Data.dividendsLoaded || (t212Data.dividendsLoaded && (!t212Data.rawDividends || t212Data.rawDividends.size === 0));
+      const dividendsAlreadyOnInstruments = matchedPie.instruments.some(i => i.dividendsReceived != null && i.dividendsReceived > 0);
+      if (needDbDividendFallback && !dividendsAlreadyOnInstruments && hasDbDividends) {
+        const divMap = new Map<string, { total: number; count: number; lastDate: string; history: { amount: number; paidOn: string; quantity: number }[] }>();
+        for (const row of dbDividends) {
+          const existing = divMap.get(row.ticker);
+          const amt = Number(row.amount);
+          const qty = row.quantity ? Number(row.quantity) : 0;
+          const record = { amount: amt, paidOn: row.paidOn, quantity: qty };
+          if (existing) {
+            existing.total += amt;
+            existing.count += 1;
+            existing.history.push(record);
+            if (row.paidOn > existing.lastDate) existing.lastDate = row.paidOn;
+          } else {
+            divMap.set(row.ticker, { total: amt, count: 1, lastDate: row.paidOn, history: [record] });
+          }
+        }
+        for (const inst of matchedPie.instruments) {
+          const div = divMap.get(inst.ticker);
+          if (div) {
+            inst.dividendsReceived = div.total;
+            inst.dividendCount = div.count;
+            inst.lastDividendDate = div.lastDate;
+            inst.dividendHistory = div.history;
+          }
+        }
+      }
+
+      sendEvent("progress", { message: "Saving holdings snapshot..." });
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      try {
+        const toNumStr = (v: any): string | null => {
+          if (v == null) return null;
+          if (typeof v === 'object') return null;
+          const n = Number(v);
+          return isNaN(n) ? null : n.toString();
+        };
+        const holdingsToSave = matchedPie.instruments.map(inst => {
+          const qty = inst.quantity ?? inst.shares;
+          const val = qty && inst.currentPrice ? (qty * inst.currentPrice) : null;
+          return {
+            ticker: inst.ticker,
+            shares: toNumStr(inst.quantity ?? inst.shares),
+            currentPrice: toNumStr(inst.currentPrice),
+            averagePrice: toNumStr(inst.averagePrice),
+            value: val != null ? val.toFixed(2) : null,
+            ppl: toNumStr(inst.ppl),
+            currentShare: toNumStr(inst.currentShare),
+            expectedShare: toNumStr(inst.expectedShare),
+            result: toNumStr(inst.result),
+          };
+        });
+        await storage.saveTrading212Holdings(platformId, userId, today, holdingsToSave);
+      } catch (saveErr: any) {
+        console.error("T212 holdings snapshot save error:", saveErr.message);
+      }
+
+      const instruments = matchedPie.instruments;
+      const totalValue = instruments.reduce((sum, i) => {
+        const qty = i.quantity ?? i.shares ?? 0;
+        const price = i.currentPrice ?? 0;
+        return sum + qty * price;
+      }, 0);
+      const totalInvested = instruments.reduce((sum, i) => {
+        const qty = i.quantity ?? i.shares ?? 0;
+        const avgPrice = i.averagePrice ?? 0;
+        return sum + qty * avgPrice;
+      }, 0);
+      const totalResult = instruments.reduce((sum, i) => sum + (i.ppl ?? 0), 0);
+
+      sendEvent("complete", {
+        message: "Done!",
+        data: {
+          pieName: matchedPie.pieName,
+          currentValue: totalValue,
+          investedValue: totalInvested,
+          cash: matchedPie.cash,
+          result: totalResult,
+          resultPercent: totalInvested > 0 ? (totalResult / totalInvested) * 100 : 0,
+          dividendsGained: matchedPie.dividendsGained,
+          dividendsReinvested: matchedPie.dividendsReinvested,
+          dividendsInCash: matchedPie.dividendsInCash,
+          instruments,
+        }
+      });
+      res.end();
+    } catch (err: any) {
+      console.error("T212 holdings stream error:", err);
+      sendEvent("error", { message: err.message || "Failed to fetch holdings" });
+      res.end();
+    }
+  });
+
   app.get('/api/platforms/:platformId/trading212-holdings', requireAuth, async (req, res) => {
     try {
       const userId = getAuthenticatedUserId(req)!;

@@ -89,18 +89,25 @@ interface PositionData {
   pieQuantity: number;
 }
 
-export async function fetchPositions(apiKey: string, apiSecret: string): Promise<Map<string, PositionData>> {
+export async function fetchPositions(apiKey: string, apiSecret: string, onProgress?: ProgressCallback): Promise<Map<string, PositionData>> {
+  const progress = onProgress || (() => {});
+  progress("Fetching positions...");
   console.log("[Trading212] Fetching all positions...");
   const positions = await makeRequest("/equity/portfolio", apiKey, apiSecret) as PositionData[];
   const posMap = new Map<string, PositionData>();
   for (const pos of positions) {
     posMap.set(pos.ticker, pos);
   }
+  progress(`Found ${positions.length} position(s)`);
   console.log(`[Trading212] Found ${positions.length} position(s)`);
   return posMap;
 }
 
-export async function scrapeTrading212(apiKey: string, apiSecret: string, options?: { filterPieName?: string; platformName?: string }): Promise<Trading212ScrapedData> {
+export type ProgressCallback = (message: string) => void;
+
+export async function scrapeTrading212(apiKey: string, apiSecret: string, options?: { filterPieName?: string; platformName?: string; onProgress?: ProgressCallback }): Promise<Trading212ScrapedData> {
+  const onProgress = options?.onProgress || (() => {});
+  onProgress("Fetching pies list...");
   console.log("[Trading212] Fetching pies list...");
   const pies = await makeRequest("/equity/pies", apiKey, apiSecret) as Array<{
     id: number;
@@ -114,6 +121,7 @@ export async function scrapeTrading212(apiKey: string, apiSecret: string, option
     };
   }>;
 
+  onProgress(`Found ${pies.length} pie(s)`);
   console.log(`[Trading212] Found ${pies.length} pie(s)`);
 
   const pieDetails: Trading212PieData[] = [];
@@ -122,9 +130,11 @@ export async function scrapeTrading212(apiKey: string, apiSecret: string, option
     const pie = pies[i];
 
     if (i > 0) {
+      onProgress(`Waiting before next API call...`);
       await new Promise(resolve => setTimeout(resolve, API_DELAY_MS));
     }
 
+    onProgress(`Fetching details for pie ${i + 1}/${pies.length}...`);
     console.log(`[Trading212] Fetching details for pie ${pie.id}...`);
     const detail = await makeRequest(`/equity/pies/${pie.id}`, apiKey, apiSecret) as {
       settings: { name: string; id: number };
@@ -191,13 +201,18 @@ export interface TickerDividendData {
   history: DividendRecord[];
 }
 
-export async function fetchDividends(apiKey: string, apiSecret: string): Promise<Map<string, TickerDividendData>> {
+export async function fetchDividends(apiKey: string, apiSecret: string, onProgress?: ProgressCallback): Promise<Map<string, TickerDividendData>> {
+  const progress = onProgress || (() => {});
+  progress("Fetching dividend history...");
   console.log("[Trading212] Fetching dividend history...");
   const divMap = new Map<string, TickerDividendData>();
+  let pageNum = 1;
 
   let nextPath: string | null = "/equity/history/dividends?limit=50";
 
   while (nextPath) {
+    progress(`Fetching dividends page ${pageNum}...`);
+    pageNum++;
     const response = await makeRequest(nextPath, apiKey, apiSecret) as {
       items: DividendItem[];
       nextPagePath?: string | null;
@@ -245,18 +260,21 @@ export async function fetchDividends(apiKey: string, apiSecret: string): Promise
 }
 
 
-export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: string, options?: { skipDividends?: boolean; filterPieName?: string; platformName?: string }): Promise<Trading212ScrapedData & { dividendsLoaded: boolean; rawDividends?: Map<string, TickerDividendData> }> {
-  const data = await scrapeTrading212(apiKey, apiSecret, { filterPieName: options?.filterPieName, platformName: options?.platformName });
+export async function scrapeTrading212WithPositions(apiKey: string, apiSecret: string, options?: { skipDividends?: boolean; filterPieName?: string; platformName?: string; onProgress?: ProgressCallback }): Promise<Trading212ScrapedData & { dividendsLoaded: boolean; rawDividends?: Map<string, TickerDividendData> }> {
+  const onProgress = options?.onProgress || (() => {});
+  const data = await scrapeTrading212(apiKey, apiSecret, { filterPieName: options?.filterPieName, platformName: options?.platformName, onProgress });
 
+  onProgress("Waiting before fetching positions...");
   await new Promise(resolve => setTimeout(resolve, API_DELAY_MS));
-  const posMap = await fetchPositions(apiKey, apiSecret);
+  const posMap = await fetchPositions(apiKey, apiSecret, onProgress);
 
   let divMap = new Map<string, TickerDividendData>();
   let dividendsLoaded = false;
   if (!options?.skipDividends) {
     try {
+      onProgress("Waiting before fetching dividends...");
       await new Promise(resolve => setTimeout(resolve, API_DELAY_MS));
-      divMap = await fetchDividends(apiKey, apiSecret);
+      divMap = await fetchDividends(apiKey, apiSecret, onProgress);
       dividendsLoaded = true;
     } catch (err: any) {
       console.log(`[Trading212] Dividend history unavailable (${err.message}), skipping`);

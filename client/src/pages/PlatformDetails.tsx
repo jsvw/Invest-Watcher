@@ -20,8 +20,9 @@ import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend } from "recharts";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { api } from "@shared/routes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AddAssetDialog } from "@/components/AddAssetDialog";
@@ -177,12 +178,12 @@ export default function PlatformDetails() {
 
   const isTrading212 = scraperConfig?.scraperType === "trading212";
 
-  const [holdingsRefreshKey, setHoldingsRefreshKey] = useState(0);
-  const { data: holdingsData, isLoading: isHoldingsLoading, isFetching: isHoldingsFetching, error: holdingsError } = useQuery({
-    queryKey: ['/api/platforms', id, 'trading212-holdings', holdingsRefreshKey],
+  const [holdingsRefreshProgress, setHoldingsRefreshProgress] = useState<string | null>(null);
+  const [isHoldingsRefreshing, setIsHoldingsRefreshing] = useState(false);
+  const { data: holdingsData, isLoading: isHoldingsLoading, error: holdingsError } = useQuery({
+    queryKey: ['/api/platforms', id, 'trading212-holdings'],
     queryFn: async () => {
-      const refreshParam = holdingsRefreshKey > 0 ? "?refresh=true" : "";
-      const res = await fetch(`/api/platforms/${id}/trading212-holdings${refreshParam}`, { credentials: 'include' });
+      const res = await fetch(`/api/platforms/${id}/trading212-holdings`, { credentials: 'include' });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
         throw new Error(errData.message || "Failed to fetch holdings");
@@ -193,6 +194,82 @@ export default function PlatformDetails() {
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  const refreshHoldings = useCallback(async () => {
+    if (isHoldingsRefreshing) return;
+    setIsHoldingsRefreshing(true);
+    setHoldingsRefreshProgress("Connecting...");
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    try {
+      const response = await fetch(`/api/platforms/${id}/trading212-holdings-stream`, {
+        credentials: 'include',
+        signal: controller.signal,
+      });
+
+      if (!response.ok || !response.body) {
+        setHoldingsRefreshProgress("Failed to connect");
+        setTimeout(() => { setIsHoldingsRefreshing(false); setHoldingsRefreshProgress(null); }, 3000);
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const parsed = JSON.parse(line.slice(6));
+              if (parsed.type === "progress") {
+                setHoldingsRefreshProgress(parsed.message);
+              } else if (parsed.type === "complete") {
+                setHoldingsRefreshProgress("Done!");
+                queryClient.setQueryData(['/api/platforms', id, 'trading212-holdings'], parsed.data);
+                queryClient.invalidateQueries({ queryKey: ['/api/platforms', id, 'trading212-holdings-history'] });
+                queryClient.invalidateQueries({ queryKey: ['/api/platforms', id, 'trading212-holdings-chart'] });
+                setTimeout(() => { setIsHoldingsRefreshing(false); setHoldingsRefreshProgress(null); }, 1500);
+                return;
+              } else if (parsed.type === "error") {
+                setHoldingsRefreshProgress(`Error: ${parsed.message}`);
+                setTimeout(() => { setIsHoldingsRefreshing(false); setHoldingsRefreshProgress(null); }, 3000);
+                return;
+              }
+            } catch (e) {
+              // skip malformed line
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        setHoldingsRefreshProgress("Connection lost");
+        setTimeout(() => { setIsHoldingsRefreshing(false); setHoldingsRefreshProgress(null); }, 3000);
+      }
+    } finally {
+      abortControllerRef.current = null;
+    }
+  }, [id, isHoldingsRefreshing]);
 
   const [selectedHistoryDate, setSelectedHistoryDate] = useState<string | null>(null);
 
@@ -1570,15 +1647,22 @@ export default function PlatformDetails() {
                       {holdingsData ? `${holdingsData.pieName} - ${holdingsData.instruments?.length || 0} instruments` : "Live instrument data from Trading 212"}
                     </CardDescription>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    data-testid="button-refresh-holdings"
-                    onClick={() => setHoldingsRefreshKey(k => k + 1)}
-                    disabled={isHoldingsFetching}
-                  >
-                    {isHoldingsFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                  </Button>
+                  <div className="flex items-center gap-3">
+                    {holdingsRefreshProgress && (
+                      <span className="text-xs text-muted-foreground animate-pulse max-w-[250px] truncate" data-testid="text-holdings-progress">
+                        {holdingsRefreshProgress}
+                      </span>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      data-testid="button-refresh-holdings"
+                      onClick={refreshHoldings}
+                      disabled={isHoldingsRefreshing}
+                    >
+                      {isHoldingsRefreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {isHoldingsLoading ? (
