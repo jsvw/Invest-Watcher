@@ -34,7 +34,7 @@ import { AssetInsightTabs } from "@/components/AssetInsightTabs";
 import { AssetRepaymentDialog } from "@/components/AssetRepaymentDialog";
 import type { Asset } from "@shared/schema";
 import { PlatformIcon } from "@/components/PlatformIcon";
-import { ScraperConfigDialog } from "@/components/ScraperConfigDialog";
+
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { BarChart as RechartsBarChart, Bar, XAxis as BarXAxis, YAxis as BarYAxis, Tooltip as BarTooltip, ResponsiveContainer as BarContainer } from "recharts";
 
@@ -542,7 +542,7 @@ export default function PlatformDetails() {
                   mode={platformMode as "asset_returns" | "item_valuations"} 
                 />
               )}
-              <ScraperConfigDialog platformId={id} platformName={platform.name} />
+
               <PlatformSettingsDialog platform={platform} />
             </div>
           </div>
