@@ -141,9 +141,28 @@ export async function scrapeValvest(email: string, password: string): Promise<Va
       console.log(`[Valvest Scraper] URL after login: ${postLoginUrl}`);
 
       if (!postLoginUrl.includes("/account/portfolio")) {
-        console.log("[Valvest Scraper] Not on portfolio page yet, navigating...");
-        await page.goto(PORTFOLIO_URL, { waitUntil: "networkidle2", timeout: 30000 });
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        console.log("[Valvest Scraper] Not on portfolio page yet, navigating via SPA...");
+        await page.evaluate(`window.location.href = '/account/portfolio'`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        const navUrl = page.url();
+        console.log(`[Valvest Scraper] URL after SPA navigation: ${navUrl}`);
+        if (!navUrl.includes("/account/portfolio")) {
+          console.log("[Valvest Scraper] SPA nav didn't work, trying direct link click...");
+          const clicked = await page.evaluate(`(function() {
+            var links = Array.from(document.querySelectorAll('a'));
+            for (var i = 0; i < links.length; i++) {
+              var href = links[i].getAttribute('href') || "";
+              var t = links[i].textContent ? links[i].textContent.trim().toLowerCase() : "";
+              if (href.includes('/account/portfolio') || href.includes('/portfolio') || t === 'portfolio') {
+                links[i].click();
+                return true;
+              }
+            }
+            return false;
+          })()`);
+          console.log(`[Valvest Scraper] Portfolio link clicked: ${clicked}`);
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        }
       }
     } else {
       console.log("[Valvest Scraper] No login form found, may already be authenticated or page structure unexpected");
