@@ -99,129 +99,85 @@ export async function scrapeValvest(email: string, password: string): Promise<Va
     const loginUrl = page.url();
     console.log(`[Valvest Scraper] Login page URL: ${loginUrl}`);
 
-    console.log("[Valvest Scraper] Waiting for email input...");
-    await page.waitForSelector('input[type="email"], input[name="email"], input[type="text"], input[name="username"]', { timeout: 15000 }).catch(() => {});
+    console.log("[Valvest Scraper] Waiting for email input (#auth-email)...");
+    await page.waitForSelector('#auth-email', { timeout: 15000 });
 
-    const availableInputs = await page.evaluate(`(function() {
-      return Array.from(document.querySelectorAll('input')).map(function(i) {
-        return { name: i.name, type: i.type, id: i.id, placeholder: i.placeholder };
-      });
-    })()`) as Array<{ name: string; type: string; id: string; placeholder: string }>;
-    console.log("[Valvest Scraper] Available inputs on login page:", JSON.stringify(availableInputs));
-
-    const emailInput = await page.$('input[type="email"]')
-      || await page.$('input[name="email"]')
-      || await page.$('input[name="username"]')
-      || await page.$('input[type="text"]');
-
+    const emailInput = await page.$('#auth-email');
     if (!emailInput) {
-      throw new Error(`Could not find email input field. Available inputs: ${JSON.stringify(availableInputs)}`);
+      const availableInputs = await page.evaluate(`(function() {
+        return Array.from(document.querySelectorAll('input')).map(function(i) {
+          return { name: i.name, type: i.type, id: i.id, placeholder: i.placeholder };
+        });
+      })()`);
+      throw new Error(`Could not find email input (#auth-email). Available inputs: ${JSON.stringify(availableInputs)}`);
     }
 
     console.log("[Valvest Scraper] Entering email...");
     await emailInput.click({ clickCount: 3 });
     await emailInput.type(email, { delay: 50 });
 
-    const passwordInputOnSamePage = await page.$('input[type="password"]');
-    if (passwordInputOnSamePage) {
-      console.log("[Valvest Scraper] Password field found on same page, entering password...");
-      await passwordInputOnSamePage.click({ clickCount: 3 });
-      await passwordInputOnSamePage.type(password, { delay: 50 });
-
-      console.log("[Valvest Scraper] Submitting login form...");
-      const submitted = await page.evaluate(`(function() {
-        var buttons = Array.from(document.querySelectorAll('button[type="submit"], input[type="submit"], button'));
-        for (var i = 0; i < buttons.length; i++) {
-          var t = buttons[i].textContent ? buttons[i].textContent.trim().toLowerCase() : "";
-          var val = buttons[i].value ? buttons[i].value.toLowerCase() : "";
-          if (t === 'log in' || t === 'login' || t === 'sign in' || t === 'inloggen' ||
-              t === 'next' || t === 'continue' || t === 'submit' ||
-              val === 'log in' || val === 'login' || val === 'sign in') {
-            buttons[i].click();
-            return true;
-          }
-        }
-        var submitBtns = document.querySelectorAll('button[type="submit"], input[type="submit"]');
-        if (submitBtns.length > 0) {
-          submitBtns[0].click();
+    console.log("[Valvest Scraper] Clicking Continue button...");
+    const continueClicked = await page.evaluate(`(function() {
+      var buttons = Array.from(document.querySelectorAll('button'));
+      for (var i = 0; i < buttons.length; i++) {
+        var t = buttons[i].textContent ? buttons[i].textContent.trim().toLowerCase() : "";
+        if (t === 'continue' || t === 'verder' || t === 'volgende' || t === 'next') {
+          buttons[i].click();
           return true;
         }
-        return false;
-      })()`);
-
-      if (!submitted) {
-        await page.keyboard.press("Enter");
       }
-    } else {
-      console.log("[Valvest Scraper] No password field on this page, submitting email first...");
-      const emailSubmitted = await page.evaluate(`(function() {
-        var buttons = Array.from(document.querySelectorAll('button[type="submit"], input[type="submit"], button'));
-        for (var i = 0; i < buttons.length; i++) {
-          var t = buttons[i].textContent ? buttons[i].textContent.trim().toLowerCase() : "";
-          var val = buttons[i].value ? buttons[i].value.toLowerCase() : "";
-          if (t === 'next' || t === 'continue' || t === 'volgende' || t === 'verder' ||
-              t === 'log in' || t === 'login' || t === 'sign in' || t === 'submit' ||
-              val === 'next' || val === 'continue' || val === 'login') {
-            buttons[i].click();
-            return true;
-          }
-        }
-        var submitBtns = document.querySelectorAll('button[type="submit"], input[type="submit"]');
-        if (submitBtns.length > 0) {
-          submitBtns[0].click();
+      var submitBtns = document.querySelectorAll('button[type="submit"]');
+      if (submitBtns.length > 0) {
+        submitBtns[0].click();
+        return true;
+      }
+      return false;
+    })()`);
+
+    if (!continueClicked) {
+      await page.keyboard.press("Enter");
+    }
+
+    await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 15000 }).catch(() => {});
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    console.log("[Valvest Scraper] Waiting for password input (#login-password)...");
+    await page.waitForSelector('#login-password', { timeout: 15000 });
+
+    const pwInput = await page.$('#login-password');
+    if (!pwInput) {
+      const currentInputs = await page.evaluate(`(function() {
+        return Array.from(document.querySelectorAll('input')).map(function(i) {
+          return { name: i.name, type: i.type, id: i.id, placeholder: i.placeholder };
+        });
+      })()`);
+      throw new Error(`Could not find password field (#login-password). Available inputs: ${JSON.stringify(currentInputs)}`);
+    }
+
+    console.log("[Valvest Scraper] Entering password...");
+    await pwInput.click({ clickCount: 3 });
+    await pwInput.type(password, { delay: 50 });
+
+    console.log("[Valvest Scraper] Submitting login...");
+    const loginSubmitted = await page.evaluate(`(function() {
+      var buttons = Array.from(document.querySelectorAll('button'));
+      for (var i = 0; i < buttons.length; i++) {
+        var t = buttons[i].textContent ? buttons[i].textContent.trim().toLowerCase() : "";
+        if (t === 'log in' || t === 'login' || t === 'sign in' || t === 'inloggen' || t === 'continue' || t === 'submit') {
+          buttons[i].click();
           return true;
         }
-        return false;
-      })()`);
-
-      if (!emailSubmitted) {
-        await page.keyboard.press("Enter");
       }
-
-      await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 15000 }).catch(() => {});
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      console.log("[Valvest Scraper] Waiting for password input on next screen...");
-      await page.waitForSelector('input[type="password"]', { timeout: 15000 });
-
-      const pwInput = await page.$('input[type="password"]');
-      if (!pwInput) {
-        const currentInputs = await page.evaluate(`(function() {
-          return Array.from(document.querySelectorAll('input')).map(function(i) {
-            return { name: i.name, type: i.type, id: i.id, placeholder: i.placeholder };
-          });
-        })()`);
-        throw new Error(`Could not find password field on second screen. Available inputs: ${JSON.stringify(currentInputs)}`);
+      var submitBtns = document.querySelectorAll('button[type="submit"]');
+      if (submitBtns.length > 0) {
+        submitBtns[0].click();
+        return true;
       }
+      return false;
+    })()`);
 
-      console.log("[Valvest Scraper] Entering password...");
-      await pwInput.click({ clickCount: 3 });
-      await pwInput.type(password, { delay: 50 });
-
-      console.log("[Valvest Scraper] Submitting password...");
-      const pwSubmitted = await page.evaluate(`(function() {
-        var buttons = Array.from(document.querySelectorAll('button[type="submit"], input[type="submit"], button'));
-        for (var i = 0; i < buttons.length; i++) {
-          var t = buttons[i].textContent ? buttons[i].textContent.trim().toLowerCase() : "";
-          var val = buttons[i].value ? buttons[i].value.toLowerCase() : "";
-          if (t === 'log in' || t === 'login' || t === 'sign in' || t === 'inloggen' ||
-              t === 'submit' || t === 'continue' || t === 'verder' ||
-              val === 'log in' || val === 'login' || val === 'sign in') {
-            buttons[i].click();
-            return true;
-          }
-        }
-        var submitBtns = document.querySelectorAll('button[type="submit"], input[type="submit"]');
-        if (submitBtns.length > 0) {
-          submitBtns[0].click();
-          return true;
-        }
-        return false;
-      })()`);
-
-      if (!pwSubmitted) {
-        await page.keyboard.press("Enter");
-      }
+    if (!loginSubmitted) {
+      await page.keyboard.press("Enter");
     }
 
     await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 }).catch(() => {});
