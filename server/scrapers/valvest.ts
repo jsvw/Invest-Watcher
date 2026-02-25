@@ -5,6 +5,8 @@ export interface ValvestScrapedData {
   totalBalance: number;
   scrapedAt: Date;
 }
+
+const HOME_URL = "https://www.landed.eu/";
 const PORTFOLIO_URL = "https://www.landed.eu/account/portfolio";
 
 export async function scrapeValvest(email: string, password: string): Promise<ValvestScrapedData> {
@@ -40,14 +42,11 @@ export async function scrapeValvest(email: string, password: string): Promise<Va
       "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
     );
 
-    console.log("[Valvest Scraper] Navigating to portfolio page (will redirect to login if needed)...");
-    await page.goto(PORTFOLIO_URL, { waitUntil: "networkidle2", timeout: 30000 });
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    console.log("[Valvest Scraper] Step 1: Navigating to landed.eu homepage...");
+    await page.goto(HOME_URL, { waitUntil: "networkidle2", timeout: 30000 });
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    console.log(`[Valvest Scraper] Current URL: ${page.url()}`);
 
-    const initialUrl = page.url();
-    console.log(`[Valvest Scraper] Initial URL: ${initialUrl}`);
-
-    console.log("[Valvest Scraper] Dismissing cookie consent if present...");
     try {
       await page.evaluate(`(function() {
         var btns = Array.from(document.querySelectorAll('button, a, [class*="cookie"], [class*="consent"]'));
@@ -60,124 +59,191 @@ export async function scrapeValvest(email: string, password: string): Promise<Va
         }
       })()`);
       await new Promise(resolve => setTimeout(resolve, 1000));
-    } catch (cookieErr) {
-      console.log("[Valvest Scraper] Cookie banner handling skipped");
+    } catch (e) {}
+
+    console.log("[Valvest Scraper] Step 2: Clicking Login link on homepage...");
+    const loginClicked = await page.evaluate(`(function() {
+      var links = Array.from(document.querySelectorAll('a, button'));
+      for (var i = 0; i < links.length; i++) {
+        var t = links[i].textContent ? links[i].textContent.trim() : "";
+        var href = links[i].getAttribute('href') || "";
+        if (t === 'Login' || t === 'Log in' || t === 'Inloggen' || href.includes('/login') || href.includes('/auth')) {
+          links[i].click();
+          return t + ' (' + href + ')';
+        }
+      }
+      return false;
+    })()`);
+    console.log(`[Valvest Scraper] Login link clicked: ${loginClicked}`);
+    await new Promise(resolve => setTimeout(resolve, 3000));
+    console.log(`[Valvest Scraper] URL after clicking login: ${page.url()}`);
+
+    console.log("[Valvest Scraper] Step 3: Waiting for email input (#auth-email)...");
+    try {
+      await page.waitForSelector('#auth-email', { visible: true, timeout: 15000 });
+    } catch (e) {
+      const inputs = await page.evaluate(`(function() {
+        return Array.from(document.querySelectorAll('input')).map(function(i) {
+          return { id: i.id, name: i.name, type: i.type, placeholder: i.placeholder };
+        });
+      })()`);
+      const allButtons = await page.evaluate(`(function() {
+        return Array.from(document.querySelectorAll('button, a')).slice(0, 20).map(function(b) {
+          return { tag: b.tagName, text: (b.textContent || '').trim().substring(0, 50), href: b.getAttribute('href') || '' };
+        });
+      })()`);
+      console.log(`[Valvest Scraper] Available inputs: ${JSON.stringify(inputs)}`);
+      console.log(`[Valvest Scraper] Available buttons/links: ${JSON.stringify(allButtons)}`);
+      throw new Error("Could not find email input #auth-email on login page");
     }
 
-    const hasEmailField = await page.$('#auth-email');
-    if (hasEmailField) {
-      console.log("[Valvest Scraper] Login form detected, entering email into #auth-email...");
-      await hasEmailField.click({ clickCount: 3 });
-      await hasEmailField.type(email, { delay: 50 });
+    console.log("[Valvest Scraper] Step 4: Entering email...");
+    const emailInput = await page.$('#auth-email');
+    if (emailInput) {
+      await emailInput.click({ clickCount: 3 });
+      await emailInput.type(email, { delay: 50 });
+    }
 
-      console.log("[Valvest Scraper] Clicking Continue button...");
-      const continueClicked = await page.evaluate(`(function() {
-        var buttons = Array.from(document.querySelectorAll('button'));
-        for (var i = 0; i < buttons.length; i++) {
-          var t = buttons[i].textContent ? buttons[i].textContent.trim().toLowerCase() : "";
-          if (t === 'continue' || t === 'verder' || t === 'volgende' || t === 'next') {
-            buttons[i].click();
-            return t;
-          }
-        }
-        var submitBtns = document.querySelectorAll('button[type="submit"]');
-        if (submitBtns.length > 0) {
-          submitBtns[0].click();
-          return 'submit';
-        }
-        return false;
-      })()`);
-      console.log(`[Valvest Scraper] Continue button clicked: ${continueClicked}`);
+    console.log("[Valvest Scraper] Step 5: Clicking Continue button...");
+    const allButtonsBefore = await page.evaluate(`(function() {
+      return Array.from(document.querySelectorAll('button')).map(function(b) {
+        return { text: (b.textContent || '').trim(), type: b.type, disabled: b.disabled };
+      });
+    })()`);
+    console.log(`[Valvest Scraper] Available buttons: ${JSON.stringify(allButtonsBefore)}`);
 
-      if (!continueClicked) {
-        await page.keyboard.press("Enter");
+    const continueClicked = await page.evaluate(`(function() {
+      var buttons = Array.from(document.querySelectorAll('button'));
+      for (var i = 0; i < buttons.length; i++) {
+        var t = buttons[i].textContent ? buttons[i].textContent.trim().toLowerCase() : "";
+        if (t === 'continue' || t === 'verder' || t === 'volgende' || t === 'next' || t === 'doorgaan') {
+          buttons[i].click();
+          return t;
+        }
       }
+      var submitBtns = Array.from(document.querySelectorAll('button[type="submit"]'));
+      if (submitBtns.length > 0) {
+        submitBtns[0].click();
+        return 'submit: ' + (submitBtns[0].textContent || '').trim();
+      }
+      return false;
+    })()`);
+    console.log(`[Valvest Scraper] Continue button result: ${continueClicked}`);
 
-      console.log("[Valvest Scraper] Waiting for password input (#login-password) to appear...");
-      await page.waitForSelector('#login-password', { visible: true, timeout: 30000 });
-      await new Promise(resolve => setTimeout(resolve, 1000));
+    if (!continueClicked) {
+      console.log("[Valvest Scraper] No continue button found, pressing Enter...");
+      await page.keyboard.press("Enter");
+    }
 
-      const pwInput = await page.$('#login-password');
-      if (!pwInput) {
-        const currentInputs = await page.evaluate(`(function() {
+    console.log("[Valvest Scraper] Step 6: Waiting for password field (#login-password)...");
+    try {
+      await page.waitForSelector('#login-password', { visible: true, timeout: 15000 });
+    } catch (e) {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      const pwCheck = await page.$('#login-password');
+      if (!pwCheck) {
+        const inputs2 = await page.evaluate(`(function() {
           return Array.from(document.querySelectorAll('input')).map(function(i) {
-            return { name: i.name, type: i.type, id: i.id, placeholder: i.placeholder };
+            return { id: i.id, name: i.name, type: i.type, placeholder: i.placeholder };
           });
         })()`);
-        throw new Error(`Could not find password field (#login-password). Available inputs: ${JSON.stringify(currentInputs)}`);
+        const pageText = await page.evaluate(`document.body.innerText.substring(0, 1000)`);
+        console.log(`[Valvest Scraper] Inputs after continue: ${JSON.stringify(inputs2)}`);
+        console.log(`[Valvest Scraper] Page text after continue: ${pageText}`);
+        throw new Error("Password field #login-password did not appear after clicking Continue");
       }
-
-      console.log("[Valvest Scraper] Entering password...");
-      await pwInput.click({ clickCount: 3 });
-      await pwInput.type(password, { delay: 50 });
-
-      console.log("[Valvest Scraper] Submitting login...");
-      const loginSubmitted = await page.evaluate(`(function() {
-        var buttons = Array.from(document.querySelectorAll('button'));
-        for (var i = 0; i < buttons.length; i++) {
-          var t = buttons[i].textContent ? buttons[i].textContent.trim().toLowerCase() : "";
-          if (t === 'log in' || t === 'login' || t === 'sign in' || t === 'inloggen' || t === 'continue' || t === 'submit') {
-            buttons[i].click();
-            return t;
-          }
-        }
-        var submitBtns = document.querySelectorAll('button[type="submit"]');
-        if (submitBtns.length > 0) {
-          submitBtns[0].click();
-          return 'submit';
-        }
-        return false;
-      })()`);
-      console.log(`[Valvest Scraper] Login button clicked: ${loginSubmitted}`);
-
-      if (!loginSubmitted) {
-        await page.keyboard.press("Enter");
-      }
-
-      console.log("[Valvest Scraper] Waiting for login to complete...");
-      await new Promise(resolve => setTimeout(resolve, 8000));
-
-      const postLoginUrl = page.url();
-      console.log(`[Valvest Scraper] URL after login: ${postLoginUrl}`);
-
-      if (!postLoginUrl.includes("/account/portfolio")) {
-        console.log("[Valvest Scraper] Not on portfolio page yet, navigating via SPA...");
-        await page.evaluate(`window.location.href = '/account/portfolio'`);
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        const navUrl = page.url();
-        console.log(`[Valvest Scraper] URL after SPA navigation: ${navUrl}`);
-        if (!navUrl.includes("/account/portfolio")) {
-          console.log("[Valvest Scraper] SPA nav didn't work, trying direct link click...");
-          const clicked = await page.evaluate(`(function() {
-            var links = Array.from(document.querySelectorAll('a'));
-            for (var i = 0; i < links.length; i++) {
-              var href = links[i].getAttribute('href') || "";
-              var t = links[i].textContent ? links[i].textContent.trim().toLowerCase() : "";
-              if (href.includes('/account/portfolio') || href.includes('/portfolio') || t === 'portfolio') {
-                links[i].click();
-                return true;
-              }
-            }
-            return false;
-          })()`);
-          console.log(`[Valvest Scraper] Portfolio link clicked: ${clicked}`);
-          await new Promise(resolve => setTimeout(resolve, 5000));
-        }
-      }
-    } else {
-      console.log("[Valvest Scraper] No login form found, may already be authenticated or page structure unexpected");
-      const pageText = await page.evaluate(`document.body.innerText.substring(0, 1000)`);
-      console.log(`[Valvest Scraper] Page text: ${pageText}`);
     }
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    console.log("[Valvest Scraper] Step 7: Entering password...");
+    const pwInput = await page.$('#login-password');
+    if (!pwInput) {
+      throw new Error("Password field #login-password not found");
+    }
+    await pwInput.click({ clickCount: 3 });
+    await pwInput.type(password, { delay: 50 });
+
+    console.log("[Valvest Scraper] Step 8: Submitting login form...");
+    const allButtonsLogin = await page.evaluate(`(function() {
+      return Array.from(document.querySelectorAll('button')).map(function(b) {
+        return { text: (b.textContent || '').trim(), type: b.type, disabled: b.disabled };
+      });
+    })()`);
+    console.log(`[Valvest Scraper] Buttons on password page: ${JSON.stringify(allButtonsLogin)}`);
+
+    const loginClicked2 = await page.evaluate(`(function() {
+      var buttons = Array.from(document.querySelectorAll('button'));
+      for (var i = 0; i < buttons.length; i++) {
+        var t = buttons[i].textContent ? buttons[i].textContent.trim().toLowerCase() : "";
+        if (t === 'log in' || t === 'login' || t === 'sign in' || t === 'inloggen' || t === 'continue' || t === 'doorgaan') {
+          buttons[i].click();
+          return t;
+        }
+      }
+      var submitBtns = Array.from(document.querySelectorAll('button[type="submit"]'));
+      if (submitBtns.length > 0) {
+        submitBtns[0].click();
+        return 'submit: ' + (submitBtns[0].textContent || '').trim();
+      }
+      return false;
+    })()`);
+    console.log(`[Valvest Scraper] Login submit result: ${loginClicked2}`);
+
+    if (!loginClicked2) {
+      console.log("[Valvest Scraper] No login button found, pressing Enter...");
+      await page.keyboard.press("Enter");
+    }
+
+    console.log("[Valvest Scraper] Step 9: Waiting for login to complete...");
+    await new Promise(resolve => setTimeout(resolve, 8000));
+
+    const postLoginUrl = page.url();
+    const postLoginText = await page.evaluate(`document.body.innerText.substring(0, 1500)`) as string;
+    console.log(`[Valvest Scraper] URL after login: ${postLoginUrl}`);
+    console.log(`[Valvest Scraper] Page text after login: ${postLoginText.substring(0, 500)}`);
+
+    const stillOnLoginPage = postLoginText.includes("Easily invest in rental real estate") && 
+                             (postLoginText.includes("Login") || postLoginText.includes("Register"));
+    
+    const hasErrorMsg = await page.evaluate(`(function() {
+      var errorEls = document.querySelectorAll('[class*="error"], [class*="alert"], [role="alert"], .text-red, .text-danger');
+      for (var i = 0; i < errorEls.length; i++) {
+        var t = (errorEls[i].textContent || '').trim();
+        if (t.length > 0 && t.length < 200) return t;
+      }
+      return null;
+    })()`) as string | null;
+    
+    if (hasErrorMsg) {
+      console.log(`[Valvest Scraper] Error message found: ${hasErrorMsg}`);
+    }
+
+    if (stillOnLoginPage) {
+      console.log("[Valvest Scraper] WARNING: Still on landing page after login attempt. Login may have failed.");
+      const allLinks = await page.evaluate(`(function() {
+        return Array.from(document.querySelectorAll('a')).slice(0, 30).map(function(a) {
+          return { text: (a.textContent || '').trim().substring(0, 40), href: a.getAttribute('href') || '' };
+        });
+      })()`);
+      console.log(`[Valvest Scraper] Links on page: ${JSON.stringify(allLinks)}`);
+    }
+
+    console.log("[Valvest Scraper] Step 10: Navigating to portfolio page...");
+    await page.goto(PORTFOLIO_URL, { waitUntil: "networkidle2", timeout: 30000 });
+    await new Promise(resolve => setTimeout(resolve, 5000));
 
     const portfolioUrl = page.url();
     console.log(`[Valvest Scraper] Portfolio page URL: ${portfolioUrl}`);
 
-    const pageCheck = await page.evaluate(`document.body.innerText.substring(0, 500)`);
-    console.log(`[Valvest Scraper] Portfolio page content check: ${pageCheck}`);
+    if (!portfolioUrl.includes("/account/portfolio")) {
+      console.log("[Valvest Scraper] Redirected away from portfolio, login likely failed.");
+      const redirectText = await page.evaluate(`document.body.innerText.substring(0, 500)`) as string;
+      console.log(`[Valvest Scraper] Redirect page text: ${redirectText}`);
+      throw new Error(`Login failed - redirected to ${portfolioUrl} instead of portfolio page. Check credentials.`);
+    }
 
-    console.log("[Valvest Scraper] Extracting principal amount from portfolio page...");
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    console.log("[Valvest Scraper] Step 11: Extracting principal amount...");
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
     const portfolioData = await page.evaluate(`(function() {
       var result = {
