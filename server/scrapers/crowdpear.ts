@@ -267,7 +267,6 @@ export async function scrapeCrowdPear(email: string, password: string, gmailAppP
 
       const imapEmail = gmailEmail || email;
       const code = await fetch2FACodeFromEmail(imapEmail, gmailAppPassword);
-      console.log(`[CrowdPear Scraper] Entering 2FA code: ${code}`);
 
       const multiInputs = await page.$$('input[maxlength="1"]');
       if (multiInputs.length >= 4) {
