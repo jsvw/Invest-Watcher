@@ -2,6 +2,11 @@ import cron from "node-cron";
 import { storage } from "./storage";
 import { decrypt } from "./encryption";
 
+function getCurrencySymbol(currency: string): string {
+  const symbols: Record<string, string> = { EUR: "€", USD: "$", GBP: "£", JPY: "¥", CHF: "CHF " };
+  return symbols[currency.toUpperCase()] || currency + " ";
+}
+
 async function runScrapeForConfig(config: any) {
   const { platformId, userId, scraperType, id } = config;
 
@@ -173,6 +178,49 @@ async function runScrapeForConfig(config: any) {
       });
 
       console.log(`[Scheduler] T212 sync complete for platform ${platformId}: ${totalValue.toFixed(2)}`);
+      return;
+    }
+
+    if (scraperType === "stock_ticker") {
+      const { scrapeStockTicker } = await import("./scrapers/stock-ticker");
+      const ticker = creds.ticker;
+      const shares = parseFloat(creds.shares);
+      const targetCurrency = platform.currency || "EUR";
+
+      if (!ticker || isNaN(shares)) {
+        await storage.updateScraperConfig(id, userId, {
+          lastScrapeAt: new Date(),
+          lastScrapeStatus: "error",
+          lastScrapeMessage: "Missing ticker or shares in credentials",
+        });
+        return;
+      }
+
+      const result = await scrapeStockTicker(ticker, shares, targetCurrency);
+
+      if (result.valueInTargetCurrency > 0) {
+        const existingVals = await storage.getValuations(platformId);
+        const sameDayVal = existingVals.find(v =>
+          new Date(v.date).toISOString().split("T")[0] === todayStr
+        );
+        if (sameDayVal) {
+          await storage.updateValuation(sameDayVal.id, { value: result.valueInTargetCurrency.toFixed(2) });
+        } else {
+          await storage.createValuation({
+            platformId,
+            value: result.valueInTargetCurrency.toFixed(2),
+            date: today,
+          });
+        }
+      }
+
+      await storage.updateScraperConfig(id, userId, {
+        lastScrapeAt: new Date(),
+        lastScrapeStatus: "success",
+        lastScrapeMessage: `${ticker}: ${shares} shares × $${result.stockPrice.toFixed(2)} = $${result.valueInStockCurrency.toFixed(2)} (FX ${result.fxRate.toFixed(4)}) = ${getCurrencySymbol(targetCurrency)}${result.valueInTargetCurrency.toFixed(2)}`,
+      });
+
+      console.log(`[Scheduler] Stock ticker scrape complete for platform ${platformId}: ${targetCurrency} ${result.valueInTargetCurrency.toFixed(2)}`);
       return;
     }
 

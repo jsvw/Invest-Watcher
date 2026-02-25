@@ -1376,7 +1376,13 @@ export async function registerRoutes(
 
       let credentialData: Record<string, string>;
 
-      if (scraperType === "trading212") {
+      if (scraperType === "stock_ticker") {
+        const { ticker, shares } = req.body;
+        if (!ticker || !shares) {
+          return res.status(400).json({ message: "ticker and shares are required for Stock Ticker" });
+        }
+        credentialData = { ticker: ticker.toUpperCase(), shares: String(shares) };
+      } else if (scraperType === "trading212") {
         const { apiKey, apiSecret, pieName } = req.body;
         if (!apiKey || !apiSecret) {
           return res.status(400).json({ message: "apiKey and apiSecret are required for Trading 212" });
@@ -1435,6 +1441,41 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/platforms/:platformId/stock-info', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.platformId);
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+
+      const config = await storage.getScraperConfig(platformId, userId);
+      if (!config || config.scraperType !== "stock_ticker") {
+        return res.status(404).json({ message: "No stock ticker config found" });
+      }
+
+      let creds;
+      try {
+        const decrypted = decrypt(config.credentials);
+        creds = JSON.parse(decrypted);
+      } catch {
+        try { creds = JSON.parse(config.credentials); } catch {
+          return res.status(500).json({ message: "Failed to decrypt credentials" });
+        }
+      }
+
+      const platform = await storage.getPlatform(platformId, userId);
+      const targetCurrency = platform?.currency || "EUR";
+
+      const { scrapeStockTicker } = await import("./scrapers/stock-ticker");
+      const result = await scrapeStockTicker(creds.ticker, parseFloat(creds.shares), targetCurrency);
+
+      res.json(result);
+    } catch (err: any) {
+      console.error("Stock info error:", err.message);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.post('/api/platforms/:platformId/scrape', requireAuth, async (req, res) => {
     try {
       const userId = getAuthenticatedUserId(req)!;
@@ -1462,6 +1503,49 @@ export async function registerRoutes(
 
       const platform = await storage.getPlatform(platformId, userId);
       if (!platform) return res.status(404).json({ message: "Platform not found" });
+
+      if (config.scraperType === "stock_ticker") {
+        const { scrapeStockTicker } = await import("./scrapers/stock-ticker");
+        const ticker = creds.ticker;
+        const shares = parseFloat(creds.shares);
+        const targetCurrency = platform!.currency || "EUR";
+
+        if (!ticker || isNaN(shares)) {
+          return res.status(400).json({ message: "Missing ticker or shares in configuration" });
+        }
+
+        const result = await scrapeStockTicker(ticker, shares, targetCurrency);
+        const todayStr = today.toISOString().split("T")[0];
+
+        if (result.valueInTargetCurrency > 0) {
+          const existingVals = await storage.getValuations(platformId);
+          const sameDayVal = existingVals.find(v =>
+            new Date(v.date).toISOString().split("T")[0] === todayStr
+          );
+          if (sameDayVal) {
+            await storage.updateValuation(sameDayVal.id, { value: result.valueInTargetCurrency.toFixed(2) });
+          } else {
+            await storage.createValuation({
+              platformId,
+              value: result.valueInTargetCurrency.toFixed(2),
+              date: today,
+            });
+          }
+        }
+
+        const sym = (c: string) => ({ EUR: "€", USD: "$", GBP: "£" }[c] || c + " ");
+        await storage.updateScraperConfig(config.id, userId, {
+          lastScrapeAt: new Date(),
+          lastScrapeStatus: "success",
+          lastScrapeMessage: `${ticker}: ${shares} shares × $${result.stockPrice.toFixed(2)} = $${result.valueInStockCurrency.toFixed(2)} (FX ${result.fxRate.toFixed(4)}) = ${sym(targetCurrency)}${result.valueInTargetCurrency.toFixed(2)}`,
+        });
+
+        return res.json({
+          success: true,
+          data: result,
+          message: `${ticker}: ${shares} shares × $${result.stockPrice.toFixed(2)} = ${sym(targetCurrency)}${result.valueInTargetCurrency.toFixed(2)}`,
+        });
+      }
 
       if (config.scraperType === "trading212") {
         if (!creds.apiKey || !creds.apiSecret) {

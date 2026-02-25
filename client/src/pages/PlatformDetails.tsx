@@ -280,6 +280,19 @@ export default function PlatformDetails() {
   });
 
   const isTrading212 = scraperConfig?.scraperType === "trading212";
+  const isStockTicker = scraperConfig?.scraperType === "stock_ticker";
+
+  const { data: stockInfo, isLoading: isStockInfoLoading } = useQuery({
+    queryKey: ['/api/platforms', id, 'stock-info'],
+    queryFn: async () => {
+      const res = await fetch(`/api/platforms/${id}/stock-info`, { credentials: 'include' });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: isStockTicker,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
 
   const [holdingsRefreshProgress, setHoldingsRefreshProgress] = useState<string | null>(null);
   const [isHoldingsRefreshing, setIsHoldingsRefreshing] = useState(false);
@@ -763,6 +776,43 @@ export default function PlatformDetails() {
             </Card>
           )}
         </div>
+
+        {isStockTicker && (
+          <Card className="bg-gradient-to-br from-card to-muted/50" data-testid="card-stock-info">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Stock Position</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isStockInfoLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Loading stock data...</span>
+                </div>
+              ) : stockInfo ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Shares</p>
+                    <p className="text-xl font-bold" data-testid="text-stock-shares">{stockInfo.shares}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Share Price ({stockInfo.stockCurrency})</p>
+                    <p className="text-xl font-bold" data-testid="text-stock-price">${stockInfo.stockPrice.toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">FX Rate ({stockInfo.stockCurrency}/{stockInfo.targetCurrency})</p>
+                    <p className="text-xl font-bold" data-testid="text-stock-fx">{stockInfo.fxRate.toFixed(4)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Value ({stockInfo.targetCurrency})</p>
+                    <p className="text-xl font-bold text-primary" data-testid="text-stock-value">{formatCurrency(stockInfo.valueInTargetCurrency, stockInfo.targetCurrency)}</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm">Could not load stock data. Configure the stock ticker scraper to get started.</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Main Content Tabs */}
         <Tabs defaultValue={platformMode !== "standard" ? "assets" : "chart"} className="space-y-6">

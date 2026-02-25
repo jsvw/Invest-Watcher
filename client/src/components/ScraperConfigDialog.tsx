@@ -16,6 +16,7 @@ const SCRAPER_TYPES = [
   { value: "crowdpear", label: "CrowdPear", credentialType: "email" },
   { value: "goldrepublic", label: "GoldRepublic", credentialType: "username_email" },
   { value: "trading212", label: "Trading 212 API", credentialType: "apikey" },
+  { value: "stock_ticker", label: "Stock Ticker (Yahoo Finance)", credentialType: "stock_ticker" },
 ];
 
 interface ScraperConfigDialogProps {
@@ -33,12 +34,15 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
   const [pieName, setPieName] = useState("");
   const [gmailAppPassword, setGmailAppPassword] = useState("");
   const [gmailEmail, setGmailEmail] = useState("");
+  const [ticker, setTicker] = useState("");
+  const [shares, setShares] = useState("");
   const [scraperType, setScraperType] = useState("monefit");
   const { toast } = useToast();
 
   const selectedType = SCRAPER_TYPES.find(st => st.value === scraperType);
   const isApiKeyType = selectedType?.credentialType === "apikey";
   const isUsernameEmailType = selectedType?.credentialType === "username_email";
+  const isStockTickerType = selectedType?.credentialType === "stock_ticker";
 
   const { data: config, isLoading: configLoading } = useQuery({
     queryKey: ['/api/platforms', platformId, 'scraper-config'],
@@ -53,7 +57,9 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
   const saveConfig = useMutation({
     mutationFn: async () => {
       let body: Record<string, any>;
-      if (isApiKeyType) {
+      if (isStockTickerType) {
+        body = { scraperType, ticker, shares };
+      } else if (isApiKeyType) {
         body = { scraperType, apiKey, apiSecret, pieName: pieName || undefined };
       } else if (isUsernameEmailType) {
         body = { scraperType, username, email, password };
@@ -64,6 +70,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/platforms', platformId, 'scraper-config'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/platforms', platformId, 'stock-info'] });
       toast({ title: "Scraper credentials saved" });
       setEmail("");
       setUsername("");
@@ -73,6 +80,8 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
       setPieName("");
       setGmailAppPassword("");
       setGmailEmail("");
+      setTicker("");
+      setShares("");
     },
     onError: () => {
       toast({ title: "Failed to save credentials", variant: "destructive" });
@@ -122,14 +131,19 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
   const hasConfig = config && config.id;
   const isConfigApiKeyType = config?.scraperType === "trading212";
   const isConfigUsernameEmailType = config?.scraperType === "goldrepublic";
+  const isConfigStockTickerType = config?.scraperType === "stock_ticker";
 
-  const canSaveNew = isApiKeyType
+  const canSaveNew = isStockTickerType
+    ? ticker.length > 0 && shares.length > 0 && !isNaN(Number(shares))
+    : isApiKeyType
     ? apiKey.length > 0 && apiSecret.length > 0
     : isUsernameEmailType
     ? username.length > 0 && email.length > 0 && password.length > 0
     : email.length > 0 && password.length > 0;
 
-  const canUpdateCredentials = isConfigApiKeyType
+  const canUpdateCredentials = isConfigStockTickerType
+    ? ticker.length > 0 && shares.length > 0 && !isNaN(Number(shares))
+    : isConfigApiKeyType
     ? apiKey.length > 0 && apiSecret.length > 0
     : isConfigUsernameEmailType
     ? username.length > 0 && email.length > 0 && password.length > 0
@@ -226,7 +240,32 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
             <div className="border-t pt-4">
               <p className="text-sm font-medium mb-2">Update credentials</p>
               <div className="space-y-3">
-                {isConfigApiKeyType ? (
+                {isConfigStockTickerType ? (
+                  <>
+                    <div>
+                      <Label htmlFor="scraper-ticker">Ticker Symbol</Label>
+                      <Input
+                        id="scraper-ticker"
+                        value={ticker}
+                        onChange={e => setTicker(e.target.value.toUpperCase())}
+                        placeholder="e.g. NIO, AAPL, TSLA"
+                        data-testid="input-scraper-ticker"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="scraper-shares">Number of Shares</Label>
+                      <Input
+                        id="scraper-shares"
+                        type="number"
+                        step="any"
+                        value={shares}
+                        onChange={e => setShares(e.target.value)}
+                        placeholder="e.g. 500"
+                        data-testid="input-scraper-shares"
+                      />
+                    </div>
+                  </>
+                ) : isConfigApiKeyType ? (
                   <>
                     <div>
                       <Label htmlFor="scraper-apikey">API Key</Label>
@@ -366,7 +405,9 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              {isApiKeyType
+              {isStockTickerType
+                ? "Enter a stock ticker symbol and number of shares to automatically track the current value using Yahoo Finance with FX conversion."
+                : isApiKeyType
                 ? "Enter your API credentials to enable automatic portfolio syncing via the Trading 212 API."
                 : "Enter your login credentials to enable automatic balance scraping. Your credentials are stored securely and only used to log into the platform."}
             </p>
@@ -386,7 +427,34 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                   </SelectContent>
                 </Select>
               </div>
-              {isApiKeyType ? (
+              {isStockTickerType ? (
+                <>
+                  <div>
+                    <Label htmlFor="scraper-ticker-new">Ticker Symbol</Label>
+                    <Input
+                      id="scraper-ticker-new"
+                      value={ticker}
+                      onChange={e => setTicker(e.target.value.toUpperCase())}
+                      placeholder="e.g. NIO, AAPL, TSLA"
+                      data-testid="input-scraper-ticker-new"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Yahoo Finance ticker symbol (e.g. NIO for NIO Inc.)</p>
+                  </div>
+                  <div>
+                    <Label htmlFor="scraper-shares-new">Number of Shares</Label>
+                    <Input
+                      id="scraper-shares-new"
+                      type="number"
+                      step="any"
+                      value={shares}
+                      onChange={e => setShares(e.target.value)}
+                      placeholder="e.g. 500"
+                      data-testid="input-scraper-shares-new"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Price will be fetched in USD and converted to the platform's currency.</p>
+                  </div>
+                </>
+              ) : isApiKeyType ? (
                 <>
                   <div>
                     <Label htmlFor="scraper-apikey-new">API Key</Label>
