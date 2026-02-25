@@ -1644,7 +1644,7 @@ export async function registerRoutes(
         });
       }
 
-      if (config.scraperType === "robocash" || config.scraperType === "crowdpear" || config.scraperType === "goldrepublic") {
+      if (config.scraperType === "robocash" || config.scraperType === "crowdpear" || config.scraperType === "goldrepublic" || config.scraperType === "valvest") {
         let balanceData: { totalBalance: number; totalInvested?: number | null; scrapedAt: Date };
         if (config.scraperType === "robocash") {
           const { scrapeRoboCash } = await import("./scrapers/robocash");
@@ -1652,6 +1652,9 @@ export async function registerRoutes(
         } else if (config.scraperType === "goldrepublic") {
           const { scrapeGoldRepublic } = await import("./scrapers/goldrepublic");
           balanceData = await scrapeGoldRepublic(creds.username, creds.email, creds.password);
+        } else if (config.scraperType === "valvest") {
+          const { scrapeValvest } = await import("./scrapers/valvest");
+          balanceData = await scrapeValvest(creds.email, creds.password);
         } else {
           const { scrapeCrowdPear } = await import("./scrapers/crowdpear");
           balanceData = await scrapeCrowdPear(creds.email, creds.password, creds.gmailAppPassword, creds.gmailEmail);
