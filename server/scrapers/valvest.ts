@@ -138,11 +138,8 @@ export async function scrapeValvest(email: string, password: string): Promise<Va
       await page.keyboard.press("Enter");
     }
 
-    await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 15000 }).catch(() => {});
-    await new Promise(resolve => setTimeout(resolve, 3000));
-
-    console.log("[Valvest Scraper] Waiting for password input (#login-password)...");
-    await page.waitForSelector('#login-password', { timeout: 15000 });
+    console.log("[Valvest Scraper] Waiting for password input (#login-password) to appear...");
+    await page.waitForSelector('#login-password', { visible: true, timeout: 30000 });
 
     const pwInput = await page.$('#login-password');
     if (!pwInput) {
@@ -180,8 +177,7 @@ export async function scrapeValvest(email: string, password: string): Promise<Va
       await page.keyboard.press("Enter");
     }
 
-    await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 }).catch(() => {});
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await new Promise(resolve => setTimeout(resolve, 5000));
 
     const currentUrl = page.url();
     console.log(`[Valvest Scraper] Current URL after login: ${currentUrl}`);
@@ -194,11 +190,9 @@ export async function scrapeValvest(email: string, password: string): Promise<Va
       throw new Error(`Login failed${errorText ? `: ${errorText}` : ". Check your email and password."}`);
     }
 
-    if (!currentUrl.includes("/account/portfolio")) {
-      console.log("[Valvest Scraper] Navigating to portfolio page...");
-      await page.goto(PORTFOLIO_URL, { waitUntil: "networkidle2", timeout: 30000 });
-      await new Promise(resolve => setTimeout(resolve, 3000));
-    }
+    console.log("[Valvest Scraper] Navigating to portfolio page...");
+    await page.goto(PORTFOLIO_URL, { waitUntil: "networkidle2", timeout: 30000 });
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
     const portfolioUrl = page.url();
     console.log(`[Valvest Scraper] Portfolio page URL: ${portfolioUrl}`);
