@@ -121,18 +121,23 @@ async function runScrapeForConfig(config: any) {
       try {
         await new Promise(resolve => setTimeout(resolve, 5000));
         const posMap = await fetchPositions(creds.apiKey, creds.apiSecret);
+        const toNumStr = (v: any): string | null => {
+          if (v == null) return null;
+          const n = typeof v === "number" ? v : parseFloat(v);
+          return isNaN(n) ? null : n.toString();
+        };
         const holdingsToSave = matchedPie.instruments.map(inst => {
           const pos = posMap.get(inst.ticker);
           return {
             ticker: inst.ticker,
-            shares: inst.shares?.toString() ?? null,
-            currentPrice: pos?.currentPrice?.toString() ?? null,
-            averagePrice: pos?.averagePrice?.toString() ?? null,
+            shares: toNumStr(inst.shares),
+            currentPrice: toNumStr(pos?.currentPrice),
+            averagePrice: toNumStr(pos?.averagePrice),
             value: pos ? ((pos.pieQuantity || pos.quantity) * pos.currentPrice).toFixed(2) : null,
-            ppl: pos?.ppl?.toString() ?? null,
-            currentShare: inst.currentShare?.toString() ?? null,
-            expectedShare: inst.expectedShare?.toString() ?? null,
-            result: inst.result?.toString() ?? null,
+            ppl: toNumStr(pos?.ppl),
+            currentShare: toNumStr(inst.currentShare),
+            expectedShare: toNumStr(inst.expectedShare),
+            result: toNumStr(inst.result),
           };
         });
         await storage.saveTrading212Holdings(platformId, userId, today, holdingsToSave);
@@ -321,22 +326,27 @@ async function runScrapeForConfig(config: any) {
   }
 }
 
-export function startScheduler() {
-  cron.schedule("0 9 * * *", async () => {
-    console.log("[Scheduler] Starting daily scrape at 09:00...");
-    try {
-      const configs = await storage.getAllEnabledScraperConfigs();
-      console.log(`[Scheduler] Found ${configs.length} enabled scraper config(s)`);
+async function runAllScrapes(label: string) {
+  console.log(`[Scheduler] Starting ${label} scrape...`);
+  try {
+    const configs = await storage.getAllEnabledScraperConfigs();
+    console.log(`[Scheduler] Found ${configs.length} enabled scraper config(s)`);
 
-      for (const config of configs) {
-        await runScrapeForConfig(config);
-      }
-
-      console.log("[Scheduler] Daily scrape complete");
-    } catch (err: any) {
-      console.error("[Scheduler] Error running scheduled scrape:", err.message);
+    for (const config of configs) {
+      await runScrapeForConfig(config);
     }
-  });
+
+    console.log(`[Scheduler] ${label} scrape complete`);
+  } catch (err: any) {
+    console.error(`[Scheduler] Error running ${label} scrape:`, err.message);
+  }
+}
+
+export function startScheduler() {
+  cron.schedule("0 9 * * *", () => runAllScrapes("daily"));
 
   console.log("[Scheduler] Daily scrape scheduled for 09:00");
+
+  setTimeout(() => runAllScrapes("startup"), 10000);
+  console.log("[Scheduler] Startup scrape will run in 10 seconds");
 }
