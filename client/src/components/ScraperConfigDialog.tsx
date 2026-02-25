@@ -36,6 +36,8 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
   const [gmailEmail, setGmailEmail] = useState("");
   const [ticker, setTicker] = useState("");
   const [shares, setShares] = useState("");
+  const [averagePrice, setAveragePrice] = useState("");
+  const [investedEur, setInvestedEur] = useState("");
   const [scraperType, setScraperType] = useState("monefit");
   const { toast } = useToast();
 
@@ -58,7 +60,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
     mutationFn: async () => {
       let body: Record<string, any>;
       if (isStockTickerType) {
-        body = { scraperType, ticker, shares };
+        body = { scraperType, ticker, shares, averagePrice: averagePrice || undefined, investedEur: investedEur || undefined };
       } else if (isApiKeyType) {
         body = { scraperType, apiKey, apiSecret, pieName: pieName || undefined };
       } else if (isUsernameEmailType) {
@@ -82,6 +84,8 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
       setGmailEmail("");
       setTicker("");
       setShares("");
+      setAveragePrice("");
+      setInvestedEur("");
     },
     onError: () => {
       toast({ title: "Failed to save credentials", variant: "destructive" });
@@ -262,6 +266,30 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                         onChange={e => setShares(e.target.value)}
                         placeholder="e.g. 500"
                         data-testid="input-scraper-shares"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="scraper-avg-price">Average Purchase Price (stock currency)</Label>
+                      <Input
+                        id="scraper-avg-price"
+                        type="number"
+                        step="any"
+                        value={averagePrice}
+                        onChange={e => setAveragePrice(e.target.value)}
+                        placeholder="e.g. 4.51"
+                        data-testid="input-scraper-avg-price"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="scraper-invested-eur">Total Invested (EUR)</Label>
+                      <Input
+                        id="scraper-invested-eur"
+                        type="number"
+                        step="any"
+                        value={investedEur}
+                        onChange={e => setInvestedEur(e.target.value)}
+                        placeholder="e.g. 2592.11"
+                        data-testid="input-scraper-invested-eur"
                       />
                     </div>
                   </>
@@ -452,6 +480,32 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                       data-testid="input-scraper-shares-new"
                     />
                     <p className="text-xs text-muted-foreground mt-1">Price will be fetched in USD and converted to the platform's currency.</p>
+                  </div>
+                  <div>
+                    <Label htmlFor="scraper-avg-price-new">Average Purchase Price (stock currency, optional)</Label>
+                    <Input
+                      id="scraper-avg-price-new"
+                      type="number"
+                      step="any"
+                      value={averagePrice}
+                      onChange={e => setAveragePrice(e.target.value)}
+                      placeholder="e.g. 4.51"
+                      data-testid="input-scraper-avg-price-new"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Used to calculate gain/loss. Leave empty to skip.</p>
+                  </div>
+                  <div>
+                    <Label htmlFor="scraper-invested-eur-new">Total Invested (EUR, optional)</Label>
+                    <Input
+                      id="scraper-invested-eur-new"
+                      type="number"
+                      step="any"
+                      value={investedEur}
+                      onChange={e => setInvestedEur(e.target.value)}
+                      placeholder="e.g. 2592.11"
+                      data-testid="input-scraper-invested-eur-new"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Used to calculate FX impact. Leave empty to skip.</p>
                   </div>
                 </>
               ) : isApiKeyType ? (

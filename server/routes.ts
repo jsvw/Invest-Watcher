@@ -1377,11 +1377,13 @@ export async function registerRoutes(
       let credentialData: Record<string, string>;
 
       if (scraperType === "stock_ticker") {
-        const { ticker, shares } = req.body;
+        const { ticker, shares, averagePrice, investedEur } = req.body;
         if (!ticker || !shares) {
           return res.status(400).json({ message: "ticker and shares are required for Stock Ticker" });
         }
         credentialData = { ticker: ticker.toUpperCase(), shares: String(shares) };
+        if (averagePrice) credentialData.averagePrice = String(averagePrice);
+        if (investedEur) credentialData.investedEur = String(investedEur);
       } else if (scraperType === "trading212") {
         const { apiKey, apiSecret, pieName } = req.body;
         if (!apiKey || !apiSecret) {
@@ -1467,7 +1469,9 @@ export async function registerRoutes(
       const targetCurrency = platform?.currency || "EUR";
 
       const { scrapeStockTicker } = await import("./scrapers/stock-ticker");
-      const result = await scrapeStockTicker(creds.ticker, parseFloat(creds.shares), targetCurrency);
+      const avgPrice = creds.averagePrice ? parseFloat(creds.averagePrice) : null;
+      const investedEur = creds.investedEur ? parseFloat(creds.investedEur) : null;
+      const result = await scrapeStockTicker(creds.ticker, parseFloat(creds.shares), targetCurrency, avgPrice, investedEur);
 
       res.json(result);
     } catch (err: any) {
@@ -1514,7 +1518,9 @@ export async function registerRoutes(
           return res.status(400).json({ message: "Missing ticker or shares in configuration" });
         }
 
-        const result = await scrapeStockTicker(ticker, shares, targetCurrency);
+        const avgPrice = creds.averagePrice ? parseFloat(creds.averagePrice) : null;
+        const investedEur = creds.investedEur ? parseFloat(creds.investedEur) : null;
+        const result = await scrapeStockTicker(ticker, shares, targetCurrency, avgPrice, investedEur);
         const todayStr = today.toISOString().split("T")[0];
 
         if (result.valueInTargetCurrency > 0) {

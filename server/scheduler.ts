@@ -196,7 +196,9 @@ async function runScrapeForConfig(config: any) {
         return;
       }
 
-      const result = await scrapeStockTicker(ticker, shares, targetCurrency);
+      const avgPrice = creds.averagePrice ? parseFloat(creds.averagePrice) : null;
+      const investedEur = creds.investedEur ? parseFloat(creds.investedEur) : null;
+      const result = await scrapeStockTicker(ticker, shares, targetCurrency, avgPrice, investedEur);
 
       if (result.valueInTargetCurrency > 0) {
         const existingVals = await storage.getValuations(platformId);

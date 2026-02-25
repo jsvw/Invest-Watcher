@@ -789,23 +789,66 @@ export default function PlatformDetails() {
                   <span>Loading stock data...</span>
                 </div>
               ) : stockInfo ? (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Shares</p>
-                    <p className="text-xl font-bold" data-testid="text-stock-shares">{stockInfo.shares}</p>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Shares</p>
+                      <p className="text-xl font-bold" data-testid="text-stock-shares">{stockInfo.shares}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Share Price ({stockInfo.stockCurrency})</p>
+                      <p className="text-xl font-bold" data-testid="text-stock-price">${stockInfo.stockPrice.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">FX Rate ({stockInfo.stockCurrency}/{stockInfo.targetCurrency})</p>
+                      <p className="text-xl font-bold" data-testid="text-stock-fx">{stockInfo.fxRate.toFixed(4)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Value ({stockInfo.targetCurrency})</p>
+                      <p className="text-xl font-bold text-primary" data-testid="text-stock-value">{formatCurrency(stockInfo.valueInTargetCurrency, stockInfo.targetCurrency)}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Share Price ({stockInfo.stockCurrency})</p>
-                    <p className="text-xl font-bold" data-testid="text-stock-price">${stockInfo.stockPrice.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">FX Rate ({stockInfo.stockCurrency}/{stockInfo.targetCurrency})</p>
-                    <p className="text-xl font-bold" data-testid="text-stock-fx">{stockInfo.fxRate.toFixed(4)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Value ({stockInfo.targetCurrency})</p>
-                    <p className="text-xl font-bold text-primary" data-testid="text-stock-value">{formatCurrency(stockInfo.valueInTargetCurrency, stockInfo.targetCurrency)}</p>
-                  </div>
+                  {stockInfo.averagePrice != null && (
+                    <div className="border-t pt-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Average Price</p>
+                          <p className="text-lg font-semibold" data-testid="text-stock-avg-price">
+                            ${stockInfo.averagePrice.toFixed(2)}
+                            {stockInfo.costBasisTargetCurrency != null && (
+                              <span className="text-sm text-muted-foreground ml-1">
+                                ({formatCurrency(stockInfo.averagePrice * stockInfo.fxRate, stockInfo.targetCurrency)})
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Total Return</p>
+                          <p className={`text-lg font-semibold ${stockInfo.totalReturn != null && stockInfo.totalReturn >= 0 ? 'text-green-500' : 'text-red-500'}`} data-testid="text-stock-total-return">
+                            {stockInfo.totalReturn != null ? (
+                              <>{stockInfo.totalReturn >= 0 ? '+' : ''}{formatCurrency(stockInfo.totalReturn, stockInfo.targetCurrency)} ({stockInfo.totalReturnPercent?.toFixed(2)}%)</>
+                            ) : '—'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Gain / Loss</p>
+                          <p className={`text-lg font-semibold ${stockInfo.gainLoss != null && stockInfo.gainLoss >= 0 ? 'text-green-500' : 'text-red-500'}`} data-testid="text-stock-gain-loss">
+                            {stockInfo.gainLoss != null ? (
+                              <>{stockInfo.gainLoss >= 0 ? '+' : ''}{formatCurrency(stockInfo.gainLoss, stockInfo.targetCurrency)} ({stockInfo.gainLossPercent?.toFixed(2)}%)</>
+                            ) : '—'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">FX Impact</p>
+                          <p className={`text-lg font-semibold ${stockInfo.fxImpact != null && stockInfo.fxImpact >= 0 ? 'text-green-500' : 'text-red-500'}`} data-testid="text-stock-fx-impact">
+                            {stockInfo.fxImpact != null ? (
+                              <>{stockInfo.fxImpact >= 0 ? '+' : ''}{formatCurrency(stockInfo.fxImpact, stockInfo.targetCurrency)} ({stockInfo.fxImpactPercent?.toFixed(2)}%)</>
+                            ) : '—'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <p className="text-muted-foreground text-sm">Could not load stock data. Configure the stock ticker scraper to get started.</p>

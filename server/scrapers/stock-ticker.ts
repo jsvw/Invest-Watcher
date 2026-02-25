@@ -5,8 +5,17 @@ export interface StockTickerResult {
   fxRate: number;
   targetCurrency: string;
   shares: number;
+  averagePrice: number | null;
   valueInStockCurrency: number;
   valueInTargetCurrency: number;
+  costBasisStockCurrency: number | null;
+  costBasisTargetCurrency: number | null;
+  gainLoss: number | null;
+  gainLossPercent: number | null;
+  fxImpact: number | null;
+  fxImpactPercent: number | null;
+  totalReturn: number | null;
+  totalReturnPercent: number | null;
   scrapedAt: Date;
 }
 
@@ -63,6 +72,8 @@ export async function scrapeStockTicker(
   ticker: string,
   shares: number,
   targetCurrency: string,
+  averagePrice?: number | null,
+  investedEur?: number | null,
 ): Promise<StockTickerResult> {
   console.log(`[StockTicker] Fetching price for ${ticker}...`);
   const { price, currency: stockCurrency } = await fetchStockPrice(ticker);
@@ -74,7 +85,40 @@ export async function scrapeStockTicker(
   const valueInStockCurrency = shares * price;
   const valueInTargetCurrency = valueInStockCurrency * fxRate;
 
+  let costBasisStockCurrency: number | null = null;
+  let costBasisTargetCurrency: number | null = null;
+  let gainLoss: number | null = null;
+  let gainLossPercent: number | null = null;
+  let fxImpact: number | null = null;
+  let fxImpactPercent: number | null = null;
+  let totalReturn: number | null = null;
+  let totalReturnPercent: number | null = null;
+
+  if (averagePrice != null && averagePrice > 0) {
+    costBasisStockCurrency = shares * averagePrice;
+
+    gainLoss = (price - averagePrice) * shares * fxRate;
+    gainLossPercent = ((price - averagePrice) / averagePrice) * 100;
+
+    if (investedEur != null && investedEur > 0) {
+      costBasisTargetCurrency = investedEur;
+      totalReturn = valueInTargetCurrency - investedEur;
+      totalReturnPercent = (totalReturn / investedEur) * 100;
+      fxImpact = totalReturn - gainLoss;
+      fxImpactPercent = (fxImpact / investedEur) * 100;
+    } else {
+      costBasisTargetCurrency = costBasisStockCurrency * fxRate;
+      totalReturn = valueInTargetCurrency - costBasisTargetCurrency;
+      totalReturnPercent = costBasisTargetCurrency > 0 ? (totalReturn / costBasisTargetCurrency) * 100 : null;
+      fxImpact = null;
+      fxImpactPercent = null;
+    }
+  }
+
   console.log(`[StockTicker] ${shares} shares × ${price} ${stockCurrency} = ${valueInStockCurrency.toFixed(2)} ${stockCurrency} = ${valueInTargetCurrency.toFixed(2)} ${targetCurrency}`);
+  if (gainLoss != null) {
+    console.log(`[StockTicker] Gain/Loss: ${gainLoss.toFixed(2)} ${targetCurrency} (${gainLossPercent?.toFixed(2)}%), FX Impact: ${fxImpact?.toFixed(2) ?? 'N/A'} ${targetCurrency}, Total Return: ${totalReturn?.toFixed(2)} ${targetCurrency} (${totalReturnPercent?.toFixed(2)}%)`);
+  }
 
   return {
     ticker,
@@ -83,8 +127,17 @@ export async function scrapeStockTicker(
     fxRate,
     targetCurrency,
     shares,
+    averagePrice: averagePrice ?? null,
     valueInStockCurrency,
     valueInTargetCurrency,
+    costBasisStockCurrency,
+    costBasisTargetCurrency,
+    gainLoss,
+    gainLossPercent,
+    fxImpact,
+    fxImpactPercent,
+    totalReturn,
+    totalReturnPercent,
     scrapedAt: new Date(),
   };
 }
