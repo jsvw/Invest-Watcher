@@ -541,10 +541,16 @@ export default function PlatformDetails() {
   const platformChartData = useMemo(() => {
     if (!history || history.length === 0) return [];
 
-    const monthMap = new Map<string, { value: number; invested: number; date: string }>();
+    const monthMap = new Map<string, { value: number; invested: number; date: string; dist: number }>();
     for (const h of history) {
-      const key = format(new Date(h.date), 'yyyy-MM');
-      monthMap.set(key, { value: h.value, invested: h.invested, date: h.date });
+      const d = new Date(h.date);
+      const key = format(d, 'yyyy-MM');
+      const target = new Date(d.getFullYear(), d.getMonth(), 10);
+      const dist = Math.abs(d.getTime() - target.getTime());
+      const existing = monthMap.get(key);
+      if (!existing || dist < existing.dist) {
+        monthMap.set(key, { value: h.value, invested: h.invested, date: h.date, dist });
+      }
     }
 
     return Array.from(monthMap.values()).map(data => ({
