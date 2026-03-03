@@ -30,7 +30,6 @@ export default function Dashboard() {
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
   const [excludedPlatforms, setExcludedPlatforms] = useState<number[]>([]);
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
-  const [chartDataMode, setChartDataMode] = useState<"daily" | "monthly">("monthly");
   const { toast } = useToast();
 
   const [scrapeLog, setScrapeLog] = useState<{ platformName: string; success: boolean; message: string }[] | null>(null);
@@ -180,7 +179,6 @@ export default function Dashboard() {
 
   const chartData = useMemo(() => {
     if (!history || history.length === 0) return [];
-    if (chartDataMode === "daily") return history;
 
     const monthMap = new Map<string, { value: number; invested: number; date: string }>();
     for (const h of history) {
@@ -193,7 +191,7 @@ export default function Dashboard() {
       value: data.value,
       invested: data.invested,
     }));
-  }, [history, chartDataMode]);
+  }, [history]);
 
 
   if (isPlatformsLoading || isHistoryLoading) {
@@ -507,12 +505,6 @@ export default function Dashboard() {
                   </Select>
                 </div>
               )}
-              <Tabs value={chartDataMode} onValueChange={(v) => setChartDataMode(v as "daily" | "monthly")} className="w-auto">
-                <TabsList>
-                  <TabsTrigger value="daily" data-testid="tab-data-daily">Daily</TabsTrigger>
-                  <TabsTrigger value="monthly" data-testid="tab-data-monthly">Month End</TabsTrigger>
-                </TabsList>
-              </Tabs>
               <Tabs value={range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range} onValueChange={(val) => {
                 setRange(val);
                 setSpecificYear(null);
@@ -569,7 +561,7 @@ export default function Dashboard() {
               <TabsList>
                 <TabsTrigger value="overview" data-testid="tab-chart-overview">Value Overview</TabsTrigger>
                 <TabsTrigger value="profit" data-testid="tab-chart-profit">Profit/Loss</TabsTrigger>
-                <TabsTrigger value="monthly" data-testid="tab-chart-monthly">{chartDataMode === "daily" ? "Growth / Day" : "Monthly Growth"}</TabsTrigger>
+                <TabsTrigger value="monthly" data-testid="tab-chart-monthly">Monthly Growth</TabsTrigger>
                 <TabsTrigger value="all" data-testid="tab-chart-all">All</TabsTrigger>
               </TabsList>
             </Tabs>
@@ -578,12 +570,11 @@ export default function Dashboard() {
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData.map((h: any, i: number, arr: any[]) => {
                     const totalChange = i === 0 ? 0 : (h.value - arr[i - 1].value) - (h.invested - arr[i - 1].invested);
-                    const daysBetween = i === 0 ? 1 : Math.max(1, Math.round((new Date(h.date).getTime() - new Date(arr[i - 1].date).getTime()) / (1000 * 60 * 60 * 24)));
                     return {
                       ...h, 
                       timestamp: new Date(h.date).getTime(),
                       gain: h.value - h.invested,
-                      monthlyChange: chartDataMode === "daily" ? totalChange / daysBetween : totalChange,
+                      monthlyChange: totalChange,
                     };
                   })}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -693,7 +684,7 @@ export default function Dashboard() {
                       <Line 
                         type="monotone" 
                         dataKey="monthlyChange" 
-                        name={chartDataMode === "daily" ? "Growth per Day" : "Monthly Growth"}
+                        name="Monthly Growth"
                         yAxisId="monthly"
                         stroke="#f59e0b" 
                         strokeWidth={chartView === "all" ? 3 : 4}

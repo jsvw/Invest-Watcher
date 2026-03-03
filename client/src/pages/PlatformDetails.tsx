@@ -253,7 +253,6 @@ export default function PlatformDetails() {
   const [range, setRange] = useState("year");
   const [specificYear, setSpecificYear] = useState<string | null>(null);
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
-  const [platformChartDataMode, setPlatformChartDataMode] = useState<"daily" | "monthly">("monthly");
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
   
   const { data: platforms } = usePlatforms();
@@ -541,7 +540,6 @@ export default function PlatformDetails() {
 
   const platformChartData = useMemo(() => {
     if (!history || history.length === 0) return [];
-    if (platformChartDataMode === "daily") return history;
 
     const monthMap = new Map<string, { value: number; invested: number; date: string }>();
     for (const h of history) {
@@ -554,7 +552,7 @@ export default function PlatformDetails() {
       value: data.value,
       invested: data.invested,
     }));
-  }, [history, platformChartDataMode]);
+  }, [history]);
 
 
   const formatAxisValue = (value: number, showSign: boolean = false) => {
@@ -893,12 +891,6 @@ export default function PlatformDetails() {
                         </Select>
                       </div>
                     )}
-                    <Tabs value={platformChartDataMode} onValueChange={(v) => setPlatformChartDataMode(v as "daily" | "monthly")} className="w-auto">
-                      <TabsList>
-                        <TabsTrigger value="daily">Daily</TabsTrigger>
-                        <TabsTrigger value="monthly">Month End</TabsTrigger>
-                      </TabsList>
-                    </Tabs>
                     <Tabs value={range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range} onValueChange={(val) => {
                       setRange(val);
                       setSpecificYear(null);
@@ -919,7 +911,7 @@ export default function PlatformDetails() {
                     <TabsList>
                       <TabsTrigger value="overview">Value Overview</TabsTrigger>
                       <TabsTrigger value="profit">Profit/Loss</TabsTrigger>
-                      <TabsTrigger value="monthly">{platformChartDataMode === "daily" ? "Growth / Day" : "Monthly Growth"}</TabsTrigger>
+                      <TabsTrigger value="monthly">Monthly Growth</TabsTrigger>
                       <TabsTrigger value="all">All</TabsTrigger>
                     </TabsList>
                   </Tabs>
@@ -928,12 +920,11 @@ export default function PlatformDetails() {
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={platformChartData.map((h: any, i: number, arr: any[]) => {
                           const totalChange = i === 0 ? 0 : (h.value - arr[i - 1].value) - (h.invested - arr[i - 1].invested);
-                          const daysBetween = i === 0 ? 1 : Math.max(1, Math.round((new Date(h.date).getTime() - new Date(arr[i - 1].date).getTime()) / (1000 * 60 * 60 * 24)));
                           return {
                             ...h, 
                             timestamp: new Date(h.date).getTime(),
                             gain: h.value - h.invested,
-                            monthlyChange: platformChartDataMode === "daily" ? totalChange / daysBetween : totalChange,
+                            monthlyChange: totalChange,
                           };
                         })}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -1043,7 +1034,7 @@ export default function PlatformDetails() {
                             <Line 
                               type="monotone" 
                               dataKey="monthlyChange" 
-                              name={platformChartDataMode === "daily" ? "Growth per Day" : "Monthly Growth"}
+                              name="Monthly Growth"
                               yAxisId="monthly"
                               stroke="#f59e0b" 
                               strokeWidth={chartView === "all" ? 3 : 4}
@@ -1356,12 +1347,6 @@ export default function PlatformDetails() {
                         </Select>
                       </div>
                     )}
-                    <Tabs value={platformChartDataMode} onValueChange={(v) => setPlatformChartDataMode(v as "daily" | "monthly")} className="w-auto">
-                      <TabsList>
-                        <TabsTrigger value="daily" data-testid="tab-platform-data-daily">Daily</TabsTrigger>
-                        <TabsTrigger value="monthly" data-testid="tab-platform-data-monthly">Month End</TabsTrigger>
-                      </TabsList>
-                    </Tabs>
                     <Tabs value={range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range} onValueChange={(val) => {
                       setRange(val);
                       setSpecificYear(null);
@@ -1382,7 +1367,7 @@ export default function PlatformDetails() {
                     <TabsList>
                       <TabsTrigger value="overview" data-testid="tab-platform-chart-overview">Value Overview</TabsTrigger>
                       <TabsTrigger value="profit" data-testid="tab-platform-chart-profit">Profit/Loss</TabsTrigger>
-                      <TabsTrigger value="monthly" data-testid="tab-platform-chart-monthly">{platformChartDataMode === "daily" ? "Growth / Day" : "Monthly Growth"}</TabsTrigger>
+                      <TabsTrigger value="monthly" data-testid="tab-platform-chart-monthly">Monthly Growth</TabsTrigger>
                       <TabsTrigger value="all" data-testid="tab-platform-chart-all">All</TabsTrigger>
                     </TabsList>
                   </Tabs>
@@ -1391,12 +1376,11 @@ export default function PlatformDetails() {
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={platformChartData.map((h: any, i: number, arr: any[]) => {
                           const totalChange = i === 0 ? 0 : (h.value - arr[i - 1].value) - (h.invested - arr[i - 1].invested);
-                          const daysBetween = i === 0 ? 1 : Math.max(1, Math.round((new Date(h.date).getTime() - new Date(arr[i - 1].date).getTime()) / (1000 * 60 * 60 * 24)));
                           return {
                             ...h, 
                             timestamp: new Date(h.date).getTime(),
                             gain: h.value - h.invested,
-                            monthlyChange: platformChartDataMode === "daily" ? totalChange / daysBetween : totalChange,
+                            monthlyChange: totalChange,
                           };
                         })}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -1506,7 +1490,7 @@ export default function PlatformDetails() {
                             <Line 
                               type="monotone" 
                               dataKey="monthlyChange" 
-                              name={platformChartDataMode === "daily" ? "Growth per Day" : "Monthly Growth"}
+                              name="Monthly Growth"
                               yAxisId="monthly"
                               stroke="#f59e0b" 
                               strokeWidth={chartView === "all" ? 3 : 4}
