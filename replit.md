@@ -54,6 +54,7 @@ The application tracks seven main entities:
 7. **ScraperConfigs**: Web scraping configurations per platform (credentials, scraper type, last status)
 8. **Trading212Holdings**: Daily instrument-level snapshots for Trading 212 platforms (ticker, shares, prices, P/L, allocation)
 9. **Trading212Dividends**: Per-ticker dividend payment records for Trading 212 platforms (amount, date, quantity); stored in DB to avoid re-fetching from API on every page load
+10. **DashboardFilters**: Named filter presets storing excluded platform IDs, allowing users to save and quickly switch between dashboard platform filter configurations
 
 ### Web Scraping & API Integrations
 - **Puppeteer + Chromium**: Headless browser automation for scraping login-protected investment platforms

@@ -3,7 +3,7 @@ import { StatCard } from "@/components/StatCard";
 import { usePlatforms } from "@/hooks/use-platforms";
 import { useAuth } from "@/App";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
-import { Wallet, TrendingUp, DollarSign, Check, RefreshCw, Loader2, CheckCircle, XCircle, ChevronDown, ChevronUp, X } from "lucide-react";
+import { Wallet, TrendingUp, DollarSign, Check, RefreshCw, Loader2, CheckCircle, XCircle, ChevronDown, ChevronUp, X, Save, Bookmark, Trash2 } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import type { DashboardFilter } from "@shared/schema";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -31,6 +34,40 @@ export default function Dashboard() {
   const [excludedPlatforms, setExcludedPlatforms] = useState<number[]>([]);
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
   const { toast } = useToast();
+
+  const [filterPresetName, setFilterPresetName] = useState("");
+  const [filterPresetsOpen, setFilterPresetsOpen] = useState(false);
+
+  const { data: savedFilters } = useQuery<DashboardFilter[]>({
+    queryKey: ['/api/dashboard-filters'],
+  });
+
+  const saveFilterMutation = useMutation({
+    mutationFn: async (name: string) => {
+      await apiRequest('POST', '/api/dashboard-filters', { name, excludedPlatformIds: excludedPlatforms });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard-filters'] });
+      setFilterPresetName("");
+      toast({ title: "Filter saved" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to save filter", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteFilterMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest('DELETE', `/api/dashboard-filters/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard-filters'] });
+      toast({ title: "Filter deleted" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Failed to delete filter", description: err.message, variant: "destructive" });
+    },
+  });
 
   const [scrapeLog, setScrapeLog] = useState<{ platformName: string; success: boolean; message: string }[] | null>(null);
   const [scrapeLogOpen, setScrapeLogOpen] = useState(false);
@@ -455,6 +492,84 @@ export default function Dashboard() {
               Deselect All
             </Button>
           )}
+          <div className="ml-auto flex items-center gap-2">
+            <Popover open={filterPresetsOpen} onOpenChange={setFilterPresetsOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-filter-presets">
+                  <Bookmark className="w-3.5 h-3.5" />
+                  Presets
+                  {savedFilters && savedFilters.length > 0 && (
+                    <span className="ml-1 text-xs bg-primary/10 text-primary rounded-full px-1.5">{savedFilters.length}</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72 p-3" data-testid="popover-filter-presets">
+                <div className="space-y-3">
+                  <p className="text-sm font-medium">Saved Filter Presets</p>
+                  {savedFilters && savedFilters.length > 0 ? (
+                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                      {savedFilters.map((filter) => (
+                        <div key={filter.id} className="flex items-center gap-2 group" data-testid={`filter-preset-${filter.id}`}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="flex-1 justify-start text-sm h-8"
+                            onClick={() => {
+                              setExcludedPlatforms(filter.excludedPlatformIds);
+                              setFilterPresetsOpen(false);
+                            }}
+                            data-testid={`button-apply-filter-${filter.id}`}
+                          >
+                            {filter.name}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteFilterMutation.mutate(filter.id);
+                            }}
+                            data-testid={`button-delete-filter-${filter.id}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No saved presets yet. Set up your platform filters above and save them here.</p>
+                  )}
+                  <div className="border-t pt-3">
+                    <p className="text-xs text-muted-foreground mb-2">Save current filter as preset</p>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Preset name..."
+                        value={filterPresetName}
+                        onChange={(e) => setFilterPresetName(e.target.value)}
+                        className="h-8 text-sm"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && filterPresetName.trim()) {
+                            saveFilterMutation.mutate(filterPresetName.trim());
+                          }
+                        }}
+                        data-testid="input-filter-preset-name"
+                      />
+                      <Button
+                        size="sm"
+                        className="h-8 px-3"
+                        disabled={!filterPresetName.trim() || saveFilterMutation.isPending}
+                        onClick={() => saveFilterMutation.mutate(filterPresetName.trim())}
+                        data-testid="button-save-filter-preset"
+                      >
+                        <Save className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
 
         {/* AI Insight Section */}

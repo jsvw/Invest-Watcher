@@ -169,6 +169,15 @@ export const trading212Holdings = pgTable("trading212_holdings", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// === DASHBOARD FILTERS (saved platform filter presets) ===
+export const dashboardFilters = pgTable("dashboard_filters", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  name: text("name").notNull(),
+  excludedPlatformIds: integer("excluded_platform_ids").array().notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === TRADING 212 DIVIDENDS (per-ticker dividend records) ===
 export const trading212Dividends = pgTable("trading212_dividends", {
   id: serial("id").primaryKey(),
@@ -195,6 +204,7 @@ export const insertEmailImportSchema = createInsertSchema(emailImports).omit({ i
 export const insertScraperConfigSchema = createInsertSchema(scraperConfigs).omit({ id: true, createdAt: true, lastScrapeAt: true, lastScrapeStatus: true, lastScrapeMessage: true });
 export const insertTrading212HoldingSchema = createInsertSchema(trading212Holdings).omit({ id: true, createdAt: true });
 export const insertTrading212DividendSchema = createInsertSchema(trading212Dividends).omit({ id: true, createdAt: true });
+export const insertDashboardFilterSchema = createInsertSchema(dashboardFilters).omit({ id: true, createdAt: true });
 
 // === EXPLICIT API CONTRACT TYPES ===
 
@@ -212,6 +222,7 @@ export type EmailImport = typeof emailImports.$inferSelect;
 export type ScraperConfig = typeof scraperConfigs.$inferSelect;
 export type Trading212Holding = typeof trading212Holdings.$inferSelect;
 export type Trading212Dividend = typeof trading212Dividends.$inferSelect;
+export type DashboardFilter = typeof dashboardFilters.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertPlatform = z.infer<typeof insertPlatformSchema>;
@@ -226,6 +237,7 @@ export type InsertEmailImport = z.infer<typeof insertEmailImportSchema>;
 export type InsertScraperConfig = z.infer<typeof insertScraperConfigSchema>;
 export type InsertTrading212Holding = z.infer<typeof insertTrading212HoldingSchema>;
 export type InsertTrading212Dividend = z.infer<typeof insertTrading212DividendSchema>;
+export type InsertDashboardFilter = z.infer<typeof insertDashboardFilterSchema>;
 
 // Request types
 export type CreatePlatformRequest = InsertPlatform;

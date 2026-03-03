@@ -2444,6 +2444,47 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/dashboard-filters', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const filters = await storage.getDashboardFilters(userId);
+      res.json(filters);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/dashboard-filters', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const { name, excludedPlatformIds } = req.body;
+      if (!name || typeof name !== 'string' || !name.trim()) {
+        return res.status(400).json({ message: "name is required" });
+      }
+      if (!Array.isArray(excludedPlatformIds) || !excludedPlatformIds.every((id: any) => typeof id === 'number' && Number.isInteger(id))) {
+        return res.status(400).json({ message: "excludedPlatformIds must be an array of integers" });
+      }
+      const filter = await storage.createDashboardFilter({ userId, name: name.trim(), excludedPlatformIds });
+      res.json(filter);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete('/api/dashboard-filters/:id', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid filter id" });
+      }
+      await storage.deleteDashboardFilter(id, userId);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   await seedDatabase();
   // removed importInvestmentData() call to prevent duplicates on restart
 

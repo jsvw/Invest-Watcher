@@ -37,7 +37,10 @@ import {
   type InsertTrading212Holding,
   trading212Dividends,
   type Trading212Dividend,
-  type InsertTrading212Dividend
+  type InsertTrading212Dividend,
+  dashboardFilters,
+  type DashboardFilter,
+  type InsertDashboardFilter
 } from "@shared/schema";
 import { eq, desc, sql, and, or } from "drizzle-orm";
 
@@ -138,6 +141,10 @@ export interface IStorage {
   // Trading 212 Dividends
   saveTrading212Dividends(platformId: number, userId: number, dividends: { ticker: string; amount: string; paidOn: string; quantity?: string | null }[]): Promise<void>;
   getTrading212Dividends(platformId: number, userId: number): Promise<Trading212Dividend[]>;
+
+  getDashboardFilters(userId: number): Promise<DashboardFilter[]>;
+  createDashboardFilter(filter: InsertDashboardFilter): Promise<DashboardFilter>;
+  deleteDashboardFilter(id: number, userId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1249,6 +1256,23 @@ export class DatabaseStorage implements IStorage {
         eq(trading212Dividends.userId, userId)
       ))
       .orderBy(trading212Dividends.paidOn);
+  }
+
+  async getDashboardFilters(userId: number): Promise<DashboardFilter[]> {
+    return db.select()
+      .from(dashboardFilters)
+      .where(eq(dashboardFilters.userId, userId))
+      .orderBy(dashboardFilters.name);
+  }
+
+  async createDashboardFilter(filter: InsertDashboardFilter): Promise<DashboardFilter> {
+    const [created] = await db.insert(dashboardFilters).values(filter).returning();
+    return created;
+  }
+
+  async deleteDashboardFilter(id: number, userId: number): Promise<void> {
+    await db.delete(dashboardFilters)
+      .where(and(eq(dashboardFilters.id, id), eq(dashboardFilters.userId, userId)));
   }
 }
 
