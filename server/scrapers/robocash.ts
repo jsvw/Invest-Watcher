@@ -227,22 +227,20 @@ export async function scrapeRoboCash(email: string, password: string): Promise<R
       }
       console.log("[RoboCash Scraper] All .value_roundings elements: " + JSON.stringify(allValues));
 
-      var available = findValueNearLabel("Available funds");
-      var invested = findValueNearLabel("Total invested");
-      console.log("[RoboCash Scraper] Available funds: " + available + ", Total invested: " + invested);
+      var totalFunds = findValueNearLabel("Total funds");
+      var interest = findValueNearLabel("Interest by today");
+      console.log("[RoboCash Scraper] Total funds: " + totalFunds + ", Interest by today: " + interest);
 
-      if (available !== null && invested !== null) {
-        var sum = available + invested;
-        console.log("[RoboCash Scraper] Sum (Available + Invested): " + sum);
+      if (totalFunds !== null && interest !== null) {
+        var sum = totalFunds + interest;
+        console.log("[RoboCash Scraper] Sum (Total funds + Interest): " + sum);
         return sum;
       }
 
-      var totalFunds = findValueNearLabel("Total funds");
-      if (!totalFunds) totalFunds = findValueNearLabel("Total balance");
-      if (!totalFunds) totalFunds = findValueNearLabel("Portfolio value");
-      console.log("[RoboCash Scraper] Fallback total label search: " + totalFunds);
-
-      if (totalFunds) return totalFunds;
+      if (totalFunds !== null) {
+        console.log("[RoboCash Scraper] Only found Total funds (no Interest), returning: " + totalFunds);
+        return totalFunds;
+      }
 
       var candidates = [];
       for (var i = 0; i < allValueEls.length; i++) {
