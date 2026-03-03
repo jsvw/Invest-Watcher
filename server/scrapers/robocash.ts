@@ -172,7 +172,7 @@ export async function scrapeRoboCash(email: string, password: string): Promise<R
             var vals = container.querySelectorAll('.value_roundings');
             if (vals.length > 0) {
               var num = extractNumber(vals[0].textContent);
-              if (num !== null && num > 0) return num;
+              if (num !== null) return num;
             }
             container = container.parentElement;
           }
@@ -182,11 +182,11 @@ export async function scrapeRoboCash(email: string, password: string): Promise<R
             var sVals = sibling.querySelectorAll('.value_roundings');
             if (sVals.length > 0) {
               var sNum = extractNumber(sVals[0].textContent);
-              if (sNum !== null && sNum > 0) return sNum;
+              if (sNum !== null) return sNum;
             }
             if (sibling.classList.contains('value_roundings')) {
               var directNum = extractNumber(sibling.textContent);
-              if (directNum !== null && directNum > 0) return directNum;
+              if (directNum !== null) return directNum;
             }
             sibling = sibling.nextElementSibling;
           }
@@ -194,27 +194,75 @@ export async function scrapeRoboCash(email: string, password: string): Promise<R
         return null;
       };
 
-      var total = findValueNearLabel("Total funds");
-      if (!total) total = findValueNearLabel("Total balance");
-      if (!total) total = findValueNearLabel("Portfolio value");
-
-      if (!total) {
-        var valueElements = document.querySelectorAll('.value_roundings');
-        var candidates = [];
-        for (var i = 0; i < valueElements.length; i++) {
-          var num = extractNumber(valueElements[i].textContent);
-          if (num !== null && num > 100) {
-            candidates.push(num);
+      var allValueEls = document.querySelectorAll('.value_roundings');
+      var allValues = [];
+      for (var i = 0; i < allValueEls.length; i++) {
+        var el = allValueEls[i];
+        var num = extractNumber(el.textContent);
+        var labelEl = el.closest('[class]');
+        var parent = el.parentElement;
+        var nearbyLabel = '';
+        if (parent) {
+          var siblings = parent.querySelectorAll('*');
+          for (var j = 0; j < siblings.length; j++) {
+            var sib = siblings[j];
+            if (sib !== el && sib.children.length === 0 && sib.textContent && sib.textContent.trim().length > 0 && sib.textContent.trim().length < 50) {
+              nearbyLabel = sib.textContent.trim();
+              break;
+            }
           }
         }
-        if (candidates.length > 0) {
-          candidates.sort(function(a, b) { return b - a; });
-          total = candidates[0];
+        if (!nearbyLabel && parent && parent.parentElement) {
+          var grandparent = parent.parentElement;
+          var gSiblings = grandparent.querySelectorAll('*');
+          for (var k = 0; k < gSiblings.length; k++) {
+            var gs = gSiblings[k];
+            if (gs !== el && gs.children.length === 0 && gs.textContent && gs.textContent.trim().length > 0 && gs.textContent.trim().length < 50 && !gs.classList.contains('value_roundings')) {
+              nearbyLabel = gs.textContent.trim();
+              break;
+            }
+          }
         }
+        allValues.push({ raw: el.textContent ? el.textContent.trim() : '', num: num, label: nearbyLabel });
+      }
+      console.log("[RoboCash Scraper] All .value_roundings elements: " + JSON.stringify(allValues));
+
+      var available = findValueNearLabel("Available funds");
+      var invested = findValueNearLabel("Total invested");
+      console.log("[RoboCash Scraper] Available funds: " + available + ", Total invested: " + invested);
+
+      if (available !== null && invested !== null) {
+        var sum = available + invested;
+        console.log("[RoboCash Scraper] Sum (Available + Invested): " + sum);
+        return sum;
       }
 
-      console.log("[RoboCash Scraper] Extracted total: " + total);
-      return total || 0;
+      var totalFunds = findValueNearLabel("Total funds");
+      if (!totalFunds) totalFunds = findValueNearLabel("Total balance");
+      if (!totalFunds) totalFunds = findValueNearLabel("Portfolio value");
+      console.log("[RoboCash Scraper] Fallback total label search: " + totalFunds);
+
+      if (totalFunds) return totalFunds;
+
+      var candidates = [];
+      for (var i = 0; i < allValueEls.length; i++) {
+        var num = extractNumber(allValueEls[i].textContent);
+        if (num !== null && num >= 0) {
+          candidates.push(num);
+        }
+      }
+      console.log("[RoboCash Scraper] All numeric candidates: " + JSON.stringify(candidates));
+      if (candidates.length >= 2) {
+        var sum = 0;
+        for (var i = 0; i < candidates.length; i++) sum += candidates[i];
+        console.log("[RoboCash Scraper] Sum of all candidates: " + sum);
+      }
+      if (candidates.length > 0) {
+        candidates.sort(function(a, b) { return b - a; });
+        return candidates[0];
+      }
+
+      return 0;
     })()`) as number;
 
     console.log(`[RoboCash Scraper] Scraping complete. Total balance: €${totalBalance}`);
