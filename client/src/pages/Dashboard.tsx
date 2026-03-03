@@ -182,27 +182,17 @@ export default function Dashboard() {
     if (!history || history.length === 0) return [];
     if (chartDataMode === "daily") return history;
 
-    const monthMap = new Map<string, { values: number[]; investeds: number[]; date: string }>();
+    const monthMap = new Map<string, { value: number; invested: number; date: string }>();
     for (const h of history) {
       const key = format(new Date(h.date), 'yyyy-MM');
-      if (!monthMap.has(key)) {
-        monthMap.set(key, { values: [], investeds: [], date: h.date });
-      }
-      const entry = monthMap.get(key)!;
-      entry.values.push(h.value);
-      entry.investeds.push(h.invested);
-      entry.date = h.date;
+      monthMap.set(key, { value: h.value, invested: h.invested, date: h.date });
     }
 
-    return Array.from(monthMap.entries()).map(([key, data]) => {
-      const avgValue = data.values.reduce((a, b) => a + b, 0) / data.values.length;
-      const avgInvested = data.investeds.reduce((a, b) => a + b, 0) / data.investeds.length;
-      return {
-        date: `${key}-15`,
-        value: avgValue,
-        invested: avgInvested,
-      };
-    });
+    return Array.from(monthMap.values()).map(data => ({
+      date: data.date,
+      value: data.value,
+      invested: data.invested,
+    }));
   }, [history, chartDataMode]);
 
 
@@ -520,7 +510,7 @@ export default function Dashboard() {
               <Tabs value={chartDataMode} onValueChange={(v) => setChartDataMode(v as "daily" | "monthly")} className="w-auto">
                 <TabsList>
                   <TabsTrigger value="daily" data-testid="tab-data-daily">Daily</TabsTrigger>
-                  <TabsTrigger value="monthly" data-testid="tab-data-monthly">Monthly Avg</TabsTrigger>
+                  <TabsTrigger value="monthly" data-testid="tab-data-monthly">Month End</TabsTrigger>
                 </TabsList>
               </Tabs>
               <Tabs value={range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range} onValueChange={(val) => {
@@ -579,7 +569,7 @@ export default function Dashboard() {
               <TabsList>
                 <TabsTrigger value="overview" data-testid="tab-chart-overview">Value Overview</TabsTrigger>
                 <TabsTrigger value="profit" data-testid="tab-chart-profit">Profit/Loss</TabsTrigger>
-                <TabsTrigger value="monthly" data-testid="tab-chart-monthly">{chartDataMode === "daily" ? "Daily" : "Monthly"} Growth</TabsTrigger>
+                <TabsTrigger value="monthly" data-testid="tab-chart-monthly">{chartDataMode === "daily" ? "Growth / Day" : "Monthly Growth"}</TabsTrigger>
                 <TabsTrigger value="all" data-testid="tab-chart-all">All</TabsTrigger>
               </TabsList>
             </Tabs>
@@ -593,7 +583,7 @@ export default function Dashboard() {
                       ...h, 
                       timestamp: new Date(h.date).getTime(),
                       gain: h.value - h.invested,
-                      monthlyChange: totalChange,
+                      monthlyChange: chartDataMode === "daily" ? totalChange / daysBetween : totalChange,
                     };
                   })}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -703,7 +693,7 @@ export default function Dashboard() {
                       <Line 
                         type="monotone" 
                         dataKey="monthlyChange" 
-                        name={chartDataMode === "daily" ? "Daily Growth" : "Monthly Growth"}
+                        name={chartDataMode === "daily" ? "Growth per Day" : "Monthly Growth"}
                         yAxisId="monthly"
                         stroke="#f59e0b" 
                         strokeWidth={chartView === "all" ? 3 : 4}
