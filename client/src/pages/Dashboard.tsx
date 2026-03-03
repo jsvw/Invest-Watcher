@@ -29,7 +29,7 @@ export default function Dashboard() {
   const [specificYear, setSpecificYear] = useState<string | null>(null);
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
   const [excludedPlatforms, setExcludedPlatforms] = useState<number[]>([]);
-  const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "realDaily" | "all">("overview");
+  const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
   const [chartDataMode, setChartDataMode] = useState<"daily" | "monthly">("monthly");
   const { toast } = useToast();
 
@@ -205,29 +205,6 @@ export default function Dashboard() {
     });
   }, [history, chartDataMode]);
 
-  const dailyGrowthData = useMemo(() => {
-    if (!chartData || chartData.length < 2) return [];
-    const result: { timestamp: number; date: string; realDailyGrowth: number }[] = [];
-    for (let i = 1; i < chartData.length; i++) {
-      const prev = chartData[i - 1];
-      const curr = chartData[i];
-      const prevDate = new Date(prev.date);
-      const currDate = new Date(curr.date);
-      const daysBetween = Math.max(1, Math.round((currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24)));
-      const totalChange = (curr.value - prev.value) - (curr.invested - prev.invested);
-      const dailyGrowth = totalChange / daysBetween;
-      for (let d = 0; d < daysBetween; d++) {
-        const dayDate = new Date(prevDate);
-        dayDate.setDate(dayDate.getDate() + d + 1);
-        result.push({
-          timestamp: dayDate.getTime(),
-          date: dayDate.toISOString().split('T')[0],
-          realDailyGrowth: dailyGrowth,
-        });
-      }
-    }
-    return result;
-  }, [chartData]);
 
   if (isPlatformsLoading || isHistoryLoading) {
     return (
@@ -603,63 +580,11 @@ export default function Dashboard() {
                 <TabsTrigger value="overview" data-testid="tab-chart-overview">Value Overview</TabsTrigger>
                 <TabsTrigger value="profit" data-testid="tab-chart-profit">Profit/Loss</TabsTrigger>
                 <TabsTrigger value="monthly" data-testid="tab-chart-monthly">{chartDataMode === "daily" ? "Daily" : "Monthly"} Growth</TabsTrigger>
-                <TabsTrigger value="realDaily" data-testid="tab-chart-real-daily">Avg Daily Growth</TabsTrigger>
                 <TabsTrigger value="all" data-testid="tab-chart-all">All</TabsTrigger>
               </TabsList>
             </Tabs>
             <div className="h-[400px] w-full">
-              {chartView === "realDaily" ? (
-                dailyGrowthData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={dailyGrowthData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                      <XAxis 
-                        dataKey="timestamp" 
-                        type="number"
-                        scale="time"
-                        domain={['dataMin', 'dataMax']}
-                        stroke="hsl(var(--muted-foreground))" 
-                        fontSize={12} 
-                        tickLine={false} 
-                        axisLine={false} 
-                        tickFormatter={(ts) => format(new Date(ts), 'MMM yy')}
-                      />
-                      <YAxis 
-                        yAxisId="realDaily"
-                        stroke="#8b5cf6" 
-                        fontSize={12} 
-                        tickLine={false} 
-                        axisLine={false} 
-                        tickFormatter={(value) => formatAxisValue(value, true)}
-                        domain={['auto', 'auto']}
-                      />
-                      <Tooltip 
-                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                        formatter={(value: number) => [
-                          `${value >= 0 ? '+' : ''}${formatCurrency(value, currency)}`,
-                          ""
-                        ]}
-                        labelFormatter={(ts) => format(new Date(ts), 'MMM dd, yyyy')}
-                      />
-                      <Legend verticalAlign="top" height={36}/>
-                      <Line 
-                        type="monotone" 
-                        dataKey="realDailyGrowth" 
-                        name="Avg Daily Growth"
-                        yAxisId="realDaily"
-                        stroke="#8b5cf6" 
-                        strokeWidth={2}
-                        dot={false}
-                        activeDot={{ r: 5, fill: '#8b5cf6' }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full flex items-center justify-center text-muted-foreground">
-                    Not enough data for daily growth.
-                  </div>
-                )
-              ) : chartData && chartData.length > 0 ? (
+              {chartData && chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData.map((h: any, i: number, arr: any[]) => {
                     const totalChange = i === 0 ? 0 : (h.value - arr[i - 1].value) - (h.invested - arr[i - 1].invested);
@@ -669,7 +594,6 @@ export default function Dashboard() {
                       timestamp: new Date(h.date).getTime(),
                       gain: h.value - h.invested,
                       monthlyChange: totalChange,
-                      realDailyGrowth: totalChange / daysBetween,
                     };
                   })}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -784,18 +708,6 @@ export default function Dashboard() {
                         stroke="#f59e0b" 
                         strokeWidth={chartView === "all" ? 3 : 4}
                         dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }}
-                        activeDot={{ r: 7 }}
-                      />
-                    )}
-                    {chartView === "all" && (
-                      <Line 
-                        type="monotone" 
-                        dataKey="realDailyGrowth" 
-                        name="Avg Daily Growth"
-                        yAxisId="monthly"
-                        stroke="#8b5cf6" 
-                        strokeWidth={3}
-                        dot={{ r: 5, fill: '#8b5cf6', strokeWidth: 0 }}
                         activeDot={{ r: 7 }}
                       />
                     )}
