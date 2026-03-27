@@ -176,10 +176,25 @@ export default function Analytics() {
     const years =
       (new Date(last.date).getTime() - new Date(first.date).getTime()) /
       (1000 * 60 * 60 * 24 * 365.25);
-    const cagr =
-      first.value > 0 && years > 0
-        ? (Math.pow(last.value / first.value, 1 / years) - 1) * 100
-        : null;
+
+    // Time-Weighted Return: strips out the effect of capital additions between periods
+    // Each period return = (end_value - begin_value - net_cash_added) / begin_value
+    // Compound all sub-period returns, then annualize
+    let twrFactor = 1;
+    let validPeriods = 0;
+    for (let i = 1; i < historyData.length; i++) {
+      const prev = historyData[i - 1];
+      const curr = historyData[i];
+      if (prev.value <= 0) continue;
+      const netCashAdded = curr.invested - prev.invested;
+      const periodReturn = (curr.value - prev.value - netCashAdded) / prev.value;
+      twrFactor *= (1 + periodReturn);
+      validPeriods++;
+    }
+    const twr = validPeriods > 0 ? (twrFactor - 1) * 100 : null;
+    const cagr = twr != null && years > 0
+      ? (Math.pow(twrFactor, 1 / years) - 1) * 100
+      : null;
 
     const bestPlatform = platforms.reduce(
       (best, p) => {
@@ -195,7 +210,7 @@ export default function Analytics() {
     const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
     const ageMonths = Math.floor(ageDays / 30);
 
-    return { totalROI, cagr, bestPlatform, ageDays, ageMonths };
+    return { totalROI, cagr, twr, bestPlatform, ageDays, ageMonths };
   }, [platforms, historyData]);
 
   const heatmapData = useMemo(() => {
@@ -350,9 +365,9 @@ export default function Analytics() {
             positive={kpis ? kpis.totalROI >= 0 : undefined}
           />
           <KpiCard
-            label="CAGR"
+            label="Ann. Return"
             value={kpis?.cagr != null ? fmtPct(kpis.cagr) : "—"}
-            sub="Compound annual growth rate"
+            sub={kpis?.twr != null ? `${fmtPct(kpis.twr)} cumulative · cash-flow adjusted` : "Time-weighted, annualized"}
             icon={<TrendingUp className="w-5 h-5 text-muted-foreground" />}
             positive={kpis?.cagr != null ? kpis.cagr >= 0 : undefined}
           />
