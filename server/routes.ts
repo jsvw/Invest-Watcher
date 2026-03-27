@@ -1253,20 +1253,21 @@ export async function registerRoutes(
         return invested - withdrawn;
       };
 
-      const result: Record<string, { platformId: number; name: string; color: string; gain: number }[]> = {};
+      const result: Record<string, { platformId: number; name: string; color: string; gain: number; gainPct: number | null }[]> = {};
 
       for (let i = 1; i < sortedMonths.length; i++) {
         const prevYM = sortedMonths[i - 1];
         const currYM = sortedMonths[i];
-        const breakdown: { platformId: number; name: string; color: string; gain: number }[] = [];
+        const breakdown: { platformId: number; name: string; color: string; gain: number; gainPct: number | null }[] = [];
 
         for (const p of userPlatforms) {
           const prevVal = getPlatformValueAtEndOfMonth(p.id, prevYM);
           const currVal = getPlatformValueAtEndOfMonth(p.id, currYM);
           const netCash = getNetCashInMonth(p.id, currYM);
           const gain = currVal - prevVal - netCash;
+          const gainPct = prevVal > 0 ? (gain / prevVal) * 100 : null;
           if (Math.abs(gain) > 0.005 || currVal > 0) {
-            breakdown.push({ platformId: p.id, name: p.name, color: p.color, gain });
+            breakdown.push({ platformId: p.id, name: p.name, color: p.color, gain, gainPct });
           }
         }
 

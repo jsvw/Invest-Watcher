@@ -110,6 +110,7 @@ interface PlatformGain {
   name: string;
   color: string;
   gain: number;
+  gainPct: number | null;
 }
 
 interface HeatmapTooltipData {
@@ -141,6 +142,9 @@ function HeatmapTooltipCard({ label, returnPct, absoluteChange, currency, platfo
                 <span className="flex-1 truncate text-muted-foreground">{p.name}</span>
                 <span className={cn("font-medium shrink-0", p.gain >= 0 ? "text-emerald-500" : "text-red-500")}>
                   {p.gain >= 0 ? "+" : ""}{formatCurrency(p.gain, currency)}
+                  {p.gainPct != null && (
+                    <span className="ml-1 opacity-70">({p.gainPct >= 0 ? "+" : ""}{p.gainPct.toFixed(2)}%)</span>
+                  )}
                 </span>
               </div>
             ))}
