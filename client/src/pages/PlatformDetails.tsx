@@ -254,6 +254,7 @@ export default function PlatformDetails() {
   const [specificYear, setSpecificYear] = useState<string | null>(null);
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
+  const [showAllPoints, setShowAllPoints] = useState(false);
   
   const { data: platforms } = usePlatforms();
   const id = platforms?.find(p => p.name.toLowerCase().replace(/\s+/g, '-') === slug)?.id || 0;
@@ -560,6 +561,16 @@ export default function PlatformDetails() {
     }));
   }, [history]);
 
+  const allPointsChartData = useMemo(() => {
+    if (!history || history.length === 0) return [];
+    return history.map((h: any) => ({
+      date: h.date,
+      value: h.value,
+      invested: h.invested,
+    }));
+  }, [history]);
+
+  const activeChartData = showAllPoints ? allPointsChartData : platformChartData;
 
   const formatAxisValue = (value: number, showSign: boolean = false) => {
     const symbol = getCurrencySymbol(currency);
@@ -913,18 +924,29 @@ export default function PlatformDetails() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <Tabs value={chartView} onValueChange={(v) => setChartView(v as any)} className="mb-4">
-                    <TabsList>
-                      <TabsTrigger value="overview">Value Overview</TabsTrigger>
-                      <TabsTrigger value="profit">Profit/Loss</TabsTrigger>
-                      <TabsTrigger value="monthly">Monthly Growth</TabsTrigger>
-                      <TabsTrigger value="all">All</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
+                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    <Tabs value={chartView} onValueChange={(v) => setChartView(v as any)}>
+                      <TabsList>
+                        <TabsTrigger value="overview">Value Overview</TabsTrigger>
+                        <TabsTrigger value="profit">Profit/Loss</TabsTrigger>
+                        <TabsTrigger value="monthly">Monthly Growth</TabsTrigger>
+                        <TabsTrigger value="all">All</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                    <Button
+                      variant={showAllPoints ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setShowAllPoints(v => !v)}
+                      className="text-xs"
+                      data-testid="button-toggle-all-data-points"
+                    >
+                      {showAllPoints ? "Monthly view" : "All data points"}
+                    </Button>
+                  </div>
                   <div className="h-[400px] w-full">
-                    {platformChartData && platformChartData.length > 0 ? (
+                    {activeChartData && activeChartData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={platformChartData.map((h: any, i: number, arr: any[]) => {
+                        <LineChart data={activeChartData.map((h: any, i: number, arr: any[]) => {
                           const totalChange = i === 0 ? 0 : (h.value - arr[i - 1].value) - (h.invested - arr[i - 1].invested);
                           return {
                             ...h, 
@@ -943,11 +965,13 @@ export default function PlatformDetails() {
                             fontSize={12} 
                             tickLine={false} 
                             axisLine={false} 
-                            tickFormatter={(ts) => format(new Date(ts), 'MMM yy')}
+                            tickFormatter={(ts) => format(new Date(ts), showAllPoints ? 'MMM dd' : 'MMM yy')}
                             ticks={(() => {
                               const seen = new Set<string>();
-                              return platformChartData.filter((entry: any) => {
-                                const key = format(new Date(entry.date), 'yyyy-MM');
+                              return activeChartData.filter((entry: any) => {
+                                const key = showAllPoints
+                                  ? format(new Date(entry.date), 'yyyy-MM-dd')
+                                  : format(new Date(entry.date), 'yyyy-MM');
                                 if (seen.has(key)) return false;
                                 seen.add(key);
                                 return true;
@@ -1369,18 +1393,29 @@ export default function PlatformDetails() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <Tabs value={chartView} onValueChange={(v) => setChartView(v as any)} className="mb-4">
-                    <TabsList>
-                      <TabsTrigger value="overview" data-testid="tab-platform-chart-overview">Value Overview</TabsTrigger>
-                      <TabsTrigger value="profit" data-testid="tab-platform-chart-profit">Profit/Loss</TabsTrigger>
-                      <TabsTrigger value="monthly" data-testid="tab-platform-chart-monthly">Monthly Growth</TabsTrigger>
-                      <TabsTrigger value="all" data-testid="tab-platform-chart-all">All</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
+                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    <Tabs value={chartView} onValueChange={(v) => setChartView(v as any)}>
+                      <TabsList>
+                        <TabsTrigger value="overview" data-testid="tab-platform-chart-overview">Value Overview</TabsTrigger>
+                        <TabsTrigger value="profit" data-testid="tab-platform-chart-profit">Profit/Loss</TabsTrigger>
+                        <TabsTrigger value="monthly" data-testid="tab-platform-chart-monthly">Monthly Growth</TabsTrigger>
+                        <TabsTrigger value="all" data-testid="tab-platform-chart-all">All</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                    <Button
+                      variant={showAllPoints ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setShowAllPoints(v => !v)}
+                      className="text-xs"
+                      data-testid="button-toggle-all-data-points-standard"
+                    >
+                      {showAllPoints ? "Monthly view" : "All data points"}
+                    </Button>
+                  </div>
                   <div className="h-[400px] w-full">
-                    {platformChartData && platformChartData.length > 0 ? (
+                    {activeChartData && activeChartData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={platformChartData.map((h: any, i: number, arr: any[]) => {
+                        <LineChart data={activeChartData.map((h: any, i: number, arr: any[]) => {
                           const totalChange = i === 0 ? 0 : (h.value - arr[i - 1].value) - (h.invested - arr[i - 1].invested);
                           return {
                             ...h, 
@@ -1399,11 +1434,13 @@ export default function PlatformDetails() {
                             fontSize={12} 
                             tickLine={false} 
                             axisLine={false} 
-                            tickFormatter={(ts) => format(new Date(ts), 'MMM yy')}
+                            tickFormatter={(ts) => format(new Date(ts), showAllPoints ? 'MMM dd' : 'MMM yy')}
                             ticks={(() => {
                               const seen = new Set<string>();
-                              return platformChartData.filter((entry: any) => {
-                                const key = format(new Date(entry.date), 'yyyy-MM');
+                              return activeChartData.filter((entry: any) => {
+                                const key = showAllPoints
+                                  ? format(new Date(entry.date), 'yyyy-MM-dd')
+                                  : format(new Date(entry.date), 'yyyy-MM');
                                 if (seen.has(key)) return false;
                                 seen.add(key);
                                 return true;
