@@ -291,6 +291,43 @@ export default function Dashboard() {
     ? history[history.length - 1] 
     : { value: 0, invested: 0 };
 
+  const ChartTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload || payload.length === 0) return null;
+    const d = payload[0]?.payload;
+    return (
+      <div className="rounded-xl border border-border bg-card shadow-lg px-4 py-3 text-sm min-w-[200px]">
+        <p className="font-semibold text-foreground mb-2">{label ? format(new Date(label), 'MMM dd, yyyy') : ''}</p>
+        {payload.map((entry: any) => {
+          const deltaKey = entry.dataKey === 'value' ? 'valueChange'
+            : entry.dataKey === 'invested' ? 'investedChange'
+            : entry.dataKey === 'gain' ? 'gainChange'
+            : null;
+          const delta = deltaKey ? d?.[deltaKey] : null;
+          return (
+            <div key={entry.dataKey} className="flex items-center justify-between gap-6 py-0.5">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
+                <span className="text-muted-foreground">{entry.name}</span>
+              </div>
+              <div className="text-right">
+                <span className="font-semibold text-foreground">
+                  {entry.dataKey === 'monthlyChange' || entry.dataKey === 'gain'
+                    ? `${entry.value >= 0 ? '+' : ''}${formatCurrency(entry.value, currency)}`
+                    : formatCurrency(entry.value, currency)}
+                </span>
+                {delta != null && delta !== 0 && (
+                  <span className={cn("ml-2 text-xs font-medium", delta >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                    {delta >= 0 ? '+' : ''}{formatCurrency(delta, currency)}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const totalValue = statsData.value;
   const totalInvested = statsData.invested;
   const netProfit = totalValue - totalInvested;
@@ -738,12 +775,16 @@ export default function Dashboard() {
               {chartData && chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData.map((h: any, i: number, arr: any[]) => {
-                    const totalChange = i === 0 ? 0 : (h.value - arr[i - 1].value) - (h.invested - arr[i - 1].invested);
+                    const prev = arr[i - 1];
+                    const totalChange = i === 0 ? 0 : (h.value - prev.value) - (h.invested - prev.invested);
                     return {
-                      ...h, 
+                      ...h,
                       timestamp: new Date(h.date).getTime(),
                       gain: h.value - h.invested,
                       monthlyChange: totalChange,
+                      valueChange: i === 0 ? null : h.value - prev.value,
+                      investedChange: i === 0 ? null : h.invested - prev.invested,
+                      gainChange: i === 0 ? null : (h.value - h.invested) - (prev.value - prev.invested),
                     };
                   })}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -802,16 +843,7 @@ export default function Dashboard() {
                         domain={['auto', 'auto']}
                       />
                     )}
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                      formatter={(value: number, name: string) => [
-                        name === "Profit/Loss" || name.includes("Growth")
-                          ? `${value >= 0 ? '+' : ''}${formatCurrency(value, currency)}`
-                          : formatCurrency(value, currency), 
-                        ""
-                      ]}
-                      labelFormatter={(ts) => format(new Date(ts), 'MMM dd, yyyy')}
-                    />
+                    <Tooltip content={<ChartTooltip />} />
                     <Legend verticalAlign="top" height={36}/>
                     {(chartView === "overview" || chartView === "all") && (
                       <>
