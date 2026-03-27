@@ -18,8 +18,10 @@ import {
   Tooltip,
   Legend,
   Cell,
+  PieChart,
+  Pie,
 } from "recharts";
-import { TrendingUp, Award, Calendar, Percent, Target } from "lucide-react";
+import { TrendingUp, Award, Calendar, Percent, Target, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -236,17 +238,41 @@ export default function Analytics() {
       .sort((a, b) => b.roi - a.roi);
   }, [platforms]);
 
-  const targetData = useMemo(() => {
-    if (!platforms) return [];
-    const totalCurrent = platforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
-    return platforms
-      .filter((p) => p.targetAllocation != null && Number(p.targetAllocation) > 0)
-      .map((p) => {
-        const current = Number(p.currentValue) || 0;
-        const actual = totalCurrent > 0 ? (current / totalCurrent) * 100 : 0;
-        const target = Number(p.targetAllocation);
-        return { name: p.name, actual: parseFloat(actual.toFixed(2)), target };
-      });
+  const rebalancerData = useMemo(() => {
+    if (!platforms) return null;
+    const totalPortfolioValue = platforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
+    const withTargets = platforms.filter((p) => p.targetAllocation != null && Number(p.targetAllocation) > 0);
+    if (withTargets.length === 0) return null;
+
+    const items = withTargets.map((p) => {
+      const currentValue = Number(p.currentValue) || 0;
+      const targetPct = Number(p.targetAllocation);
+      const targetAmount = (targetPct / 100) * totalPortfolioValue;
+      const surplus = currentValue - targetAmount;
+      const currentPct = totalPortfolioValue > 0 ? (currentValue / totalPortfolioValue) * 100 : 0;
+      return { ...p, currentValue, targetPct, targetAmount, surplus, currentPct };
+    });
+
+    const sources = items.filter((i) => i.surplus > 0.01).sort((a, b) => b.surplus - a.surplus);
+    const destinations = items.filter((i) => i.surplus < -0.01).sort((a, b) => a.surplus - b.surplus);
+
+    const srcRem = sources.map((s) => ({ ...s, remaining: s.surplus }));
+    const dstRem = destinations.map((d) => ({ ...d, remaining: Math.abs(d.surplus) }));
+    const flows: { from: (typeof items)[0]; to: (typeof items)[0]; amount: number }[] = [];
+    let si = 0, di = 0;
+    while (si < srcRem.length && di < dstRem.length) {
+      const amount = Math.min(srcRem[si].remaining, dstRem[di].remaining);
+      if (amount > 0.01) flows.push({ from: sources[si], to: destinations[di], amount });
+      srcRem[si].remaining -= amount;
+      dstRem[di].remaining -= amount;
+      if (srcRem[si].remaining < 0.01) si++;
+      if (dstRem[di].remaining < 0.01) di++;
+    }
+
+    const currentDonut = items.map((p) => ({ name: p.name, value: p.currentValue, color: p.color, pct: p.currentPct }));
+    const targetDonut = items.map((p) => ({ name: p.name, value: p.targetAmount, color: p.color, pct: p.targetPct }));
+
+    return { items, sources, destinations, flows, currentDonut, targetDonut };
   }, [platforms]);
 
   const momMap = useMemo(() => {
@@ -415,104 +441,197 @@ export default function Analytics() {
           </div>
         )}
 
-        {/* ROI by Platform + Target vs Actual */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>ROI by Platform</CardTitle>
-              <CardDescription>Sorted best to worst return on investment</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {roiData.length > 0 ? (
-                <div className="h-[320px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={roiData} layout="vertical" margin={{ left: 4, right: 48 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
-                      <XAxis
-                        type="number"
-                        tickFormatter={(v: number) => `${v.toFixed(0)}%`}
-                        tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        dataKey="name"
-                        type="category"
-                        width={90}
-                        tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip
-                        formatter={(v: number) => [`${v.toFixed(2)}%`, "ROI"]}
-                        contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
-                      />
-                      <Bar
-                        dataKey="roi"
-                        radius={[0, 4, 4, 0]}
-                        barSize={18}
-                        label={{ position: "right", formatter: (v: number) => `${v.toFixed(1)}%`, fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                      >
-                        {roiData.map((entry, i) => (
-                          <Cell key={i} fill={entry.roi >= 0 ? "#10b981" : "#ef4444"} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">No platform data available.</p>
-              )}
-            </CardContent>
-          </Card>
+        {/* ROI by Platform */}
+        <Card>
+          <CardHeader>
+            <CardTitle>ROI by Platform</CardTitle>
+            <CardDescription>Sorted best to worst return on investment</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {roiData.length > 0 ? (
+              <div className="h-[260px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={roiData} layout="vertical" margin={{ left: 4, right: 56 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+                    <XAxis
+                      type="number"
+                      tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      width={90}
+                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      formatter={(v: number) => [`${v.toFixed(2)}%`, "ROI"]}
+                      contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
+                    />
+                    <Bar
+                      dataKey="roi"
+                      radius={[0, 4, 4, 0]}
+                      barSize={18}
+                      label={{ position: "right", formatter: (v: number) => `${v.toFixed(1)}%`, fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    >
+                      {roiData.map((entry, i) => (
+                        <Cell key={i} fill={entry.roi >= 0 ? "#10b981" : "#ef4444"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm">No platform data available.</p>
+            )}
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Target vs Actual Allocation</CardTitle>
-              <CardDescription>How your current allocation compares to your targets</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {targetData.length > 0 ? (
-                <div className="h-[320px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={targetData} margin={{ left: 4 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        tickFormatter={(v: number) => `${v}%`}
-                        tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip
-                        formatter={(v: number) => [`${v.toFixed(2)}%`]}
-                        contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
-                      />
-                      <Legend />
-                      <Bar dataKey="actual" name="Actual %" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={20} />
-                      <Bar dataKey="target" name="Target %" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={20} />
-                    </BarChart>
-                  </ResponsiveContainer>
+        {/* Portfolio Rebalancer */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Portfolio Rebalancer</CardTitle>
+            <CardDescription>
+              Current vs target allocation — and exactly where to move capital to rebalance
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {rebalancerData ? (
+              <div className="space-y-8">
+                {/* Dual donut charts */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {[
+                    { label: "Current Allocation", data: rebalancerData.currentDonut, testId: "donut-current" },
+                    { label: "Target Allocation", data: rebalancerData.targetDonut, testId: "donut-target" },
+                  ].map(({ label, data, testId }) => (
+                    <div key={label} className="flex flex-col items-center gap-3">
+                      <p className="text-sm font-medium text-muted-foreground">{label}</p>
+                      <div className="h-[180px] w-full" data-testid={testId}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={data}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={52}
+                              outerRadius={80}
+                              dataKey="value"
+                              paddingAngle={2}
+                            >
+                              {data.map((entry, i) => (
+                                <Cell key={i} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              formatter={(v: number, _name: string, props: { payload?: { pct?: number } }) =>
+                                [`${props.payload?.pct?.toFixed(1) ?? "0.0"}%`, ""]
+                              }
+                              contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", fontSize: 12 }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-[200px] gap-3 text-center">
-                  <Target className="w-10 h-10 text-muted-foreground/40" />
-                  <div>
-                    <p className="text-muted-foreground text-sm font-medium">No allocation targets set</p>
-                    <p className="text-muted-foreground/70 text-xs mt-1">
-                      Set target allocations on the Dashboard to see this chart.
-                    </p>
+
+                {/* Shared legend */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2">
+                  {rebalancerData.items.map((item) => (
+                    <div key={item.id} className="flex items-center gap-2 min-w-0" data-testid={`legend-item-${item.id}`}>
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="text-xs text-muted-foreground truncate">{item.name}</span>
+                      <span className="text-xs font-medium ml-auto shrink-0">
+                        {item.currentPct.toFixed(1)}% / {item.targetPct.toFixed(1)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t pt-6 space-y-6">
+                  {/* Over / Under panel */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-red-500 mb-3">Over-Allocated</p>
+                      {rebalancerData.sources.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">All platforms are at or below their target.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {rebalancerData.sources.map((p) => (
+                            <div key={p.id} className="flex items-center gap-2" data-testid={`over-item-${p.id}`}>
+                              <PlatformIcon icon={p.icon} customIconUrl={p.customIconUrl} color={p.color} name={p.name} size="sm" />
+                              <span className="text-sm flex-1 truncate">{p.name}</span>
+                              <span className="text-sm font-semibold text-red-500 shrink-0">
+                                +{formatCurrency(p.surplus, currency)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-emerald-500 mb-3">Under-Allocated</p>
+                      {rebalancerData.destinations.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">All platforms are at or above their target.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {rebalancerData.destinations.map((p) => (
+                            <div key={p.id} className="flex items-center gap-2" data-testid={`under-item-${p.id}`}>
+                              <PlatformIcon icon={p.icon} customIconUrl={p.customIconUrl} color={p.color} name={p.name} size="sm" />
+                              <span className="text-sm flex-1 truncate">{p.name}</span>
+                              <span className="text-sm font-semibold text-emerald-500 shrink-0">
+                                {formatCurrency(p.surplus, currency)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Suggested cash flows */}
+                  {rebalancerData.flows.length > 0 && (
+                    <div>
+                      <p className="text-sm font-semibold mb-3">Suggested Cash Flows</p>
+                      <div className="space-y-2">
+                        {rebalancerData.flows.map((flow, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2"
+                            data-testid={`flow-${i}`}
+                          >
+                            <PlatformIcon icon={flow.from.icon} customIconUrl={flow.from.customIconUrl} color={flow.from.color} name={flow.from.name} size="sm" />
+                            <span className="text-sm font-medium truncate">{flow.from.name}</span>
+                            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground shrink-0 mx-1" />
+                            <PlatformIcon icon={flow.to.icon} customIconUrl={flow.to.customIconUrl} color={flow.to.color} name={flow.to.name} size="sm" />
+                            <span className="text-sm font-medium truncate">{flow.to.name}</span>
+                            <span className="ml-auto text-sm font-semibold shrink-0 bg-background border rounded-full px-2.5 py-0.5">
+                              {formatCurrency(flow.amount, currency)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-[200px] gap-3 text-center">
+                <Target className="w-10 h-10 text-muted-foreground/40" />
+                <div>
+                  <p className="text-muted-foreground text-sm font-medium">No allocation targets set</p>
+                  <p className="text-muted-foreground/70 text-xs mt-1">
+                    Set target allocations on the Dashboard to see the rebalancer.
+                  </p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Monthly Investment Flow */}
         <Card>
