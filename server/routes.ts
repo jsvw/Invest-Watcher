@@ -1153,6 +1153,62 @@ export async function registerRoutes(
     }
   });
 
+  // --- Analytics: Investment Flow ---
+  app.get('/api/analytics/investment-flow', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const userPlatforms = await storage.getPlatforms(userId);
+      const userInvestments = await storage.getAllInvestmentsForUser(userId);
+      const userWithdrawals = await storage.getAllWithdrawalsForUser(userId);
+
+      // Build a map of platformId -> category
+      const platformCategoryMap = new Map<number, string>();
+      for (const p of userPlatforms) {
+        platformCategoryMap.set(p.id, p.category || 'Other');
+      }
+
+      // Gather all unique categories
+      const allCategories = Array.from(new Set(userPlatforms.map(p => p.category || 'Other')));
+
+      // Build month -> category -> net amount map
+      const monthCategoryMap = new Map<string, Map<string, number>>();
+
+      for (const inv of userInvestments) {
+        const d = new Date(inv.date);
+        const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const category = platformCategoryMap.get(inv.platformId) || 'Other';
+        if (!monthCategoryMap.has(month)) monthCategoryMap.set(month, new Map());
+        const catMap = monthCategoryMap.get(month)!;
+        catMap.set(category, (catMap.get(category) || 0) + Number(inv.amount));
+      }
+
+      for (const wd of userWithdrawals) {
+        const d = new Date(wd.date);
+        const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const category = platformCategoryMap.get(wd.platformId) || 'Other';
+        if (!monthCategoryMap.has(month)) monthCategoryMap.set(month, new Map());
+        const catMap = monthCategoryMap.get(month)!;
+        catMap.set(category, (catMap.get(category) || 0) - Number(wd.amount));
+      }
+
+      // Build response rows: { month: string, [category]: number }
+      const sortedMonths = Array.from(monthCategoryMap.keys()).sort();
+      const result = sortedMonths.map(month => {
+        const catMap = monthCategoryMap.get(month)!;
+        const row: Record<string, string | number> = { month };
+        for (const cat of allCategories) {
+          row[cat] = catMap.get(cat) || 0;
+        }
+        return row;
+      });
+
+      res.json({ months: result, categories: allCategories });
+    } catch (error) {
+      console.error("Error fetching investment flow:", error);
+      res.status(500).json({ message: "Failed to fetch investment flow data" });
+    }
+  });
+
   // --- Email Settings ---
   app.get("/api/email-settings", requireAuth, async (req, res) => {
     const userId = getAuthenticatedUserId(req)!;
