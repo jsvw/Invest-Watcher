@@ -110,6 +110,8 @@ interface PlatformGain {
   platformId: number;
   name: string;
   color: string;
+  prevVal: number;
+  currVal: number;
   gain: number;
   gainPct: number | null;
 }
@@ -295,6 +297,30 @@ export default function Analytics() {
 
     return { years, cells };
   }, [historyData]);
+
+  // When platforms are filtered, re-derive the heatmap from per-platform breakdown
+  const filteredHeatmapData = useMemo(() => {
+    if (!platformBreakdownByMonth || excludedPlatforms.size === 0) return null;
+
+    const monthKeys = Object.keys(platformBreakdownByMonth).sort();
+    if (monthKeys.length < 1) return null;
+
+    const years = Array.from(new Set(monthKeys.map((k) => k.split("-")[0]))).sort();
+    const cells: { year: string; month: number; returnPct: number; absoluteChange: number }[] = [];
+
+    for (const key of monthKeys) {
+      const entries = platformBreakdownByMonth[key].filter((p) => !excludedPlatforms.has(p.platformId));
+      const filteredGain = entries.reduce((s, p) => s + p.gain, 0);
+      const filteredPrevVal = entries.reduce((s, p) => s + p.prevVal, 0);
+      const [cy, cm] = key.split("-").map(Number);
+      const returnPct = filteredPrevVal > 0 ? (filteredGain / filteredPrevVal) * 100 : 0;
+      cells.push({ year: String(cy), month: cm, returnPct, absoluteChange: filteredGain });
+    }
+
+    return { years, cells };
+  }, [platformBreakdownByMonth, excludedPlatforms]);
+
+  const activeHeatmapData = excludedPlatforms.size > 0 ? filteredHeatmapData : heatmapData;
 
   const roiData = useMemo(() => {
     if (!activePlatforms) return [];
@@ -497,7 +523,7 @@ export default function Analytics() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {heatmapData ? (
+            {activeHeatmapData ? (
               <div className="overflow-x-auto">
                 <div className="min-w-[600px]">
                   <div className="flex mb-1">
@@ -508,14 +534,14 @@ export default function Analytics() {
                       </div>
                     ))}
                   </div>
-                  {heatmapData.years.map((year) => (
+                  {activeHeatmapData.years.map((year) => (
                     <div key={year} className="flex items-center mb-1">
                       <div className="w-12 shrink-0 text-xs text-muted-foreground font-medium pr-2 text-right">
                         {year}
                       </div>
                       {Array.from({ length: 12 }, (_, mi) => {
                         const monthNum = mi + 1;
-                        const cell = heatmapData.cells.find(
+                        const cell = activeHeatmapData.cells.find(
                           (c) => c.year === year && c.month === monthNum
                         );
                         if (!cell) {

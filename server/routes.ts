@@ -1258,7 +1258,7 @@ export async function registerRoutes(
       for (let i = 1; i < sortedMonths.length; i++) {
         const prevYM = sortedMonths[i - 1];
         const currYM = sortedMonths[i];
-        const breakdown: { platformId: number; name: string; color: string; gain: number; gainPct: number | null }[] = [];
+        const breakdown: { platformId: number; name: string; color: string; prevVal: number; currVal: number; gain: number; gainPct: number | null }[] = [];
 
         for (const p of userPlatforms) {
           const prevVal = getPlatformValueAtEndOfMonth(p.id, prevYM);
@@ -1266,8 +1266,8 @@ export async function registerRoutes(
           const netCash = getNetCashInMonth(p.id, currYM);
           const gain = currVal - prevVal - netCash;
           const gainPct = prevVal > 0 ? (gain / prevVal) * 100 : null;
-          if (Math.abs(gain) > 0.005 || currVal > 0) {
-            breakdown.push({ platformId: p.id, name: p.name, color: p.color, gain, gainPct });
+          if (prevVal > 0 || currVal > 0) {
+            breakdown.push({ platformId: p.id, name: p.name, color: p.color, prevVal, currVal, gain, gainPct });
           }
         }
 
