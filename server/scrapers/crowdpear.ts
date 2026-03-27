@@ -501,6 +501,15 @@ export async function scrapeCrowdPear(email: string, password: string, gmailAppP
       return mainBalance + availableBalance;
     })()`) as number;
 
+    // Debug: dump relevant page text to server logs so we can see what's there
+    const pageTextDump = await page.evaluate(`(function() {
+      var text = document.body.innerText || '';
+      // Find "available" section (100 chars around it)
+      var idx = text.toLowerCase().indexOf('available');
+      if (idx >= 0) return text.substring(Math.max(0, idx - 50), idx + 150);
+      return text.substring(0, 500);
+    })()`);
+    console.log(`[CrowdPear Scraper] Page text around 'available': ${pageTextDump}`);
     console.log(`[CrowdPear Scraper] Scraping complete. Total balance: €${totalBalance}`);
 
     return {
