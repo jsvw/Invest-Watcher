@@ -569,7 +569,9 @@ export default function Analytics() {
                                   returnPct: cell.returnPct,
                                   absoluteChange: cell.absoluteChange,
                                   currency,
-                                  platformBreakdown: platformBreakdownByMonth?.[ymKey],
+                                  platformBreakdown: platformBreakdownByMonth?.[ymKey]?.filter(
+                                    (p) => !excludedPlatforms.has(p.platformId)
+                                  ),
                                 },
                               });
                             }}
