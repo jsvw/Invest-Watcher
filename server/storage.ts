@@ -646,6 +646,11 @@ export class DatabaseStorage implements IStorage {
       .where(eq(assets.id, id))
       .returning();
     if (!updated) throw new Error("Asset not found");
+    await db.insert(assetValuations).values({
+      assetId: id,
+      value: exitPrice,
+      date: exitDate,
+    });
     return updated;
   }
 
