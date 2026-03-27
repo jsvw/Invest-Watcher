@@ -386,38 +386,49 @@ export async function scrapeCrowdPear(email: string, password: string, gmailAppP
         return match ? parseFloat(match[0]) : null;
       };
 
-      // Helper: find a labelled value by searching for an element whose text contains
-      // the label, then grabbing the associated numeric sibling/child.
+      // Helper: find a labelled value — handles value-before-label and value-after-label layouts.
       var findLabelledValue = function(labelPatterns) {
         var allEls = Array.from(document.querySelectorAll('*'));
         for (var i = 0; i < allEls.length; i++) {
           var el = allEls[i];
-          var ownText = (el.childNodes.length === 1 && el.childNodes[0].nodeType === 3)
-            ? (el.textContent || '').trim().toLowerCase()
-            : '';
+          // Only look at leaf-ish elements (few children) to avoid matching giant containers
+          if (el.children.length > 5) continue;
+          var elText = (el.textContent || '').trim().toLowerCase();
+          var matched = false;
           for (var p = 0; p < labelPatterns.length; p++) {
-            if (ownText.includes(labelPatterns[p])) {
-              // Try next sibling
-              var sib = el.nextElementSibling;
-              if (sib) {
-                var n = extractNumber(sib.textContent);
-                if (n !== null) return n;
-              }
-              // Try parent's next sibling
-              if (el.parentElement) {
-                var parentSib = el.parentElement.nextElementSibling;
-                if (parentSib) {
-                  var pn = extractNumber(parentSib.textContent);
-                  if (pn !== null) return pn;
-                }
-                // Try other children of the parent
-                var siblings = Array.from(el.parentElement.children);
-                for (var s = 0; s < siblings.length; s++) {
-                  if (siblings[s] !== el) {
-                    var sn = extractNumber(siblings[s].textContent);
-                    if (sn !== null) return sn;
-                  }
-                }
+            if (elText.includes(labelPatterns[p])) { matched = true; break; }
+          }
+          if (!matched) continue;
+
+          // 1. Try previous sibling (value appears before the label element)
+          var prev = el.previousElementSibling;
+          if (prev) {
+            var pv = extractNumber(prev.textContent);
+            if (pv !== null) return pv;
+          }
+          // 2. Try next sibling (value appears after the label element)
+          var next = el.nextElementSibling;
+          if (next) {
+            var nv = extractNumber(next.textContent);
+            if (nv !== null) return nv;
+          }
+          // 3. Try parent siblings and parent's own numeric children
+          if (el.parentElement) {
+            var parentPrev = el.parentElement.previousElementSibling;
+            if (parentPrev) {
+              var ppv = extractNumber(parentPrev.textContent);
+              if (ppv !== null) return ppv;
+            }
+            var parentNext = el.parentElement.nextElementSibling;
+            if (parentNext) {
+              var pnv = extractNumber(parentNext.textContent);
+              if (pnv !== null) return pnv;
+            }
+            var siblings = Array.from(el.parentElement.children);
+            for (var s = 0; s < siblings.length; s++) {
+              if (siblings[s] !== el) {
+                var sv = extractNumber(siblings[s].textContent);
+                if (sv !== null) return sv;
               }
             }
           }
@@ -465,8 +476,25 @@ export async function scrapeCrowdPear(email: string, password: string, gmailAppP
         'available funds',
         'cash available',
         'available balance',
-        'available',
       ]);
+
+      // Fallback: regex on full page text — handles "€12.76\nAvailable for investment" layout
+      if (availableBalance === null) {
+        var pageText = document.body.innerText || '';
+        var availPatterns = [
+          /([\\d.,]+)\\s*€?\\s*\\n?\\s*Available\\s+for\\s+investment/i,
+          /€\\s*([\\d.,]+)\\s*\\n?\\s*Available\\s+for\\s+investment/i,
+          /Available\\s+for\\s+investment[\\s\\S]{0,30}€?\\s*([\\d.,]+)/i,
+        ];
+        for (var ap = 0; ap < availPatterns.length; ap++) {
+          var am = pageText.match(availPatterns[ap]);
+          if (am) {
+            var av = extractNumber(am[1]);
+            if (av !== null) { availableBalance = av; break; }
+          }
+        }
+      }
+
       if (availableBalance === null) availableBalance = 0;
 
       console.log('[CrowdPear] mainBalance=' + mainBalance + ' availableBalance=' + availableBalance);
