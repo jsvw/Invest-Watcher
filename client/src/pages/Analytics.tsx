@@ -21,7 +21,8 @@ import {
   PieChart,
   Pie,
 } from "recharts";
-import { TrendingUp, Award, Calendar, Percent, Target, ArrowRight } from "lucide-react";
+import { TrendingUp, Award, Calendar, Percent, Target, ArrowRight, Filter } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -165,8 +166,22 @@ export default function Analytics() {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; data: HeatmapTooltipData } | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("roi");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [excludedPlatforms, setExcludedPlatforms] = useState<Set<number>>(new Set());
+
+  function togglePlatform(id: number) {
+    setExcludedPlatforms((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
 
   const { data: platforms } = usePlatforms();
+
+  const activePlatforms = useMemo(
+    () => platforms?.filter((p) => !excludedPlatforms.has(p.id)),
+    [platforms, excludedPlatforms]
+  );
 
   const { data: historyData } = useQuery<HistoryPoint[]>({
     queryKey: ["/api/portfolio/history", "all"],
@@ -205,10 +220,10 @@ export default function Analytics() {
   });
 
   const kpis = useMemo(() => {
-    if (!platforms || !historyData || historyData.length === 0) return null;
+    if (!activePlatforms || !historyData || historyData.length === 0) return null;
 
-    const totalInvested = platforms.reduce((s, p) => s + (Number(p.totalInvested) || 0), 0);
-    const totalCurrent = platforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
+    const totalInvested = activePlatforms.reduce((s, p) => s + (Number(p.totalInvested) || 0), 0);
+    const totalCurrent = activePlatforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
     const totalROI = totalInvested > 0 ? ((totalCurrent - totalInvested) / totalInvested) * 100 : 0;
 
     const first = historyData[0];
@@ -236,7 +251,7 @@ export default function Analytics() {
       ? (Math.pow(twrFactor, 1 / years) - 1) * 100
       : null;
 
-    const bestPlatform = platforms.reduce(
+    const bestPlatform = activePlatforms.reduce(
       (best, p) => {
         const invested = Number(p.totalInvested) || 0;
         const current = Number(p.currentValue) || 0;
@@ -251,7 +266,7 @@ export default function Analytics() {
     const ageMonths = Math.floor(ageDays / 30);
 
     return { totalROI, cagr, twr, bestPlatform, ageDays, ageMonths };
-  }, [platforms, historyData]);
+  }, [activePlatforms, historyData]);
 
   const heatmapData = useMemo(() => {
     if (!historyData || historyData.length < 2) return null;
@@ -282,8 +297,8 @@ export default function Analytics() {
   }, [historyData]);
 
   const roiData = useMemo(() => {
-    if (!platforms) return [];
-    return platforms
+    if (!activePlatforms) return [];
+    return activePlatforms
       .map((p) => {
         const invested = Number(p.totalInvested) || 0;
         const current = Number(p.currentValue) || 0;
@@ -291,12 +306,12 @@ export default function Analytics() {
         return { name: p.name, roi, color: p.color };
       })
       .sort((a, b) => b.roi - a.roi);
-  }, [platforms]);
+  }, [activePlatforms]);
 
   const rebalancerData = useMemo(() => {
-    if (!platforms) return null;
-    const totalPortfolioValue = platforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
-    const withTargets = platforms.filter((p) => p.targetAllocation != null && Number(p.targetAllocation) > 0);
+    if (!activePlatforms) return null;
+    const totalPortfolioValue = activePlatforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
+    const withTargets = activePlatforms.filter((p) => p.targetAllocation != null && Number(p.targetAllocation) > 0);
     if (withTargets.length === 0) return null;
 
     const items = withTargets.map((p) => {
@@ -336,7 +351,7 @@ export default function Analytics() {
     const targetDonut = itemsWithPct.map((p) => ({ name: p.name, value: p.targetPct, color: p.color, pct: p.targetPct }));
 
     return { items: itemsWithPct, sources, destinations, flows, currentDonut, targetDonut };
-  }, [platforms]);
+  }, [activePlatforms]);
 
   const momMap = useMemo(() => {
     const m = new Map<number, number>();
@@ -345,9 +360,9 @@ export default function Analytics() {
   }, [momData]);
 
   const tableData = useMemo(() => {
-    if (!platforms) return [];
-    const totalCurrent = platforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
-    return platforms.map((p) => {
+    if (!activePlatforms) return [];
+    const totalCurrent = activePlatforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
+    return activePlatforms.map((p) => {
       const invested = Number(p.totalInvested) || 0;
       const current = Number(p.currentValue) || 0;
       const pnl = current - invested;
@@ -358,7 +373,7 @@ export default function Analytics() {
       const delta = target != null ? actual - target : null;
       return { ...p, invested, current, pnl, roi, mom, target, actual, delta };
     });
-  }, [platforms, momMap]);
+  }, [activePlatforms, momMap]);
 
   const sortedTable = useMemo(() => {
     const copy = [...tableData];
@@ -390,9 +405,55 @@ export default function Analytics() {
   return (
     <Layout>
       <div className="space-y-8 pb-12">
-        <div>
-          <h1 className="text-3xl font-bold font-display tracking-tight">Analytics</h1>
-          <p className="text-muted-foreground">Deep dive into your portfolio performance.</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold font-display tracking-tight">Analytics</h1>
+            <p className="text-muted-foreground">Deep dive into your portfolio performance.</p>
+          </div>
+          {platforms && platforms.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Filter className="w-3.5 h-3.5" />
+                <span>Filter platforms</span>
+                {excludedPlatforms.size > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 px-1.5 text-xs"
+                    onClick={() => setExcludedPlatforms(new Set())}
+                    data-testid="analytics-clear-filter"
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {platforms.map((p) => {
+                  const excluded = excludedPlatforms.has(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => togglePlatform(p.id)}
+                      data-testid={`analytics-filter-platform-${p.id}`}
+                      title={excluded ? `Include ${p.name}` : `Exclude ${p.name}`}
+                      className={cn(
+                        "flex items-center gap-1.5 px-2 py-1 rounded-full border text-xs font-medium transition-all",
+                        excluded
+                          ? "opacity-40 bg-muted border-transparent"
+                          : "border-transparent bg-muted/60 hover:bg-muted"
+                      )}
+                    >
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: excluded ? undefined : p.color }}
+                      />
+                      {p.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* KPI Cards */}
