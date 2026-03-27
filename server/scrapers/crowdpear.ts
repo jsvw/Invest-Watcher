@@ -386,54 +386,91 @@ export async function scrapeCrowdPear(email: string, password: string, gmailAppP
         return match ? parseFloat(match[0]) : null;
       };
 
-      var balanceEl = document.querySelector('.Balance_balance__-D0Zw');
-      if (balanceEl) {
-        var num = extractNumber(balanceEl.textContent);
-        if (num !== null && num > 0) return num;
-      }
-
-      var balanceEls = document.querySelectorAll('[class*="Balance_balance"]');
-      for (var i = 0; i < balanceEls.length; i++) {
-        var n = extractNumber(balanceEls[i].textContent);
-        if (n !== null && n > 0) return n;
-      }
-
-      var antTypoEls = document.querySelectorAll('.ant-typography');
-      var candidates = [];
-      for (var j = 0; j < antTypoEls.length; j++) {
-        var txt = antTypoEls[j].textContent || "";
-        if (txt.match(/[\\d.,]+/) && (txt.includes("\\u20ac") || txt.includes("EUR"))) {
-          var amount = extractNumber(txt);
-          if (amount !== null && amount > 0) {
-            candidates.push(amount);
+      // Helper: find a labelled value by searching for an element whose text contains
+      // the label, then grabbing the associated numeric sibling/child.
+      var findLabelledValue = function(labelPatterns) {
+        var allEls = Array.from(document.querySelectorAll('*'));
+        for (var i = 0; i < allEls.length; i++) {
+          var el = allEls[i];
+          var ownText = (el.childNodes.length === 1 && el.childNodes[0].nodeType === 3)
+            ? (el.textContent || '').trim().toLowerCase()
+            : '';
+          for (var p = 0; p < labelPatterns.length; p++) {
+            if (ownText.includes(labelPatterns[p])) {
+              // Try next sibling
+              var sib = el.nextElementSibling;
+              if (sib) {
+                var n = extractNumber(sib.textContent);
+                if (n !== null) return n;
+              }
+              // Try parent's next sibling
+              if (el.parentElement) {
+                var parentSib = el.parentElement.nextElementSibling;
+                if (parentSib) {
+                  var pn = extractNumber(parentSib.textContent);
+                  if (pn !== null) return pn;
+                }
+                // Try other children of the parent
+                var siblings = Array.from(el.parentElement.children);
+                for (var s = 0; s < siblings.length; s++) {
+                  if (siblings[s] !== el) {
+                    var sn = extractNumber(siblings[s].textContent);
+                    if (sn !== null) return sn;
+                  }
+                }
+              }
+            }
           }
         }
-      }
-      if (candidates.length > 0) {
-        candidates.sort(function(a, b) { return b - a; });
-        return candidates[0];
-      }
+        return null;
+      };
 
-      var allEls = document.querySelectorAll('[class*="balance"], [class*="Balance"], [class*="total"], [class*="Total"]');
-      for (var k = 0; k < allEls.length; k++) {
-        var val = extractNumber(allEls[k].textContent);
-        if (val !== null && val > 0) return val;
+      // 1. Find the main invested/portfolio balance
+      var mainBalance = null;
+      var balanceEl = document.querySelector('.Balance_balance__-D0Zw');
+      if (balanceEl) {
+        mainBalance = extractNumber(balanceEl.textContent);
       }
+      if (mainBalance === null) {
+        var balanceEls = document.querySelectorAll('[class*="Balance_balance"]');
+        for (var i = 0; i < balanceEls.length; i++) {
+          var n = extractNumber(balanceEls[i].textContent);
+          if (n !== null && n > 0) { mainBalance = n; break; }
+        }
+      }
+      if (mainBalance === null) {
+        mainBalance = findLabelledValue(['total balance', 'portfolio value', 'invested', 'my investments']);
+      }
+      if (mainBalance === null) {
+        var antTypoEls = document.querySelectorAll('.ant-typography');
+        var candidates = [];
+        for (var j = 0; j < antTypoEls.length; j++) {
+          var txt = antTypoEls[j].textContent || "";
+          if (txt.match(/[\\d.,]+/) && (txt.includes("\\u20ac") || txt.includes("EUR"))) {
+            var amount = extractNumber(txt);
+            if (amount !== null && amount > 0) candidates.push(amount);
+          }
+        }
+        if (candidates.length > 0) {
+          candidates.sort(function(a, b) { return b - a; });
+          mainBalance = candidates[0];
+        }
+      }
+      if (mainBalance === null) mainBalance = 0;
 
-      var pageContent = document.body.innerHTML;
-      var euroPattern = /\\u20ac\\s*([\\d.,]+)/g;
-      var euroMatches = [];
-      var m;
-      while ((m = euroPattern.exec(pageContent)) !== null) {
-        var parsed = extractNumber(m[1]);
-        if (parsed !== null && parsed > 0) euroMatches.push(parsed);
-      }
-      if (euroMatches.length > 0) {
-        euroMatches.sort(function(a, b) { return b - a; });
-        return euroMatches[0];
-      }
+      // 2. Find "Available for investment" cash balance
+      var availableBalance = findLabelledValue([
+        'available for investment',
+        'available to invest',
+        'available funds',
+        'cash available',
+        'available balance',
+        'available',
+      ]);
+      if (availableBalance === null) availableBalance = 0;
 
-      return 0;
+      console.log('[CrowdPear] mainBalance=' + mainBalance + ' availableBalance=' + availableBalance);
+      return mainBalance + availableBalance;
     })()`) as number;
 
     console.log(`[CrowdPear Scraper] Scraping complete. Total balance: €${totalBalance}`);
