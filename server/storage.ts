@@ -241,6 +241,7 @@ export class DatabaseStorage implements IStorage {
         description: row.description,
         currency: row.currency,
         platformMode: row.platform_mode,
+        targetAllocation: row.target_allocation != null ? Number(row.target_allocation) : null,
         createdAt: row.created_at,
         currentValue: Number(row.current_value) || 0,
         totalInvested: totalInvested - totalWithdrawn,

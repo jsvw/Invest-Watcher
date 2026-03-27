@@ -3,7 +3,7 @@ import { StatCard } from "@/components/StatCard";
 import { usePlatforms } from "@/hooks/use-platforms";
 import { useAuth } from "@/App";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
-import { Wallet, TrendingUp, DollarSign, Check, RefreshCw, Loader2, CheckCircle, XCircle, ChevronDown, ChevronUp, X, Save, Bookmark, Trash2 } from "lucide-react";
+import { Wallet, TrendingUp, DollarSign, Check, RefreshCw, Loader2, CheckCircle, XCircle, ChevronDown, ChevronUp, X, Save, Bookmark, Trash2, Target, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { Button } from "@/components/ui/button";
@@ -66,6 +66,42 @@ export default function Dashboard() {
     },
     onError: (err: Error) => {
       toast({ title: "Failed to delete filter", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const [localTargets, setLocalTargets] = useState<Record<number, string>>({});
+  const [targetsDirty, setTargetsDirty] = useState(false);
+
+  useEffect(() => {
+    if (platforms && !targetsDirty) {
+      const initial: Record<number, string> = {};
+      platforms.forEach(p => {
+        initial[p.id] = (p as any).targetAllocation != null ? String((p as any).targetAllocation) : '';
+      });
+      setLocalTargets(initial);
+    }
+  }, [platforms]);
+
+  const saveTargetsMutation = useMutation({
+    mutationFn: async () => {
+      if (!platforms) return;
+      await Promise.all(
+        platforms.map(p =>
+          apiRequest('PATCH', `/api/platforms/${p.id}`, {
+            targetAllocation: localTargets[p.id] !== '' && localTargets[p.id] != null
+              ? Number(localTargets[p.id])
+              : null,
+          })
+        )
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.platforms.list.path] });
+      setTargetsDirty(false);
+      toast({ title: "Allocation targets saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save targets", variant: "destructive" });
     },
   });
 
@@ -929,6 +965,141 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Portfolio Allocation Targets */}
+        {platforms && platforms.length > 0 && (() => {
+          const totalPortfolioValue = platforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
+          const totalTargetPct = platforms.reduce((s, p) => {
+            const t = localTargets[p.id];
+            return s + (t !== '' && t != null ? Number(t) : 0);
+          }, 0);
+          const totalRequired = platforms.reduce((s, p) => {
+            const t = localTargets[p.id];
+            if (t === '' || t == null) return s;
+            const targetVal = (Number(t) / 100) * totalPortfolioValue;
+            const needed = targetVal - (Number(p.currentValue) || 0);
+            return needed > 0 ? s + needed : s;
+          }, 0);
+
+          return (
+            <Card className="shadow-md">
+              <CardHeader>
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex items-center gap-2">
+                    <Target className="w-5 h-5 text-primary" />
+                    <div>
+                      <CardTitle>Portfolio Allocation Targets</CardTitle>
+                      <CardDescription>Set target % per platform and see how much to invest to rebalance</CardDescription>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className={cn("text-sm font-semibold px-3 py-1 rounded-full",
+                      Math.abs(totalTargetPct - 100) < 0.1 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                      : totalTargetPct > 100 ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
+                      : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                    )}>
+                      {totalTargetPct.toFixed(1)}% / 100%
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => saveTargetsMutation.mutate()}
+                      disabled={saveTargetsMutation.isPending}
+                      data-testid="button-save-targets"
+                    >
+                      {saveTargetsMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />}
+                      Save Targets
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="divide-y divide-border">
+                  {platforms.map(p => {
+                    const currentVal = Number(p.currentValue) || 0;
+                    const currentPct = totalPortfolioValue > 0 ? (currentVal / totalPortfolioValue) * 100 : 0;
+                    const targetStr = localTargets[p.id] ?? '';
+                    const targetNum = targetStr !== '' ? Number(targetStr) : null;
+                    const targetVal = targetNum != null ? (targetNum / 100) * totalPortfolioValue : null;
+                    const required = targetVal != null ? targetVal - currentVal : null;
+                    const delta = targetNum != null ? targetNum - currentPct : null;
+
+                    return (
+                      <div key={p.id} className="flex items-center gap-4 px-6 py-4 hover:bg-muted/20 transition-colors flex-wrap">
+                        <PlatformIcon
+                          icon={(p as any).icon}
+                          customIconUrl={(p as any).customIconUrl}
+                          color={p.color}
+                          name={p.name}
+                          size="md"
+                        />
+                        <div className="flex-1 min-w-[120px]">
+                          <div className="font-semibold text-sm">{p.name}</div>
+                          <div className="text-xs text-muted-foreground">{p.category}</div>
+                        </div>
+                        <div className="text-right min-w-[100px]">
+                          <div className="text-sm font-medium">{formatCurrency(currentVal, currency)}</div>
+                          <div className="text-xs text-muted-foreground">{currentPct.toFixed(1)}% current</div>
+                        </div>
+                        <div className="flex items-center gap-2 min-w-[130px]">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={targetStr}
+                            placeholder="—"
+                            className="w-20 h-8 text-sm text-right"
+                            data-testid={`input-target-${p.id}`}
+                            onChange={e => {
+                              setLocalTargets(prev => ({ ...prev, [p.id]: e.target.value }));
+                              setTargetsDirty(true);
+                            }}
+                          />
+                          <span className="text-sm text-muted-foreground">%</span>
+                        </div>
+                        {delta != null ? (
+                          <div className={cn("flex items-center gap-1 text-xs font-medium min-w-[70px]",
+                            delta >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                          )}>
+                            {delta >= 0 ? <ArrowUpCircle className="w-3.5 h-3.5" /> : <ArrowDownCircle className="w-3.5 h-3.5" />}
+                            {delta >= 0 ? '+' : ''}{delta.toFixed(1)}%
+                          </div>
+                        ) : (
+                          <div className="min-w-[70px]" />
+                        )}
+                        <div className="text-right min-w-[120px]">
+                          {required != null ? (
+                            required > 0.005 ? (
+                              <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                                +{formatCurrency(required, currency)}
+                              </div>
+                            ) : required < -0.005 ? (
+                              <div className="text-sm font-semibold text-rose-600 dark:text-rose-400">
+                                {formatCurrency(required, currency)} over
+                              </div>
+                            ) : (
+                              <div className="text-sm text-muted-foreground">On target</div>
+                            )
+                          ) : (
+                            <div className="text-xs text-muted-foreground">No target set</div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {totalRequired > 0 && (
+                  <div className="px-6 py-4 bg-muted/30 border-t border-border flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-sm text-muted-foreground">Total additional investment needed</span>
+                    <span className="font-bold text-base text-emerald-600 dark:text-emerald-400">
+                      +{formatCurrency(totalRequired, currency)}
+                    </span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()}
       </div>
     </Layout>
   );
