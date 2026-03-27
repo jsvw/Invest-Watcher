@@ -355,12 +355,17 @@ export default function Dashboard() {
             value={formatCurrency(totalValue, currency)} 
             icon={Wallet} 
             className="border-l-primary"
-            platformBreakdown={filteredPlatforms.map(p => ({
-              name: p.name,
-              value: formatCurrency(Number(p.currentValue) || 0, currency),
-              iconUrl: (p as any).customIconUrl,
-              sortValue: Number(p.currentValue) || 0
-            }))}
+            platformBreakdown={filteredPlatforms.map(p => {
+              const val = Number(p.currentValue) || 0;
+              const pct = totalValue > 0 ? (val / totalValue) * 100 : 0;
+              return {
+                name: p.name,
+                value: formatCurrency(val, currency),
+                percent: `${pct.toFixed(1)}%`,
+                iconUrl: (p as any).customIconUrl,
+                sortValue: val
+              };
+            })}
             data-testid="stat-total-value"
           />
           <StatCard 
@@ -368,12 +373,17 @@ export default function Dashboard() {
             value={formatCurrency(totalInvested, currency)} 
             icon={DollarSign}
             className="border-l-blue-500"
-            platformBreakdown={filteredPlatforms.map(p => ({
-              name: p.name,
-              value: formatCurrency(Number(p.totalInvested) || 0, currency),
-              iconUrl: (p as any).customIconUrl,
-              sortValue: Number(p.totalInvested) || 0
-            }))}
+            platformBreakdown={filteredPlatforms.map(p => {
+              const inv = Number(p.totalInvested) || 0;
+              const pct = totalInvested > 0 ? (inv / totalInvested) * 100 : 0;
+              return {
+                name: p.name,
+                value: formatCurrency(inv, currency),
+                percent: `${pct.toFixed(1)}%`,
+                iconUrl: (p as any).customIconUrl,
+                sortValue: inv
+              };
+            })}
             data-testid="stat-total-invested"
           />
           <StatCard 
@@ -387,9 +397,11 @@ export default function Dashboard() {
               const invested = Number(p.totalInvested) || 0;
               const value = Number(p.currentValue) || 0;
               const profit = value - invested;
+              const roi = invested > 0 ? (profit / invested) * 100 : 0;
               return {
                 name: p.name,
                 value: `${profit >= 0 ? '+' : ''}${formatCurrency(profit, currency)}`,
+                percent: `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%`,
                 iconUrl: (p as any).customIconUrl,
                 sortValue: profit
               };

@@ -6,6 +6,7 @@ import { LucideIcon } from "lucide-react";
 interface PlatformBreakdown {
   name: string;
   value: string;
+  percent?: string;
   iconUrl?: string | null;
   sortValue?: number;
 }
@@ -53,7 +54,14 @@ export function StatCard({ title, value, subValue, trend, trendValue, icon: Icon
                         )}
                         <span className="truncate text-muted-foreground">{item.name}</span>
                       </div>
-                      <span className="font-medium ml-2 flex-shrink-0">{item.value}</span>
+                      <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+                        {item.percent && (
+                          <span className="text-xs text-muted-foreground bg-muted px-1 py-0.5 rounded">
+                            {item.percent}
+                          </span>
+                        )}
+                        <span className="font-medium">{item.value}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
