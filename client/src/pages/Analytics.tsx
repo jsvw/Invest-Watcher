@@ -249,16 +249,22 @@ export default function Analytics() {
       const targetPct = Number(p.targetAllocation);
       const targetAmount = (targetPct / 100) * totalPortfolioValue;
       const surplus = currentValue - targetAmount;
-      const currentPct = totalPortfolioValue > 0 ? (currentValue / totalPortfolioValue) * 100 : 0;
-      return { ...p, currentValue, targetPct, targetAmount, surplus, currentPct };
+      return { ...p, currentValue, targetPct, targetAmount, surplus };
     });
 
-    const sources = items.filter((i) => i.surplus > 0.01).sort((a, b) => b.surplus - a.surplus);
-    const destinations = items.filter((i) => i.surplus < -0.01).sort((a, b) => a.surplus - b.surplus);
+    // Use only targeted platforms' total for donut display percentages so slices match labels exactly
+    const totalTargetedValue = items.reduce((s, p) => s + p.currentValue, 0);
+    const itemsWithPct = items.map((p) => ({
+      ...p,
+      currentPct: totalTargetedValue > 0 ? (p.currentValue / totalTargetedValue) * 100 : 0,
+    }));
+
+    const sources = itemsWithPct.filter((i) => i.surplus > 0.01).sort((a, b) => b.surplus - a.surplus);
+    const destinations = itemsWithPct.filter((i) => i.surplus < -0.01).sort((a, b) => a.surplus - b.surplus);
 
     const srcRem = sources.map((s) => ({ ...s, remaining: s.surplus }));
     const dstRem = destinations.map((d) => ({ ...d, remaining: Math.abs(d.surplus) }));
-    const flows: { from: (typeof items)[0]; to: (typeof items)[0]; amount: number }[] = [];
+    const flows: { from: (typeof itemsWithPct)[0]; to: (typeof itemsWithPct)[0]; amount: number }[] = [];
     let si = 0, di = 0;
     while (si < srcRem.length && di < dstRem.length) {
       const amount = Math.min(srcRem[si].remaining, dstRem[di].remaining);
@@ -269,10 +275,12 @@ export default function Analytics() {
       if (dstRem[di].remaining < 0.01) di++;
     }
 
-    const currentDonut = items.map((p) => ({ name: p.name, value: p.currentValue, color: p.color, pct: p.currentPct }));
-    const targetDonut = items.map((p) => ({ name: p.name, value: p.targetAmount, color: p.color, pct: p.targetPct }));
+    // Donut slices use the same denominator as their displayed percentages
+    const currentDonut = itemsWithPct.map((p) => ({ name: p.name, value: p.currentValue, color: p.color, pct: p.currentPct }));
+    // Target donut uses targetPct as slice value so slices are proportional to target%
+    const targetDonut = itemsWithPct.map((p) => ({ name: p.name, value: p.targetPct, color: p.color, pct: p.targetPct }));
 
-    return { items, sources, destinations, flows, currentDonut, targetDonut };
+    return { items: itemsWithPct, sources, destinations, flows, currentDonut, targetDonut };
   }, [platforms]);
 
   const momMap = useMemo(() => {
@@ -584,7 +592,7 @@ export default function Analytics() {
                               <PlatformIcon icon={p.icon} customIconUrl={p.customIconUrl} color={p.color} name={p.name} size="sm" />
                               <span className="text-sm flex-1 truncate">{p.name}</span>
                               <span className="text-sm font-semibold text-emerald-500 shrink-0">
-                                {formatCurrency(p.surplus, currency)}
+                                −{formatCurrency(Math.abs(p.surplus), currency)}
                               </span>
                             </div>
                           ))}
