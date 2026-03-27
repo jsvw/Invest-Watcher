@@ -501,15 +501,31 @@ export async function scrapeCrowdPear(email: string, password: string, gmailAppP
       return mainBalance + availableBalance;
     })()`) as number;
 
-    // Debug: dump relevant page text to server logs so we can see what's there
-    const pageTextDump = await page.evaluate(`(function() {
+    // Debug: dump page text and HTML structure so we can identify the correct selector
+    const pageDebug = await page.evaluate(`(function() {
       var text = document.body.innerText || '';
-      // Find "available" section (100 chars around it)
       var idx = text.toLowerCase().indexOf('available');
-      if (idx >= 0) return text.substring(Math.max(0, idx - 50), idx + 150);
-      return text.substring(0, 500);
+      var textSnippet = idx >= 0
+        ? text.substring(Math.max(0, idx - 80), idx + 200)
+        : text.substring(0, 400);
+
+      // Also find any element whose text includes 'available' and dump its outerHTML
+      var htmlSnippets = [];
+      var allEls = Array.from(document.querySelectorAll('*'));
+      for (var i = 0; i < allEls.length; i++) {
+        var el = allEls[i];
+        if (el.children.length > 3) continue;
+        var t = (el.textContent || '').toLowerCase().trim();
+        if (t.includes('available') && t.length < 200) {
+          htmlSnippets.push(el.parentElement ? el.parentElement.outerHTML.substring(0, 300) : el.outerHTML.substring(0, 300));
+          if (htmlSnippets.length >= 3) break;
+        }
+      }
+      return { textSnippet: textSnippet, htmlSnippets: htmlSnippets };
     })()`);
-    console.log(`[CrowdPear Scraper] Page text around 'available': ${pageTextDump}`);
+    const debug = pageDebug as any;
+    console.log('[CrowdPear Debug] Text around "available":', debug.textSnippet);
+    console.log('[CrowdPear Debug] HTML snippets:', JSON.stringify(debug.htmlSnippets));
     console.log(`[CrowdPear Scraper] Scraping complete. Total balance: €${totalBalance}`);
 
     return {
