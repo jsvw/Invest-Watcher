@@ -105,21 +105,48 @@ function KpiCard({ label, value, sub, icon, positive, neutral }: KpiCardProps) {
   );
 }
 
+interface PlatformGain {
+  platformId: number;
+  name: string;
+  color: string;
+  gain: number;
+}
+
 interface HeatmapTooltipData {
   label: string;
   returnPct: number;
   absoluteChange: number;
   currency: string;
+  platformBreakdown?: PlatformGain[];
 }
 
-function HeatmapTooltipCard({ label, returnPct, absoluteChange, currency }: HeatmapTooltipData) {
+function HeatmapTooltipCard({ label, returnPct, absoluteChange, currency, platformBreakdown }: HeatmapTooltipData) {
+  const significant = platformBreakdown?.filter(p => Math.abs(p.gain) > 0.01) ?? [];
   return (
-    <div className="bg-popover border rounded-lg shadow-lg p-3 text-xs space-y-1 pointer-events-none">
-      <p className="font-semibold">{label}</p>
-      <p className={returnPct >= 0 ? "text-emerald-500" : "text-red-500"}>
-        Return: {fmtPct(returnPct)}
-      </p>
-      <p className="text-muted-foreground">Change: {formatCurrency(absoluteChange, currency)}</p>
+    <div className="bg-popover border rounded-lg shadow-lg p-3 text-xs pointer-events-none min-w-[200px]">
+      <p className="font-semibold mb-1">{label}</p>
+      <div className="flex justify-between gap-4 mb-2">
+        <span className={returnPct >= 0 ? "text-emerald-500" : "text-red-500"}>
+          {fmtPct(returnPct)}
+        </span>
+        <span className="text-muted-foreground">{formatCurrency(absoluteChange, currency)}</span>
+      </div>
+      {significant.length > 0 && (
+        <>
+          <div className="border-t my-2" />
+          <div className="space-y-1">
+            {significant.map(p => (
+              <div key={p.platformId} className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+                <span className="flex-1 truncate text-muted-foreground">{p.name}</span>
+                <span className={cn("font-medium shrink-0", p.gain >= 0 ? "text-emerald-500" : "text-red-500")}>
+                  {p.gain >= 0 ? "+" : ""}{formatCurrency(p.gain, currency)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -151,6 +178,15 @@ export default function Analytics() {
     queryFn: async () => {
       const res = await fetch("/api/portfolio/platform-mom", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch MoM");
+      return res.json();
+    },
+  });
+
+  const { data: platformBreakdownByMonth } = useQuery<Record<string, PlatformGain[]>>({
+    queryKey: ["/api/analytics/monthly-platform-breakdown"],
+    queryFn: async () => {
+      const res = await fetch("/api/analytics/monthly-platform-breakdown", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch platform breakdown");
       return res.json();
     },
   });
@@ -433,10 +469,17 @@ export default function Analytics() {
                             data-testid={`heatmap-cell-${year}-${monthNum}`}
                             onMouseEnter={(e) => {
                               const rect = (e.target as HTMLElement).getBoundingClientRect();
+                              const ymKey = `${year}-${String(monthNum).padStart(2, "0")}`;
                               setTooltip({
                                 x: rect.left + rect.width / 2,
                                 y: rect.top,
-                                data: { label, returnPct: cell.returnPct, absoluteChange: cell.absoluteChange, currency },
+                                data: {
+                                  label,
+                                  returnPct: cell.returnPct,
+                                  absoluteChange: cell.absoluteChange,
+                                  currency,
+                                  platformBreakdown: platformBreakdownByMonth?.[ymKey],
+                                },
                               });
                             }}
                             onMouseLeave={() => setTooltip(null)}

@@ -1209,6 +1209,78 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/analytics/monthly-platform-breakdown', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const userPlatforms = await storage.getPlatforms(userId);
+      const userInvestments = await storage.getAllInvestmentsForUser(userId);
+      const userValuations = await storage.getAllValuationsForUser(userId);
+      const userWithdrawals = await storage.getAllWithdrawalsForUser(userId);
+
+      // Collect all unique year-months that have any data
+      const monthSet = new Set<string>();
+      const toYM = (date: string | Date) => {
+        const d = new Date(date);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      };
+      userInvestments.forEach(i => monthSet.add(toYM(i.date)));
+      userValuations.forEach(v => monthSet.add(toYM(v.date)));
+      userWithdrawals.forEach(w => monthSet.add(toYM(w.date)));
+      const sortedMonths = Array.from(monthSet).sort();
+
+      // For a given platform, get its value at the end of a given year-month
+      const getPlatformValueAtEndOfMonth = (platformId: number, ym: string): number => {
+        const [year, month] = ym.split('-').map(Number);
+        const endOfMonth = new Date(year, month, 0, 23, 59, 59);
+        const relevant = userValuations
+          .filter(v => v.platformId === platformId && new Date(v.date) <= endOfMonth)
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        if (relevant.length === 0) return 0;
+        return Number(relevant[0].value);
+      };
+
+      // Net cash added to a platform in a specific year-month
+      const getNetCashInMonth = (platformId: number, ym: string): number => {
+        const [year, month] = ym.split('-').map(Number);
+        const start = new Date(year, month - 1, 1);
+        const end = new Date(year, month, 0, 23, 59, 59);
+        const invested = userInvestments
+          .filter(i => i.platformId === platformId && new Date(i.date) >= start && new Date(i.date) <= end)
+          .reduce((s, i) => s + Number(i.amount), 0);
+        const withdrawn = userWithdrawals
+          .filter(w => w.platformId === platformId && new Date(w.date) >= start && new Date(w.date) <= end)
+          .reduce((s, w) => s + Number(w.amount), 0);
+        return invested - withdrawn;
+      };
+
+      const result: Record<string, { platformId: number; name: string; color: string; gain: number }[]> = {};
+
+      for (let i = 1; i < sortedMonths.length; i++) {
+        const prevYM = sortedMonths[i - 1];
+        const currYM = sortedMonths[i];
+        const breakdown: { platformId: number; name: string; color: string; gain: number }[] = [];
+
+        for (const p of userPlatforms) {
+          const prevVal = getPlatformValueAtEndOfMonth(p.id, prevYM);
+          const currVal = getPlatformValueAtEndOfMonth(p.id, currYM);
+          const netCash = getNetCashInMonth(p.id, currYM);
+          const gain = currVal - prevVal - netCash;
+          if (Math.abs(gain) > 0.005 || currVal > 0) {
+            breakdown.push({ platformId: p.id, name: p.name, color: p.color, gain });
+          }
+        }
+
+        breakdown.sort((a, b) => Math.abs(b.gain) - Math.abs(a.gain));
+        if (breakdown.length > 0) result[currYM] = breakdown;
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching monthly platform breakdown:", error);
+      res.status(500).json({ message: "Failed to fetch monthly platform breakdown" });
+    }
+  });
+
   // --- Email Settings ---
   app.get("/api/email-settings", requireAuth, async (req, res) => {
     const userId = getAuthenticatedUserId(req)!;
