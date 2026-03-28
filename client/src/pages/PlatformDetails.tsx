@@ -668,7 +668,7 @@ export default function PlatformDetails() {
     const years = Array.from(new Set(monthlyReturns.map(m => m.month.split('-')[0]))).sort();
     const cells = monthlyReturns.map(m => {
       const [y, mo] = m.month.split('-').map(Number);
-      return { year: String(y), month: mo, returnPct: m.gainPct ?? 0, absoluteChange: m.gain, monthKey: m.month };
+      return { year: String(y), month: mo, returnPct: m.gainPct ?? 0, rawGainPct: m.gainPct, absoluteChange: m.gain, monthKey: m.month };
     });
 
     const monthsActive = monthlyReturns.length;
@@ -2275,11 +2275,28 @@ export default function PlatformDetails() {
                               if (!cell) {
                                 return <div key={monthNum} className="flex-1 mx-0.5 h-10 rounded bg-muted/30" />;
                               }
+                              const label = `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][monthNum - 1]} ${year}`;
+                              // Cells with no computable rate (e.g. first month with prevVal=0) show neutral background
+                              if (cell.rawGainPct === null) {
+                                return (
+                                  <div
+                                    key={monthNum}
+                                    className="flex-1 mx-0.5 h-10 rounded flex items-center justify-center text-[10px] font-medium cursor-default bg-muted/50 text-muted-foreground"
+                                    data-testid={`platform-heatmap-cell-${year}-${monthNum}`}
+                                    onMouseEnter={(e) => {
+                                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                      setAnalyticsHeatmapTooltip({ x: rect.left + rect.width / 2, y: rect.top, label, gain: cell.absoluteChange, gainPct: 0 });
+                                    }}
+                                    onMouseLeave={() => setAnalyticsHeatmapTooltip(null)}
+                                  >
+                                    —
+                                  </div>
+                                );
+                              }
                               const intensity = Math.min(Math.abs(cell.returnPct) / 5, 1);
                               const bg = cell.returnPct >= 0
                                 ? `rgba(16,185,129,${0.15 + intensity * 0.75})`
                                 : `rgba(239,68,68,${0.15 + intensity * 0.75})`;
-                              const label = `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][monthNum - 1]} ${year}`;
                               return (
                                 <div
                                   key={monthNum}
