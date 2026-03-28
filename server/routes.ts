@@ -1304,14 +1304,16 @@ export async function registerRoutes(
 
       const sortedMonths = Array.from(valuationMonths).sort();
 
+      // Pre-sort valuations once (desc) for O(n) month-end lookups via early-exit find
+      const valuationsSortedDesc = [...platformValuations].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+
       const getValueAtEndOfMonth = (ym: string): number => {
         const [year, month] = ym.split('-').map(Number);
         const endOfMonth = new Date(year, month, 0, 23, 59, 59);
-        const relevant = platformValuations
-          .filter(v => new Date(v.date) <= endOfMonth)
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        if (relevant.length === 0) return 0;
-        return Number(relevant[0].value);
+        const match = valuationsSortedDesc.find(v => new Date(v.date) <= endOfMonth);
+        return match ? Number(match.value) : 0;
       };
 
       const getNetCashInMonth = (ym: string): number => {

@@ -625,7 +625,9 @@ export default function PlatformDetails() {
   const platformAnalytics = useMemo(() => {
     if (!monthlyReturns || monthlyReturns.length === 0) return null;
 
-    // All-time ROI from current platform data
+    // All-time ROI: uses platform aggregate totals (totalInvested, currentValue) as the
+    // authoritative source — these are maintained by the server and reflect all transactions
+    // including withdrawals and bonuses, making them more reliable than summing monthly gains.
     const typedPlatform = platform as PlatformResponse | null | undefined;
     const totalInvested = typedPlatform?.totalInvested ?? 0;
     const currentValue = typedPlatform?.currentValue ?? 0;
