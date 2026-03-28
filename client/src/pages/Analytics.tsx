@@ -33,24 +33,6 @@ import { cn } from "@/lib/utils";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-const CATEGORY_COLORS: Record<string, string> = {
-  "Real Estate": "#3b82f6",
-  "Stocks":      "#10b981",
-  "Stock":       "#10b981",
-  "Crypto":      "#f59e0b",
-  "Loans":       "#8b5cf6",
-  "Loan":        "#8b5cf6",
-  "Bonds":       "#06b6d4",
-  "Bond":        "#06b6d4",
-  "Cash":        "#6b7280",
-  "Bank":        "#6b7280",
-  "Other":       "#ec4899",
-};
-
-function categoryColor(cat: string): string {
-  return CATEGORY_COLORS[cat] || "#94a3b8";
-}
-
 function fmtPct(v: number): string {
   return `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
 }
@@ -78,7 +60,7 @@ interface PlatformMomEntry {
 
 interface InvestmentFlowResponse {
   months: Record<string, string | number>[];
-  categories: string[];
+  platforms: { name: string; color: string }[];
 }
 
 interface KpiCardProps {
@@ -921,7 +903,7 @@ export default function Analytics() {
         <Card>
           <CardHeader>
             <CardTitle>Monthly Investment Flow</CardTitle>
-            <CardDescription>Net new capital deployed each month, broken down by category</CardDescription>
+            <CardDescription>Net new capital deployed each month, broken down by platform</CardDescription>
           </CardHeader>
           <CardContent>
             {flowData && flowData.months.length > 0 ? (
@@ -949,8 +931,8 @@ export default function Analytics() {
                       contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
                     />
                     <Legend />
-                    {flowData.categories.map((cat) => (
-                      <Bar key={cat} dataKey={cat} stackId="flow" fill={categoryColor(cat)} />
+                    {flowData.platforms.map((p) => (
+                      <Bar key={p.name} dataKey={p.name} stackId="flow" fill={p.color} />
                     ))}
                   </BarChart>
                 </ResponsiveContainer>

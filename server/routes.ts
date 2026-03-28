@@ -1199,48 +1199,56 @@ export async function registerRoutes(
       const userInvestments = await storage.getAllInvestmentsForUser(userId);
       const userWithdrawals = await storage.getAllWithdrawalsForUser(userId);
 
-      // Build a map of platformId -> category
-      const platformCategoryMap = new Map<number, string>();
+      // Build a map of platformId -> { name, color }
+      const platformInfoMap = new Map<number, { name: string; color: string }>();
       for (const p of userPlatforms) {
-        platformCategoryMap.set(p.id, p.category || 'Other');
+        platformInfoMap.set(p.id, { name: p.name, color: p.color || '#6b7280' });
       }
 
-      // Gather all unique categories
-      const allCategories = Array.from(new Set(userPlatforms.map(p => p.category || 'Other')));
+      // Gather all platforms that have any investment/withdrawal activity
+      const activePlatformIds = new Set<number>();
+      userInvestments.forEach(i => activePlatformIds.add(i.platformId));
+      userWithdrawals.forEach(w => activePlatformIds.add(w.platformId));
 
-      // Build month -> category -> net amount map
-      const monthCategoryMap = new Map<string, Map<string, number>>();
+      const allPlatforms = Array.from(activePlatformIds)
+        .map(id => platformInfoMap.get(id))
+        .filter(Boolean) as { name: string; color: string }[];
+
+      // Build month -> platformName -> net amount map
+      const monthPlatformMap = new Map<string, Map<string, number>>();
 
       for (const inv of userInvestments) {
         const d = new Date(inv.date);
         const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        const category = platformCategoryMap.get(inv.platformId) || 'Other';
-        if (!monthCategoryMap.has(month)) monthCategoryMap.set(month, new Map());
-        const catMap = monthCategoryMap.get(month)!;
-        catMap.set(category, (catMap.get(category) || 0) + Number(inv.amount));
+        const pInfo = platformInfoMap.get(inv.platformId);
+        if (!pInfo) continue;
+        if (!monthPlatformMap.has(month)) monthPlatformMap.set(month, new Map());
+        const pm = monthPlatformMap.get(month)!;
+        pm.set(pInfo.name, (pm.get(pInfo.name) || 0) + Number(inv.amount));
       }
 
       for (const wd of userWithdrawals) {
         const d = new Date(wd.date);
         const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        const category = platformCategoryMap.get(wd.platformId) || 'Other';
-        if (!monthCategoryMap.has(month)) monthCategoryMap.set(month, new Map());
-        const catMap = monthCategoryMap.get(month)!;
-        catMap.set(category, (catMap.get(category) || 0) - Number(wd.amount));
+        const pInfo = platformInfoMap.get(wd.platformId);
+        if (!pInfo) continue;
+        if (!monthPlatformMap.has(month)) monthPlatformMap.set(month, new Map());
+        const pm = monthPlatformMap.get(month)!;
+        pm.set(pInfo.name, (pm.get(pInfo.name) || 0) - Number(wd.amount));
       }
 
-      // Build response rows: { month: string, [category]: number }
-      const sortedMonths = Array.from(monthCategoryMap.keys()).sort();
+      // Build response rows: { month: string, [platformName]: number }
+      const sortedMonths = Array.from(monthPlatformMap.keys()).sort();
       const result = sortedMonths.map(month => {
-        const catMap = monthCategoryMap.get(month)!;
+        const pm = monthPlatformMap.get(month)!;
         const row: Record<string, string | number> = { month };
-        for (const cat of allCategories) {
-          row[cat] = catMap.get(cat) || 0;
+        for (const p of allPlatforms) {
+          row[p.name] = pm.get(p.name) || 0;
         }
         return row;
       });
 
-      res.json({ months: result, categories: allCategories });
+      res.json({ months: result, platforms: allPlatforms });
     } catch (error) {
       console.error("Error fetching investment flow:", error);
       res.status(500).json({ message: "Failed to fetch investment flow data" });
