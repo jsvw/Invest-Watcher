@@ -779,65 +779,72 @@ export default function Analytics() {
           <CardContent>
             {rebalancerData ? (
               <div className="space-y-8">
-                {/* Allocation delta bar chart */}
-                <div
-                  style={{ height: Math.max(200, rebalancerData.items.length * 32) }}
-                  data-testid="rebalancer-delta-chart"
-                >
+                {/* Allocation stacked bar chart */}
+                <div className="h-[280px]" data-testid="rebalancer-alloc-chart">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      layout="vertical"
-                      data={rebalancerData.items.map((item) => ({
-                        name: item.name,
-                        delta: parseFloat((item.currentPct - item.targetPct).toFixed(2)),
-                        currentPct: item.currentPct,
-                        targetPct: item.targetPct,
-                      }))}
-                      margin={{ top: 4, right: 24, bottom: 4, left: 8 }}
+                      data={rebalancerData.items.map((item) => {
+                        const over = item.currentPct > item.targetPct;
+                        return {
+                          name: item.name,
+                          currentPct: item.currentPct,
+                          targetPct: item.targetPct,
+                          green: over ? item.targetPct : item.currentPct,
+                          gray: over ? 0 : item.targetPct - item.currentPct,
+                          red: over ? item.currentPct - item.targetPct : 0,
+                        };
+                      })}
+                      margin={{ top: 4, right: 8, bottom: 40, left: 8 }}
+                      barCategoryGap="30%"
                     >
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                       <XAxis
-                        type="number"
-                        tickFormatter={(v: number) => `${v > 0 ? "+" : ""}${v.toFixed(1)}%`}
+                        dataKey="name"
                         tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                         axisLine={false}
                         tickLine={false}
+                        angle={-35}
+                        textAnchor="end"
+                        interval={0}
                       />
                       <YAxis
-                        type="category"
-                        dataKey="name"
-                        width={88}
-                        tick={{ fontSize: 11, fill: "hsl(var(--foreground))" }}
+                        tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+                        tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                         axisLine={false}
                         tickLine={false}
+                        width={36}
                       />
                       <Tooltip
                         cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }}
-                        contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", fontSize: 12 }}
-                        formatter={(_v: number, _name: string, props: { payload?: { name: string; currentPct: number; targetPct: number; delta: number } }) => {
-                          const p = props.payload;
-                          if (!p) return ["", ""];
-                          const sign = p.delta >= 0 ? "+" : "";
-                          return [
-                            `Current: ${p.currentPct.toFixed(1)}%  Target: ${p.targetPct.toFixed(1)}%  Delta: ${sign}${p.delta.toFixed(1)}%`,
-                            p.name,
-                          ];
+                        content={({ active, payload }) => {
+                          if (!active || !payload?.length) return null;
+                          const d = payload[0]?.payload as { name: string; currentPct: number; targetPct: number } | undefined;
+                          if (!d) return null;
+                          const delta = d.currentPct - d.targetPct;
+                          const sign = delta >= 0 ? "+" : "";
+                          return (
+                            <div style={{ borderRadius: 8, background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", padding: "8px 12px", fontSize: 12, boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
+                              <p style={{ fontWeight: 600, marginBottom: 4 }}>{d.name}</p>
+                              <p>Current: <strong>{d.currentPct.toFixed(1)}%</strong></p>
+                              <p>Target: <strong>{d.targetPct.toFixed(1)}%</strong></p>
+                              <p style={{ color: delta > 0 ? "#ef4444" : delta < 0 ? "#10b981" : "inherit" }}>
+                                Delta: <strong>{sign}{delta.toFixed(1)}%</strong>
+                              </p>
+                            </div>
+                          );
                         }}
                       />
-                      <ReferenceLine x={0} stroke="hsl(var(--border))" strokeWidth={1.5} />
-                      <Bar dataKey="delta" radius={[0, 3, 3, 0]} isAnimationActive={false}>
-                        {rebalancerData.items.map((item) => {
-                          const delta = item.currentPct - item.targetPct;
-                          return (
-                            <Cell
-                              key={item.id}
-                              fill={delta > 0 ? "#ef4444" : "#10b981"}
-                            />
-                          );
-                        })}
-                      </Bar>
+                      <Bar dataKey="green" stackId="alloc" fill="#10b981" isAnimationActive={false} />
+                      <Bar dataKey="gray"  stackId="alloc" fill="#d1d5db" isAnimationActive={false} />
+                      <Bar dataKey="red"   stackId="alloc" fill="#ef4444" isAnimationActive={false} />
                     </BarChart>
                   </ResponsiveContainer>
+                </div>
+                {/* Chart legend */}
+                <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm inline-block bg-emerald-500" />Achieved</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm inline-block bg-gray-300" />Gap to target</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm inline-block bg-red-500" />Over target</span>
                 </div>
 
                 {/* Shared legend */}
