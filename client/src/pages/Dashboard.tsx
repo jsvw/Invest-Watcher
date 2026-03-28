@@ -5,7 +5,7 @@ import { useAuth } from "@/App";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 import { Wallet, TrendingUp, DollarSign, Check, RefreshCw, Loader2, CheckCircle, XCircle, ChevronDown, ChevronUp, X, Save, Bookmark, Trash2, Target, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -346,18 +346,6 @@ export default function Dashboard() {
   // Filter platforms based on exclusion list
   const filteredPlatforms = platforms?.filter(p => !excludedPlatforms.includes(p.id)) || [];
 
-  // Prepare Chart Data
-  const pieData = filteredPlatforms.reduce((acc: any[], platform) => {
-    const existing = acc.find(item => item.name === platform.category);
-    if (existing) {
-      existing.value += Number(platform.currentValue) || 0;
-    } else {
-      acc.push({ name: platform.category, value: Number(platform.currentValue) || 0 });
-    }
-    return acc;
-  }, []);
-
-  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
   return (
     <Layout>
@@ -923,114 +911,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Allocation Chart */}
-          <Card className="lg:col-span-1 shadow-md">
-            <CardHeader>
-              <CardTitle>Asset Allocation</CardTitle>
-              <CardDescription>Distribution by category</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {pieData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      content={(props: any) => {
-                        if (!props.active || !props.payload?.length) return null;
-                        const entry = props.payload[0];
-                        const total = pieData.reduce((s: number, d: any) => s + d.value, 0);
-                        const pct = total > 0 ? (entry.value / total) * 100 : 0;
-                        return (
-                          <div className="rounded-xl border border-border bg-card shadow-lg px-4 py-3 text-sm min-w-[160px]">
-                            <p className="font-semibold text-foreground mb-1">{entry.name}</p>
-                            <div className="flex justify-between gap-4">
-                              <span className="text-muted-foreground">{formatCurrency(entry.value, currency)}</span>
-                              <span className="font-medium">{pct.toFixed(1)}%</span>
-                            </div>
-                          </div>
-                        );
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="flex flex-wrap gap-4 justify-center mt-4">
-                {pieData.map((entry, index) => (
-                  <div key={entry.name} className="flex items-center gap-2 text-sm">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                    <span className="text-muted-foreground">{entry.name}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Platforms List Preview */}
-          <Card className="lg:col-span-2 shadow-md">
-            <CardHeader>
-              <CardTitle>Platform Performance</CardTitle>
-              <CardDescription>Current value by platform</CardDescription>
-            </CardHeader>
-            <CardContent>
-               {platforms && platforms.length > 0 ? (
-                 <div className="space-y-4">
-                   {platforms.map(platform => {
-                     const val = Number(platform.currentValue) || 0;
-                     const invested = Number(platform.totalInvested) || 0;
-                     const gain = val - invested;
-                     const percent = invested > 0 ? (gain / invested) * 100 : 0;
-                     
-                     return (
-                       <Link key={platform.id} href={`/platforms/${encodeURIComponent(platform.name.toLowerCase().replace(/\s+/g, '-'))}`} className="flex items-center justify-between p-4 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer group">
-                         <div className="flex items-center gap-4">
-                           <div className="group-hover:scale-110 transition-transform">
-                             <PlatformIcon
-                               icon={(platform as any).icon}
-                               customIconUrl={(platform as any).customIconUrl}
-                               color={platform.color}
-                               name={platform.name}
-                               size="lg"
-                             />
-                           </div>
-                           <div>
-                             <h4 className="font-semibold group-hover:text-primary transition-colors">{platform.name}</h4>
-                             <p className="text-xs text-muted-foreground">{platform.category}</p>
-                           </div>
-                         </div>
-                         <div className="text-right">
-                           <div className="font-bold">{formatCurrency(val, currency)}</div>
-                           <div className={cn("text-xs font-medium", gain >= 0 ? "text-emerald-600" : "text-rose-600")}>
-                             {gain >= 0 ? "+" : ""}{percent.toFixed(2)}%
-                           </div>
-                         </div>
-                       </Link>
-                     )
-                   })}
-                 </div>
-               ) : (
-                 <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                   No platforms added yet.
-                 </div>
-               )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Portfolio Allocation Targets */}
+        {/* Platform Performance + Allocation Targets */}
         {platforms && platforms.length > 0 && (() => {
           const totalPortfolioValue = platforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
           const totalTargetPct = platforms.reduce((s, p) => {
@@ -1052,8 +933,8 @@ export default function Dashboard() {
                   <div className="flex items-center gap-2">
                     <Target className="w-5 h-5 text-primary" />
                     <div>
-                      <CardTitle>Portfolio Allocation Targets</CardTitle>
-                      <CardDescription>Set target % per platform and see how much to invest to rebalance</CardDescription>
+                      <CardTitle>Platform Performance</CardTitle>
+                      <CardDescription>Value, ROI and allocation targets per platform</CardDescription>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -1079,30 +960,42 @@ export default function Dashboard() {
               <CardContent className="p-0">
                 <div className="divide-y divide-border">
                   {platforms.map(p => {
-                    const currentVal = Number(p.currentValue) || 0;
-                    const currentPct = totalPortfolioValue > 0 ? (currentVal / totalPortfolioValue) * 100 : 0;
+                    const val = Number(p.currentValue) || 0;
+                    const invested = Number(p.totalInvested) || 0;
+                    const gain = val - invested;
+                    const gainPct = invested > 0 ? (gain / invested) * 100 : 0;
+                    const currentPct = totalPortfolioValue > 0 ? (val / totalPortfolioValue) * 100 : 0;
                     const targetStr = localTargets[p.id] ?? '';
                     const targetNum = targetStr !== '' ? Number(targetStr) : null;
                     const targetVal = targetNum != null ? (targetNum / 100) * totalPortfolioValue : null;
-                    const required = targetVal != null ? targetVal - currentVal : null;
+                    const required = targetVal != null ? targetVal - val : null;
                     const delta = targetNum != null ? targetNum - currentPct : null;
 
                     return (
-                      <div key={p.id} className="flex items-center gap-4 px-6 py-4 hover:bg-muted/20 transition-colors flex-wrap">
-                        <PlatformIcon
-                          icon={(p as any).icon}
-                          customIconUrl={(p as any).customIconUrl}
-                          color={p.color}
-                          name={p.name}
-                          size="md"
-                        />
-                        <div className="flex-1 min-w-[120px]">
-                          <div className="font-semibold text-sm">{p.name}</div>
-                          <div className="text-xs text-muted-foreground">{p.category}</div>
-                        </div>
+                      <div key={p.id} className="flex items-center gap-4 px-6 py-3 hover:bg-muted/20 transition-colors flex-wrap">
+                        <Link href={`/platforms/${encodeURIComponent(p.name.toLowerCase().replace(/\s+/g, '-'))}`} className="flex items-center gap-3 group flex-1 min-w-[140px]">
+                          <div className="group-hover:scale-110 transition-transform">
+                            <PlatformIcon
+                              icon={(p as any).icon}
+                              customIconUrl={(p as any).customIconUrl}
+                              color={p.color}
+                              name={p.name}
+                              size="md"
+                            />
+                          </div>
+                          <div>
+                            <div className="font-semibold text-sm group-hover:text-primary transition-colors">{p.name}</div>
+                            <div className="text-xs text-muted-foreground">{p.category}</div>
+                          </div>
+                        </Link>
                         <div className="text-right min-w-[100px]">
-                          <div className="text-sm font-medium">{formatCurrency(currentVal, currency)}</div>
-                          <div className="text-xs text-muted-foreground">{currentPct.toFixed(1)}% current</div>
+                          <div className="text-sm font-medium">{formatCurrency(val, currency)}</div>
+                          <div className={cn("text-xs font-medium", gainPct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                            {gainPct >= 0 ? '+' : ''}{gainPct.toFixed(2)}%
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground min-w-[55px] text-right">
+                          {currentPct.toFixed(1)}% alloc
                         </div>
                         <div className="flex items-center gap-2 min-w-[130px]">
                           <Input
@@ -1131,7 +1024,7 @@ export default function Dashboard() {
                         ) : (
                           <div className="min-w-[70px]" />
                         )}
-                        <div className="text-right min-w-[120px]">
+                        <div className="text-right min-w-[110px]">
                           {required != null ? (
                             required > 0.005 ? (
                               <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
