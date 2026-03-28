@@ -17,10 +17,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { data: platforms } = usePlatforms();
 
+  const thirtyOneDaysAgo = new Date();
+  thirtyOneDaysAgo.setDate(thirtyOneDaysAgo.getDate() - 31);
+
+  const isPlatformStale = (lastValuationDate: string | null | undefined) => {
+    if (!lastValuationDate) return true;
+    return new Date(lastValuationDate) < thirtyOneDaysAgo;
+  };
+
   const hasStaleValuation = (() => {
     if (!platforms || platforms.length === 0) return false;
-    const thirtyOneDaysAgo = new Date();
-    thirtyOneDaysAgo.setDate(thirtyOneDaysAgo.getDate() - 31);
     const latestDate = platforms
       .map(p => p.lastValuationDate ? new Date(p.lastValuationDate) : null)
       .filter((d): d is Date => d !== null)
@@ -109,26 +115,39 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="mt-6">
             <p className="text-xs font-medium text-muted-foreground px-1 mb-2 uppercase tracking-wider">Platforms</p>
             <div className="grid grid-cols-3 gap-1.5">
-              {platforms?.map((p) => (
-                <Link
-                  key={p.id}
-                  href={`/platforms/${encodeURIComponent(p.name.toLowerCase().replace(/\s+/g, '-'))}`}
-                >
-                  <div
-                    title={p.name}
-                    data-testid={`sidebar-platform-${p.id}`}
-                    className="flex items-center justify-center p-2 rounded-lg hover:bg-muted transition-colors cursor-pointer"
-                  >
-                    <PlatformIcon
-                      icon={p.icon}
-                      customIconUrl={p.customIconUrl}
-                      color={p.color}
-                      name={p.name}
-                      size="md"
-                    />
-                  </div>
-                </Link>
-              ))}
+              {platforms?.map((p) => {
+                const stale = isPlatformStale(p.lastValuationDate);
+                return (
+                  <Tooltip key={p.id}>
+                    <TooltipTrigger asChild>
+                      <Link href={`/platforms/${encodeURIComponent(p.name.toLowerCase().replace(/\s+/g, '-'))}`}>
+                        <div
+                          data-testid={`sidebar-platform-${p.id}`}
+                          className="relative flex items-center justify-center p-2 rounded-lg hover:bg-muted transition-colors cursor-pointer"
+                        >
+                          <PlatformIcon
+                            icon={p.icon}
+                            customIconUrl={p.customIconUrl}
+                            color={p.color}
+                            name={p.name}
+                            size="md"
+                          />
+                          {stale && (
+                            <AlertTriangle
+                              className="absolute top-0.5 right-0.5 h-3 w-3 text-amber-500"
+                              data-testid={`icon-stale-platform-${p.id}`}
+                            />
+                          )}
+                        </div>
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <p className="font-medium">{p.name}</p>
+                      {stale && <p className="text-amber-400 text-xs">No valuation in 31+ days</p>}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
               <AddPlatformDialog
                 trigger={
                   <div
