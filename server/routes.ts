@@ -1309,34 +1309,46 @@ export async function registerRoutes(
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
       );
 
-      const getValueAtEndOfMonth = (ym: string): number => {
+      // Returns the latest valuation snapshot on or before end-of-month, with its exact date
+      const getSnapshotAtEndOfMonth = (ym: string): { value: number; date: Date } | null => {
         const [year, month] = ym.split('-').map(Number);
         const endOfMonth = new Date(year, month, 0, 23, 59, 59);
         const match = valuationsSortedDesc.find(v => new Date(v.date) <= endOfMonth);
-        return match ? Number(match.value) : 0;
+        return match ? { value: Number(match.value), date: new Date(match.date) } : null;
       };
 
-      const getNetCashInMonth = (ym: string): number => {
-        const [year, month] = ym.split('-').map(Number);
-        const start = new Date(year, month - 1, 1);
-        const end = new Date(year, month, 0, 23, 59, 59);
+      // Only count cash flows between two snapshot dates (exclusive of prevDate, inclusive of upTo)
+      // This avoids charging deposits/withdrawals that happened AFTER the month's snapshot date
+      const getNetCashBetween = (after: Date, upTo: Date): number => {
         const invested = platformInvestments
-          .filter(i => new Date(i.date) >= start && new Date(i.date) <= end)
+          .filter(i => new Date(i.date) > after && new Date(i.date) <= upTo)
           .reduce((s, i) => s + Number(i.amount), 0);
         const withdrawn = platformWithdrawals
-          .filter(w => new Date(w.date) >= start && new Date(w.date) <= end)
+          .filter(w => new Date(w.date) > after && new Date(w.date) <= upTo)
           .reduce((s, w) => s + Number(w.amount), 0);
         return invested - withdrawn;
       };
 
       const result: { month: string; prevVal: number; currVal: number; gain: number; gainPct: number | null }[] = [];
+      const epoch = new Date(0);
 
       for (let i = 0; i < sortedMonths.length; i++) {
         const currYM = sortedMonths[i];
-        const currVal = getValueAtEndOfMonth(currYM);
-        // For the first month use prevVal=0 (no prior baseline); for subsequent months use previous month-end value
-        const prevVal = i === 0 ? 0 : getValueAtEndOfMonth(sortedMonths[i - 1]);
-        const netCash = getNetCashInMonth(currYM);
+        const currSnap = getSnapshotAtEndOfMonth(currYM);
+        if (!currSnap) continue;
+
+        const currVal = currSnap.value;
+        const currDate = currSnap.date;
+
+        // For the first month use prevVal=0 and epoch as prevDate so all pre-snapshot flows are included
+        let prevVal = 0;
+        let prevDate = epoch;
+        if (i > 0) {
+          const prevSnap = getSnapshotAtEndOfMonth(sortedMonths[i - 1]);
+          if (prevSnap) { prevVal = prevSnap.value; prevDate = prevSnap.date; }
+        }
+
+        const netCash = getNetCashBetween(prevDate, currDate);
         const gain = currVal - prevVal - netCash;
         const gainPct = prevVal > 0 ? (gain / prevVal) * 100 : null;
         result.push({ month: currYM, prevVal, currVal, gain, gainPct });
