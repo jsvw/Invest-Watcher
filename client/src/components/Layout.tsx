@@ -91,8 +91,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     className="flex items-center justify-center p-2 rounded-lg hover:bg-muted transition-colors cursor-pointer"
                   >
                     <PlatformIcon
-                      icon={(p as any).icon}
-                      customIconUrl={(p as any).customIconUrl}
+                      icon={p.icon}
+                      customIconUrl={p.customIconUrl}
                       color={p.color}
                       name={p.name}
                       size="md"
