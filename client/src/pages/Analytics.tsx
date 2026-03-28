@@ -906,7 +906,7 @@ export default function Analytics() {
             <CardDescription>Net new capital deployed each month, broken down by platform</CardDescription>
           </CardHeader>
           <CardContent>
-            {flowData && flowData.months.length > 0 ? (
+            {flowData && flowData.months.length > 0 && flowData.platforms ? (
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={flowData.months} margin={{ left: 4 }}>
