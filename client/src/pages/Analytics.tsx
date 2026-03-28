@@ -27,7 +27,7 @@ import {
   Cell,
   ReferenceLine,
 } from "recharts";
-import { TrendingUp, Award, Calendar, Percent, Target, ArrowRight, Filter, Bookmark, Save, Trash2 } from "lucide-react";
+import { TrendingUp, Award, Calendar, Percent, Target, Filter, Bookmark, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -901,30 +901,6 @@ export default function Analytics() {
                     </div>
                   </div>
 
-                  {/* Suggested cash flows */}
-                  {rebalancerData.flows.length > 0 && (
-                    <div>
-                      <p className="text-sm font-semibold mb-3">Suggested Cash Flows</p>
-                      <div className="space-y-2">
-                        {rebalancerData.flows.map((flow, i) => (
-                          <div
-                            key={i}
-                            className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2"
-                            data-testid={`flow-${i}`}
-                          >
-                            <PlatformIcon icon={flow.from.icon} customIconUrl={flow.from.customIconUrl} color={flow.from.color} name={flow.from.name} size="sm" />
-                            <span className="text-sm font-medium truncate">{flow.from.name}</span>
-                            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground shrink-0 mx-1" />
-                            <PlatformIcon icon={flow.to.icon} customIconUrl={flow.to.customIconUrl} color={flow.to.color} name={flow.to.name} size="sm" />
-                            <span className="text-sm font-medium truncate">{flow.to.name}</span>
-                            <span className="ml-auto text-sm font-semibold shrink-0 bg-background border rounded-full px-2.5 py-0.5">
-                              {formatCurrency(flow.amount, currency)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             ) : (
