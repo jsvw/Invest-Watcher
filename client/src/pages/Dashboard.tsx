@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { api } from "@shared/routes";
 import { Link } from "wouter";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -105,6 +105,15 @@ export default function Dashboard() {
     },
   });
 
+  const { data: scraperConfigs } = useQuery<{ platformId: number; platformName: string; lastScrapeAt: string | null }[]>({
+    queryKey: ['/api/scraper-configs'],
+  });
+
+  const lastScrapeAt = scraperConfigs
+    ?.map(c => c.lastScrapeAt ? new Date(c.lastScrapeAt) : null)
+    .filter((d): d is Date => d !== null)
+    .reduce<Date | null>((max, d) => (max === null || d > max ? d : max), null) ?? null;
+
   const [scrapeLog, setScrapeLog] = useState<{ platformName: string; success: boolean; message: string }[] | null>(null);
   const [scrapeLogOpen, setScrapeLogOpen] = useState(false);
   const scrapeLogRef = useRef<HTMLDivElement>(null);
@@ -176,6 +185,7 @@ export default function Dashboard() {
       }
       queryClient.invalidateQueries({ queryKey: [api.portfolio.history.path] });
       queryClient.invalidateQueries({ queryKey: ['/api/platforms'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/scraper-configs'] });
     },
     onError: (err: any) => {
       setScrapeLog(prev => [...(prev || []), { platformName: "Error", success: false, message: err.message }]);
@@ -359,19 +369,28 @@ export default function Dashboard() {
             <h1 className="text-3xl font-bold font-display tracking-tight text-foreground">Dashboard</h1>
             <p className="text-muted-foreground">Your financial overview at a glance.</p>
           </div>
-          <Button
-            data-testid="button-scrape-all"
-            onClick={() => scrapeAllMutation.mutate()}
-            disabled={scrapeAllMutation.isPending}
-            variant="outline"
-          >
-            {scrapeAllMutation.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="mr-2 h-4 w-4" />
+          <div className="flex flex-col items-end gap-1">
+            <Button
+              data-testid="button-scrape-all"
+              onClick={() => scrapeAllMutation.mutate()}
+              disabled={scrapeAllMutation.isPending}
+              variant="outline"
+            >
+              {scrapeAllMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              {scrapeAllMutation.isPending ? "Scraping..." : "Scrape All"}
+            </Button>
+            {scraperConfigs && scraperConfigs.length > 0 && (
+              <span className="text-xs text-muted-foreground" data-testid="text-last-scrape-time">
+                {lastScrapeAt
+                  ? `Last scraped ${formatDistanceToNow(lastScrapeAt, { addSuffix: true })}`
+                  : "Never scraped"}
+              </span>
             )}
-            {scrapeAllMutation.isPending ? "Scraping..." : "Scrape All"}
-          </Button>
+          </div>
         </div>
 
         {(scrapeLogOpen && scrapeLog !== null) && (

@@ -65,7 +65,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* Scrollable top section */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="flex items-center gap-2 font-display text-2xl font-bold text-primary mb-8">
-            <TrendingUp className="h-8 w-8" />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="relative shrink-0 cursor-default">
+                  <TrendingUp className="h-8 w-8" />
+                  {hasStaleValuation && (
+                    <AlertTriangle
+                      className="absolute -top-1.5 -right-1.5 h-4 w-4 text-amber-500"
+                      data-testid="icon-stale-valuation-warning"
+                    />
+                  )}
+                </div>
+              </TooltipTrigger>
+              {hasStaleValuation && (
+                <TooltipContent side="right">
+                  <p>Some platforms haven't been updated in over 31 days</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
             <span>InvestTrack</span>
           </div>
 

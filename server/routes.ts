@@ -2102,7 +2102,7 @@ export async function registerRoutes(
       for (const config of configs) {
         const platform = await storage.getPlatform(config.platformId, userId);
         if (platform) {
-          results.push({ platformId: config.platformId, platformName: platform.name });
+          results.push({ platformId: config.platformId, platformName: platform.name, lastScrapeAt: config.lastScrapeAt });
         }
       }
       res.json(results);
