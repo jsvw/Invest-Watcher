@@ -382,7 +382,7 @@ export default function Analytics() {
 
   const rebalancerData = useMemo(() => {
     if (!activePlatforms) return null;
-    const totalPortfolioValue = activePlatforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
+    const totalPortfolioValue = (platforms ?? activePlatforms).reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
     const withTargets = activePlatforms.filter((p) => p.targetAllocation != null && Number(p.targetAllocation) > 0);
     if (withTargets.length === 0) return null;
 
@@ -423,7 +423,7 @@ export default function Analytics() {
     const targetDonut = itemsWithPct.map((p) => ({ name: p.name, value: p.targetPct, color: p.color, pct: p.targetPct }));
 
     return { items: itemsWithPct, sources, destinations, flows, currentDonut, targetDonut };
-  }, [activePlatforms]);
+  }, [activePlatforms, platforms]);
 
   const momMap = useMemo(() => {
     const m = new Map<number, number>();
@@ -433,7 +433,7 @@ export default function Analytics() {
 
   const tableData = useMemo(() => {
     if (!activePlatforms) return [];
-    const totalCurrent = activePlatforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
+    const totalCurrent = (platforms ?? activePlatforms).reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
     return activePlatforms.map((p) => {
       const invested = Number(p.totalInvested) || 0;
       const current = Number(p.currentValue) || 0;
@@ -445,7 +445,7 @@ export default function Analytics() {
       const delta = target != null ? actual - target : null;
       return { ...p, invested, current, pnl, roi, mom, target, actual, delta };
     });
-  }, [activePlatforms, momMap]);
+  }, [activePlatforms, platforms, momMap]);
 
   const sortedTable = useMemo(() => {
     const copy = [...tableData];
