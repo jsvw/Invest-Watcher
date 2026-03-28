@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend } from "recharts";
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -814,6 +814,11 @@ export default function PlatformDetails() {
                      </Badge></>
                    )}
                  </div>
+                 {(platform as any).lastValuationDate && (
+                   <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-last-valuation-date">
+                     Last valued {formatDistanceToNow(new Date((platform as any).lastValuationDate), { addSuffix: true })} — {format(new Date((platform as any).lastValuationDate), "MMM d, yyyy")}
+                   </p>
+                 )}
                </div>
             </div>
             
