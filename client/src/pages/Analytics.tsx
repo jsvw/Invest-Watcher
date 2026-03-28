@@ -394,11 +394,9 @@ export default function Analytics() {
       return { ...p, currentValue, targetPct, targetAmount, surplus };
     });
 
-    // Use only targeted platforms' total for donut display percentages so slices match labels exactly
-    const totalTargetedValue = items.reduce((s, p) => s + p.currentValue, 0);
     const itemsWithPct = items.map((p) => ({
       ...p,
-      currentPct: totalTargetedValue > 0 ? (p.currentValue / totalTargetedValue) * 100 : 0,
+      currentPct: totalPortfolioValue > 0 ? (p.currentValue / totalPortfolioValue) * 100 : 0,
     }));
 
     const sources = itemsWithPct.filter((i) => i.surplus > 0.01).sort((a, b) => b.surplus - a.surplus);
