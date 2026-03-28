@@ -29,7 +29,7 @@ const platformModes = [
   { value: "item_valuations", label: "Items with Valuations", description: "Individual items with periodic valuation updates (collectibles, crypto)" },
 ];
 
-export function AddPlatformDialog() {
+export function AddPlatformDialog({ trigger }: { trigger?: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const { mutate, isPending } = useCreatePlatform();
 
@@ -59,9 +59,11 @@ export function AddPlatformDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all">
-          <Plus className="h-4 w-4" /> Add Platform
-        </Button>
+        {trigger ?? (
+          <Button className="gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all">
+            <Plus className="h-4 w-4" /> Add Platform
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>

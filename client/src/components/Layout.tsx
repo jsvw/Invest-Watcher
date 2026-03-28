@@ -1,16 +1,20 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Wallet, PieChart, TrendingUp, Menu, X, LogOut, Settings, Coffee } from "lucide-react";
+import { LayoutDashboard, PieChart, TrendingUp, Menu, X, LogOut, Settings, Coffee, Plus } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/App";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { APP_VERSION } from "@/lib/version";
+import { usePlatforms } from "@/hooks/use-platforms";
+import { PlatformIcon } from "@/components/PlatformIcon";
+import { AddPlatformDialog } from "@/components/AddPlatformDialog";
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const [location, setLocation] = useLocation();
+  const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user } = useAuth();
+  const { data: platforms } = usePlatforms();
 
   const handleLogout = async () => {
     try {
@@ -24,7 +28,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/platforms", label: "Platforms", icon: Wallet },
     { href: "/analytics", label: "Analytics", icon: PieChart },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
@@ -44,15 +47,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Sidebar Navigation */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-card border-r shadow-xl transform transition-transform duration-200 ease-in-out md:translate-x-0 md:relative md:shadow-none",
+        "fixed inset-y-0 left-0 z-50 w-64 bg-card border-r shadow-xl transform transition-transform duration-200 ease-in-out md:translate-x-0 md:relative md:shadow-none flex flex-col h-full",
         isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="p-6">
+        {/* Scrollable top section */}
+        <div className="flex-1 overflow-y-auto p-6">
           <div className="flex items-center gap-2 font-display text-2xl font-bold text-primary mb-8">
             <TrendingUp className="h-8 w-8" />
             <span>InvestTrack</span>
           </div>
-          
+
           <nav className="space-y-2">
             {navItems.map((item) => {
               const isActive = location === item.href;
@@ -60,8 +64,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <Link key={item.href} href={item.href}>
                   <div className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer",
-                    isActive 
-                      ? "bg-primary text-primary-foreground shadow-md shadow-primary/20 font-medium" 
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-md shadow-primary/20 font-medium"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}>
                     <item.icon className="h-5 w-5" />
@@ -71,18 +75,57 @@ export function Layout({ children }: { children: React.ReactNode }) {
               );
             })}
           </nav>
+
+          {/* Platform icon grid */}
+          <div className="mt-6">
+            <p className="text-xs font-medium text-muted-foreground px-1 mb-2 uppercase tracking-wider">Platforms</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {platforms?.map((p) => (
+                <Link
+                  key={p.id}
+                  href={`/platforms/${encodeURIComponent(p.name.toLowerCase().replace(/\s+/g, '-'))}`}
+                >
+                  <div
+                    title={p.name}
+                    data-testid={`sidebar-platform-${p.id}`}
+                    className="flex items-center justify-center p-2 rounded-lg hover:bg-muted transition-colors cursor-pointer"
+                  >
+                    <PlatformIcon
+                      icon={(p as any).icon}
+                      customIconUrl={(p as any).customIconUrl}
+                      color={p.color}
+                      name={p.name}
+                      size="md"
+                    />
+                  </div>
+                </Link>
+              ))}
+              <AddPlatformDialog
+                trigger={
+                  <div
+                    title="Add Platform"
+                    data-testid="sidebar-add-platform"
+                    className="flex items-center justify-center p-2 rounded-lg hover:bg-muted transition-colors cursor-pointer border border-dashed border-muted-foreground/30"
+                  >
+                    <Plus className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                }
+              />
+            </div>
+          </div>
         </div>
 
-        <div className="absolute bottom-0 w-full p-6 space-y-4">
+        {/* Fixed bottom section */}
+        <div className="p-6 border-t space-y-4 flex-shrink-0">
           {user && (
             <div className="flex items-center justify-between">
               <div className="text-sm truncate">
                 <div className="font-medium">{user.name || "User"}</div>
                 <div className="text-xs text-muted-foreground truncate">{user.email}</div>
               </div>
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={handleLogout}
                 title="Log out"
                 data-testid="button-logout"
@@ -91,9 +134,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </Button>
             </div>
           )}
-          <a 
-            href="https://buymeacoffee.com/investmenttracker" 
-            target="_blank" 
+          <a
+            href="https://buymeacoffee.com/investmenttracker"
+            target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3 bg-amber-500/10 hover:bg-amber-500/20 rounded-xl p-4 border border-amber-500/30 transition-colors"
             data-testid="link-buy-me-coffee"
@@ -116,10 +159,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
-      
+
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />

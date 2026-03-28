@@ -9,7 +9,6 @@ import { lazy, Suspense, useEffect, createContext, useContext } from "react";
 import { Loader2 } from "lucide-react";
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const Platforms = lazy(() => import("@/pages/Platforms"));
 const PlatformDetails = lazy(() => import("@/pages/PlatformDetails"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const Settings = lazy(() => import("@/pages/Settings"));
@@ -107,9 +106,6 @@ function Router() {
       <Route path="/login" component={AuthPage} />
       <Route path="/">
         {(params) => <ProtectedRoute component={Dashboard} {...params} />}
-      </Route>
-      <Route path="/platforms">
-        {(params) => <ProtectedRoute component={Platforms} {...params} />}
       </Route>
       <Route path="/platforms/:slug">
         {(params) => <ProtectedRoute component={PlatformDetails} {...params} />}
