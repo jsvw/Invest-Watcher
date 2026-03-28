@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search, ArrowUpDown, Trash2, RotateCcw, BarChart3, RefreshCw, Loader2 } from "lucide-react";
+import { TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search, ArrowUpDown, Trash2, RotateCcw, BarChart3, RefreshCw, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -794,10 +794,6 @@ export default function PlatformDetails() {
         
         {/* Header */}
         <div>
-          <Link href="/platforms" className="inline-flex items-center text-sm text-muted-foreground hover:text-primary mb-4 transition-colors">
-            <ArrowLeft className="h-4 w-4 mr-1" /> Back to Platforms
-          </Link>
-          
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
                <PlatformIcon
