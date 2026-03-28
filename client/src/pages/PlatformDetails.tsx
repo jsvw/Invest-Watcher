@@ -631,7 +631,7 @@ export default function PlatformDetails() {
     const currentValue = typedPlatform?.currentValue ?? 0;
     const allTimeROI = totalInvested > 0 ? ((currentValue - totalInvested) / totalInvested) * 100 : null;
 
-    // Annualized TWR from monthly data
+    // Annualized TWR from monthly data — annualize over validPeriods, not total months
     let twrFactor = 1;
     let validPeriods = 0;
     for (const m of monthlyReturns) {
@@ -641,9 +641,8 @@ export default function PlatformDetails() {
       validPeriods++;
     }
     const twr = validPeriods > 0 ? (twrFactor - 1) * 100 : null;
-    const monthsActive = monthlyReturns.length;
-    const yearsActive = monthsActive / 12;
-    const annualizedTwr = twr !== null && yearsActive > 0 ? (Math.pow(twrFactor, 1 / yearsActive) - 1) * 100 : null;
+    const yearsActive = validPeriods / 12;
+    const annualizedTwr = twr !== null && validPeriods > 0 ? (Math.pow(twrFactor, 1 / yearsActive) - 1) * 100 : null;
 
     // Best/worst month
     const positiveMonths = monthlyReturns.filter(m => m.gain > 0);
