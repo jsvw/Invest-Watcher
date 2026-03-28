@@ -620,7 +620,7 @@ export default function PlatformDetails() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const [analyticsHeatmapTooltip, setAnalyticsHeatmapTooltip] = useState<{ x: number; y: number; label: string; gain: number; gainPct: number } | null>(null);
+  const [analyticsHeatmapTooltip, setAnalyticsHeatmapTooltip] = useState<{ x: number; y: number; label: string; gain: number; gainPct: number | null } | null>(null);
 
   const platformAnalytics = useMemo(() => {
     if (!monthlyReturns || monthlyReturns.length === 0) return null;
@@ -2285,7 +2285,7 @@ export default function PlatformDetails() {
                                     data-testid={`platform-heatmap-cell-${year}-${monthNum}`}
                                     onMouseEnter={(e) => {
                                       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                      setAnalyticsHeatmapTooltip({ x: rect.left + rect.width / 2, y: rect.top, label, gain: cell.absoluteChange, gainPct: 0 });
+                                      setAnalyticsHeatmapTooltip({ x: rect.left + rect.width / 2, y: rect.top, label, gain: cell.absoluteChange, gainPct: null });
                                     }}
                                     onMouseLeave={() => setAnalyticsHeatmapTooltip(null)}
                                   >
@@ -2334,8 +2334,10 @@ export default function PlatformDetails() {
                     <div className="bg-popover border rounded-lg shadow-lg p-3 text-xs min-w-[160px]">
                       <p className="font-semibold mb-1">{analyticsHeatmapTooltip.label}</p>
                       <div className="flex justify-between gap-4">
-                        <span className={analyticsHeatmapTooltip.gainPct >= 0 ? 'text-emerald-500' : 'text-red-500'}>
-                          {`${analyticsHeatmapTooltip.gainPct >= 0 ? '+' : ''}${analyticsHeatmapTooltip.gainPct.toFixed(2)}%`}
+                        <span className={analyticsHeatmapTooltip.gainPct !== null ? (analyticsHeatmapTooltip.gainPct >= 0 ? 'text-emerald-500' : 'text-red-500') : 'text-muted-foreground'}>
+                          {analyticsHeatmapTooltip.gainPct !== null
+                            ? `${analyticsHeatmapTooltip.gainPct >= 0 ? '+' : ''}${analyticsHeatmapTooltip.gainPct.toFixed(2)}%`
+                            : 'N/A'}
                         </span>
                         <span className="text-muted-foreground">
                           {`${analyticsHeatmapTooltip.gain >= 0 ? '+' : ''}${formatCurrency(analyticsHeatmapTooltip.gain, currency)}`}
