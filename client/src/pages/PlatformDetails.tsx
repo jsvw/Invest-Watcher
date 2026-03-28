@@ -766,14 +766,14 @@ export default function PlatformDetails() {
                />
                <div>
                  <h1 className="text-3xl font-bold font-display tracking-tight">{platform.name}</h1>
-                 <p className="text-muted-foreground">
+                 <div className="text-sm text-muted-foreground">
                    {platform.category} • {(platform as any).currency || "USD"} 
                    {platformMode !== "standard" && (
                      <> • <Badge variant="outline" className="ml-1 text-xs">
                        {platformMode === "asset_returns" ? "Asset Tracking" : "Item Tracking"}
                      </Badge></>
                    )}
-                 </p>
+                 </div>
                </div>
             </div>
             
