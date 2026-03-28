@@ -25,8 +25,6 @@ import {
   Tooltip,
   Legend,
   Cell,
-  PieChart,
-  Pie,
   ReferenceLine,
 } from "recharts";
 import { TrendingUp, Award, Calendar, Percent, Target, ArrowRight, Filter, Bookmark, Save, Trash2 } from "lucide-react";
@@ -781,41 +779,65 @@ export default function Analytics() {
           <CardContent>
             {rebalancerData ? (
               <div className="space-y-8">
-                {/* Dual donut charts */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  {[
-                    { label: "Current Allocation", data: rebalancerData.currentDonut, testId: "donut-current" },
-                    { label: "Target Allocation", data: rebalancerData.targetDonut, testId: "donut-target" },
-                  ].map(({ label, data, testId }) => (
-                    <div key={label} className="flex flex-col items-center gap-3">
-                      <p className="text-sm font-medium text-muted-foreground">{label}</p>
-                      <div className="h-[180px] w-full" data-testid={testId}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={data}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={52}
-                              outerRadius={80}
-                              dataKey="value"
-                              paddingAngle={2}
-                            >
-                              {data.map((entry, i) => (
-                                <Cell key={i} fill={entry.color} />
-                              ))}
-                            </Pie>
-                            <Tooltip
-                              formatter={(v: number, _name: string, props: { payload?: { pct?: number } }) =>
-                                [`${props.payload?.pct?.toFixed(1) ?? "0.0"}%`, ""]
-                              }
-                              contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", fontSize: 12 }}
+                {/* Allocation delta bar chart */}
+                <div
+                  style={{ height: Math.max(200, rebalancerData.items.length * 32) }}
+                  data-testid="rebalancer-delta-chart"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      layout="vertical"
+                      data={rebalancerData.items.map((item) => ({
+                        name: item.name,
+                        delta: parseFloat((item.currentPct - item.targetPct).toFixed(2)),
+                        currentPct: item.currentPct,
+                        targetPct: item.targetPct,
+                      }))}
+                      margin={{ top: 4, right: 24, bottom: 4, left: 8 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+                      <XAxis
+                        type="number"
+                        tickFormatter={(v: number) => `${v > 0 ? "+" : ""}${v.toFixed(1)}%`}
+                        tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        width={88}
+                        tick={{ fontSize: 11, fill: "hsl(var(--foreground))" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }}
+                        contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)", fontSize: 12 }}
+                        formatter={(_v: number, _name: string, props: { payload?: { name: string; currentPct: number; targetPct: number; delta: number } }) => {
+                          const p = props.payload;
+                          if (!p) return ["", ""];
+                          const sign = p.delta >= 0 ? "+" : "";
+                          return [
+                            `Current: ${p.currentPct.toFixed(1)}%  Target: ${p.targetPct.toFixed(1)}%  Delta: ${sign}${p.delta.toFixed(1)}%`,
+                            p.name,
+                          ];
+                        }}
+                      />
+                      <ReferenceLine x={0} stroke="hsl(var(--border))" strokeWidth={1.5} />
+                      <Bar dataKey="delta" radius={[0, 3, 3, 0]} isAnimationActive={false}>
+                        {rebalancerData.items.map((item) => {
+                          const delta = item.currentPct - item.targetPct;
+                          return (
+                            <Cell
+                              key={item.id}
+                              fill={delta > 0 ? "#ef4444" : "#10b981"}
                             />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                  ))}
+                          );
+                        })}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
 
                 {/* Shared legend */}
