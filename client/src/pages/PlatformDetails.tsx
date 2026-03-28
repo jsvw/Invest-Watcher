@@ -2111,7 +2111,7 @@ export default function PlatformDetails() {
 
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
-            {isMonthlyReturnsLoading ? (
+            {(isMonthlyReturnsLoading || !id) ? (
               <Card>
                 <CardContent className="py-12">
                   <div className="flex items-center justify-center gap-2 text-muted-foreground">
