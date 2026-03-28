@@ -8,6 +8,7 @@ import { useWithdrawals, useDeleteWithdrawal } from "@/hooks/use-withdrawals";
 import { useAssets, useUpdateAsset } from "@/hooks/use-assets";
 import { useAuth } from "@/App";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
+import { cn } from "@/lib/utils";
 import { useRoute } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -248,6 +249,49 @@ function AssetActionsMenu({ asset, platformId, platformMode, currency }: { asset
 export default function PlatformDetails() {
   const { user } = useAuth();
   const currency = user?.currency || "EUR";
+
+  const PlatformChartTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload || payload.length === 0) return null;
+    const d = payload[0]?.payload;
+    return (
+      <div className="rounded-xl border border-border bg-card shadow-lg px-4 py-3 text-sm min-w-[200px]">
+        <p className="font-semibold text-foreground mb-2">{label ? format(new Date(label), 'MMM dd, yyyy') : ''}</p>
+        {payload.map((entry: any) => {
+          const deltaKey = entry.dataKey === 'value' ? 'valueChange'
+            : entry.dataKey === 'invested' ? 'investedChange'
+            : entry.dataKey === 'gain' ? 'gainChange'
+            : null;
+          const delta = deltaKey ? d?.[deltaKey] : null;
+          const prevVal = delta != null ? entry.value - delta : null;
+          const deltaPct = delta != null && delta !== 0 && prevVal != null && prevVal !== 0
+            ? (delta / prevVal) * 100
+            : null;
+          return (
+            <div key={entry.dataKey} className="flex items-center justify-between gap-6 py-0.5">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
+                <span className="text-muted-foreground">{entry.name}</span>
+              </div>
+              <div className="text-right">
+                <span className="font-semibold text-foreground">
+                  {entry.dataKey === 'monthlyChange' || entry.dataKey === 'gain'
+                    ? `${entry.value >= 0 ? '+' : ''}${formatCurrency(entry.value, currency)}`
+                    : formatCurrency(entry.value, currency)}
+                </span>
+                {delta != null && delta !== 0 && (
+                  <span className={cn("ml-2 text-xs font-medium", delta >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                    {delta >= 0 ? '+' : ''}{formatCurrency(delta, currency)}
+                    {deltaPct != null ? ` (${deltaPct >= 0 ? '+' : ''}${deltaPct.toFixed(1)}%)` : ''}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const [, params] = useRoute("/platforms/:slug");
   const slug = params?.slug ? decodeURIComponent(params.slug) : "";
   const [range, setRange] = useState("year");
@@ -1018,12 +1062,16 @@ export default function PlatformDetails() {
                     {activeChartData && activeChartData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={activeChartData.map((h: any, i: number, arr: any[]) => {
-                          const totalChange = i === 0 ? 0 : (h.value - arr[i - 1].value) - (h.invested - arr[i - 1].invested);
+                          const prev = arr[i - 1];
+                          const totalChange = i === 0 ? 0 : (h.value - prev.value) - (h.invested - prev.invested);
                           return {
                             ...h, 
                             timestamp: new Date(h.date).getTime(),
                             gain: h.value - h.invested,
                             monthlyChange: totalChange,
+                            valueChange: i === 0 ? null : h.value - prev.value,
+                            investedChange: i === 0 ? null : h.invested - prev.invested,
+                            gainChange: i === 0 ? null : (h.value - h.invested) - (prev.value - prev.invested),
                           };
                         })}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -1084,16 +1132,7 @@ export default function PlatformDetails() {
                               domain={['auto', 'auto']}
                             />
                           )}
-                          <Tooltip 
-                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                            formatter={(value: number, name: string) => [
-                              name === "Profit/Loss" || name.includes("Growth")
-                                ? `${value >= 0 ? '+' : ''}${formatCurrency(value, currency)}`
-                                : formatCurrency(value, currency), 
-                              ""
-                            ]}
-                            labelFormatter={(ts) => format(new Date(ts), 'MMM dd, yyyy')}
-                          />
+                          <Tooltip content={<PlatformChartTooltip />} />
                           <Legend verticalAlign="top" height={36}/>
                           {(chartView === "overview" || chartView === "all") && (
                             <>
@@ -1487,12 +1526,16 @@ export default function PlatformDetails() {
                     {activeChartData && activeChartData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={activeChartData.map((h: any, i: number, arr: any[]) => {
-                          const totalChange = i === 0 ? 0 : (h.value - arr[i - 1].value) - (h.invested - arr[i - 1].invested);
+                          const prev = arr[i - 1];
+                          const totalChange = i === 0 ? 0 : (h.value - prev.value) - (h.invested - prev.invested);
                           return {
                             ...h, 
                             timestamp: new Date(h.date).getTime(),
                             gain: h.value - h.invested,
                             monthlyChange: totalChange,
+                            valueChange: i === 0 ? null : h.value - prev.value,
+                            investedChange: i === 0 ? null : h.invested - prev.invested,
+                            gainChange: i === 0 ? null : (h.value - h.invested) - (prev.value - prev.invested),
                           };
                         })}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -1553,16 +1596,7 @@ export default function PlatformDetails() {
                               domain={['auto', 'auto']}
                             />
                           )}
-                          <Tooltip 
-                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                            formatter={(value: number, name: string) => [
-                              name === "Profit/Loss" || name.includes("Growth")
-                                ? `${value >= 0 ? '+' : ''}${formatCurrency(value, currency)}`
-                                : formatCurrency(value, currency), 
-                              ""
-                            ]}
-                            labelFormatter={(ts) => format(new Date(ts), 'MMM dd, yyyy')}
-                          />
+                          <Tooltip content={<PlatformChartTooltip />} />
                           <Legend verticalAlign="top" height={36}/>
                           {(chartView === "overview" || chartView === "all") && (
                             <>
@@ -2007,9 +2041,31 @@ export default function PlatformDetails() {
                             />
                             <YAxis tick={{ fontSize: 11 }} tickFormatter={(val) => `${getCurrencySymbol(currency)}${val.toFixed(0)}`} width={60} />
                             <Tooltip
-                              formatter={(val: number, name: string) => [formatCurrency(val, currency), name]}
-                              labelFormatter={(ts) => format(new Date(ts), 'MMM d, yyyy')}
-                              contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                              content={(props: any) => {
+                                if (!props.active || !props.payload?.length) return null;
+                                const total = props.payload.reduce((s: number, e: any) => s + (e.value || 0), 0);
+                                return (
+                                  <div className="rounded-xl border border-border bg-card shadow-lg px-3 py-2 text-xs min-w-[180px]">
+                                    <p className="font-semibold text-foreground mb-2">{props.label ? format(new Date(props.label), 'MMM d, yyyy') : ''}</p>
+                                    {[...props.payload].reverse().map((entry: any) => (
+                                      <div key={entry.dataKey} className="flex items-center justify-between gap-4 py-0.5">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
+                                          <span className="text-muted-foreground">{entry.name}</span>
+                                        </div>
+                                        <div className="text-right">
+                                          <span className="font-medium">{formatCurrency(entry.value, currency)}</span>
+                                          {total > 0 && <span className="ml-1 text-muted-foreground">({((entry.value / total) * 100).toFixed(1)}%)</span>}
+                                        </div>
+                                      </div>
+                                    ))}
+                                    <div className="mt-1 pt-1 border-t border-border flex justify-between">
+                                      <span className="text-muted-foreground font-medium">Total</span>
+                                      <span className="font-semibold">{formatCurrency(total, currency)}</span>
+                                    </div>
+                                  </div>
+                                );
+                              }}
                             />
                             {tickerList.map((ticker, i) => (
                               <Area

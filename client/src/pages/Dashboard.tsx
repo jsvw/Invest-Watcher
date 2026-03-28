@@ -929,9 +929,22 @@ export default function Dashboard() {
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip 
-                      formatter={(value: number) => formatCurrency(value, currency)}
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                    <Tooltip
+                      content={(props: any) => {
+                        if (!props.active || !props.payload?.length) return null;
+                        const entry = props.payload[0];
+                        const total = pieData.reduce((s: number, d: any) => s + d.value, 0);
+                        const pct = total > 0 ? (entry.value / total) * 100 : 0;
+                        return (
+                          <div className="rounded-xl border border-border bg-card shadow-lg px-4 py-3 text-sm min-w-[160px]">
+                            <p className="font-semibold text-foreground mb-1">{entry.name}</p>
+                            <div className="flex justify-between gap-4">
+                              <span className="text-muted-foreground">{formatCurrency(entry.value, currency)}</span>
+                              <span className="font-medium">{pct.toFixed(1)}%</span>
+                            </div>
+                          </div>
+                        );
+                      }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
