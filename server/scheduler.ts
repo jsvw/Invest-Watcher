@@ -399,7 +399,4 @@ export function startScheduler() {
   cron.schedule("0 9 * * *", () => runAllScrapes("daily"));
 
   console.log("[Scheduler] Daily scrape scheduled for 09:00");
-
-  setTimeout(() => runAllScrapes("startup"), 10000);
-  console.log("[Scheduler] Startup scrape will run in 10 seconds");
 }
