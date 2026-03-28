@@ -1282,6 +1282,74 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/platforms/:id/monthly-returns', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.id);
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+
+      const platformValuations = await storage.getValuations(platformId);
+      const platformInvestments = await storage.getInvestments(platformId);
+      const platformWithdrawals = await storage.getWithdrawals(platformId);
+
+      const toYM = (date: string | Date) => {
+        const d = new Date(date);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      };
+
+      const monthSet = new Set<string>();
+      platformInvestments.forEach(i => monthSet.add(toYM(i.date)));
+      platformValuations.forEach(v => monthSet.add(toYM(v.date)));
+      platformWithdrawals.forEach(w => monthSet.add(toYM(w.date)));
+
+      const sortedMonths = Array.from(monthSet).sort();
+
+      const getValueAtEndOfMonth = (ym: string): number => {
+        const [year, month] = ym.split('-').map(Number);
+        const endOfMonth = new Date(year, month, 0, 23, 59, 59);
+        const relevant = platformValuations
+          .filter(v => new Date(v.date) <= endOfMonth)
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        if (relevant.length === 0) return 0;
+        return Number(relevant[0].value);
+      };
+
+      const getNetCashInMonth = (ym: string): number => {
+        const [year, month] = ym.split('-').map(Number);
+        const start = new Date(year, month - 1, 1);
+        const end = new Date(year, month, 0, 23, 59, 59);
+        const invested = platformInvestments
+          .filter(i => new Date(i.date) >= start && new Date(i.date) <= end)
+          .reduce((s, i) => s + Number(i.amount), 0);
+        const withdrawn = platformWithdrawals
+          .filter(w => new Date(w.date) >= start && new Date(w.date) <= end)
+          .reduce((s, w) => s + Number(w.amount), 0);
+        return invested - withdrawn;
+      };
+
+      const result: { month: string; prevVal: number; currVal: number; gain: number; gainPct: number | null }[] = [];
+
+      for (let i = 1; i < sortedMonths.length; i++) {
+        const prevYM = sortedMonths[i - 1];
+        const currYM = sortedMonths[i];
+        const prevVal = getValueAtEndOfMonth(prevYM);
+        const currVal = getValueAtEndOfMonth(currYM);
+        const netCash = getNetCashInMonth(currYM);
+        const gain = currVal - prevVal - netCash;
+        const gainPct = prevVal > 0 ? (gain / prevVal) * 100 : null;
+        if (prevVal > 0 || currVal > 0) {
+          result.push({ month: currYM, prevVal, currVal, gain, gainPct });
+        }
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching platform monthly returns:", error);
+      res.status(500).json({ message: "Failed to fetch monthly returns" });
+    }
+  });
+
   // --- Email Settings ---
   app.get("/api/email-settings", requireAuth, async (req, res) => {
     const userId = getAuthenticatedUserId(req)!;

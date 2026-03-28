@@ -38,7 +38,7 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { ScraperConfigDialog } from "@/components/ScraperConfigDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
-import { BarChart as RechartsBarChart, Bar, XAxis as BarXAxis, YAxis as BarYAxis, Tooltip as BarTooltip, ResponsiveContainer as BarContainer } from "recharts";
+import { BarChart as RechartsBarChart, Bar, XAxis as BarXAxis, YAxis as BarYAxis, Tooltip as BarTooltip, ResponsiveContainer as BarContainer, Cell as BarCell } from "recharts";
 
 function TickerPriceHover({ ticker, currency, children }: { ticker: string; currency: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -608,6 +608,68 @@ export default function PlatformDetails() {
     enabled: platformMode !== "standard"
   });
 
+  // Monthly returns for analytics tab
+  const { data: monthlyReturns } = useQuery<{ month: string; prevVal: number; currVal: number; gain: number; gainPct: number | null }[]>({
+    queryKey: ['/api/platforms', id, 'monthly-returns'],
+    queryFn: async () => {
+      const res = await fetch(`/api/platforms/${id}/monthly-returns`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch monthly returns");
+      return res.json();
+    },
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const [analyticsHeatmapTooltip, setAnalyticsHeatmapTooltip] = useState<{ x: number; y: number; label: string; gain: number; gainPct: number } | null>(null);
+
+  const platformAnalytics = useMemo(() => {
+    if (!monthlyReturns || monthlyReturns.length === 0) return null;
+
+    // All-time ROI from current platform data
+    const totalInvested = Number((platform as any)?.totalInvested) || 0;
+    const currentValue = Number((platform as any)?.currentValue) || 0;
+    const allTimeROI = totalInvested > 0 ? ((currentValue - totalInvested) / totalInvested) * 100 : null;
+
+    // Annualized TWR from monthly data
+    let twrFactor = 1;
+    let validPeriods = 0;
+    for (const m of monthlyReturns) {
+      if (m.prevVal <= 0) continue;
+      const periodReturn = m.gain / m.prevVal;
+      twrFactor *= (1 + periodReturn);
+      validPeriods++;
+    }
+    const twr = validPeriods > 0 ? (twrFactor - 1) * 100 : null;
+    const monthsActive = monthlyReturns.length;
+    const yearsActive = monthsActive / 12;
+    const annualizedTwr = twr !== null && yearsActive > 0 ? (Math.pow(twrFactor, 1 / yearsActive) - 1) * 100 : null;
+
+    // Best/worst month
+    const positiveMonths = monthlyReturns.filter(m => m.gain > 0);
+    const negativeMonths = monthlyReturns.filter(m => m.gain < 0);
+    const bestMonth = positiveMonths.length > 0 ? positiveMonths.reduce((best, m) => m.gain > best.gain ? m : best) : null;
+    const worstMonth = negativeMonths.length > 0 ? negativeMonths.reduce((worst, m) => m.gain < worst.gain ? m : worst) : null;
+
+    // % months positive
+    const pctPositive = monthlyReturns.length > 0 ? (positiveMonths.length / monthlyReturns.length) * 100 : 0;
+
+    // Current positive streak (consecutive positive months from the end)
+    let streak = 0;
+    for (let i = monthlyReturns.length - 1; i >= 0; i--) {
+      if (monthlyReturns[i].gain > 0) streak++;
+      else break;
+    }
+
+    // Heatmap structure
+    const years = Array.from(new Set(monthlyReturns.map(m => m.month.split('-')[0]))).sort();
+    const cells = monthlyReturns.map(m => {
+      const [y, mo] = m.month.split('-').map(Number);
+      return { year: String(y), month: mo, returnPct: m.gainPct ?? 0, absoluteChange: m.gain, monthKey: m.month };
+    });
+
+    return { allTimeROI, twr, annualizedTwr, bestMonth, worstMonth, pctPositive, streak, monthsActive, years, cells };
+  }, [monthlyReturns, platform]);
+
   const years = availableFilters?.years || [];
   const monthsData = availableFilters?.months?.map((m: string) => {
     const [y, mm] = m.split('-');
@@ -853,6 +915,7 @@ export default function PlatformDetails() {
             {isTrading212 && (
               <TabsTrigger value="holdings" className="gap-2" data-testid="tab-holdings"><BarChart3 className="h-4 w-4" /> Holdings</TabsTrigger>
             )}
+            <TabsTrigger value="analytics" className="gap-2" data-testid="tab-platform-analytics"><TrendingUp className="h-4 w-4" /> Analytics</TabsTrigger>
           </TabsList>
 
           {/* Assets Tab for non-standard modes */}
@@ -2037,6 +2100,221 @@ export default function PlatformDetails() {
               )}
             </TabsContent>
           )}
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics" className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
+            {!platformAnalytics ? (
+              <Card>
+                <CardContent className="py-12">
+                  <p className="text-center text-muted-foreground text-sm">Not enough history data to show analytics. Add more valuations over time to see performance metrics.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {/* Scorecard strip */}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  <Card className="bg-gradient-to-br from-card to-muted/30" data-testid="analytics-stat-roi">
+                    <CardContent className="pt-5 pb-4">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">All-time ROI</p>
+                      <p className={`text-2xl font-bold font-display ${platformAnalytics.allTimeROI !== null ? (platformAnalytics.allTimeROI >= 0 ? 'text-emerald-500' : 'text-red-500') : ''}`}>
+                        {platformAnalytics.allTimeROI !== null ? `${platformAnalytics.allTimeROI >= 0 ? '+' : ''}${platformAnalytics.allTimeROI.toFixed(2)}%` : '—'}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">Return on invested capital</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-card to-muted/30" data-testid="analytics-stat-twr">
+                    <CardContent className="pt-5 pb-4">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Ann. Return</p>
+                      <p className={`text-2xl font-bold font-display ${platformAnalytics.annualizedTwr !== null ? (platformAnalytics.annualizedTwr >= 0 ? 'text-emerald-500' : 'text-red-500') : ''}`}>
+                        {platformAnalytics.annualizedTwr !== null ? `${platformAnalytics.annualizedTwr >= 0 ? '+' : ''}${platformAnalytics.annualizedTwr.toFixed(2)}%` : '—'}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {platformAnalytics.twr !== null ? `${platformAnalytics.twr >= 0 ? '+' : ''}${platformAnalytics.twr.toFixed(2)}% cumulative` : 'Cash-flow adjusted'}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-card to-muted/30" data-testid="analytics-stat-best">
+                    <CardContent className="pt-5 pb-4">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Best Month</p>
+                      <p className="text-2xl font-bold font-display text-emerald-500">
+                        {platformAnalytics.bestMonth ? `+${formatCurrency(platformAnalytics.bestMonth.gain, currency)}` : '—'}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {platformAnalytics.bestMonth ? (() => {
+                          const [y, m] = platformAnalytics.bestMonth.month.split('-');
+                          return `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(m)-1]} ${y}`;
+                        })() : 'No positive months yet'}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-card to-muted/30" data-testid="analytics-stat-worst">
+                    <CardContent className="pt-5 pb-4">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Worst Month</p>
+                      <p className="text-2xl font-bold font-display text-red-500">
+                        {platformAnalytics.worstMonth ? formatCurrency(platformAnalytics.worstMonth.gain, currency) : '—'}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {platformAnalytics.worstMonth ? (() => {
+                          const [y, m] = platformAnalytics.worstMonth.month.split('-');
+                          return `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(m)-1]} ${y}`;
+                        })() : 'No negative months'}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-card to-muted/30" data-testid="analytics-stat-positive">
+                    <CardContent className="pt-5 pb-4">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Positive Months</p>
+                      <p className="text-2xl font-bold font-display text-foreground">
+                        {platformAnalytics.pctPositive.toFixed(0)}%
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">of {platformAnalytics.monthsActive} months tracked</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-gradient-to-br from-card to-muted/30" data-testid="analytics-stat-streak">
+                    <CardContent className="pt-5 pb-4">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Current Streak</p>
+                      <p className={`text-2xl font-bold font-display ${platformAnalytics.streak > 0 ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+                        {platformAnalytics.streak > 0 ? `${platformAnalytics.streak}mo` : '—'}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {platformAnalytics.streak > 0 ? 'consecutive positive months' : 'No active streak'}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Monthly return bar chart */}
+                <Card data-testid="card-monthly-return-chart">
+                  <CardHeader>
+                    <CardTitle>Monthly Returns</CardTitle>
+                    <CardDescription>Cash-flow adjusted gain / loss per month — green = gain, red = loss</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[280px]">
+                      <BarContainer width="100%" height="100%">
+                        <RechartsBarChart
+                          data={monthlyReturns?.map(m => {
+                            const [y, mo] = m.month.split('-');
+                            return {
+                              label: `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(mo)-1]} ${y}`,
+                              gain: m.gain,
+                              gainPct: m.gainPct,
+                              month: m.month,
+                            };
+                          }) || []}
+                          margin={{ top: 4, right: 8, bottom: 8, left: 8 }}
+                        >
+                          <BarXAxis
+                            dataKey="label"
+                            tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                            axisLine={false}
+                            tickLine={false}
+                            interval="preserveStartEnd"
+                          />
+                          <BarYAxis
+                            tickFormatter={(v: number) => `${formatCurrency(v, currency)}`}
+                            tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                            axisLine={false}
+                            tickLine={false}
+                            width={68}
+                          />
+                          <BarTooltip
+                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', fontSize: 12 }}
+                            formatter={(val: number, _: string, props: any) => [
+                              `${val >= 0 ? '+' : ''}${formatCurrency(val, currency)}${props.payload?.gainPct != null ? ` (${props.payload.gainPct >= 0 ? '+' : ''}${props.payload.gainPct.toFixed(2)}%)` : ''}`,
+                              'Gain / Loss'
+                            ]}
+                          />
+                          <Bar dataKey="gain" radius={[3, 3, 0, 0]}>
+                            {monthlyReturns?.map((m, i) => (
+                              <BarCell key={i} fill={m.gain >= 0 ? '#10b981' : '#ef4444'} />
+                            ))}
+                          </Bar>
+                        </RechartsBarChart>
+                      </BarContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Mini monthly heatmap */}
+                <Card data-testid="card-monthly-heatmap">
+                  <CardHeader>
+                    <CardTitle>Monthly Returns Heatmap</CardTitle>
+                    <CardDescription>Cash-flow adjusted return per calendar month — green = gain, red = loss</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <div className="min-w-[500px]">
+                        <div className="flex mb-1">
+                          <div className="w-12 shrink-0" />
+                          {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map(m => (
+                            <div key={m} className="flex-1 text-center text-xs text-muted-foreground font-medium">{m}</div>
+                          ))}
+                        </div>
+                        {platformAnalytics.years.map(year => (
+                          <div key={year} className="flex items-center mb-1">
+                            <div className="w-12 shrink-0 text-xs text-muted-foreground font-medium pr-2 text-right">{year}</div>
+                            {Array.from({ length: 12 }, (_, mi) => {
+                              const monthNum = mi + 1;
+                              const cell = platformAnalytics.cells.find(c => c.year === year && c.month === monthNum);
+                              if (!cell) {
+                                return <div key={monthNum} className="flex-1 mx-0.5 h-10 rounded bg-muted/30" />;
+                              }
+                              const intensity = Math.min(Math.abs(cell.returnPct) / 5, 1);
+                              const bg = cell.returnPct >= 0
+                                ? `rgba(16,185,129,${0.15 + intensity * 0.75})`
+                                : `rgba(239,68,68,${0.15 + intensity * 0.75})`;
+                              const label = `${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][monthNum - 1]} ${year}`;
+                              return (
+                                <div
+                                  key={monthNum}
+                                  className="flex-1 mx-0.5 h-10 rounded flex items-center justify-center text-[10px] font-medium cursor-default transition-transform hover:scale-105"
+                                  style={{ backgroundColor: bg, color: intensity > 0.5 ? '#fff' : undefined }}
+                                  data-testid={`platform-heatmap-cell-${year}-${monthNum}`}
+                                  onMouseEnter={(e) => {
+                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                    setAnalyticsHeatmapTooltip({
+                                      x: rect.left + rect.width / 2,
+                                      y: rect.top,
+                                      label,
+                                      gain: cell.absoluteChange,
+                                      gainPct: cell.returnPct,
+                                    });
+                                  }}
+                                  onMouseLeave={() => setAnalyticsHeatmapTooltip(null)}
+                                >
+                                  {`${cell.returnPct >= 0 ? '+' : ''}${cell.returnPct.toFixed(1)}%`}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {analyticsHeatmapTooltip && (
+                  <div
+                    className="fixed z-50 pointer-events-none"
+                    style={{ left: analyticsHeatmapTooltip.x, top: analyticsHeatmapTooltip.y - 8, transform: 'translate(-50%, -100%)' }}
+                  >
+                    <div className="bg-popover border rounded-lg shadow-lg p-3 text-xs min-w-[160px]">
+                      <p className="font-semibold mb-1">{analyticsHeatmapTooltip.label}</p>
+                      <div className="flex justify-between gap-4">
+                        <span className={analyticsHeatmapTooltip.gainPct >= 0 ? 'text-emerald-500' : 'text-red-500'}>
+                          {`${analyticsHeatmapTooltip.gainPct >= 0 ? '+' : ''}${analyticsHeatmapTooltip.gainPct.toFixed(2)}%`}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {`${analyticsHeatmapTooltip.gain >= 0 ? '+' : ''}${formatCurrency(analyticsHeatmapTooltip.gain, currency)}`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </TabsContent>
         </Tabs>
       </div>
     </Layout>
