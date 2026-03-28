@@ -378,7 +378,7 @@ export default function Analytics() {
   }, [activePlatforms]);
 
   const roiOverTimeData = useMemo(() => {
-    if (excludedPlatforms.size > 0 && platformBreakdownByMonth) {
+    if (platformBreakdownByMonth) {
       const monthKeys = Object.keys(platformBreakdownByMonth).sort();
       let factor = 1;
       return monthKeys.map((key) => {
@@ -540,7 +540,7 @@ export default function Analytics() {
           <Card>
             <CardHeader>
               <CardTitle>ROI Over Time</CardTitle>
-              <CardDescription>Total return on invested capital as it evolved over time</CardDescription>
+              <CardDescription>Time-weighted return — chains monthly gains independent of cash flow timing</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-56">
