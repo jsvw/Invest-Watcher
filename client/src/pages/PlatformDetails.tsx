@@ -616,7 +616,7 @@ export default function PlatformDetails() {
       if (!res.ok) throw new Error("Failed to fetch monthly returns");
       return res.json();
     },
-    enabled: !!id,
+    enabled: !!id && platformMode === "standard",
     staleTime: 5 * 60 * 1000,
   });
 
@@ -923,7 +923,9 @@ export default function PlatformDetails() {
             {isTrading212 && (
               <TabsTrigger value="holdings" className="gap-2" data-testid="tab-holdings"><BarChart3 className="h-4 w-4" /> Holdings</TabsTrigger>
             )}
-            <TabsTrigger value="analytics" className="gap-2" data-testid="tab-platform-analytics"><TrendingUp className="h-4 w-4" /> Analytics</TabsTrigger>
+            {platformMode === "standard" && (
+              <TabsTrigger value="analytics" className="gap-2" data-testid="tab-platform-analytics"><TrendingUp className="h-4 w-4" /> Analytics</TabsTrigger>
+            )}
           </TabsList>
 
           {/* Assets Tab for non-standard modes */}
