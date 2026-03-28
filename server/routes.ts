@@ -20,6 +20,44 @@ import { encrypt, decrypt } from "./encryption";
 // Configure multer for file uploads
 const upload = multer({ dest: "/tmp/uploads/" });
 
+/**
+ * Normalize a number string that may use European formatting.
+ * European format uses "." as thousands separator and "," as decimal.
+ *
+ * Only normalizes when the format is unambiguous (comma is present):
+ *   "2.596,11"  → "2596.11"  (dot thousands + comma decimal = clear EU format)
+ *   "2596,11"   → "2596.11"  (comma only = comma as decimal separator)
+ *   "2.596.000,11" → "2596000.11" (multi-group EU format)
+ *
+ * Leaves ambiguous dot-only strings unchanged:
+ *   "2596.11"   → "2596.11"  (standard US format, unchanged)
+ *   "2.596"     → "2.596"   (ambiguous — could be decimal 2.596 or EU-thousands 2596)
+ *   "4.51"      → "4.51"    (unchanged)
+ *   "608.105"   → "608.105"  (unchanged)
+ */
+function normalizeEuropeanNumber(value: string): string {
+  const s = value.trim().replace(/\s/g, "");
+  if (!s) return s;
+
+  const hasComma = s.includes(",");
+
+  if (!hasComma) {
+    return s;
+  }
+
+  const hasDot = s.includes(".");
+  if (hasDot && hasComma) {
+    const lastDotIdx = s.lastIndexOf(".");
+    const lastCommaIdx = s.lastIndexOf(",");
+    if (lastCommaIdx > lastDotIdx) {
+      return s.replace(/\./g, "").replace(",", ".");
+    }
+    return s.replace(/,/g, "");
+  }
+
+  return s.replace(",", ".");
+}
+
 // Initialize OpenAI client for insights
 const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -1589,9 +1627,9 @@ export async function registerRoutes(
         if (!ticker || !shares) {
           return res.status(400).json({ message: "ticker and shares are required for Stock Ticker" });
         }
-        credentialData = { ticker: ticker.toUpperCase(), shares: String(shares) };
-        if (averagePrice) credentialData.averagePrice = String(averagePrice);
-        if (investedEur) credentialData.investedEur = String(investedEur);
+        credentialData = { ticker: ticker.toUpperCase(), shares: String(normalizeEuropeanNumber(String(shares))) };
+        if (averagePrice) credentialData.averagePrice = String(normalizeEuropeanNumber(String(averagePrice)));
+        if (investedEur) credentialData.investedEur = String(normalizeEuropeanNumber(String(investedEur)));
       } else if (scraperType === "trading212") {
         const { apiKey, apiSecret, pieName } = req.body;
         if (!apiKey || !apiSecret) {

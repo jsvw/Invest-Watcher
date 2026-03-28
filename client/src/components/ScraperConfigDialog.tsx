@@ -268,6 +268,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                         placeholder="e.g. 500"
                         data-testid="input-scraper-shares"
                       />
+                      <p className="text-xs text-muted-foreground mt-1">Use . as decimal separator (e.g. 608.105)</p>
                     </div>
                     <div>
                       <Label htmlFor="scraper-avg-price">Average Purchase Price (stock currency)</Label>
@@ -280,6 +281,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                         placeholder="e.g. 4.51"
                         data-testid="input-scraper-avg-price"
                       />
+                      <p className="text-xs text-muted-foreground mt-1">Use . as decimal separator (e.g. 4.51)</p>
                     </div>
                     <div>
                       <Label htmlFor="scraper-invested-eur">Total Invested (EUR)</Label>
@@ -292,6 +294,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                         placeholder="e.g. 2592.11"
                         data-testid="input-scraper-invested-eur"
                       />
+                      <p className="text-xs text-muted-foreground mt-1">Use . as decimal separator (e.g. 2592.11)</p>
                     </div>
                   </>
                 ) : isConfigApiKeyType ? (
@@ -480,7 +483,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                       placeholder="e.g. 500"
                       data-testid="input-scraper-shares-new"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">Price will be fetched in USD and converted to the platform's currency.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Use . as decimal separator (e.g. 608.105). Price will be fetched in USD and converted to the platform's currency.</p>
                   </div>
                   <div>
                     <Label htmlFor="scraper-avg-price-new">Average Purchase Price (stock currency, optional)</Label>
@@ -493,7 +496,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                       placeholder="e.g. 4.51"
                       data-testid="input-scraper-avg-price-new"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">Used to calculate gain/loss. Leave empty to skip.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Use . as decimal separator (e.g. 4.51). Used to calculate gain/loss. Leave empty to skip.</p>
                   </div>
                   <div>
                     <Label htmlFor="scraper-invested-eur-new">Total Invested (EUR, optional)</Label>
@@ -506,7 +509,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                       placeholder="e.g. 2592.11"
                       data-testid="input-scraper-invested-eur-new"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">Used to calculate FX impact. Leave empty to skip.</p>
+                    <p className="text-xs text-muted-foreground mt-1">Use . as decimal separator (e.g. 2592.11). Used to calculate FX impact. Leave empty to skip.</p>
                   </div>
                 </>
               ) : isApiKeyType ? (
