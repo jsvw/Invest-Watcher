@@ -988,7 +988,7 @@ export default function Analytics() {
                     <tr
                       key={p.id}
                       className="border-b last:border-0 hover:bg-muted/40 cursor-pointer transition-colors"
-                      onClick={() => navigate(`/platforms/${p.id}`)}
+                      onClick={() => navigate(`/platforms/${encodeURIComponent(p.name.toLowerCase().replace(/\s+/g, '-'))}`)}
                       data-testid={`table-row-platform-${p.id}`}
                     >
                       <td className="px-4 py-3">
