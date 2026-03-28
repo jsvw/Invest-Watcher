@@ -378,6 +378,19 @@ export default function Analytics() {
   }, [activePlatforms]);
 
   const roiOverTimeData = useMemo(() => {
+    if (excludedPlatforms.size > 0 && platformBreakdownByMonth) {
+      const monthKeys = Object.keys(platformBreakdownByMonth).sort();
+      let factor = 1;
+      return monthKeys.map((key) => {
+        const entries = platformBreakdownByMonth[key].filter((p) => !excludedPlatforms.has(p.platformId));
+        const gain = entries.reduce((s, p) => s + p.gain, 0);
+        const prevVal = entries.reduce((s, p) => s + p.prevVal, 0);
+        if (prevVal > 0) factor *= (1 + gain / prevVal);
+        const [y, m] = key.split("-");
+        const label = `${MONTHS[Number(m) - 1]} ${y}`;
+        return { date: `${key}-01`, label, roi: (factor - 1) * 100 };
+      });
+    }
     if (!historyData || historyData.length === 0) return [];
     return historyData.map((p) => {
       const roi = p.invested > 0 ? ((p.value - p.invested) / p.invested) * 100 : 0;
@@ -385,7 +398,7 @@ export default function Analytics() {
       const label = `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
       return { date: p.date, label, roi };
     });
-  }, [historyData]);
+  }, [historyData, platformBreakdownByMonth, excludedPlatforms]);
 
   const rebalancerData = useMemo(() => {
     if (!activePlatforms) return null;
