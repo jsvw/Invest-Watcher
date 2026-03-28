@@ -236,7 +236,7 @@ export default function Analytics() {
   });
 
   const { data: flowData } = useQuery<InvestmentFlowResponse>({
-    queryKey: ["/api/analytics/investment-flow"],
+    queryKey: ["/api/analytics/investment-flow", "by-platform"],
     queryFn: async () => {
       const res = await fetch("/api/analytics/investment-flow", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch flow");
