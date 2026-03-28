@@ -1058,17 +1058,26 @@ export default function Analytics() {
                     <Filter className="w-3.5 h-3.5" />
                     Platforms
                   </span>
-                  {excludedPlatforms.size > 0 && (
+                  <div className="flex items-center gap-1">
                     <Button
                       variant="ghost"
                       size="sm"
                       className="h-5 px-1.5 text-xs"
                       onClick={() => setExcludedPlatforms(new Set())}
-                      data-testid="analytics-clear-filter"
+                      data-testid="analytics-select-all"
                     >
-                      Clear
+                      All
                     </Button>
-                  )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-5 px-1.5 text-xs"
+                      onClick={() => setExcludedPlatforms(new Set(platforms.map(p => p.id)))}
+                      data-testid="analytics-deselect-all"
+                    >
+                      None
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-0.5">
