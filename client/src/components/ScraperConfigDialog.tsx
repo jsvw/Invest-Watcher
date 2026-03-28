@@ -60,14 +60,18 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
   const saveConfig = useMutation({
     mutationFn: async () => {
       let body: Record<string, any>;
-      if (isStockTickerType) {
-        body = { scraperType, ticker, shares, averagePrice: averagePrice || undefined, investedEur: investedEur || undefined };
-      } else if (isApiKeyType) {
-        body = { scraperType, apiKey, apiSecret, pieName: pieName || undefined };
-      } else if (isUsernameEmailType) {
-        body = { scraperType, username, email, password };
+      const effectiveType = hasConfig ? config.scraperType : scraperType;
+      const effectiveIsStock = effectiveType === "stock_ticker";
+      const effectiveIsApiKey = effectiveType === "trading212";
+      const effectiveIsUsernameEmail = effectiveType === "goldrepublic";
+      if (effectiveIsStock) {
+        body = { scraperType: effectiveType, ticker, shares, averagePrice: averagePrice || undefined, investedEur: investedEur || undefined };
+      } else if (effectiveIsApiKey) {
+        body = { scraperType: effectiveType, apiKey, apiSecret, pieName: pieName || undefined };
+      } else if (effectiveIsUsernameEmail) {
+        body = { scraperType: effectiveType, username, email, password };
       } else {
-        body = { scraperType, email, password, ...(scraperType === "crowdpear" ? { ...(gmailAppPassword ? { gmailAppPassword } : {}), ...(gmailEmail ? { gmailEmail } : {}) } : {}) };
+        body = { scraperType: effectiveType, email, password, ...(effectiveType === "crowdpear" ? { ...(gmailAppPassword ? { gmailAppPassword } : {}), ...(gmailEmail ? { gmailEmail } : {}) } : {}) };
       }
       return apiRequest("POST", `/api/platforms/${platformId}/scraper-config`, body);
     },
