@@ -15,6 +15,8 @@ import { formatCurrency, formatCompactCurrency, getCurrencySymbol } from "@/lib/
 import { PlatformIcon } from "@/components/PlatformIcon";
 import {
   ResponsiveContainer,
+  AreaChart,
+  Area,
   BarChart,
   Bar,
   XAxis,
@@ -25,6 +27,7 @@ import {
   Cell,
   PieChart,
   Pie,
+  ReferenceLine,
 } from "recharts";
 import { TrendingUp, Award, Calendar, Percent, Target, ArrowRight, Filter, Bookmark, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -374,6 +377,16 @@ export default function Analytics() {
       .sort((a, b) => b.roi - a.roi);
   }, [activePlatforms]);
 
+  const roiOverTimeData = useMemo(() => {
+    if (!historyData || historyData.length === 0) return [];
+    return historyData.map((p) => {
+      const roi = p.invested > 0 ? ((p.value - p.invested) / p.invested) * 100 : 0;
+      const d = new Date(p.date);
+      const label = `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+      return { date: p.date, label, roi };
+    });
+  }, [historyData]);
+
   const rebalancerData = useMemo(() => {
     if (!activePlatforms) return null;
     const totalPortfolioValue = activePlatforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
@@ -624,6 +637,73 @@ export default function Analytics() {
             neutral
           />
         </div>
+
+        {/* ROI Over Time */}
+        {roiOverTimeData.length > 1 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>ROI Over Time</CardTitle>
+              <CardDescription>Total return on invested capital as it evolved over time</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-56">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={roiOverTimeData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="roiGradientPos" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="roiGradientNeg" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                      tickLine={false}
+                      axisLine={false}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis
+                      tickFormatter={(v: number) => `${v.toFixed(1)}%`}
+                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                      tickLine={false}
+                      axisLine={false}
+                      width={52}
+                    />
+                    <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" />
+                    <Tooltip
+                      content={({ active, payload, label }: any) => {
+                        if (!active || !payload?.length) return null;
+                        const roi = payload[0].value as number;
+                        return (
+                          <div className="bg-popover border rounded-lg shadow-lg p-2.5 text-xs">
+                            <p className="text-muted-foreground mb-1">{label}</p>
+                            <p className={cn("font-semibold", roi >= 0 ? "text-emerald-500" : "text-red-500")}>
+                              {fmtPct(roi)} ROI
+                            </p>
+                          </div>
+                        );
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="roi"
+                      stroke={roiOverTimeData[roiOverTimeData.length - 1]?.roi >= 0 ? "#10b981" : "#ef4444"}
+                      strokeWidth={2}
+                      fill={roiOverTimeData[roiOverTimeData.length - 1]?.roi >= 0 ? "url(#roiGradientPos)" : "url(#roiGradientNeg)"}
+                      dot={false}
+                      activeDot={{ r: 4, strokeWidth: 0 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Monthly Returns Heatmap */}
         <Card>
