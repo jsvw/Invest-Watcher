@@ -609,7 +609,7 @@ export default function PlatformDetails() {
   });
 
   // Monthly returns for analytics tab
-  const { data: monthlyReturns } = useQuery<{ month: string; prevVal: number; currVal: number; gain: number; gainPct: number | null }[]>({
+  const { data: monthlyReturns, isLoading: isMonthlyReturnsLoading } = useQuery<{ month: string; prevVal: number; currVal: number; gain: number; gainPct: number | null }[]>({
     queryKey: ['/api/platforms', id, 'monthly-returns'],
     queryFn: async () => {
       const res = await fetch(`/api/platforms/${id}/monthly-returns`, { credentials: "include" });
@@ -641,7 +641,11 @@ export default function PlatformDetails() {
       validPeriods++;
     }
     const twr = validPeriods > 0 ? (twrFactor - 1) * 100 : null;
-    const yearsActive = validPeriods / 12;
+    // Annualize over actual calendar span (first to last month), not just compounded periods
+    const [fy, fm] = monthlyReturns[0].month.split('-').map(Number);
+    const [ly, lm] = monthlyReturns[monthlyReturns.length - 1].month.split('-').map(Number);
+    const elapsedMonths = (ly - fy) * 12 + (lm - fm) + 1;
+    const yearsActive = Math.max(elapsedMonths, validPeriods) / 12;
     const annualizedTwr = twr !== null && validPeriods > 0 ? (Math.pow(twrFactor, 1 / yearsActive) - 1) * 100 : null;
 
     // Best/worst month
@@ -2105,7 +2109,16 @@ export default function PlatformDetails() {
 
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
-            {!platformAnalytics ? (
+            {isMonthlyReturnsLoading ? (
+              <Card>
+                <CardContent className="py-12">
+                  <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">Loading analytics…</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : !platformAnalytics ? (
               <Card>
                 <CardContent className="py-12">
                   <p className="text-center text-muted-foreground text-sm">Not enough history data to show analytics. Add more valuations over time to see performance metrics.</p>
