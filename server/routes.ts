@@ -1298,12 +1298,11 @@ export async function registerRoutes(
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       };
 
-      const monthSet = new Set<string>();
-      platformInvestments.forEach(i => monthSet.add(toYM(i.date)));
-      platformValuations.forEach(v => monthSet.add(toYM(v.date)));
-      platformWithdrawals.forEach(w => monthSet.add(toYM(w.date)));
+      // Only include months that have actual valuation snapshots — avoids synthetic returns
+      const valuationMonths = new Set<string>();
+      platformValuations.forEach(v => valuationMonths.add(toYM(v.date)));
 
-      const sortedMonths = Array.from(monthSet).sort();
+      const sortedMonths = Array.from(valuationMonths).sort();
 
       const getValueAtEndOfMonth = (ym: string): number => {
         const [year, month] = ym.split('-').map(Number);

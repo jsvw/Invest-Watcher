@@ -33,7 +33,7 @@ import { AssetValuationHoverCard } from "@/components/AssetValuationHoverCard";
 import { AssetValuationManageDialog } from "@/components/AssetValuationManageDialog";
 import { AssetInsightTabs } from "@/components/AssetInsightTabs";
 import { AssetRepaymentDialog } from "@/components/AssetRepaymentDialog";
-import type { Asset } from "@shared/schema";
+import type { Asset, PlatformResponse } from "@shared/schema";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { ScraperConfigDialog } from "@/components/ScraperConfigDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -626,8 +626,9 @@ export default function PlatformDetails() {
     if (!monthlyReturns || monthlyReturns.length === 0) return null;
 
     // All-time ROI from current platform data
-    const totalInvested = Number((platform as any)?.totalInvested) || 0;
-    const currentValue = Number((platform as any)?.currentValue) || 0;
+    const typedPlatform = platform as PlatformResponse | null | undefined;
+    const totalInvested = typedPlatform?.totalInvested ?? 0;
+    const currentValue = typedPlatform?.currentValue ?? 0;
     const allTimeROI = totalInvested > 0 ? ((currentValue - totalInvested) / totalInvested) * 100 : null;
 
     // Annualized TWR from monthly data
@@ -2220,8 +2221,8 @@ export default function PlatformDetails() {
                           />
                           <BarTooltip
                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', fontSize: 12 }}
-                            formatter={(val: number, _: string, props: any) => [
-                              `${val >= 0 ? '+' : ''}${formatCurrency(val, currency)}${props.payload?.gainPct != null ? ` (${props.payload.gainPct >= 0 ? '+' : ''}${props.payload.gainPct.toFixed(2)}%)` : ''}`,
+                            formatter={(val: number, _: string, item: { payload?: { gainPct?: number | null } }) => [
+                              `${val >= 0 ? '+' : ''}${formatCurrency(val, currency)}${item.payload?.gainPct != null ? ` (${item.payload.gainPct >= 0 ? '+' : ''}${item.payload.gainPct.toFixed(2)}%)` : ''}`,
                               'Gain / Loss'
                             ]}
                           />
