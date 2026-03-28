@@ -783,7 +783,7 @@ export default function Analytics() {
                 <div className="h-[280px]" data-testid="rebalancer-alloc-chart">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={rebalancerData.items.map((item) => {
+                      data={[...rebalancerData.items].sort((a, b) => b.targetPct - a.targetPct).map((item) => {
                         const over = item.currentPct > item.targetPct;
                         return {
                           name: item.name,
