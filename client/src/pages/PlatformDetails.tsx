@@ -667,6 +667,8 @@ export default function PlatformDetails() {
       return { year: String(y), month: mo, returnPct: m.gainPct ?? 0, absoluteChange: m.gain, monthKey: m.month };
     });
 
+    const monthsActive = monthlyReturns.length;
+
     return { allTimeROI, twr, annualizedTwr, bestMonth, worstMonth, pctPositive, streak, monthsActive, years, cells };
   }, [monthlyReturns, platform]);
 

@@ -1329,17 +1329,15 @@ export async function registerRoutes(
 
       const result: { month: string; prevVal: number; currVal: number; gain: number; gainPct: number | null }[] = [];
 
-      for (let i = 1; i < sortedMonths.length; i++) {
-        const prevYM = sortedMonths[i - 1];
+      for (let i = 0; i < sortedMonths.length; i++) {
         const currYM = sortedMonths[i];
-        const prevVal = getValueAtEndOfMonth(prevYM);
         const currVal = getValueAtEndOfMonth(currYM);
+        // For the first month use prevVal=0 (no prior baseline); for subsequent months use previous month-end value
+        const prevVal = i === 0 ? 0 : getValueAtEndOfMonth(sortedMonths[i - 1]);
         const netCash = getNetCashInMonth(currYM);
         const gain = currVal - prevVal - netCash;
         const gainPct = prevVal > 0 ? (gain / prevVal) * 100 : null;
-        if (prevVal > 0 || currVal > 0) {
-          result.push({ month: currYM, prevVal, currVal, gain, gainPct });
-        }
+        result.push({ month: currYM, prevVal, currVal, gain, gainPct });
       }
 
       res.json(result);
