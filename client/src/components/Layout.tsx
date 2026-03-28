@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, PieChart, TrendingUp, Menu, X, LogOut, Settings, Coffee, Plus } from "lucide-react";
+import { LayoutDashboard, PieChart, TrendingUp, Menu, X, LogOut, Settings, Coffee, Plus, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -9,12 +9,24 @@ import { APP_VERSION } from "@/lib/version";
 import { usePlatforms } from "@/hooks/use-platforms";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { AddPlatformDialog } from "@/components/AddPlatformDialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user } = useAuth();
   const { data: platforms } = usePlatforms();
+
+  const hasStaleValuation = (() => {
+    if (!platforms || platforms.length === 0) return false;
+    const thirtyOneDaysAgo = new Date();
+    thirtyOneDaysAgo.setDate(thirtyOneDaysAgo.getDate() - 31);
+    const latestDate = platforms
+      .map(p => p.lastValuationDate ? new Date(p.lastValuationDate) : null)
+      .filter((d): d is Date => d !== null)
+      .reduce<Date | null>((max, d) => (max === null || d > max ? d : max), null);
+    return latestDate === null || latestDate < thirtyOneDaysAgo;
+  })();
 
   const handleLogout = async () => {
     try {
