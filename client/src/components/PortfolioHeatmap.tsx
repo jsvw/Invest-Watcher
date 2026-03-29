@@ -38,6 +38,52 @@ interface PortfolioHeatmapProps {
   currency: string;
 }
 
+function extractMaker(name: string): string {
+  const trimmed = name.trim();
+
+  // Skip leading year: "1988 Porsche 911..." → work on "Porsche 911..."
+  const yearPrefix = trimmed.match(/^(\d{4})\s+(.+)$/);
+  if (yearPrefix) return extractMaker(yearPrefix[2]);
+
+  // "Artist Name, Title, Year" pattern → everything before first comma is the maker
+  const commaIdx = trimmed.indexOf(",");
+  if (commaIdx > 0) {
+    const beforeComma = trimmed.substring(0, commaIdx).trim();
+    if (beforeComma.length > 0 && !/^\d+$/.test(beforeComma)) return beforeComma;
+  }
+
+  // Known two-word brand prefixes (lowercase)
+  const twoWordPrefixes = [
+    "de bethune", "de tomaso", "aston martin", "rolls royce",
+    "alfa romeo", "land rover", "château", "chateau", "domaine",
+  ];
+  const lower = trimmed.toLowerCase();
+  for (const prefix of twoWordPrefixes) {
+    if (lower.startsWith(prefix)) return trimmed.split(/\s+/).slice(0, 2).join(" ");
+  }
+
+  // Default: first word (Nike, Porsche, Rolex, etc.)
+  return trimmed.split(/\s+/)[0] ?? trimmed;
+}
+
+function aggregateCells(items: EnrichedAsset[], groupFn: (a: EnrichedAsset) => string, hasChildren: boolean): HeatmapCell[] {
+  const map = new Map<string, { currentValue: number; invested: number; gainLoss: number }>();
+  for (const a of items) {
+    const key = groupFn(a);
+    const existing = map.get(key) ?? { currentValue: 0, invested: 0, gainLoss: 0 };
+    existing.currentValue += a.currentValue;
+    existing.invested += a.invested;
+    existing.gainLoss += a.gainLoss;
+    map.set(key, existing);
+  }
+  const cells: HeatmapCell[] = [];
+  for (const [key, data] of map.entries()) {
+    const roi = data.invested > 0 ? (data.gainLoss / data.invested) * 100 : 0;
+    cells.push({ id: key, label: key, ...data, roi, hasChildren });
+  }
+  return cells.sort((a, b) => b.currentValue - a.currentValue);
+}
+
 function getCellColor(roi: number): string {
   if (roi === 0) return "rgba(100,116,139,0.18)";
   const intensity = Math.min(Math.abs(roi) / 20, 1);
@@ -99,6 +145,7 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
   const [drillCategory, setDrillCategory] = useState<string | null>(null);
   const [drillPlatformId, setDrillPlatformId] = useState<number | null>(null);
   const [drillAssetCategory, setDrillAssetCategory] = useState<string | null>(null);
+  const [drillMaker, setDrillMaker] = useState<string | null>(null);
 
   const filteredAssets = useMemo(
     () => assets.filter((a) => !excludedPlatforms.has(a.platformId)),
@@ -110,187 +157,142 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
     [platforms, excludedPlatforms]
   );
 
-  // Level 1: platform categories — aggregated from platform totals
-  const categoryMap = useMemo(() => {
+  // Level 1: platform categories
+  const levelOneCells = useMemo((): HeatmapCell[] => {
     const map = new Map<string, { currentValue: number; invested: number }>();
     for (const p of filteredPlatforms) {
-      const cat = p.category;
-      const existing = map.get(cat) ?? { currentValue: 0, invested: 0 };
+      const existing = map.get(p.category) ?? { currentValue: 0, invested: 0 };
       existing.currentValue += Number(p.currentValue) || 0;
       existing.invested += Number(p.totalInvested) || 0;
-      map.set(cat, existing);
+      map.set(p.category, existing);
     }
-    return map;
-  }, [filteredPlatforms]);
-
-  const levelOneCells = useMemo((): HeatmapCell[] => {
     const cells: HeatmapCell[] = [];
-    for (const [cat, data] of categoryMap.entries()) {
+    for (const [cat, data] of map.entries()) {
       const gainLoss = data.currentValue - data.invested;
       const roi = data.invested > 0 ? (gainLoss / data.invested) * 100 : 0;
-      cells.push({
-        id: cat,
-        label: cat,
-        currentValue: data.currentValue,
-        invested: data.invested,
-        gainLoss,
-        roi,
-        hasChildren: true,
-      });
+      cells.push({ id: cat, label: cat, currentValue: data.currentValue, invested: data.invested, gainLoss, roi, hasChildren: true });
     }
     return cells.sort((a, b) => b.currentValue - a.currentValue);
-  }, [categoryMap]);
+  }, [filteredPlatforms]);
 
-  // Level 2: platforms within selected category
+  // Level 2: platforms within category
   const levelTwoCells = useMemo((): HeatmapCell[] => {
     if (!drillCategory) return [];
-    const inCategory = filteredPlatforms.filter((p) => p.category === drillCategory);
-    return inCategory.map((p) => {
-      const currentValue = Number(p.currentValue) || 0;
-      const invested = Number(p.totalInvested) || 0;
-      const gainLoss = currentValue - invested;
-      const roi = invested > 0 ? (gainLoss / invested) * 100 : 0;
-      const hasChildren = p.platformMode === "asset_returns" || p.platformMode === "item_valuations";
-      return {
-        id: p.id,
-        label: p.name,
-        currentValue,
-        invested,
-        gainLoss,
-        roi,
-        hasChildren,
-      };
-    }).sort((a, b) => b.currentValue - a.currentValue);
+    return filteredPlatforms
+      .filter((p) => p.category === drillCategory)
+      .map((p) => {
+        const currentValue = Number(p.currentValue) || 0;
+        const invested = Number(p.totalInvested) || 0;
+        const gainLoss = currentValue - invested;
+        const roi = invested > 0 ? (gainLoss / invested) * 100 : 0;
+        return {
+          id: p.id, label: p.name, currentValue, invested, gainLoss, roi,
+          hasChildren: p.platformMode === "asset_returns" || p.platformMode === "item_valuations",
+        };
+      })
+      .sort((a, b) => b.currentValue - a.currentValue);
   }, [drillCategory, filteredPlatforms]);
 
-  // Determine the mode of the currently drilled platform
   const drilledPlatform = useMemo(
-    () => drillPlatformId ? platforms.find((p) => p.id === drillPlatformId) : null,
+    () => (drillPlatformId ? platforms.find((p) => p.id === drillPlatformId) : null),
     [drillPlatformId, platforms]
   );
   const isItemValuations = drilledPlatform?.platformMode === "item_valuations";
 
-  // Level 3a (item_valuations): asset description groups within the platform
-  const levelThreeGroupCells = useMemo((): HeatmapCell[] => {
-    if (!drillPlatformId || !isItemValuations) return [];
-    const inPlatform = filteredAssets.filter((a) => a.platformId === drillPlatformId);
-    const groupMap = new Map<string, { currentValue: number; invested: number; gainLoss: number }>();
-    for (const a of inPlatform) {
-      const key = a.assetCategory ?? "Uncategorized";
-      const existing = groupMap.get(key) ?? { currentValue: 0, invested: 0, gainLoss: 0 };
-      existing.currentValue += a.currentValue;
-      existing.invested += a.invested;
-      existing.gainLoss += a.gainLoss;
-      groupMap.set(key, existing);
-    }
-    const cells: HeatmapCell[] = [];
-    for (const [key, data] of groupMap.entries()) {
-      const roi = data.invested > 0 ? (data.gainLoss / data.invested) * 100 : 0;
-      cells.push({
-        id: key,
-        label: key,
-        currentValue: data.currentValue,
-        invested: data.invested,
-        gainLoss: data.gainLoss,
-        roi,
-        hasChildren: true,
-      });
-    }
-    return cells.sort((a, b) => b.currentValue - a.currentValue);
-  }, [drillPlatformId, isItemValuations, filteredAssets]);
+  const platformAssets = useMemo(
+    () => filteredAssets.filter((a) => a.platformId === drillPlatformId),
+    [filteredAssets, drillPlatformId]
+  );
 
-  // Level 3b (asset_returns): individual assets directly within the platform
-  // Level 4 (item_valuations): individual assets within selected description group
-  const levelAssetCells = useMemo((): HeatmapCell[] => {
+  // Level 3: description groups (item_valuations) or direct assets (asset_returns)
+  const levelThreeCells = useMemo((): HeatmapCell[] => {
     if (!drillPlatformId) return [];
-    const inPlatform = filteredAssets.filter((a) => a.platformId === drillPlatformId);
-    const subset = isItemValuations
-      ? inPlatform.filter((a) => (a.assetCategory ?? "Uncategorized") === drillAssetCategory)
-      : inPlatform;
-    return subset.map((a) => ({
-      id: a.assetId,
-      label: a.assetName,
-      currentValue: a.currentValue,
-      invested: a.invested,
-      gainLoss: a.gainLoss,
-      roi: a.roi,
+    if (isItemValuations) {
+      return aggregateCells(
+        platformAssets,
+        (a) => a.assetCategory ?? "Uncategorized",
+        true
+      );
+    }
+    return platformAssets.map((a) => ({
+      id: a.assetId, label: a.assetName,
+      currentValue: a.currentValue, invested: a.invested, gainLoss: a.gainLoss, roi: a.roi,
       hasChildren: false,
     })).sort((a, b) => b.currentValue - a.currentValue);
-  }, [drillPlatformId, drillAssetCategory, isItemValuations, filteredAssets]);
+  }, [drillPlatformId, isItemValuations, platformAssets]);
 
-  // Current level:
-  // 1 = platform categories
-  // 2 = platforms in category
-  // 3 = asset description groups (item_valuations) OR direct assets (asset_returns)
-  // 4 = individual assets within description group (item_valuations only)
-  const level = drillPlatformId
-    ? isItemValuations
-      ? drillAssetCategory !== null ? 4 : 3
-      : 3
-    : drillCategory
-    ? 2
-    : 1;
+  const descriptionAssets = useMemo(
+    () => platformAssets.filter((a) => (a.assetCategory ?? "Uncategorized") === drillAssetCategory),
+    [platformAssets, drillAssetCategory]
+  );
+
+  // Level 4: maker groups within description group
+  const levelFourCells = useMemo((): HeatmapCell[] => {
+    if (!drillAssetCategory) return [];
+    return aggregateCells(descriptionAssets, (a) => extractMaker(a.assetName), true);
+  }, [drillAssetCategory, descriptionAssets]);
+
+  // Level 5: individual assets within maker group
+  const levelFiveCells = useMemo((): HeatmapCell[] => {
+    if (!drillMaker) return [];
+    return descriptionAssets
+      .filter((a) => extractMaker(a.assetName) === drillMaker)
+      .map((a) => ({
+        id: a.assetId, label: a.assetName,
+        currentValue: a.currentValue, invested: a.invested, gainLoss: a.gainLoss, roi: a.roi,
+        hasChildren: false,
+      }))
+      .sort((a, b) => b.currentValue - a.currentValue);
+  }, [drillMaker, descriptionAssets]);
+
+  // Determine level
+  const level = !drillCategory ? 1
+    : !drillPlatformId ? 2
+    : !isItemValuations ? 3
+    : !drillAssetCategory ? 3
+    : !drillMaker ? 4
+    : 5;
 
   const currentCells =
-    level === 4
-      ? levelAssetCells
-      : level === 3
-      ? isItemValuations
-        ? levelThreeGroupCells
-        : levelAssetCells
-      : level === 2
-      ? levelTwoCells
-      : levelOneCells;
-
-  function handleCategoryClick(cat: string) {
-    setDrillCategory(cat);
-    setDrillPlatformId(null);
-    setDrillAssetCategory(null);
-  }
-
-  function handlePlatformClick(platformId: number) {
-    setDrillPlatformId(platformId);
-    setDrillAssetCategory(null);
-  }
-
-  function handleAssetCategoryClick(assetCat: string) {
-    setDrillAssetCategory(assetCat);
-  }
+    level === 5 ? levelFiveCells
+    : level === 4 ? levelFourCells
+    : level === 3 ? levelThreeCells
+    : level === 2 ? levelTwoCells
+    : levelOneCells;
 
   function handleBreadcrumbAll() {
-    setDrillCategory(null);
-    setDrillPlatformId(null);
-    setDrillAssetCategory(null);
+    setDrillCategory(null); setDrillPlatformId(null); setDrillAssetCategory(null); setDrillMaker(null);
   }
-
   function handleBreadcrumbCategory() {
-    setDrillPlatformId(null);
-    setDrillAssetCategory(null);
+    setDrillPlatformId(null); setDrillAssetCategory(null); setDrillMaker(null);
+  }
+  function handleBreadcrumbPlatform() {
+    setDrillAssetCategory(null); setDrillMaker(null);
+  }
+  function handleBreadcrumbAssetCategory() {
+    setDrillMaker(null);
   }
 
-  function handleBreadcrumbPlatform() {
-    setDrillAssetCategory(null);
+  if (filteredPlatforms.length === 0) {
+    return <p className="text-muted-foreground text-sm">No platforms to display. Try adjusting your filters.</p>;
   }
 
   const activePlatformName = drilledPlatform?.name ?? null;
 
-  if (filteredPlatforms.length === 0) {
-    return (
-      <p className="text-muted-foreground text-sm">No platforms to display. Try adjusting your filters.</p>
-    );
-  }
+  const levelHint =
+    level === 1 ? "Click a category to drill down into its platforms."
+    : level === 2 ? "Click a platform to see its assets."
+    : level === 3 && isItemValuations ? "Click a group to explore by maker or brand."
+    : level === 3 ? "Individual asset performance."
+    : level === 4 ? "Click a maker to see individual assets."
+    : "Individual asset performance.";
 
   return (
     <div className="space-y-4">
-      {/* Controls row */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        {/* Breadcrumb */}
         <nav className="flex items-center gap-1 text-sm flex-wrap" data-testid="heatmap-breadcrumb">
           <button
-            className={cn(
-              "font-medium transition-colors",
-              level === 1 ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-            )}
+            className={cn("font-medium transition-colors", level === 1 ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
             onClick={handleBreadcrumbAll}
             data-testid="breadcrumb-all"
           >
@@ -300,10 +302,7 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
             <>
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
               <button
-                className={cn(
-                  "font-medium transition-colors",
-                  level === 2 ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-                )}
+                className={cn("font-medium transition-colors", level === 2 ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
                 onClick={handleBreadcrumbCategory}
                 data-testid="breadcrumb-category"
               >
@@ -315,10 +314,7 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
             <>
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
               <button
-                className={cn(
-                  "font-medium transition-colors",
-                  level === 3 ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-                )}
+                className={cn("font-medium transition-colors", level === 3 ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
                 onClick={handleBreadcrumbPlatform}
                 data-testid="breadcrumb-platform"
               >
@@ -329,23 +325,30 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
           {drillAssetCategory !== null && (
             <>
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              <span className="font-medium text-foreground" data-testid="breadcrumb-asset-category">
+              <button
+                className={cn("font-medium transition-colors", level === 4 ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
+                onClick={handleBreadcrumbAssetCategory}
+                data-testid="breadcrumb-asset-category"
+              >
                 {drillAssetCategory}
+              </button>
+            </>
+          )}
+          {drillMaker !== null && (
+            <>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              <span className="font-medium text-foreground" data-testid="breadcrumb-maker">
+                {drillMaker}
               </span>
             </>
           )}
         </nav>
 
-        {/* Display mode toggle */}
         <div className="flex items-center rounded-md border p-0.5 shrink-0">
           <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "px-2.5 py-1 h-auto text-xs font-medium rounded",
-              displayMode === "pct"
-                ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground"
+            variant="ghost" size="sm"
+            className={cn("px-2.5 py-1 h-auto text-xs font-medium rounded",
+              displayMode === "pct" ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" : "text-muted-foreground hover:text-foreground"
             )}
             onClick={() => setDisplayMode("pct")}
             data-testid="portfolio-heatmap-toggle-pct"
@@ -353,13 +356,9 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
             % Return
           </Button>
           <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "px-2.5 py-1 h-auto text-xs font-medium rounded",
-              displayMode === "abs"
-                ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground"
+            variant="ghost" size="sm"
+            className={cn("px-2.5 py-1 h-auto text-xs font-medium rounded",
+              displayMode === "abs" ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" : "text-muted-foreground hover:text-foreground"
             )}
             onClick={() => setDisplayMode("abs")}
             data-testid="portfolio-heatmap-toggle-abs"
@@ -369,16 +368,8 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
         </div>
       </div>
 
-      {/* Level label */}
-      <p className="text-xs text-muted-foreground">
-        {level === 1 && "Click a category to drill down into its platforms."}
-        {level === 2 && "Click a platform to see its assets."}
-        {level === 3 && isItemValuations && "Click a group to see individual assets within it."}
-        {level === 3 && !isItemValuations && "Individual asset performance."}
-        {level === 4 && "Individual asset performance."}
-      </p>
+      <p className="text-xs text-muted-foreground">{levelHint}</p>
 
-      {/* Grid */}
       {currentCells.length === 0 ? (
         <p className="text-muted-foreground text-sm">No data available at this level.</p>
       ) : (
@@ -390,20 +381,17 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
               currency={currency}
               displayMode={displayMode}
               onClick={
-                level === 1
-                  ? () => handleCategoryClick(cell.id as string)
-                  : level === 2 && cell.hasChildren
-                  ? () => handlePlatformClick(cell.id as number)
-                  : level === 3 && isItemValuations
-                  ? () => handleAssetCategoryClick(cell.id as string)
-                  : undefined
+                level === 1 ? () => { setDrillCategory(cell.id as string); }
+                : level === 2 && cell.hasChildren ? () => { setDrillPlatformId(cell.id as number); }
+                : level === 3 && isItemValuations ? () => { setDrillAssetCategory(cell.id as string); }
+                : level === 4 ? () => { setDrillMaker(cell.id as string); }
+                : undefined
               }
             />
           ))}
         </div>
       )}
 
-      {/* Color legend */}
       <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1">
         <div className="flex items-center gap-1.5">
           <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: "rgba(239,68,68,0.7)" }} />
