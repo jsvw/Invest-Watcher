@@ -7,7 +7,7 @@ import { useValuations, useDeleteValuation } from "@/hooks/use-valuations";
 import { useWithdrawals, useDeleteWithdrawal } from "@/hooks/use-withdrawals";
 import { useAssets, useUpdateAsset } from "@/hooks/use-assets";
 import { useAuth } from "@/App";
-import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
+import { formatCurrency, formatCompactCurrency, getCurrencySymbol } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import { useRoute } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -665,6 +665,7 @@ export default function PlatformDetails() {
   });
 
   const [analyticsHeatmapTooltip, setAnalyticsHeatmapTooltip] = useState<{ x: number; y: number; label: string; gain: number; gainPct: number | null } | null>(null);
+  const [heatmapMode, setHeatmapMode] = useState<"pct" | "value">("pct");
 
   const platformAnalytics = useMemo(() => {
     if (!monthlyReturns || monthlyReturns.length === 0) return null;
@@ -2313,8 +2314,24 @@ export default function PlatformDetails() {
                 {/* Mini monthly heatmap */}
                 <Card data-testid="card-monthly-heatmap">
                   <CardHeader>
-                    <CardTitle>Monthly Returns Heatmap</CardTitle>
-                    <CardDescription>Cash-flow adjusted return per calendar month — green = gain, red = loss</CardDescription>
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <CardTitle>Monthly Returns Heatmap</CardTitle>
+                        <CardDescription>Cash-flow adjusted return per calendar month — green = gain, red = loss</CardDescription>
+                      </div>
+                      <div className="flex items-center rounded-md border p-0.5 shrink-0">
+                        <button
+                          className={cn("px-2.5 py-1 text-xs rounded transition-colors", heatmapMode === "pct" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+                          onClick={() => setHeatmapMode("pct")}
+                          data-testid="heatmap-toggle-pct"
+                        >%</button>
+                        <button
+                          className={cn("px-2.5 py-1 text-xs rounded transition-colors", heatmapMode === "value" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+                          onClick={() => setHeatmapMode("value")}
+                          data-testid="heatmap-toggle-value"
+                        >€</button>
+                      </div>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     <div className="overflow-x-auto">
@@ -2374,7 +2391,9 @@ export default function PlatformDetails() {
                                   }}
                                   onMouseLeave={() => setAnalyticsHeatmapTooltip(null)}
                                 >
-                                  {`${cell.returnPct >= 0 ? '+' : ''}${cell.returnPct.toFixed(1)}%`}
+                                  {heatmapMode === "pct"
+                                  ? `${cell.returnPct >= 0 ? '+' : ''}${cell.returnPct.toFixed(1)}%`
+                                  : `${cell.absoluteChange >= 0 ? '+' : ''}${formatCompactCurrency(cell.absoluteChange, currency)}`}
                                 </div>
                               );
                             })}
