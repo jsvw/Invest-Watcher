@@ -76,6 +76,7 @@ export const assets = pgTable("assets", {
   status: text("status").notNull().default("active"), // 'active' or 'exited'
   exitDate: timestamp("exit_date"), // When the asset was sold
   exitPrice: numeric("exit_price"), // Sale price when exited
+  category: text("category"), // Asset category (e.g. Whisky, Wine, Watches — for item_valuations mode)
   createdAt: timestamp("created_at").defaultNow(),
 });
 
