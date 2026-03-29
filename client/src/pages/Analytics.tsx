@@ -257,19 +257,28 @@ export default function Analytics() {
       (new Date(last.date).getTime() - new Date(first.date).getTime()) /
       (1000 * 60 * 60 * 24 * 365.25);
 
-    // Time-Weighted Return: strips out the effect of capital additions between periods
-    // Each period return = (end_value - begin_value - net_cash_added) / begin_value
-    // Compound all sub-period returns, then annualize
+    // Time-Weighted Return — filter-aware when per-platform monthly data is available,
+    // otherwise falls back to full-portfolio history.
     let twrFactor = 1;
     let validPeriods = 0;
-    for (let i = 1; i < historyData.length; i++) {
-      const prev = historyData[i - 1];
-      const curr = historyData[i];
-      if (prev.value <= 0) continue;
-      const netCashAdded = curr.invested - prev.invested;
-      const periodReturn = (curr.value - prev.value - netCashAdded) / prev.value;
-      twrFactor *= (1 + periodReturn);
-      validPeriods++;
+    if (platformBreakdownByMonth) {
+      const monthKeys = Object.keys(platformBreakdownByMonth).sort();
+      for (const key of monthKeys) {
+        const entries = platformBreakdownByMonth[key].filter((p) => !excludedPlatforms.has(p.platformId));
+        const gain = entries.reduce((s, p) => s + p.gain, 0);
+        const prevVal = entries.reduce((s, p) => s + p.prevVal, 0);
+        if (prevVal > 0) { twrFactor *= (1 + gain / prevVal); validPeriods++; }
+      }
+    } else {
+      for (let i = 1; i < historyData.length; i++) {
+        const prev = historyData[i - 1];
+        const curr = historyData[i];
+        if (prev.value <= 0) continue;
+        const netCashAdded = curr.invested - prev.invested;
+        const periodReturn = (curr.value - prev.value - netCashAdded) / prev.value;
+        twrFactor *= (1 + periodReturn);
+        validPeriods++;
+      }
     }
     const twr = validPeriods > 0 ? (twrFactor - 1) * 100 : null;
     const cagr = twr != null && years > 0
@@ -291,7 +300,7 @@ export default function Analytics() {
     const ageMonths = Math.floor(ageDays / 30);
 
     return { totalROI, cagr, twr, bestPlatform, ageDays, ageMonths };
-  }, [activePlatforms, historyData]);
+  }, [activePlatforms, historyData, platformBreakdownByMonth, excludedPlatforms]);
 
   const heatmapData = useMemo(() => {
     if (!historyData || historyData.length < 2) return null;
