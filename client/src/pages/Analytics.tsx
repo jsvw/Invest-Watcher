@@ -246,9 +246,10 @@ export default function Analytics() {
 
   const kpis = useMemo(() => {
     if (!activePlatforms || !historyData || historyData.length === 0) return null;
+    const allPlatforms = platforms ?? activePlatforms;
 
-    const totalInvested = activePlatforms.reduce((s, p) => s + (Number(p.totalInvested) || 0), 0);
-    const totalCurrent = activePlatforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
+    const totalInvested = allPlatforms.reduce((s, p) => s + (Number(p.totalInvested) || 0), 0);
+    const totalCurrent = allPlatforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
     const totalROI = totalInvested > 0 ? ((totalCurrent - totalInvested) / totalInvested) * 100 : 0;
 
     const first = historyData[0];
