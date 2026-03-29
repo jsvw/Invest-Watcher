@@ -19,6 +19,7 @@ import {
   Area,
   BarChart,
   Bar,
+  LabelList,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -243,6 +244,29 @@ export default function Analytics() {
       return res.json();
     },
   });
+
+  // Build the set of platform names that are currently excluded (for cross-referencing flow data by name)
+  const excludedPlatformNames = useMemo(() => {
+    if (!platforms) return new Set<string>();
+    return new Set(platforms.filter((p) => excludedPlatforms.has(p.id)).map((p) => p.name));
+  }, [platforms, excludedPlatforms]);
+
+  // Filter the investment-flow platforms list and add a __total__ field per month for stack labels
+  const filteredFlowPlatforms = useMemo(() => {
+    if (!flowData?.platforms) return [];
+    return flowData.platforms.filter((p) => !excludedPlatformNames.has(p.name));
+  }, [flowData, excludedPlatformNames]);
+
+  const filteredFlowMonths = useMemo(() => {
+    if (!flowData?.months) return [];
+    return flowData.months.map((month) => {
+      let total = 0;
+      for (const [key, val] of Object.entries(month)) {
+        if (key !== "month" && !excludedPlatformNames.has(key)) total += (val as number) || 0;
+      }
+      return { ...month, __total__: total };
+    });
+  }, [flowData, excludedPlatformNames]);
 
   const kpis = useMemo(() => {
     if (!activePlatforms || !historyData || historyData.length === 0) return null;
@@ -916,7 +940,7 @@ export default function Analytics() {
             {flowData && flowData.months.length > 0 && flowData.platforms ? (
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={flowData.months} margin={{ left: 4 }}>
+                  <BarChart data={filteredFlowMonths} margin={{ left: 4, top: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis
                       dataKey="month"
@@ -938,8 +962,17 @@ export default function Analytics() {
                       contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
                     />
                     <Legend />
-                    {flowData.platforms.map((p) => (
-                      <Bar key={p.name} dataKey={p.name} stackId="flow" fill={p.color} />
+                    {filteredFlowPlatforms.map((p, i) => (
+                      <Bar key={p.name} dataKey={p.name} stackId="flow" fill={p.color}>
+                        {i === filteredFlowPlatforms.length - 1 && (
+                          <LabelList
+                            dataKey="__total__"
+                            position="top"
+                            formatter={(v: number) => v > 0 ? formatCompactCurrency(v, currency) : ""}
+                            style={{ fontSize: 9, fill: "hsl(var(--muted-foreground))", fontWeight: 500 }}
+                          />
+                        )}
+                      </Bar>
                     ))}
                   </BarChart>
                 </ResponsiveContainer>
