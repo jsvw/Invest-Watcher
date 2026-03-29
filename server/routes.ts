@@ -1367,7 +1367,7 @@ export async function registerRoutes(
             platformName: platform.name,
             platformMode: platform.platformMode,
             category: platform.category,
-            assetCategory: (asset as any).category ?? null,
+            assetCategory: asset.description ?? null,
             currentValue: Math.round(currentValue * 100) / 100,
             invested: Math.round(invested * 100) / 100,
             gainLoss: Math.round(gainLoss * 100) / 100,

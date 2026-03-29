@@ -10,7 +10,9 @@ export interface EnrichedAsset {
   assetName: string;
   platformId: number;
   platformName: string;
+  platformMode: string;
   category: string;
+  assetCategory: string | null;
   currentValue: number;
   invested: number;
   gainLoss: number;
@@ -96,6 +98,7 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
   const [displayMode, setDisplayMode] = useState<DisplayMode>("pct");
   const [drillCategory, setDrillCategory] = useState<string | null>(null);
   const [drillPlatformId, setDrillPlatformId] = useState<number | null>(null);
+  const [drillAssetCategory, setDrillAssetCategory] = useState<string | null>(null);
 
   const filteredAssets = useMemo(
     () => assets.filter((a) => !excludedPlatforms.has(a.platformId)),
@@ -107,9 +110,7 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
     [platforms, excludedPlatforms]
   );
 
-  // Level 1: categories — aggregated from platform totals.
-  // Platform-level currentValue and totalInvested are the single source of truth for all modes
-  // (standard, asset_returns, item_valuations) and are already computed by the backend.
+  // Level 1: platform categories — aggregated from platform totals
   const categoryMap = useMemo(() => {
     const map = new Map<string, { currentValue: number; invested: number }>();
     for (const p of filteredPlatforms) {
@@ -149,7 +150,6 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
       const invested = Number(p.totalInvested) || 0;
       const gainLoss = currentValue - invested;
       const roi = invested > 0 ? (gainLoss / invested) * 100 : 0;
-      // Only platforms with asset-level modes have drillable Level 3
       const hasChildren = p.platformMode === "asset_returns" || p.platformMode === "item_valuations";
       return {
         id: p.id,
@@ -163,11 +163,51 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
     }).sort((a, b) => b.currentValue - a.currentValue);
   }, [drillCategory, filteredPlatforms]);
 
-  // Level 3: individual assets within selected platform
-  const levelThreeCells = useMemo((): HeatmapCell[] => {
+  // Determine the mode of the currently drilled platform
+  const drilledPlatform = useMemo(
+    () => drillPlatformId ? platforms.find((p) => p.id === drillPlatformId) : null,
+    [drillPlatformId, platforms]
+  );
+  const isItemValuations = drilledPlatform?.platformMode === "item_valuations";
+
+  // Level 3a (item_valuations): asset description groups within the platform
+  const levelThreeGroupCells = useMemo((): HeatmapCell[] => {
+    if (!drillPlatformId || !isItemValuations) return [];
+    const inPlatform = filteredAssets.filter((a) => a.platformId === drillPlatformId);
+    const groupMap = new Map<string, { currentValue: number; invested: number; gainLoss: number }>();
+    for (const a of inPlatform) {
+      const key = a.assetCategory ?? "Uncategorized";
+      const existing = groupMap.get(key) ?? { currentValue: 0, invested: 0, gainLoss: 0 };
+      existing.currentValue += a.currentValue;
+      existing.invested += a.invested;
+      existing.gainLoss += a.gainLoss;
+      groupMap.set(key, existing);
+    }
+    const cells: HeatmapCell[] = [];
+    for (const [key, data] of groupMap.entries()) {
+      const roi = data.invested > 0 ? (data.gainLoss / data.invested) * 100 : 0;
+      cells.push({
+        id: key,
+        label: key,
+        currentValue: data.currentValue,
+        invested: data.invested,
+        gainLoss: data.gainLoss,
+        roi,
+        hasChildren: true,
+      });
+    }
+    return cells.sort((a, b) => b.currentValue - a.currentValue);
+  }, [drillPlatformId, isItemValuations, filteredAssets]);
+
+  // Level 3b (asset_returns): individual assets directly within the platform
+  // Level 4 (item_valuations): individual assets within selected description group
+  const levelAssetCells = useMemo((): HeatmapCell[] => {
     if (!drillPlatformId) return [];
     const inPlatform = filteredAssets.filter((a) => a.platformId === drillPlatformId);
-    return inPlatform.map((a) => ({
+    const subset = isItemValuations
+      ? inPlatform.filter((a) => (a.assetCategory ?? "Uncategorized") === drillAssetCategory)
+      : inPlatform;
+    return subset.map((a) => ({
       id: a.assetId,
       label: a.assetName,
       currentValue: a.currentValue,
@@ -176,33 +216,63 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
       roi: a.roi,
       hasChildren: false,
     })).sort((a, b) => b.currentValue - a.currentValue);
-  }, [drillPlatformId, filteredAssets]);
+  }, [drillPlatformId, drillAssetCategory, isItemValuations, filteredAssets]);
 
-  // Determine current level and cells
-  const level = drillPlatformId ? 3 : drillCategory ? 2 : 1;
-  const currentCells = level === 3 ? levelThreeCells : level === 2 ? levelTwoCells : levelOneCells;
+  // Current level:
+  // 1 = platform categories
+  // 2 = platforms in category
+  // 3 = asset description groups (item_valuations) OR direct assets (asset_returns)
+  // 4 = individual assets within description group (item_valuations only)
+  const level = drillPlatformId
+    ? isItemValuations
+      ? drillAssetCategory !== null ? 4 : 3
+      : 3
+    : drillCategory
+    ? 2
+    : 1;
+
+  const currentCells =
+    level === 4
+      ? levelAssetCells
+      : level === 3
+      ? isItemValuations
+        ? levelThreeGroupCells
+        : levelAssetCells
+      : level === 2
+      ? levelTwoCells
+      : levelOneCells;
 
   function handleCategoryClick(cat: string) {
     setDrillCategory(cat);
     setDrillPlatformId(null);
+    setDrillAssetCategory(null);
   }
 
   function handlePlatformClick(platformId: number) {
     setDrillPlatformId(platformId);
+    setDrillAssetCategory(null);
+  }
+
+  function handleAssetCategoryClick(assetCat: string) {
+    setDrillAssetCategory(assetCat);
   }
 
   function handleBreadcrumbAll() {
     setDrillCategory(null);
     setDrillPlatformId(null);
+    setDrillAssetCategory(null);
   }
 
   function handleBreadcrumbCategory() {
     setDrillPlatformId(null);
+    setDrillAssetCategory(null);
   }
 
-  const activePlatformName = drillPlatformId
-    ? platforms.find((p) => p.id === drillPlatformId)?.name ?? ""
-    : null;
+  function handleBreadcrumbPlatform() {
+    setDrillAssetCategory(null);
+  }
+
+  const activePlatformName = drilledPlatform?.name ?? null;
 
   if (filteredPlatforms.length === 0) {
     return (
@@ -244,8 +314,23 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
           {activePlatformName && (
             <>
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
-              <span className="font-medium text-foreground" data-testid="breadcrumb-platform">
+              <button
+                className={cn(
+                  "font-medium transition-colors",
+                  level === 3 ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={handleBreadcrumbPlatform}
+                data-testid="breadcrumb-platform"
+              >
                 {activePlatformName}
+              </button>
+            </>
+          )}
+          {drillAssetCategory !== null && (
+            <>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              <span className="font-medium text-foreground" data-testid="breadcrumb-asset-category">
+                {drillAssetCategory}
               </span>
             </>
           )}
@@ -287,8 +372,10 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
       {/* Level label */}
       <p className="text-xs text-muted-foreground">
         {level === 1 && "Click a category to drill down into its platforms."}
-        {level === 2 && "Click a platform to see individual assets (where available)."}
-        {level === 3 && "Individual asset performance."}
+        {level === 2 && "Click a platform to see its assets."}
+        {level === 3 && isItemValuations && "Click a group to see individual assets within it."}
+        {level === 3 && !isItemValuations && "Individual asset performance."}
+        {level === 4 && "Individual asset performance."}
       </p>
 
       {/* Grid */}
@@ -307,6 +394,8 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
                   ? () => handleCategoryClick(cell.id as string)
                   : level === 2 && cell.hasChildren
                   ? () => handlePlatformClick(cell.id as number)
+                  : level === 3 && isItemValuations
+                  ? () => handleAssetCategoryClick(cell.id as string)
                   : undefined
               }
             />
