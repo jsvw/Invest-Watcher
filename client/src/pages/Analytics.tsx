@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import type { DashboardFilter } from "@shared/schema";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { PortfolioHeatmap, type EnrichedAsset } from "@/components/PortfolioHeatmap";
 import { Badge } from "@/components/ui/badge";
 import { usePlatforms } from "@/hooks/use-platforms";
 import { useAuth } from "@/App";
@@ -232,6 +233,15 @@ export default function Analytics() {
     queryFn: async () => {
       const res = await fetch("/api/analytics/monthly-platform-breakdown", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch platform breakdown");
+      return res.json();
+    },
+  });
+
+  const { data: analyticsAssets } = useQuery<EnrichedAsset[]>({
+    queryKey: ["/api/analytics/assets"],
+    queryFn: async () => {
+      const res = await fetch("/api/analytics/assets", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch analytics assets");
       return res.json();
     },
   });
@@ -730,6 +740,26 @@ export default function Analytics() {
             <HeatmapTooltipCard {...tooltip.data} />
           </div>
         )}
+
+        {/* Portfolio Heatmap */}
+        <Card data-testid="portfolio-heatmap-card">
+          <CardHeader>
+            <CardTitle>Portfolio Heatmap</CardTitle>
+            <CardDescription>
+              Drill into your portfolio by category → platform → asset. Green = positive return, red = negative.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {platforms && (
+              <PortfolioHeatmap
+                assets={analyticsAssets ?? []}
+                platforms={platforms}
+                excludedPlatforms={excludedPlatforms}
+                currency={currency}
+              />
+            )}
+          </CardContent>
+        </Card>
 
         {/* ROI by Platform */}
         <Card>

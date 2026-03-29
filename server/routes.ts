@@ -1328,6 +1328,57 @@ export async function registerRoutes(
     }
   });
 
+  // --- Analytics: All Assets Enriched (for Portfolio Heatmap) ---
+  app.get('/api/analytics/assets', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const userPlatforms = await storage.getPlatforms(userId);
+
+      // For each platform, get assets (only platforms with asset_returns or item_valuations modes have assets)
+      const assetPlatforms = userPlatforms.filter(
+        (p) => p.platformMode === 'asset_returns' || p.platformMode === 'item_valuations'
+      );
+
+      const enrichedAssets: {
+        assetId: number;
+        assetName: string;
+        platformId: number;
+        platformName: string;
+        category: string;
+        currentValue: number;
+        invested: number;
+        roi: number;
+        gainLoss: number;
+      }[] = [];
+
+      for (const platform of assetPlatforms) {
+        const platformAssets = await storage.getAssets(platform.id);
+        for (const asset of platformAssets) {
+          const currentValue = asset.currentValue ?? Number(asset.investedAmount);
+          const invested = Number(asset.investedAmount);
+          const gainLoss = currentValue - invested;
+          const roi = invested > 0 ? (gainLoss / invested) * 100 : 0;
+          enrichedAssets.push({
+            assetId: asset.id,
+            assetName: asset.name,
+            platformId: platform.id,
+            platformName: platform.name,
+            category: platform.category,
+            currentValue: Math.round(currentValue * 100) / 100,
+            invested: Math.round(invested * 100) / 100,
+            gainLoss: Math.round(gainLoss * 100) / 100,
+            roi: Math.round(roi * 100) / 100,
+          });
+        }
+      }
+
+      res.json(enrichedAssets);
+    } catch (error) {
+      console.error("Error fetching analytics assets:", error);
+      res.status(500).json({ message: "Failed to fetch analytics assets" });
+    }
+  });
+
   app.get('/api/platforms/:id/monthly-returns', requireAuth, async (req, res) => {
     try {
       const userId = getAuthenticatedUserId(req)!;
