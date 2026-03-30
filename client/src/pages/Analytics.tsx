@@ -109,13 +109,25 @@ function KpiCard({ label, value, sub, icon, positive, neutral, chartData, chartI
           >
             <div className="h-[72px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
+                <AreaChart data={chartData} margin={{ top: 2, right: 2, left: 0, bottom: 2 }}>
                   <defs>
                     <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor={chartColor} stopOpacity={0.25} />
                       <stop offset="95%" stopColor={chartColor} stopOpacity={0} />
                     </linearGradient>
                   </defs>
+                  <YAxis
+                    tickFormatter={(v: number) =>
+                      chartIsCurrency
+                        ? formatCompactCurrency(v, currency ?? "EUR")
+                        : `${v.toFixed(1)}%`
+                    }
+                    tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
+                    tickLine={false}
+                    axisLine={false}
+                    width={38}
+                    tickCount={3}
+                  />
                   <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" strokeOpacity={0.4} />
                   <Tooltip
                     content={({ active, payload }: any) => {
