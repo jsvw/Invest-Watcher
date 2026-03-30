@@ -577,10 +577,11 @@ export default function Analytics() {
             annualized: "Annualised equivalent of the compounded TWR at each point in time",
             cumulative: "Running sum of absolute monthly gains — cash-flow adjusted profit in portfolio currency",
           };
-          const roiToggleBtns: { key: typeof roiChartMode; label: string }[] = [
-            { key: "roi", label: "% ROI" },
-            { key: "annualized", label: "Ann. Return" },
-            { key: "cumulative", label: "Cum. Gain" },
+          const hasMonthlyBreakdown = !!platformBreakdownByMonth;
+          const roiToggleBtns: { key: typeof roiChartMode; label: string; disabled: boolean }[] = [
+            { key: "roi", label: "% ROI", disabled: false },
+            { key: "annualized", label: "Ann. Return", disabled: !hasMonthlyBreakdown },
+            { key: "cumulative", label: "Cum. Gain", disabled: !hasMonthlyBreakdown },
           ];
           return (
             <Card>
@@ -590,15 +591,19 @@ export default function Analytics() {
                   <CardDescription>{descriptions[roiChartMode]}</CardDescription>
                 </div>
                 <div className="flex items-center rounded-md border p-0.5 shrink-0">
-                  {roiToggleBtns.map(({ key, label }) => (
+                  {roiToggleBtns.map(({ key, label, disabled }) => (
                     <button
                       key={key}
                       type="button"
-                      onClick={() => setRoiChartMode(key)}
+                      disabled={disabled}
+                      onClick={() => !disabled && setRoiChartMode(key)}
+                      title={disabled ? "Requires monthly breakdown data" : undefined}
                       className={cn(
                         "px-2.5 py-1 text-xs font-medium rounded transition-colors",
                         roiChartMode === key
                           ? "bg-primary text-primary-foreground"
+                          : disabled
+                          ? "text-muted-foreground/40 cursor-not-allowed"
                           : "text-muted-foreground hover:text-foreground"
                       )}
                       data-testid={`roi-chart-toggle-${key}`}
