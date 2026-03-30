@@ -157,6 +157,7 @@ export default function Analytics() {
   const [, navigate] = useLocation();
   const [tooltip, setTooltip] = useState<{ x: number; y: number; data: HeatmapTooltipData } | null>(null);
   const [heatmapMode, setHeatmapMode] = useState<"pct" | "value">("pct");
+  const [roiChartMode, setRoiChartMode] = useState<"roi" | "annualized" | "cumulative">("roi");
   const [sortKey, setSortKey] = useState<SortKey>("roi");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [excludedPlatforms, setExcludedPlatforms] = useState<Set<number>>(new Set());
@@ -404,14 +405,21 @@ export default function Analytics() {
     if (platformBreakdownByMonth) {
       const monthKeys = Object.keys(platformBreakdownByMonth).sort();
       let factor = 1;
+      let cumulativeGain = 0;
+      let monthsElapsed = 0;
       return monthKeys.map((key) => {
         const entries = platformBreakdownByMonth[key].filter((p) => !excludedPlatforms.has(p.platformId));
         const gain = entries.reduce((s, p) => s + p.gain, 0);
         const prevVal = entries.reduce((s, p) => s + p.prevVal, 0);
         if (prevVal > 0) factor *= (1 + gain / prevVal);
+        cumulativeGain += gain;
+        monthsElapsed += 1;
+        const annualized = monthsElapsed > 0 && factor > 0
+          ? (Math.pow(factor, 12 / monthsElapsed) - 1) * 100
+          : 0;
         const [y, m] = key.split("-");
         const label = `${MONTHS[Number(m) - 1]} ${y}`;
-        return { date: `${key}-01`, label, roi: (factor - 1) * 100 };
+        return { date: `${key}-01`, label, roi: (factor - 1) * 100, annualized, cumulative: cumulativeGain };
       });
     }
     if (!historyData || historyData.length === 0) return [];
@@ -419,7 +427,7 @@ export default function Analytics() {
       const roi = p.invested > 0 ? ((p.value - p.invested) / p.invested) * 100 : 0;
       const d = new Date(p.date);
       const label = `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-      return { date: p.date, label, roi };
+      return { date: p.date, label, roi, annualized: roi, cumulative: p.value - p.invested };
     });
   }, [historyData, platformBreakdownByMonth, excludedPlatforms]);
 
@@ -557,71 +565,115 @@ export default function Analytics() {
         </div>
 
         {/* ROI Over Time */}
-        {roiOverTimeData.length > 1 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>ROI Over Time</CardTitle>
-              <CardDescription>Time-weighted return — chains monthly gains independent of cash flow timing</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-56">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={roiOverTimeData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="roiGradientPos" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="roiGradientNeg" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                    <XAxis
-                      dataKey="label"
-                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                      tickLine={false}
-                      axisLine={false}
-                      interval="preserveStartEnd"
-                    />
-                    <YAxis
-                      tickFormatter={(v: number) => `${v.toFixed(1)}%`}
-                      tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                      tickLine={false}
-                      axisLine={false}
-                      width={52}
-                    />
-                    <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" />
-                    <Tooltip
-                      content={({ active, payload, label }: any) => {
-                        if (!active || !payload?.length) return null;
-                        const roi = payload[0].value as number;
-                        return (
-                          <div className="bg-popover border rounded-lg shadow-lg p-2.5 text-xs">
-                            <p className="text-muted-foreground mb-1">{label}</p>
-                            <p className={cn("font-semibold", roi >= 0 ? "text-emerald-500" : "text-red-500")}>
-                              {fmtPct(roi)} ROI
-                            </p>
-                          </div>
-                        );
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="roi"
-                      stroke={roiOverTimeData[roiOverTimeData.length - 1]?.roi >= 0 ? "#10b981" : "#ef4444"}
-                      strokeWidth={2}
-                      fill={roiOverTimeData[roiOverTimeData.length - 1]?.roi >= 0 ? "url(#roiGradientPos)" : "url(#roiGradientNeg)"}
-                      dot={false}
-                      activeDot={{ r: 4, strokeWidth: 0 }}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {roiOverTimeData.length > 1 && (() => {
+          const lastPoint = roiOverTimeData[roiOverTimeData.length - 1];
+          const activeValue = roiChartMode === "roi" ? lastPoint?.roi : roiChartMode === "annualized" ? lastPoint?.annualized : lastPoint?.cumulative;
+          const isPositive = (activeValue ?? 0) >= 0;
+          const strokeColor = isPositive ? "#10b981" : "#ef4444";
+          const fillGradient = isPositive ? "url(#roiGradientPos)" : "url(#roiGradientNeg)";
+          const isCurrency = roiChartMode === "cumulative";
+          const descriptions: Record<typeof roiChartMode, string> = {
+            roi: "Time-weighted return — chains monthly gains independent of cash flow timing",
+            annualized: "Annualised equivalent of the compounded TWR at each point in time",
+            cumulative: "Running sum of absolute monthly gains — cash-flow adjusted profit in portfolio currency",
+          };
+          const roiToggleBtns: { key: typeof roiChartMode; label: string }[] = [
+            { key: "roi", label: "% ROI" },
+            { key: "annualized", label: "Ann. Return" },
+            { key: "cumulative", label: "Cum. Gain" },
+          ];
+          return (
+            <Card>
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle>ROI Over Time</CardTitle>
+                  <CardDescription>{descriptions[roiChartMode]}</CardDescription>
+                </div>
+                <div className="flex items-center rounded-md border p-0.5 shrink-0">
+                  {roiToggleBtns.map(({ key, label }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setRoiChartMode(key)}
+                      className={cn(
+                        "px-2.5 py-1 text-xs font-medium rounded transition-colors",
+                        roiChartMode === key
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                      data-testid={`roi-chart-toggle-${key}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={roiOverTimeData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="roiGradientPos" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="roiGradientNeg" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#ef4444" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                        tickLine={false}
+                        axisLine={false}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        tickFormatter={(v: number) =>
+                          isCurrency ? formatCompactCurrency(v, currency) : `${v.toFixed(1)}%`
+                        }
+                        tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                        tickLine={false}
+                        axisLine={false}
+                        width={isCurrency ? 64 : 52}
+                      />
+                      <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" />
+                      <Tooltip
+                        content={({ active, payload, label }: any) => {
+                          if (!active || !payload?.length) return null;
+                          const val = payload[0].value as number;
+                          const formatted = isCurrency
+                            ? `${val >= 0 ? "+" : ""}${formatCompactCurrency(val, currency)}`
+                            : fmtPct(val);
+                          const modeLabel = roiChartMode === "roi" ? "TWR" : roiChartMode === "annualized" ? "Ann. Return" : "Cum. Gain";
+                          return (
+                            <div className="bg-popover border rounded-lg shadow-lg p-2.5 text-xs">
+                              <p className="text-muted-foreground mb-1">{label}</p>
+                              <p className={cn("font-semibold", val >= 0 ? "text-emerald-500" : "text-red-500")}>
+                                {formatted} {modeLabel}
+                              </p>
+                            </div>
+                          );
+                        }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey={roiChartMode}
+                        stroke={strokeColor}
+                        strokeWidth={2}
+                        fill={fillGradient}
+                        dot={false}
+                        activeDot={{ r: 4, strokeWidth: 0 }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* Monthly Returns Heatmap */}
         <Card>
