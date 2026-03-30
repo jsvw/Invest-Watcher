@@ -404,22 +404,25 @@ export default function Analytics() {
   const roiOverTimeData = useMemo(() => {
     if (platformBreakdownByMonth) {
       const monthKeys = Object.keys(platformBreakdownByMonth).sort();
-      let factor = 1;
+      let twrFactor = 1;
       let cumulativeGain = 0;
       let monthsElapsed = 0;
       return monthKeys.map((key) => {
         const entries = platformBreakdownByMonth[key].filter((p) => !excludedPlatforms.has(p.platformId));
         const gain = entries.reduce((s, p) => s + p.gain, 0);
         const prevVal = entries.reduce((s, p) => s + p.prevVal, 0);
-        if (prevVal > 0) factor *= (1 + gain / prevVal);
+        const currVal = entries.reduce((s, p) => s + p.currVal, 0);
+        if (prevVal > 0) twrFactor *= (1 + gain / prevVal);
         cumulativeGain += gain;
         monthsElapsed += 1;
-        const annualized = monthsElapsed > 0 && factor > 0
-          ? (Math.pow(factor, 12 / monthsElapsed) - 1) * 100
+        const totalInvested = currVal - cumulativeGain;
+        const roi = totalInvested > 0 ? (cumulativeGain / totalInvested) * 100 : 0;
+        const annualized = monthsElapsed > 0 && twrFactor > 0
+          ? (Math.pow(twrFactor, 12 / monthsElapsed) - 1) * 100
           : 0;
         const [y, m] = key.split("-");
         const label = `${MONTHS[Number(m) - 1]} ${y}`;
-        return { date: `${key}-01`, label, roi: (factor - 1) * 100, annualized, cumulative: cumulativeGain };
+        return { date: `${key}-01`, label, roi, annualized, cumulative: cumulativeGain };
       });
     }
     if (!historyData || historyData.length === 0) return [];
@@ -573,8 +576,8 @@ export default function Analytics() {
           const fillGradient = isPositive ? "url(#roiGradientPos)" : "url(#roiGradientNeg)";
           const isCurrency = roiChartMode === "cumulative";
           const descriptions: Record<typeof roiChartMode, string> = {
-            roi: "Time-weighted return — chains monthly gains independent of cash flow timing",
-            annualized: "Annualised equivalent of the compounded TWR at each point in time",
+            roi: "Total return on invested capital — cumulative gains divided by total capital deployed",
+            annualized: "Annualised time-weighted return (TWR) — neutralises cash flow timing",
             cumulative: "Running sum of absolute monthly gains — cash-flow adjusted profit in portfolio currency",
           };
           const hasMonthlyBreakdown = !!platformBreakdownByMonth;
@@ -652,7 +655,7 @@ export default function Analytics() {
                           const formatted = isCurrency
                             ? `${val >= 0 ? "+" : ""}${formatCompactCurrency(val, currency)}`
                             : fmtPct(val);
-                          const modeLabel = roiChartMode === "roi" ? "TWR" : roiChartMode === "annualized" ? "Ann. Return" : "Cum. Gain";
+                          const modeLabel = roiChartMode === "roi" ? "ROI" : roiChartMode === "annualized" ? "Ann. Return" : "Cum. Gain";
                           return (
                             <div className="bg-popover border rounded-lg shadow-lg p-2.5 text-xs">
                               <p className="text-muted-foreground mb-1">{label}</p>
