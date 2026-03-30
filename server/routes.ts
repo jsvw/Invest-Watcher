@@ -1328,6 +1328,152 @@ export async function registerRoutes(
     }
   });
 
+  // --- Portfolio Waterfall ---
+  app.get('/api/portfolio/waterfall', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const granularity = (req.query.granularity as string) || 'month';
+      const excludePlatforms = req.query.excludePlatforms
+        ? (req.query.excludePlatforms as string).split(',').map(Number).filter(n => !isNaN(n))
+        : [];
+
+      const userPlatforms = await storage.getPlatforms(userId);
+      const userInvestments = await storage.getAllInvestmentsForUser(userId);
+      const userWithdrawals = await storage.getAllWithdrawalsForUser(userId);
+      const userValuations = await storage.getAllValuationsForUser(userId);
+
+      const filteredPlatforms = userPlatforms.filter(p => !excludePlatforms.includes(p.id));
+      const filteredInvestments = userInvestments.filter(inv => !excludePlatforms.includes(inv.platformId));
+      const filteredWithdrawals = userWithdrawals.filter(wd => !excludePlatforms.includes(wd.platformId));
+      const filteredValuations = userValuations.filter(val => !excludePlatforms.includes(val.platformId));
+
+      // Helper: format a date to a period key
+      const toPeriodKey = (date: Date): string => {
+        const y = date.getFullYear();
+        const m = date.getMonth() + 1;
+        if (granularity === 'year') {
+          return `${y}`;
+        } else if (granularity === 'quarter') {
+          const q = Math.ceil(m / 3);
+          return `${y}-Q${q}`;
+        } else {
+          return `${y}-${String(m).padStart(2, '0')}`;
+        }
+      };
+
+      // Collect all period keys
+      const periodSet = new Set<string>();
+      filteredInvestments.forEach(inv => periodSet.add(toPeriodKey(new Date(inv.date))));
+      filteredWithdrawals.forEach(wd => periodSet.add(toPeriodKey(new Date(wd.date))));
+      filteredValuations.forEach(val => periodSet.add(toPeriodKey(new Date(val.date))));
+      
+      if (periodSet.size === 0) {
+        return res.json([]);
+      }
+
+      const sortedPeriods = Array.from(periodSet).sort();
+
+      // Get the end-of-period date for a given period key
+      const getPeriodEndDate = (key: string): Date => {
+        if (granularity === 'year') {
+          const y = parseInt(key);
+          return new Date(y, 11, 31, 23, 59, 59);
+        } else if (granularity === 'quarter') {
+          const [y, qStr] = key.split('-');
+          const q = parseInt(qStr.replace('Q', ''));
+          const endMonth = q * 3; // 3, 6, 9, 12
+          return new Date(parseInt(y), endMonth, 0, 23, 59, 59);
+        } else {
+          const [y, m] = key.split('-').map(Number);
+          return new Date(y, m, 0, 23, 59, 59);
+        }
+      };
+
+      // Get portfolio value at end of a given date
+      const getPortfolioValueAtDate = (endDate: Date): number => {
+        const platformLatestVals = new Map<number, number>();
+        [...filteredValuations]
+          .filter(val => new Date(val.date) <= endDate)
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          .forEach(val => {
+            platformLatestVals.set(val.platformId, Number(val.value));
+          });
+        return Array.from(platformLatestVals.values()).reduce((sum, v) => sum + v, 0);
+      };
+
+      // Get platform value at end of a given date
+      const getPlatformValueAtDate = (platformId: number, endDate: Date): number => {
+        const platformVals = filteredValuations
+          .filter(val => val.platformId === platformId && new Date(val.date) <= endDate)
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return platformVals.length > 0 ? Number(platformVals[0].value) : 0;
+      };
+
+      // Get net invested for period
+      const getNetInvested = (startDate: Date, endDate: Date): number => {
+        const inv = filteredInvestments
+          .filter(i => new Date(i.date) > startDate && new Date(i.date) <= endDate)
+          .reduce((s, i) => s + Number(i.amount), 0);
+        const wd = filteredWithdrawals
+          .filter(w => new Date(w.date) > startDate && new Date(w.date) <= endDate)
+          .reduce((s, w) => s + Number(w.amount), 0);
+        return inv - wd;
+      };
+
+      // Get per-platform net invested for period
+      const getPlatformNetInvested = (platformId: number, startDate: Date, endDate: Date): number => {
+        const inv = filteredInvestments
+          .filter(i => i.platformId === platformId && new Date(i.date) > startDate && new Date(i.date) <= endDate)
+          .reduce((s, i) => s + Number(i.amount), 0);
+        const wd = filteredWithdrawals
+          .filter(w => w.platformId === platformId && new Date(w.date) > startDate && new Date(w.date) <= endDate)
+          .reduce((s, w) => s + Number(w.amount), 0);
+        return inv - wd;
+      };
+
+      const epoch = new Date(0);
+      const result = [];
+
+      for (let i = 0; i < sortedPeriods.length; i++) {
+        const period = sortedPeriods[i];
+        const endDate = getPeriodEndDate(period);
+
+        let prevEndDate: Date;
+        if (i === 0) {
+          prevEndDate = epoch;
+        } else {
+          prevEndDate = getPeriodEndDate(sortedPeriods[i - 1]);
+        }
+
+        const openValue = i === 0 ? 0 : getPortfolioValueAtDate(prevEndDate);
+        const closeValue = getPortfolioValueAtDate(endDate);
+        const netInvested = getNetInvested(prevEndDate, endDate);
+        const valueChange = closeValue - openValue - netInvested;
+
+        const platformBreakdown = filteredPlatforms.map(p => {
+          const pNetInvested = getPlatformNetInvested(p.id, prevEndDate, endDate);
+          const pOpenValue = i === 0 ? 0 : getPlatformValueAtDate(p.id, prevEndDate);
+          const pCloseValue = getPlatformValueAtDate(p.id, endDate);
+          const pValueChange = pCloseValue - pOpenValue - pNetInvested;
+          return {
+            platformId: p.id,
+            name: p.name,
+            color: p.color,
+            netInvested: pNetInvested,
+            valueChange: pValueChange,
+          };
+        }).filter(pb => Math.abs(pb.netInvested) > 0.001 || Math.abs(pb.valueChange) > 0.001);
+
+        result.push({ period, openValue, netInvested, valueChange, closeValue, platformBreakdown });
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching waterfall data:", error);
+      res.status(500).json({ message: "Failed to fetch waterfall data" });
+    }
+  });
+
   // --- Analytics: All Assets Enriched (for Portfolio Heatmap) ---
   app.get('/api/analytics/assets', requireAuth, async (req, res) => {
     try {

@@ -9,6 +9,7 @@ import type { DashboardFilter } from "@shared/schema";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PortfolioHeatmap, type EnrichedAsset } from "@/components/PortfolioHeatmap";
+import { WaterfallChart } from "@/components/WaterfallChart";
 import { Badge } from "@/components/ui/badge";
 import { usePlatforms } from "@/hooks/use-platforms";
 import { useAuth } from "@/App";
@@ -1036,6 +1037,9 @@ export default function Analytics() {
             )}
           </CardContent>
         </Card>
+
+        {/* Portfolio Waterfall */}
+        <WaterfallChart currency={currency} excludedPlatforms={excludedPlatforms} />
 
         {/* Platform Performance Table */}
         <Card>
