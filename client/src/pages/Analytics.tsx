@@ -402,27 +402,49 @@ export default function Analytics() {
   }, [activePlatforms]);
 
   const roiOverTimeData = useMemo(() => {
-    if (platformBreakdownByMonth) {
+    if (platformBreakdownByMonth && activePlatforms) {
       const monthKeys = Object.keys(platformBreakdownByMonth).sort();
+
+      // Actual total invested from platform records (excludes filtered platforms)
+      const actualTotalInvested = activePlatforms
+        .reduce((s, p) => s + (Number(p.totalInvested) || 0), 0);
+
+      // Pass 1: sum all net cash deposits across every tracked month
+      // netCash per month is derived as: currVal - prevVal - gain
+      let totalNetCash = 0;
+      for (const key of monthKeys) {
+        const entries = platformBreakdownByMonth[key].filter((p) => !excludedPlatforms.has(p.platformId));
+        for (const e of entries) totalNetCash += e.currVal - e.prevVal - e.gain;
+      }
+
+      // Capital that existed before the first tracked month's deposit activity
+      const baseCapital = actualTotalInvested - totalNetCash;
+
+      // Pass 2: build the chart points
       let twrFactor = 1;
-      let cumulativeGain = 0;
+      let cumulativeNetCash = 0;
       let monthsElapsed = 0;
+
       return monthKeys.map((key) => {
         const entries = platformBreakdownByMonth[key].filter((p) => !excludedPlatforms.has(p.platformId));
         const gain = entries.reduce((s, p) => s + p.gain, 0);
         const prevVal = entries.reduce((s, p) => s + p.prevVal, 0);
         const currVal = entries.reduce((s, p) => s + p.currVal, 0);
+        const netCash = entries.reduce((s, p) => s + (p.currVal - p.prevVal - p.gain), 0);
+
         if (prevVal > 0) twrFactor *= (1 + gain / prevVal);
-        cumulativeGain += gain;
+        cumulativeNetCash += netCash;
         monthsElapsed += 1;
-        const totalInvested = currVal - cumulativeGain;
-        const roi = totalInvested > 0 ? (cumulativeGain / totalInvested) * 100 : 0;
+
+        const totalInvestedAtMonth = baseCapital + cumulativeNetCash;
+        const totalGainAtMonth = currVal - totalInvestedAtMonth;
+        const roi = totalInvestedAtMonth > 0 ? (totalGainAtMonth / totalInvestedAtMonth) * 100 : 0;
         const annualized = monthsElapsed > 0 && twrFactor > 0
           ? (Math.pow(twrFactor, 12 / monthsElapsed) - 1) * 100
           : 0;
         const [y, m] = key.split("-");
         const label = `${MONTHS[Number(m) - 1]} ${y}`;
-        return { date: `${key}-01`, label, roi, annualized, cumulative: cumulativeGain };
+        return { date: `${key}-01`, label, roi, annualized, cumulative: totalGainAtMonth };
       });
     }
     if (!historyData || historyData.length === 0) return [];
@@ -432,7 +454,7 @@ export default function Analytics() {
       const label = `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
       return { date: p.date, label, roi, annualized: roi, cumulative: p.value - p.invested };
     });
-  }, [historyData, platformBreakdownByMonth, excludedPlatforms]);
+  }, [historyData, platformBreakdownByMonth, activePlatforms, excludedPlatforms]);
 
   const rebalancerData = useMemo(() => {
     if (!activePlatforms) return null;
