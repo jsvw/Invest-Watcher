@@ -579,7 +579,7 @@ export default function Analytics() {
           };
           const hasMonthlyBreakdown = !!platformBreakdownByMonth;
           const roiToggleBtns: { key: typeof roiChartMode; label: string; disabled: boolean }[] = [
-            { key: "roi", label: "% ROI", disabled: false },
+            { key: "roi", label: "Total ROI", disabled: false },
             { key: "annualized", label: "Ann. Return", disabled: !hasMonthlyBreakdown },
             { key: "cumulative", label: "Cum. Gain", disabled: !hasMonthlyBreakdown },
           ];
