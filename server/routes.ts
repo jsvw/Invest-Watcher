@@ -1367,6 +1367,7 @@ export async function registerRoutes(
       filteredWithdrawals.forEach(wd => periodSet.add(toPeriodKey(new Date(wd.date))));
       filteredValuations.forEach(val => periodSet.add(toPeriodKey(new Date(val.date))));
       
+      console.log(`[waterfall] inv=${filteredInvestments.length} val=${filteredValuations.length} periods=${periodSet.size}`);
       if (periodSet.size === 0) {
         return res.json([]);
       }
