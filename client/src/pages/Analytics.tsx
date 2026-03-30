@@ -72,16 +72,26 @@ interface KpiCardProps {
   icon: React.ReactNode;
   positive?: boolean;
   neutral?: boolean;
+  chartData?: { label: string; value: number }[];
+  chartIsCurrency?: boolean;
+  currency?: string;
 }
 
-function KpiCard({ label, value, sub, icon, positive, neutral }: KpiCardProps) {
+function KpiCard({ label, value, sub, icon, positive, neutral, chartData, chartIsCurrency, currency }: KpiCardProps) {
+  const [hovered, setHovered] = useState(false);
   const valueColor = neutral
     ? "text-foreground"
     : positive
     ? "text-emerald-500"
     : "text-red-500";
+  const chartColor = positive === false ? "#ef4444" : "#10b981";
+  const gradId = `sparkGrad-${label.replace(/\s+/g, "")}`;
   return (
-    <Card data-testid={`kpi-card-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+    <Card
+      data-testid={`kpi-card-${label.toLowerCase().replace(/\s+/g, "-")}`}
+      onMouseEnter={() => chartData?.length && setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <CardContent className="pt-6">
         <div className="flex items-start justify-between">
           <div>
@@ -91,6 +101,51 @@ function KpiCard({ label, value, sub, icon, positive, neutral }: KpiCardProps) {
           </div>
           <div className="p-2 rounded-lg bg-muted/50">{icon}</div>
         </div>
+        {chartData && chartData.length > 1 && (
+          <div
+            className="overflow-hidden transition-all duration-300 ease-in-out"
+            style={{ height: hovered ? 72 : 0, marginTop: hovered ? 12 : 0 }}
+          >
+            <div className="h-[72px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
+                  <defs>
+                    <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={chartColor} stopOpacity={0.25} />
+                      <stop offset="95%" stopColor={chartColor} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" strokeOpacity={0.4} />
+                  <Tooltip
+                    content={({ active, payload }: any) => {
+                      if (!active || !payload?.length) return null;
+                      const val = payload[0].value as number;
+                      const formatted = chartIsCurrency
+                        ? `${val >= 0 ? "+" : ""}${formatCompactCurrency(val, currency ?? "EUR")}`
+                        : fmtPct(val);
+                      return (
+                        <div className="bg-popover border rounded-md shadow-sm p-1.5 text-xs">
+                          <p className="text-muted-foreground mb-0.5">{payload[0].payload.label}</p>
+                          <p className={cn("font-semibold", val >= 0 ? "text-emerald-500" : "text-red-500")}>{formatted}</p>
+                        </div>
+                      );
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    stroke={chartColor}
+                    strokeWidth={1.5}
+                    fill={`url(#${gradId})`}
+                    dot={false}
+                    activeDot={{ r: 3, strokeWidth: 0 }}
+                    isAnimationActive={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -157,7 +212,6 @@ export default function Analytics() {
   const [, navigate] = useLocation();
   const [tooltip, setTooltip] = useState<{ x: number; y: number; data: HeatmapTooltipData } | null>(null);
   const [heatmapMode, setHeatmapMode] = useState<"pct" | "value">("pct");
-  const [roiChartMode, setRoiChartMode] = useState<"roi" | "annualized" | "cumulative">("roi");
   const [sortKey, setSortKey] = useState<SortKey>("roi");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [excludedPlatforms, setExcludedPlatforms] = useState<Set<number>>(new Set());
@@ -565,6 +619,8 @@ export default function Analytics() {
             sub="All-time return on invested capital"
             icon={<Percent className="w-5 h-5 text-muted-foreground" />}
             positive={kpis ? kpis.totalROI >= 0 : undefined}
+            chartData={roiOverTimeData.map((p) => ({ label: p.label, value: p.roi }))}
+            currency={currency}
           />
           <KpiCard
             label="Ann. Return"
@@ -572,6 +628,8 @@ export default function Analytics() {
             sub={kpis?.twr != null ? `${fmtPct(kpis.twr)} cumulative · cash-flow adjusted` : "Time-weighted, annualized"}
             icon={<TrendingUp className="w-5 h-5 text-muted-foreground" />}
             positive={kpis?.cagr != null ? kpis.cagr >= 0 : undefined}
+            chartData={roiOverTimeData.map((p) => ({ label: p.label, value: p.annualized }))}
+            currency={currency}
           />
           <KpiCard
             label="Best Platform"
@@ -588,122 +646,6 @@ export default function Analytics() {
             neutral
           />
         </div>
-
-        {/* ROI Over Time */}
-        {roiOverTimeData.length > 1 && (() => {
-          const lastPoint = roiOverTimeData[roiOverTimeData.length - 1];
-          const activeValue = roiChartMode === "roi" ? lastPoint?.roi : roiChartMode === "annualized" ? lastPoint?.annualized : lastPoint?.cumulative;
-          const isPositive = (activeValue ?? 0) >= 0;
-          const strokeColor = isPositive ? "#10b981" : "#ef4444";
-          const fillGradient = isPositive ? "url(#roiGradientPos)" : "url(#roiGradientNeg)";
-          const isCurrency = roiChartMode === "cumulative";
-          const descriptions: Record<typeof roiChartMode, string> = {
-            roi: "Total return on invested capital — cumulative gains divided by total capital deployed",
-            annualized: "Annualised time-weighted return (TWR) — neutralises cash flow timing",
-            cumulative: "Running sum of absolute monthly gains — cash-flow adjusted profit in portfolio currency",
-          };
-          const hasMonthlyBreakdown = !!platformBreakdownByMonth;
-          const roiToggleBtns: { key: typeof roiChartMode; label: string; disabled: boolean }[] = [
-            { key: "roi", label: "Total ROI", disabled: false },
-            { key: "annualized", label: "Ann. Return", disabled: !hasMonthlyBreakdown },
-            { key: "cumulative", label: "Cum. Gain", disabled: !hasMonthlyBreakdown },
-          ];
-          return (
-            <Card>
-              <CardHeader className="flex flex-row items-start justify-between gap-4">
-                <div>
-                  <CardTitle>ROI Over Time</CardTitle>
-                  <CardDescription>{descriptions[roiChartMode]}</CardDescription>
-                </div>
-                <div className="flex items-center rounded-md border p-0.5 shrink-0">
-                  {roiToggleBtns.map(({ key, label, disabled }) => (
-                    <button
-                      key={key}
-                      type="button"
-                      disabled={disabled}
-                      onClick={() => !disabled && setRoiChartMode(key)}
-                      title={disabled ? "Requires monthly breakdown data" : undefined}
-                      className={cn(
-                        "px-2.5 py-1 text-xs font-medium rounded transition-colors",
-                        roiChartMode === key
-                          ? "bg-primary text-primary-foreground"
-                          : disabled
-                          ? "text-muted-foreground/40 cursor-not-allowed"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                      data-testid={`roi-chart-toggle-${key}`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={roiOverTimeData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="roiGradientPos" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.25} />
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="roiGradientNeg" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#ef4444" stopOpacity={0.25} />
-                          <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                      <XAxis
-                        dataKey="label"
-                        tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                        tickLine={false}
-                        axisLine={false}
-                        interval="preserveStartEnd"
-                      />
-                      <YAxis
-                        tickFormatter={(v: number) =>
-                          isCurrency ? formatCompactCurrency(v, currency) : `${v.toFixed(1)}%`
-                        }
-                        tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                        tickLine={false}
-                        axisLine={false}
-                        width={isCurrency ? 64 : 52}
-                      />
-                      <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" />
-                      <Tooltip
-                        content={({ active, payload, label }: any) => {
-                          if (!active || !payload?.length) return null;
-                          const val = payload[0].value as number;
-                          const formatted = isCurrency
-                            ? `${val >= 0 ? "+" : ""}${formatCompactCurrency(val, currency)}`
-                            : fmtPct(val);
-                          const modeLabel = roiChartMode === "roi" ? "ROI" : roiChartMode === "annualized" ? "Ann. Return" : "Cum. Gain";
-                          return (
-                            <div className="bg-popover border rounded-lg shadow-lg p-2.5 text-xs">
-                              <p className="text-muted-foreground mb-1">{label}</p>
-                              <p className={cn("font-semibold", val >= 0 ? "text-emerald-500" : "text-red-500")}>
-                                {formatted} {modeLabel}
-                              </p>
-                            </div>
-                          );
-                        }}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey={roiChartMode}
-                        stroke={strokeColor}
-                        strokeWidth={2}
-                        fill={fillGradient}
-                        dot={false}
-                        activeDot={{ r: 4, strokeWidth: 0 }}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })()}
 
         {/* Monthly Returns Heatmap */}
         <Card>
