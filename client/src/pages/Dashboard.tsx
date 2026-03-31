@@ -1359,33 +1359,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* ROI by Platform */}
-          <Card>
-            <CardHeader>
-              <CardTitle>ROI by Platform</CardTitle>
-              <CardDescription>Sorted best to worst return on investment</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {roiData.length > 0 ? (
-                <div className="h-[260px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={roiData} layout="vertical" margin={{ left: 4, right: 56 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
-                      <XAxis type="number" tickFormatter={v => `${v.toFixed(0)}%`} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                      <YAxis dataKey="name" type="category" width={90} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                      <Tooltip formatter={(v: number) => [`${v.toFixed(2)}%`, "ROI"]} contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
-                      <Bar dataKey="roi" radius={[0, 4, 4, 0]} barSize={18} label={{ position: "right", formatter: (v: number) => `${v.toFixed(1)}%`, fontSize: 10, fill: "hsl(var(--muted-foreground))" }}>
-                        {roiData.map((entry, i) => <Cell key={i} fill={entry.roi >= 0 ? "#10b981" : "#ef4444"} />)}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">No platform data available.</p>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Portfolio Rebalancer */}
           <Card>
             <CardHeader>
