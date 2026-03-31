@@ -971,15 +971,6 @@ export default function Dashboard() {
               data-testid="stat-net-profit"
             />
             <KpiCard
-              label="Total ROI"
-              value={kpis ? fmtPct(kpis.totalROI) : "—"}
-              sub="All-time return on invested capital"
-              icon={<Percent className="w-5 h-5 text-muted-foreground" />}
-              positive={kpis ? kpis.totalROI >= 0 : undefined}
-              chartData={roiOverTimeData.map(p => ({ label: p.label, value: p.roi }))}
-              currency={currency}
-            />
-            <KpiCard
               label="Ann. Return"
               value={kpis?.cagr != null ? fmtPct(kpis.cagr) : "—"}
               sub={kpis?.twr != null ? `${fmtPct(kpis.twr)} cumulative · cash-flow adjusted` : "Time-weighted, annualized"}
