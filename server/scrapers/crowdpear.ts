@@ -467,6 +467,29 @@ export async function scrapeCrowdPear(email: string, password: string, gmailAppP
 
     const totalBalance = balanceResult.mainBalance + balanceResult.availableBalance;
     console.log(`[CrowdPear Scraper] mainBalance=${balanceResult.mainBalance} availableBalance=${balanceResult.availableBalance}`);
+
+    // Diagnostic: dump page text and elements near "available" so we can fix the selector
+    const diag = await page.evaluate(`(function() {
+      var text = document.body.innerText || "";
+      var idx = text.toLowerCase().indexOf("available");
+      var snippet = idx >= 0 ? text.substring(Math.max(0, idx - 100), idx + 300) : text.substring(0, 500);
+      var nums = [];
+      var allEls = document.querySelectorAll("*");
+      for (var i = 0; i < allEls.length; i++) {
+        var el = allEls[i];
+        if (el.children.length > 0) continue;
+        var t = (el.textContent || "").trim();
+        if (/[0-9]/.test(t) && t.length < 30 && el.parentElement) {
+          var par = (el.parentElement.textContent || "").trim().substring(0, 80);
+          nums.push(t + " | parent: " + par);
+        }
+        if (nums.length >= 20) break;
+      }
+      return { snippet: snippet, nums: nums };
+    })()`) as unknown as { snippet: string; nums: string[] };
+    console.log("[CrowdPear Debug] Page around 'available':", diag.snippet);
+    console.log("[CrowdPear Debug] Numeric leaf nodes:", diag.nums.join(" || "));
+
     console.log(`[CrowdPear Scraper] Scraping complete. Total balance: ${totalBalance}`);
 
     return {
