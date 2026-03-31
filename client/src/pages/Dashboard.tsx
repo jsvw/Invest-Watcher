@@ -6,7 +6,7 @@ import { formatCurrency, formatCompactCurrency, getCurrencySymbol } from "@/lib/
 import {
   Wallet, TrendingUp, DollarSign, Check, RefreshCw, Loader2, CheckCircle, XCircle,
   X, Save, Bookmark, Trash2, Target, ArrowUpCircle, ArrowDownCircle,
-  LineChart as LineChartIcon, BarChart2, Filter, Award, Calendar, Percent,
+  LineChart as LineChartIcon, BarChart2, Award, Calendar, Percent,
 } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import {
@@ -863,10 +863,6 @@ export default function Dashboard() {
   const filterSidebar = platforms && platforms.length > 0 ? (
     <div data-testid="platform-filter-bar">
       <div className="flex items-center gap-0.5 px-1">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1 mr-auto">
-          <Filter className="w-3 h-3" />
-          Filter
-        </p>
         <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs" onClick={() => setExcludedPlatforms(new Set())} data-testid="filter-select-all">All</Button>
         <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs" onClick={() => setExcludedPlatforms(new Set(platforms.map(p => p.id)))} data-testid="filter-deselect-all">None</Button>
         <Popover open={filterPresetsOpen} onOpenChange={setFilterPresetsOpen}>
