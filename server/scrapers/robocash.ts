@@ -47,17 +47,20 @@ export async function scrapeRoboCash(email: string, password: string): Promise<R
 
     console.log("[RoboCash Scraper] Dismissing cookie consent if present...");
     try {
+      // OneTrust-specific accept button, then generic fallbacks
       await page.evaluate(`(function() {
-        var btns = Array.from(document.querySelectorAll('button, a'));
+        var specific = document.querySelector("#onetrust-accept-btn-handler, .onetrust-accept-btn-handler, [id*='accept-btn-handler']");
+        if (specific) { specific.click(); return; }
+        var btns = Array.from(document.querySelectorAll("button, a"));
         for (var i = 0; i < btns.length; i++) {
-          var t = btns[i].textContent ? btns[i].textContent.toLowerCase().trim() : "";
-          if (t.includes('accept') || t.includes('allow all') || t.includes('agree') || t.includes('ok')) {
+          var t = (btns[i].textContent || "").toLowerCase().trim();
+          if (t === "accept all" || t === "allow all" || t === "accept" || t === "agree" || t === "ok") {
             btns[i].click();
-            break;
+            return;
           }
         }
       })()`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 2000));
     } catch (cookieErr) {
       console.log("[RoboCash Scraper] Cookie banner handling skipped");
     }
@@ -89,27 +92,9 @@ export async function scrapeRoboCash(email: string, password: string): Promise<R
     await passwordInput.type(password, { delay: 50 });
 
     console.log("[RoboCash Scraper] Submitting login...");
-    const submitted = await page.evaluate(`(function() {
-      var buttons = Array.from(document.querySelectorAll('button[type="submit"], input[type="submit"], button'));
-      for (var i = 0; i < buttons.length; i++) {
-        var t = buttons[i].textContent ? buttons[i].textContent.trim().toLowerCase() : "";
-        var val = buttons[i].value ? buttons[i].value.toLowerCase() : "";
-        if (t === 'log in' || t === 'login' || t === 'sign in' || val === 'log in' || val === 'login') {
-          buttons[i].click();
-          return true;
-        }
-      }
-      var submitBtns = document.querySelectorAll('button[type="submit"], input[type="submit"]');
-      if (submitBtns.length > 0) {
-        submitBtns[0].click();
-        return true;
-      }
-      return false;
-    })()`);
-
-    if (!submitted) {
-      await page.keyboard.press("Enter");
-    }
+    // Press Enter on the password field — reliable form submission that avoids
+    // accidentally clicking cookie-banner buttons instead of the login button
+    await page.keyboard.press("Enter");
 
     await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 }).catch(() => {});
     await new Promise(resolve => setTimeout(resolve, 3000));
