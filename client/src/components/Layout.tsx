@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, PieChart, TrendingUp, Menu, X, LogOut, Settings, Coffee, Plus, AlertTriangle } from "lucide-react";
+import { LayoutDashboard, TrendingUp, Menu, X, LogOut, Settings, Coffee, Plus, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -46,8 +46,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/analytics", label: "Analytics", icon: PieChart },
-    { href: "/settings", label: "Settings", icon: Settings },
   ];
 
   return (
@@ -171,15 +169,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <div className="font-medium">{user.name || "User"}</div>
                 <div className="text-xs text-muted-foreground truncate">{user.email}</div>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleLogout}
-                title="Log out"
-                data-testid="button-logout"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Link href="/settings">
+                  <Button variant="ghost" size="icon" title="Settings" data-testid="button-settings">
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleLogout}
+                  title="Log out"
+                  data-testid="button-logout"
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           )}
           <a

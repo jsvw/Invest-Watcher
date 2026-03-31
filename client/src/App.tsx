@@ -10,7 +10,6 @@ import { Loader2 } from "lucide-react";
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const PlatformDetails = lazy(() => import("@/pages/PlatformDetails"));
-const Analytics = lazy(() => import("@/pages/Analytics"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Imports = lazy(() => import("@/pages/Imports"));
 
@@ -109,9 +108,6 @@ function Router() {
       </Route>
       <Route path="/platforms/:slug">
         {(params) => <ProtectedRoute component={PlatformDetails} {...params} />}
-      </Route>
-      <Route path="/analytics">
-        {(params) => <ProtectedRoute component={Analytics} {...params} />}
       </Route>
       <Route path="/settings">
         {(params) => <ProtectedRoute component={Settings} {...params} />}
