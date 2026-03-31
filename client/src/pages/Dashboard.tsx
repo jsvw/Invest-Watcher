@@ -601,36 +601,8 @@ export default function Dashboard() {
     return { totalROI, cagr, twr, bestPlatform, ageDays, ageMonths };
   }, [activePlatforms, historyData, platformBreakdownByMonth, excludedPlatforms]);
 
-  const heatmapData = useMemo(() => {
-    if (!historyData || historyData.length < 2) return null;
-
-    const monthMap = new Map<string, { value: number; invested: number }>();
-    for (const point of historyData) {
-      const d = new Date(point.date);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      monthMap.set(key, { value: point.value, invested: point.invested });
-    }
-
-    const sortedKeys = Array.from(monthMap.keys()).sort();
-    const years = Array.from(new Set(sortedKeys.map(k => k.split("-")[0]))).sort();
-    const cells: { year: string; month: number; returnPct: number; absoluteChange: number }[] = [];
-
-    for (let i = 1; i < sortedKeys.length; i++) {
-      const prevKey = sortedKeys[i - 1];
-      const curKey = sortedKeys[i];
-      const prev = monthMap.get(prevKey)!;
-      const cur = monthMap.get(curKey)!;
-      const [cy, cm] = curKey.split("-").map(Number);
-      const absoluteChange = cur.value - prev.value - (cur.invested - prev.invested);
-      const returnPct = prev.value > 0 ? (absoluteChange / prev.value) * 100 : 0;
-      cells.push({ year: String(cy), month: cm, returnPct, absoluteChange });
-    }
-
-    return { years, cells };
-  }, [historyData]);
-
-  const filteredHeatmapData = useMemo(() => {
-    if (!platformBreakdownByMonth || excludedPlatforms.size === 0) return null;
+  const activeHeatmapData = useMemo(() => {
+    if (!platformBreakdownByMonth) return null;
 
     const monthKeys = Object.keys(platformBreakdownByMonth).sort();
     if (monthKeys.length < 1) return null;
@@ -649,8 +621,6 @@ export default function Dashboard() {
 
     return { years, cells };
   }, [platformBreakdownByMonth, excludedPlatforms]);
-
-  const activeHeatmapData = excludedPlatforms.size > 0 ? filteredHeatmapData : heatmapData;
 
   const roiData = useMemo(() => {
     if (!activePlatforms) return [];
