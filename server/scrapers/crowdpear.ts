@@ -364,169 +364,110 @@ export async function scrapeCrowdPear(email: string, password: string, gmailAppP
 
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    const totalBalance = await page.evaluate(`(function() {
-      var extractNumber = function(text) {
+    const balanceResult = await page.evaluate(() => {
+      function extractNumber(text: string | null): number | null {
         if (!text) return null;
-        var cleaned = text.replace(/[^0-9.,\\-]/g, "");
-        if (cleaned.indexOf(",") > -1 && cleaned.indexOf(".") > -1) {
+        let cleaned = text.replace(/[^0-9.,-]/g, "");
+        if (cleaned.includes(",") && cleaned.includes(".")) {
           if (cleaned.lastIndexOf(",") > cleaned.lastIndexOf(".")) {
-            cleaned = cleaned.replace(/\\./g, "").replace(",", ".");
+            cleaned = cleaned.replace(/\./g, "").replace(",", ".");
           } else {
             cleaned = cleaned.replace(/,/g, "");
           }
-        } else if (cleaned.indexOf(",") > -1) {
-          var parts = cleaned.split(",");
+        } else if (cleaned.includes(",")) {
+          const parts = cleaned.split(",");
           if (parts.length === 2 && parts[1].length <= 2) {
             cleaned = cleaned.replace(",", ".");
           } else {
             cleaned = cleaned.replace(/,/g, "");
           }
         }
-        var match = cleaned.match(/-?\\d+\\.?\\d*/);
+        const match = cleaned.match(/-?\d+\.?\d*/);
         return match ? parseFloat(match[0]) : null;
-      };
+      }
 
-      // Helper: find a labelled value — handles value-before-label and value-after-label layouts.
-      var findLabelledValue = function(labelPatterns) {
-        var allEls = Array.from(document.querySelectorAll('*'));
-        for (var i = 0; i < allEls.length; i++) {
-          var el = allEls[i];
-          // Only look at leaf-ish elements (few children) to avoid matching giant containers
+      function findLabelledValue(labelPatterns: string[]): number | null {
+        const allEls = Array.from(document.querySelectorAll("*"));
+        for (const el of allEls) {
           if (el.children.length > 5) continue;
-          var elText = (el.textContent || '').trim().toLowerCase();
-          var matched = false;
-          for (var p = 0; p < labelPatterns.length; p++) {
-            if (elText.includes(labelPatterns[p])) { matched = true; break; }
-          }
-          if (!matched) continue;
+          const elText = (el.textContent || "").trim().toLowerCase();
+          if (!labelPatterns.some(p => elText.includes(p))) continue;
 
-          // 1. Try previous sibling (value appears before the label element)
-          var prev = el.previousElementSibling;
-          if (prev) {
-            var pv = extractNumber(prev.textContent);
-            if (pv !== null) return pv;
-          }
-          // 2. Try next sibling (value appears after the label element)
-          var next = el.nextElementSibling;
-          if (next) {
-            var nv = extractNumber(next.textContent);
-            if (nv !== null) return nv;
-          }
-          // 3. Try parent siblings and parent's own numeric children
+          const prev = el.previousElementSibling;
+          if (prev) { const pv = extractNumber(prev.textContent); if (pv !== null) return pv; }
+          const next = el.nextElementSibling;
+          if (next) { const nv = extractNumber(next.textContent); if (nv !== null) return nv; }
           if (el.parentElement) {
-            var parentPrev = el.parentElement.previousElementSibling;
-            if (parentPrev) {
-              var ppv = extractNumber(parentPrev.textContent);
-              if (ppv !== null) return ppv;
-            }
-            var parentNext = el.parentElement.nextElementSibling;
-            if (parentNext) {
-              var pnv = extractNumber(parentNext.textContent);
-              if (pnv !== null) return pnv;
-            }
-            var siblings = Array.from(el.parentElement.children);
-            for (var s = 0; s < siblings.length; s++) {
-              if (siblings[s] !== el) {
-                var sv = extractNumber(siblings[s].textContent);
-                if (sv !== null) return sv;
-              }
+            const parentPrev = el.parentElement.previousElementSibling;
+            if (parentPrev) { const ppv = extractNumber(parentPrev.textContent); if (ppv !== null) return ppv; }
+            const parentNext = el.parentElement.nextElementSibling;
+            if (parentNext) { const pnv = extractNumber(parentNext.textContent); if (pnv !== null) return pnv; }
+            for (const sib of Array.from(el.parentElement.children)) {
+              if (sib !== el) { const sv = extractNumber(sib.textContent); if (sv !== null) return sv; }
             }
           }
         }
         return null;
-      };
+      }
 
       // 1. Find the main invested/portfolio balance
-      var mainBalance = null;
-      var balanceEl = document.querySelector('.Balance_balance__-D0Zw');
-      if (balanceEl) {
-        mainBalance = extractNumber(balanceEl.textContent);
-      }
+      let mainBalance: number | null = null;
+      const balanceEl = document.querySelector(".Balance_balance__-D0Zw");
+      if (balanceEl) mainBalance = extractNumber(balanceEl.textContent);
+
       if (mainBalance === null) {
-        var balanceEls = document.querySelectorAll('[class*="Balance_balance"]');
-        for (var i = 0; i < balanceEls.length; i++) {
-          var n = extractNumber(balanceEls[i].textContent);
+        const balanceEls = document.querySelectorAll('[class*="Balance_balance"]');
+        for (const el of Array.from(balanceEls)) {
+          const n = extractNumber((el as HTMLElement).textContent);
           if (n !== null && n > 0) { mainBalance = n; break; }
         }
       }
       if (mainBalance === null) {
-        mainBalance = findLabelledValue(['total balance', 'portfolio value', 'invested', 'my investments']);
+        mainBalance = findLabelledValue(["total balance", "portfolio value", "invested", "my investments"]);
       }
       if (mainBalance === null) {
-        var antTypoEls = document.querySelectorAll('.ant-typography');
-        var candidates = [];
-        for (var j = 0; j < antTypoEls.length; j++) {
-          var txt = antTypoEls[j].textContent || "";
-          if (txt.match(/[\\d.,]+/) && (txt.includes("\\u20ac") || txt.includes("EUR"))) {
-            var amount = extractNumber(txt);
+        const antEls = document.querySelectorAll(".ant-typography");
+        const candidates: number[] = [];
+        for (const el of Array.from(antEls)) {
+          const txt = (el as HTMLElement).textContent || "";
+          if (/[\d.,]+/.test(txt) && (txt.includes("\u20ac") || txt.includes("EUR"))) {
+            const amount = extractNumber(txt);
             if (amount !== null && amount > 0) candidates.push(amount);
           }
         }
-        if (candidates.length > 0) {
-          candidates.sort(function(a, b) { return b - a; });
-          mainBalance = candidates[0];
-        }
+        if (candidates.length > 0) mainBalance = candidates.sort((a, b) => b - a)[0];
       }
       if (mainBalance === null) mainBalance = 0;
 
       // 2. Find "Available for investment" cash balance
-      var availableBalance = findLabelledValue([
-        'available for investment',
-        'available to invest',
-        'available funds',
-        'cash available',
-        'available balance',
+      let availableBalance: number | null = findLabelledValue([
+        "available for investment",
+        "available to invest",
+        "available funds",
+        "cash available",
+        "available balance",
       ]);
 
-      // Fallback: regex on full page text — handles "€12.76\nAvailable for investment" layout
       if (availableBalance === null) {
-        var pageText = document.body.innerText || '';
-        var availPatterns = [
-          /([\\d.,]+)\\s*€?\\s*\\n?\\s*Available\\s+for\\s+investment/i,
-          /€\\s*([\\d.,]+)\\s*\\n?\\s*Available\\s+for\\s+investment/i,
-          /Available\\s+for\\s+investment[\\s\\S]{0,30}€?\\s*([\\d.,]+)/i,
+        const pageText = document.body.innerText || "";
+        const patterns = [
+          /([\d.,]+)\s*[\u20ac]?\s*\n?\s*Available\s+for\s+investment/i,
+          /[\u20ac]\s*([\d.,]+)\s*\n?\s*Available\s+for\s+investment/i,
+          /Available\s+for\s+investment[\s\S]{0,30}[\u20ac]?\s*([\d.,]+)/i,
         ];
-        for (var ap = 0; ap < availPatterns.length; ap++) {
-          var am = pageText.match(availPatterns[ap]);
-          if (am) {
-            var av = extractNumber(am[1]);
-            if (av !== null) { availableBalance = av; break; }
-          }
+        for (const pattern of patterns) {
+          const m = pageText.match(pattern);
+          if (m) { const av = extractNumber(m[1]); if (av !== null) { availableBalance = av; break; } }
         }
       }
-
       if (availableBalance === null) availableBalance = 0;
 
-      console.log('[CrowdPear] mainBalance=' + mainBalance + ' availableBalance=' + availableBalance);
-      return mainBalance + availableBalance;
-    })()`) as number;
+      return { mainBalance, availableBalance };
+    });
 
-    // Debug: dump page text and HTML structure so we can identify the correct selector
-    const pageDebug = await page.evaluate(`(function() {
-      var text = document.body.innerText || '';
-      var idx = text.toLowerCase().indexOf('available');
-      var textSnippet = idx >= 0
-        ? text.substring(Math.max(0, idx - 80), idx + 200)
-        : text.substring(0, 400);
-
-      // Also find any element whose text includes 'available' and dump its outerHTML
-      var htmlSnippets = [];
-      var allEls = Array.from(document.querySelectorAll('*'));
-      for (var i = 0; i < allEls.length; i++) {
-        var el = allEls[i];
-        if (el.children.length > 3) continue;
-        var t = (el.textContent || '').toLowerCase().trim();
-        if (t.includes('available') && t.length < 200) {
-          htmlSnippets.push(el.parentElement ? el.parentElement.outerHTML.substring(0, 300) : el.outerHTML.substring(0, 300));
-          if (htmlSnippets.length >= 3) break;
-        }
-      }
-      return { textSnippet: textSnippet, htmlSnippets: htmlSnippets };
-    })()`);
-    const debug = pageDebug as any;
-    console.log('[CrowdPear Debug] Text around "available":', debug.textSnippet);
-    console.log('[CrowdPear Debug] HTML snippets:', JSON.stringify(debug.htmlSnippets));
-    console.log(`[CrowdPear Scraper] Scraping complete. Total balance: €${totalBalance}`);
+    const totalBalance = balanceResult.mainBalance + balanceResult.availableBalance;
+    console.log(`[CrowdPear Scraper] mainBalance=${balanceResult.mainBalance} availableBalance=${balanceResult.availableBalance}`);
+    console.log(`[CrowdPear Scraper] Scraping complete. Total balance: ${totalBalance}`);
 
     return {
       totalBalance,
