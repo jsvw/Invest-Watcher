@@ -165,6 +165,9 @@ export default function Dashboard() {
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
   const [chartType, setChartType] = useState<"line" | "bar">("line");
   const [chartValueMode, setChartValueMode] = useState<"value" | "pct">("value");
+  const [displayedChartView, setDisplayedChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
+  const [displayedChartType, setDisplayedChartType] = useState<"line" | "bar">("line");
+  const [displayedChartValueMode, setDisplayedChartValueMode] = useState<"value" | "pct">("value");
   const [chartFading, setChartFading] = useState(false);
 
   // ── Allocation targets state ─────────────────────────────────────────────
@@ -201,7 +204,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     setChartFading(true);
-    const t = setTimeout(() => setChartFading(false), 180);
+    const t = setTimeout(() => {
+      setDisplayedChartView(chartView);
+      setDisplayedChartType(chartType);
+      setDisplayedChartValueMode(chartValueMode);
+      setChartFading(false);
+    }, 160);
     return () => clearTimeout(t);
   }, [chartView, chartType, chartValueMode]);
 
@@ -1047,26 +1055,26 @@ export default function Dashboard() {
                     />
                   );
 
-                  const profitKey = chartValueMode === "pct" ? "gainPct" : "gain";
-                  const monthlyKey = chartValueMode === "pct" ? "monthlyChangePct" : "monthlyChange";
-                  const profitAxisFmt = (v: number) => chartValueMode === "pct" ? fmtPct(v) : formatAxisValue(v, true);
-                  const monthlyAxisFmt = (v: number) => chartValueMode === "pct" ? fmtPct(v) : formatAxisValue(v, true);
+                  const profitKey = displayedChartValueMode === "pct" ? "gainPct" : "gain";
+                  const monthlyKey = displayedChartValueMode === "pct" ? "monthlyChangePct" : "monthlyChange";
+                  const profitAxisFmt = (v: number) => displayedChartValueMode === "pct" ? fmtPct(v) : formatAxisValue(v, true);
+                  const monthlyAxisFmt = (v: number) => displayedChartValueMode === "pct" ? fmtPct(v) : formatAxisValue(v, true);
 
-                  if (chartType === "bar") {
+                  if (displayedChartType === "bar") {
                     return (
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={mappedData} barCategoryGap="20%">
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                           <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={d => format(new Date(d), 'MMM yy')} interval="preserveStartEnd" />
-                          {(chartView === "overview" || chartView === "all") && (
+                          {(displayedChartView === "overview" || displayedChartView === "all") && (
                             <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={value => formatAxisValue(value)} domain={[0, 'auto']} />
                           )}
-                          {(chartView === "profit" || chartView === "monthly") && (
-                            <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={chartView === "profit" ? profitAxisFmt : monthlyAxisFmt} domain={['auto', 'auto']} />
+                          {(displayedChartView === "profit" || displayedChartView === "monthly") && (
+                            <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={displayedChartView === "profit" ? profitAxisFmt : monthlyAxisFmt} domain={['auto', 'auto']} />
                           )}
                           <Tooltip content={<ChartTooltip />} />
                           <Legend verticalAlign="top" height={36} />
-                          {(chartView === "overview" || chartView === "all") && (
+                          {(displayedChartView === "overview" || displayedChartView === "all") && (
                             <>
                               <Bar dataKey="baseAmount" name="Invested" stackId="stack" yAxisId="left" fill="#3b82f6" animationDuration={350} />
                               <Bar dataKey="gainPortion" name="Profit" stackId="stack" yAxisId="left" animationDuration={350} radius={[3, 3, 0, 0]}>
@@ -1077,12 +1085,12 @@ export default function Dashboard() {
                               </Bar>
                             </>
                           )}
-                          {chartView === "profit" && (
+                          {displayedChartView === "profit" && (
                             <Bar dataKey={profitKey} name="Profit/Loss" yAxisId="left" animationDuration={350} radius={[3, 3, 3, 3]}>
                               {mappedData.map((entry: any, i: number) => <Cell key={i} fill={entry.gain >= 0 ? '#10b981' : '#ef4444'} />)}
                             </Bar>
                           )}
-                          {chartView === "monthly" && (
+                          {displayedChartView === "monthly" && (
                             <Bar dataKey={monthlyKey} name="Monthly Growth" yAxisId="left" animationDuration={350} radius={[3, 3, 3, 3]}>
                               {mappedData.map((entry: any, i: number) => <Cell key={i} fill={entry.monthlyChange >= 0 ? '#10b981' : '#ef4444'} />)}
                             </Bar>
@@ -1097,27 +1105,27 @@ export default function Dashboard() {
                       <LineChart data={mappedData}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                         {commonXAxis}
-                        {(chartView === "overview" || chartView === "all") && (
+                        {(displayedChartView === "overview" || displayedChartView === "all") && (
                           <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={value => formatAxisValue(value)} domain={['auto', 'auto']} />
                         )}
-                        {(chartView === "profit" || chartView === "all") && (
+                        {(displayedChartView === "profit" || displayedChartView === "all") && (
                           <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={profitAxisFmt} domain={['auto', 'auto']} />
                         )}
-                        {(chartView === "monthly" || chartView === "all") && (
+                        {(displayedChartView === "monthly" || displayedChartView === "all") && (
                           <YAxis yAxisId="monthly" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={monthlyAxisFmt} domain={['auto', 'auto']} />
                         )}
                         <Tooltip content={<ChartTooltip />} />
                         <Legend verticalAlign="top" height={36} />
-                        {(chartView === "overview" || chartView === "all") && (
+                        {(displayedChartView === "overview" || displayedChartView === "all") && (
                           <>
                             <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke="hsl(var(--primary))" strokeWidth={4} dot={false} activeDot={{ r: 6 }} animationDuration={350} />
                             <Line type="monotone" dataKey="invested" name="Invested" yAxisId="left" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={false} activeDot={{ r: 4 }} animationDuration={350} />
                           </>
                         )}
-                        {(chartView === "profit" || chartView === "all") && (
+                        {(displayedChartView === "profit" || displayedChartView === "all") && (
                           <Line type="monotone" dataKey={profitKey} name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 4 }} animationDuration={350} />
                         )}
-                        {(chartView === "monthly" || chartView === "all") && (
+                        {(displayedChartView === "monthly" || displayedChartView === "all") && (
                           <Line type="monotone" dataKey={monthlyKey} name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 7 }} animationDuration={350} />
                         )}
                       </LineChart>
