@@ -75,7 +75,6 @@ export function Layout({ children, sidebarExtra }: { children: React.ReactNode; 
 
           {/* Platform icon grid */}
           <div className="mt-6">
-            <p className="text-xs font-medium text-muted-foreground px-1 mb-2 uppercase tracking-wider">Platforms</p>
             <div className="grid grid-cols-3 gap-1.5">
               {platforms?.map((p) => {
                 const stale = isPlatformStale(p.lastValuationDate);
