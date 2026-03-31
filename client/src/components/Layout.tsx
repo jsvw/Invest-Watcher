@@ -1,5 +1,5 @@
-import { Link, useLocation } from "wouter";
-import { LayoutDashboard, Menu, X, LogOut, Settings, Plus, AlertTriangle } from "lucide-react";
+import { Link } from "wouter";
+import { Menu, X, LogOut, Settings, Plus, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,6 @@ import { AddPlatformDialog } from "@/components/AddPlatformDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function Layout({ children, sidebarExtra }: { children: React.ReactNode; sidebarExtra?: React.ReactNode }) {
-  const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user } = useAuth();
   const { data: platforms } = usePlatforms();
@@ -43,10 +42,6 @@ export function Layout({ children, sidebarExtra }: { children: React.ReactNode; 
     }
   };
 
-  const navItems = [
-    { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  ];
-
   return (
     <div className="h-screen bg-background flex flex-col md:flex-row overflow-hidden">
       {/* Mobile Header */}
@@ -77,24 +72,6 @@ export function Layout({ children, sidebarExtra }: { children: React.ReactNode; 
             </Tooltip>
           )}
 
-          <nav className="space-y-2">
-            {navItems.map((item) => {
-              const isActive = location === item.href;
-              return (
-                <Link key={item.href} href={item.href}>
-                  <div className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer",
-                    isActive
-                      ? "bg-primary text-primary-foreground shadow-md shadow-primary/20 font-medium"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}>
-                    <item.icon className="h-5 w-5" />
-                    {item.label}
-                  </div>
-                </Link>
-              );
-            })}
-          </nav>
 
           {/* Platform icon grid */}
           <div className="mt-6">
