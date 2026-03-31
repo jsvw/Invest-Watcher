@@ -1506,7 +1506,7 @@ export default function Dashboard() {
           <WaterfallChart currency={currency} excludedPlatforms={excludedPlatforms} />
 
           {/* Platform Performance (combined table + allocation targets) */}
-          {platforms && platforms.length > 0 && (() => {
+          {platforms != null && (() => {
             const totalPortfolioValue = platforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
             const totalTargetPct = platforms.reduce((s, p) => {
               const t = localTargets[p.id];
