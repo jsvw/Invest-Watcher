@@ -11,7 +11,7 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { AddPlatformDialog } from "@/components/AddPlatformDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-export function Layout({ children }: { children: React.ReactNode }) {
+export function Layout({ children, sidebarExtra }: { children: React.ReactNode; sidebarExtra?: React.ReactNode }) {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user } = useAuth();
@@ -159,6 +159,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
               />
             </div>
           </div>
+
+          {sidebarExtra && (
+            <div className="mt-6">
+              {sidebarExtra}
+            </div>
+          )}
         </div>
 
         {/* Fixed bottom section */}

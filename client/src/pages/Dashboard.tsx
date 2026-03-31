@@ -859,121 +859,125 @@ export default function Dashboard() {
     );
   }
 
+  // ── Sidebar filter panel ─────────────────────────────────────────────────
+  const filterSidebar = platforms && platforms.length > 0 ? (
+    <div data-testid="platform-filter-bar">
+      <div className="flex items-center justify-between mb-2 px-1">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+          <Filter className="w-3 h-3" />
+          Filter
+        </p>
+        <div className="flex items-center gap-0.5">
+          <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs" onClick={() => setExcludedPlatforms(new Set())} data-testid="filter-select-all">All</Button>
+          <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs" onClick={() => setExcludedPlatforms(new Set(platforms.map(p => p.id)))} data-testid="filter-deselect-all">None</Button>
+        </div>
+      </div>
+      <div className="space-y-0.5">
+        {platforms.map(p => {
+          const excluded = excludedPlatforms.has(p.id);
+          return (
+            <button
+              key={p.id}
+              onClick={() => togglePlatform(p.id)}
+              data-testid={`filter-platform-${p.id}`}
+              title={excluded ? `Include ${p.name}` : `Exclude ${p.name}`}
+              className={cn(
+                "flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-xs text-left transition-all",
+                excluded
+                  ? "opacity-40 text-muted-foreground"
+                  : "text-foreground hover:bg-muted"
+              )}
+            >
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: excluded ? "#888" : p.color }} />
+              <span className="flex-1 truncate">{p.name}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-3 pt-3 border-t">
+        <Popover open={filterPresetsOpen} onOpenChange={setFilterPresetsOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="w-full h-7 gap-1.5 text-xs" data-testid="button-filter-presets">
+              <Bookmark className="w-3 h-3" />
+              Presets
+              {savedFilters && savedFilters.length > 0 && (
+                <span className="bg-primary/10 text-primary rounded-full px-1 ml-auto">{savedFilters.length}</span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent side="right" align="start" className="w-72 p-3" data-testid="popover-filter-presets">
+            <div className="space-y-3">
+              <p className="text-sm font-medium">Saved Filter Presets</p>
+              {savedFilters && savedFilters.length > 0 ? (
+                <div className="space-y-1 max-h-48 overflow-y-auto">
+                  {savedFilters.map(filter => (
+                    <div key={filter.id} className="flex items-center gap-2 group" data-testid={`filter-preset-${filter.id}`}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="flex-1 justify-start text-sm h-8"
+                        onClick={() => {
+                          setExcludedPlatforms(new Set(filter.excludedPlatformIds));
+                          setFilterPresetsOpen(false);
+                        }}
+                        data-testid={`button-apply-filter-${filter.id}`}
+                      >
+                        {filter.name}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                        onClick={e => {
+                          e.stopPropagation();
+                          deleteFilterMutation.mutate(filter.id);
+                        }}
+                        data-testid={`button-delete-filter-${filter.id}`}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No saved presets yet. Toggle platforms and save them here.</p>
+              )}
+              <div className="border-t pt-3">
+                <p className="text-xs text-muted-foreground mb-2">Save current filter as preset</p>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Preset name..."
+                    value={filterPresetName}
+                    onChange={e => setFilterPresetName(e.target.value)}
+                    className="h-8 text-sm"
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && filterPresetName.trim())
+                        saveFilterMutation.mutate(filterPresetName.trim());
+                    }}
+                    data-testid="input-filter-preset-name"
+                  />
+                  <Button
+                    size="sm"
+                    className="h-8 px-3"
+                    disabled={!filterPresetName.trim() || saveFilterMutation.isPending}
+                    onClick={() => saveFilterMutation.mutate(filterPresetName.trim())}
+                    data-testid="button-save-filter-preset"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+    </div>
+  ) : null;
+
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <Layout>
+    <Layout sidebarExtra={filterSidebar}>
       <div className="space-y-6 pb-12">
-
-        {/* ── Platform filter bar ──────────────────────────────────────── */}
-        {platforms && platforms.length > 0 && (
-          <div className="flex items-center gap-3 flex-wrap" data-testid="platform-filter-bar">
-            <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground shrink-0">
-              <Filter className="w-3.5 h-3.5" />
-              Platforms:
-            </span>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {platforms.map(p => {
-                const excluded = excludedPlatforms.has(p.id);
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => togglePlatform(p.id)}
-                    data-testid={`filter-platform-${p.id}`}
-                    title={excluded ? `Include ${p.name}` : `Exclude ${p.name}`}
-                    className={cn(
-                      "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all",
-                      excluded
-                        ? "opacity-40 text-muted-foreground border-border bg-transparent"
-                        : "border-transparent bg-muted/60 hover:bg-muted"
-                    )}
-                  >
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: excluded ? "#888" : p.color }} />
-                    {p.name}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex items-center gap-1 ml-auto shrink-0">
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setExcludedPlatforms(new Set())} data-testid="filter-select-all">All</Button>
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setExcludedPlatforms(new Set(platforms.map(p => p.id)))} data-testid="filter-deselect-all">None</Button>
-              <Popover open={filterPresetsOpen} onOpenChange={setFilterPresetsOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-6 gap-1 text-xs px-2" data-testid="button-filter-presets">
-                    <Bookmark className="w-3 h-3" />
-                    Presets
-                    {savedFilters && savedFilters.length > 0 && (
-                      <span className="bg-primary/10 text-primary rounded-full px-1">{savedFilters.length}</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent side="bottom" align="end" className="w-72 p-3" data-testid="popover-filter-presets">
-                  <div className="space-y-3">
-                    <p className="text-sm font-medium">Saved Filter Presets</p>
-                    {savedFilters && savedFilters.length > 0 ? (
-                      <div className="space-y-1 max-h-48 overflow-y-auto">
-                        {savedFilters.map(filter => (
-                          <div key={filter.id} className="flex items-center gap-2 group" data-testid={`filter-preset-${filter.id}`}>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="flex-1 justify-start text-sm h-8"
-                              onClick={() => {
-                                setExcludedPlatforms(new Set(filter.excludedPlatformIds));
-                                setFilterPresetsOpen(false);
-                              }}
-                              data-testid={`button-apply-filter-${filter.id}`}
-                            >
-                              {filter.name}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                              onClick={e => {
-                                e.stopPropagation();
-                                deleteFilterMutation.mutate(filter.id);
-                              }}
-                              data-testid={`button-delete-filter-${filter.id}`}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">No saved presets yet. Toggle platforms and save them here.</p>
-                    )}
-                    <div className="border-t pt-3">
-                      <p className="text-xs text-muted-foreground mb-2">Save current filter as preset</p>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Preset name..."
-                          value={filterPresetName}
-                          onChange={e => setFilterPresetName(e.target.value)}
-                          className="h-8 text-sm"
-                          onKeyDown={e => {
-                            if (e.key === "Enter" && filterPresetName.trim())
-                              saveFilterMutation.mutate(filterPresetName.trim());
-                          }}
-                          data-testid="input-filter-preset-name"
-                        />
-                        <Button
-                          size="sm"
-                          className="h-8 px-3"
-                          disabled={!filterPresetName.trim() || saveFilterMutation.isPending}
-                          onClick={() => saveFilterMutation.mutate(filterPresetName.trim())}
-                          data-testid="button-save-filter-preset"
-                        >
-                          <Save className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-        )}
 
           {/* Header */}
           <div className="flex items-center justify-between gap-4 flex-wrap">
