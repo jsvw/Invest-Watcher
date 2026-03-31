@@ -165,6 +165,7 @@ export default function Dashboard() {
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
   const [chartType, setChartType] = useState<"line" | "bar">("line");
   const [chartValueMode, setChartValueMode] = useState<"value" | "pct">("value");
+  const [chartFading, setChartFading] = useState(false);
 
   // ── Allocation targets state ─────────────────────────────────────────────
   const [localTargets, setLocalTargets] = useState<Record<number, string>>({});
@@ -197,6 +198,12 @@ export default function Dashboard() {
       scrapeLogRef.current.scrollTop = scrapeLogRef.current.scrollHeight;
     }
   }, [scrapeLog]);
+
+  useEffect(() => {
+    setChartFading(true);
+    const t = setTimeout(() => setChartFading(false), 180);
+    return () => clearTimeout(t);
+  }, [chartView, chartType, chartValueMode]);
 
   // ── Helper: togglePlatform ───────────────────────────────────────────────
   function togglePlatform(id: number) {
@@ -993,7 +1000,7 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
-              <div className="h-[400px] w-full">
+              <div className={cn("h-[400px] w-full transition-opacity duration-150", chartFading ? "opacity-0" : "opacity-100")}>
                 {chartData && chartData.length > 0 ? (() => {
                   const mappedData = chartData.map((h: any, i: number, arr: any[]) => {
                     const prev = arr[i - 1];
@@ -1061,22 +1068,22 @@ export default function Dashboard() {
                           <Legend verticalAlign="top" height={36} />
                           {(chartView === "overview" || chartView === "all") && (
                             <>
-                              <Bar dataKey="baseAmount" name="Invested" stackId="stack" yAxisId="left" fill="#3b82f6" isAnimationActive={false} />
-                              <Bar dataKey="gainPortion" name="Profit" stackId="stack" yAxisId="left" isAnimationActive={false} radius={[3, 3, 0, 0]}>
+                              <Bar dataKey="baseAmount" name="Invested" stackId="stack" yAxisId="left" fill="#3b82f6" animationDuration={350} />
+                              <Bar dataKey="gainPortion" name="Profit" stackId="stack" yAxisId="left" animationDuration={350} radius={[3, 3, 0, 0]}>
                                 {mappedData.map((_: any, i: number) => <Cell key={i} fill="#10b981" />)}
                               </Bar>
-                              <Bar dataKey="lostPortion" name="Loss" stackId="stack" yAxisId="left" isAnimationActive={false} radius={[3, 3, 0, 0]}>
+                              <Bar dataKey="lostPortion" name="Loss" stackId="stack" yAxisId="left" animationDuration={350} radius={[3, 3, 0, 0]}>
                                 {mappedData.map((_: any, i: number) => <Cell key={i} fill="#ef4444" />)}
                               </Bar>
                             </>
                           )}
                           {chartView === "profit" && (
-                            <Bar dataKey={profitKey} name="Profit/Loss" yAxisId="left" isAnimationActive={false} radius={[3, 3, 3, 3]}>
+                            <Bar dataKey={profitKey} name="Profit/Loss" yAxisId="left" animationDuration={350} radius={[3, 3, 3, 3]}>
                               {mappedData.map((entry: any, i: number) => <Cell key={i} fill={entry.gain >= 0 ? '#10b981' : '#ef4444'} />)}
                             </Bar>
                           )}
                           {chartView === "monthly" && (
-                            <Bar dataKey={monthlyKey} name="Monthly Growth" yAxisId="left" isAnimationActive={false} radius={[3, 3, 3, 3]}>
+                            <Bar dataKey={monthlyKey} name="Monthly Growth" yAxisId="left" animationDuration={350} radius={[3, 3, 3, 3]}>
                               {mappedData.map((entry: any, i: number) => <Cell key={i} fill={entry.monthlyChange >= 0 ? '#10b981' : '#ef4444'} />)}
                             </Bar>
                           )}
@@ -1103,15 +1110,15 @@ export default function Dashboard() {
                         <Legend verticalAlign="top" height={36} />
                         {(chartView === "overview" || chartView === "all") && (
                           <>
-                            <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke="hsl(var(--primary))" strokeWidth={4} dot={false} activeDot={{ r: 6 }} isAnimationActive={false} />
-                            <Line type="monotone" dataKey="invested" name="Invested" yAxisId="left" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
+                            <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke="hsl(var(--primary))" strokeWidth={4} dot={false} activeDot={{ r: 6 }} animationDuration={350} />
+                            <Line type="monotone" dataKey="invested" name="Invested" yAxisId="left" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={false} activeDot={{ r: 4 }} animationDuration={350} />
                           </>
                         )}
                         {(chartView === "profit" || chartView === "all") && (
-                          <Line type="monotone" dataKey={profitKey} name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
+                          <Line type="monotone" dataKey={profitKey} name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 4 }} animationDuration={350} />
                         )}
                         {(chartView === "monthly" || chartView === "all") && (
-                          <Line type="monotone" dataKey={monthlyKey} name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 7 }} isAnimationActive={false} />
+                          <Line type="monotone" dataKey={monthlyKey} name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 7 }} animationDuration={350} />
                         )}
                       </LineChart>
                     </ResponsiveContainer>
