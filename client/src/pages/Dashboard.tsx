@@ -812,7 +812,7 @@ export default function Dashboard() {
               <div className="text-right">
                 <span className="font-semibold text-foreground">
                   {isPct
-                    ? `${entry.value >= 0 ? '+' : ''}${fmtPct(entry.value)}`
+                    ? fmtPct(entry.value)
                     : isSigned
                       ? `${entry.value >= 0 ? '+' : ''}${formatCurrency(entry.value, currency)}`
                       : formatCurrency(entry.value, currency)}
