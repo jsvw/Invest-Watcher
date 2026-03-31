@@ -6,7 +6,7 @@ import { formatCurrency, formatCompactCurrency, getCurrencySymbol } from "@/lib/
 import {
   Wallet, TrendingUp, DollarSign, Check, RefreshCw, Loader2, CheckCircle, XCircle,
   X, Save, Bookmark, Trash2, Target, ArrowUpCircle, ArrowDownCircle,
-  LineChart as LineChartIcon, BarChart2, Filter, Award, Calendar, Percent,
+  LineChart as LineChartIcon, BarChart2, Filter, Percent,
 } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import {
@@ -1248,20 +1248,6 @@ export default function Dashboard() {
               positive={kpis?.cagr != null ? kpis.cagr >= 0 : undefined}
               chartData={roiOverTimeData.map(p => ({ label: p.label, value: p.annualized }))}
               currency={currency}
-            />
-            <KpiCard
-              label="Best Platform"
-              value={kpis && kpis.bestPlatform.roi > -Infinity ? kpis.bestPlatform.name : "—"}
-              sub={kpis && kpis.bestPlatform.roi > -Infinity ? `${fmtPct(kpis.bestPlatform.roi)} ROI` : undefined}
-              icon={<Award className="w-5 h-5 text-muted-foreground" />}
-              neutral
-            />
-            <KpiCard
-              label="Portfolio Age"
-              value={kpis ? `${kpis.ageMonths} months` : "—"}
-              sub={kpis ? `${kpis.ageDays} days since first entry` : undefined}
-              icon={<Calendar className="w-5 h-5 text-muted-foreground" />}
-              neutral
             />
           </div>
 
