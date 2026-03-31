@@ -426,7 +426,7 @@ export async function scrapeCrowdPear(email: string, password: string, gmailAppP
         }
       }
       if (mainBalance === null) {
-        mainBalance = findLabelledValue(["total balance", "portfolio value", "my investments"]);
+        mainBalance = findLabelledValue(["total balance", "portfolio value", "invested", "my investments"]);
       }
       if (mainBalance === null) {
         var antEls = document.querySelectorAll(".ant-typography");
