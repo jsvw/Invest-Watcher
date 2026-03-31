@@ -316,7 +316,8 @@ export default function Dashboard() {
       let url = `${api.portfolio.history.path}?range=${range}`;
       if (specificYear) url += `&year=${specificYear}`;
       if (specificMonth) url += `&month_select=${specificMonth}`;
-      if (excludedPlatforms.size > 0) url += `&excludePlatforms=${Array.from(excludedPlatforms).join(',')}`;
+      // Use debouncedExcludedKey so the URL param is always in sync with the query key.
+      if (debouncedExcludedKey) url += `&excludePlatforms=${debouncedExcludedKey}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch history");
       return await res.json();
