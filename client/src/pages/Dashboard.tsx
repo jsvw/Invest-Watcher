@@ -862,39 +862,7 @@ export default function Dashboard() {
   // ── Sidebar filter panel ─────────────────────────────────────────────────
   const filterSidebar = platforms && platforms.length > 0 ? (
     <div data-testid="platform-filter-bar">
-      <div className="flex items-center justify-between mb-2 px-1">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-          <Filter className="w-3 h-3" />
-          Filter
-        </p>
-        <div className="flex items-center gap-0.5">
-          <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs" onClick={() => setExcludedPlatforms(new Set())} data-testid="filter-select-all">All</Button>
-          <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs" onClick={() => setExcludedPlatforms(new Set(platforms.map(p => p.id)))} data-testid="filter-deselect-all">None</Button>
-        </div>
-      </div>
-      <div className="space-y-0.5">
-        {platforms.map(p => {
-          const excluded = excludedPlatforms.has(p.id);
-          return (
-            <button
-              key={p.id}
-              onClick={() => togglePlatform(p.id)}
-              data-testid={`filter-platform-${p.id}`}
-              title={excluded ? `Include ${p.name}` : `Exclude ${p.name}`}
-              className={cn(
-                "flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-xs text-left transition-all",
-                excluded
-                  ? "opacity-40 text-muted-foreground"
-                  : "text-foreground hover:bg-muted"
-              )}
-            >
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: excluded ? "#888" : p.color }} />
-              <span className="flex-1 truncate">{p.name}</span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="mt-3 pt-3 border-t">
+      <div className="mb-3">
         <Popover open={filterPresetsOpen} onOpenChange={setFilterPresetsOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className="w-full h-7 gap-1.5 text-xs" data-testid="button-filter-presets">
