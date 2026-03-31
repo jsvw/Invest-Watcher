@@ -872,29 +872,7 @@ export default function Dashboard() {
           <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs" onClick={() => setExcludedPlatforms(new Set(platforms.map(p => p.id)))} data-testid="filter-deselect-all">None</Button>
         </div>
       </div>
-      <div className="space-y-0.5">
-        {platforms.map(p => {
-          const excluded = excludedPlatforms.has(p.id);
-          return (
-            <button
-              key={p.id}
-              onClick={() => togglePlatform(p.id)}
-              data-testid={`filter-platform-${p.id}`}
-              title={excluded ? `Include ${p.name}` : `Exclude ${p.name}`}
-              className={cn(
-                "flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-xs text-left transition-all",
-                excluded
-                  ? "opacity-40 text-muted-foreground"
-                  : "text-foreground hover:bg-muted"
-              )}
-            >
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: excluded ? "#888" : p.color }} />
-              <span className="flex-1 truncate">{p.name}</span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="mt-3 pt-3 border-t">
+      <div className="pt-1 border-t">
         <Popover open={filterPresetsOpen} onOpenChange={setFilterPresetsOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className="w-full h-7 gap-1.5 text-xs" data-testid="button-filter-presets">
@@ -976,7 +954,7 @@ export default function Dashboard() {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <Layout sidebarExtra={filterSidebar}>
+    <Layout sidebarExtra={filterSidebar} platformFilter={{ excludedPlatforms, onToggle: togglePlatform }}>
       <div className="space-y-6 pb-12">
 
           {/* Header */}

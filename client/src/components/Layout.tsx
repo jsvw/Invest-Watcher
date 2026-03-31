@@ -10,7 +10,11 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { AddPlatformDialog } from "@/components/AddPlatformDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-export function Layout({ children, sidebarExtra }: { children: React.ReactNode; sidebarExtra?: React.ReactNode }) {
+export function Layout({ children, sidebarExtra, platformFilter }: {
+  children: React.ReactNode;
+  sidebarExtra?: React.ReactNode;
+  platformFilter?: { excludedPlatforms: Set<number>; onToggle: (id: number) => void };
+}) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user } = useAuth();
   const { data: platforms } = usePlatforms();
@@ -78,35 +82,55 @@ export function Layout({ children, sidebarExtra }: { children: React.ReactNode; 
             <div className="grid grid-cols-3 gap-1.5">
               {platforms?.map((p) => {
                 const stale = isPlatformStale(p.lastValuationDate);
+                const excluded = platformFilter ? platformFilter.excludedPlatforms.has(p.id) : false;
                 return (
-                  <Tooltip key={p.id}>
-                    <TooltipTrigger asChild>
-                      <Link href={`/platforms/${encodeURIComponent(p.name.toLowerCase().replace(/\s+/g, '-'))}`}>
-                        <div
-                          data-testid={`sidebar-platform-${p.id}`}
-                          className="relative flex items-center justify-center p-2 rounded-lg hover:bg-muted transition-colors cursor-pointer"
-                        >
-                          <PlatformIcon
-                            icon={p.icon}
-                            customIconUrl={p.customIconUrl}
-                            color={p.color}
-                            name={p.name}
-                            size="md"
-                          />
-                          {stale && (
-                            <AlertTriangle
-                              className="absolute top-0.5 right-0.5 h-3 w-3 text-amber-500"
-                              data-testid={`icon-stale-platform-${p.id}`}
+                  <div key={p.id} className="relative">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Link href={`/platforms/${encodeURIComponent(p.name.toLowerCase().replace(/\s+/g, '-'))}`}>
+                          <div
+                            data-testid={`sidebar-platform-${p.id}`}
+                            className={cn(
+                              "relative flex items-center justify-center p-2 rounded-lg hover:bg-muted transition-all cursor-pointer",
+                              excluded && "opacity-40"
+                            )}
+                          >
+                            <PlatformIcon
+                              icon={p.icon}
+                              customIconUrl={p.customIconUrl}
+                              color={p.color}
+                              name={p.name}
+                              size="md"
                             />
-                          )}
-                        </div>
-                      </Link>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <p className="font-medium">{p.name}</p>
-                      {stale && <p className="text-amber-400 text-xs">No valuation in 31+ days</p>}
-                    </TooltipContent>
-                  </Tooltip>
+                            {stale && (
+                              <AlertTriangle
+                                className="absolute top-0.5 right-0.5 h-3 w-3 text-amber-500"
+                                data-testid={`icon-stale-platform-${p.id}`}
+                              />
+                            )}
+                          </div>
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <p className="font-medium">{p.name}</p>
+                        {excluded && <p className="text-muted-foreground text-xs">Excluded from charts</p>}
+                        {stale && <p className="text-amber-400 text-xs">No valuation in 31+ days</p>}
+                      </TooltipContent>
+                    </Tooltip>
+                    {platformFilter && (
+                      <button
+                        onClick={e => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          platformFilter.onToggle(p.id);
+                        }}
+                        data-testid={`filter-platform-${p.id}`}
+                        title={excluded ? `Include ${p.name}` : `Exclude ${p.name}`}
+                        className="absolute top-0.5 left-0.5 w-2.5 h-2.5 rounded-full border-2 border-card transition-all z-10 hover:scale-125"
+                        style={{ backgroundColor: excluded ? "#888" : p.color }}
+                      />
+                    )}
+                  </div>
                 );
               })}
               <AddPlatformDialog
