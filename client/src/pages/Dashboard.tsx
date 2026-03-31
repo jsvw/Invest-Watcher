@@ -23,7 +23,7 @@ import { api } from "@shared/routes";
 import { Link, useLocation } from "wouter";
 import { format, formatDistanceToNow } from "date-fns";
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
@@ -249,6 +249,7 @@ export default function Dashboard() {
   // ── Analytics state ──────────────────────────────────────────────────────
   const [tooltip, setTooltip] = useState<{ x: number; y: number; data: HeatmapTooltipData } | null>(null);
   const [heatmapMode, setHeatmapMode] = useState<"pct" | "value">("pct");
+  const [activeHeatmapTab, setActiveHeatmapTab] = useState<string>("monthly");
   const [sortKey, setSortKey] = useState<SortKey>("roi");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -1264,98 +1265,105 @@ export default function Dashboard() {
             />
           </div>
 
-          {/* Monthly Returns Heatmap */}
-          <Card>
-            <CardHeader className="flex flex-row items-start justify-between gap-4">
-              <div>
-                <CardTitle>Monthly Returns Heatmap</CardTitle>
-                <CardDescription>Cash-flow adjusted return per calendar month — green = gain, red = loss</CardDescription>
-              </div>
-              <div className="flex items-center rounded-md border p-0.5 shrink-0">
-                <button type="button" onClick={() => setHeatmapMode("pct")} className={cn("px-2.5 py-1 text-xs font-medium rounded transition-colors", heatmapMode === "pct" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")} data-testid="heatmap-toggle-pct">%</button>
-                <button type="button" onClick={() => setHeatmapMode("value")} className={cn("px-2.5 py-1 text-xs font-medium rounded transition-colors", heatmapMode === "value" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")} data-testid="heatmap-toggle-value">{getCurrencySymbol(currency)}</button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {activeHeatmapData ? (
-                <div className="overflow-x-auto">
-                  <div className="min-w-[600px]">
-                    <div className="flex mb-1">
-                      <div className="w-12 shrink-0" />
-                      {MONTHS.map(m => (
-                        <div key={m} className="flex-1 text-center text-xs text-muted-foreground font-medium">{m}</div>
-                      ))}
-                    </div>
-                    {activeHeatmapData.years.map(year => (
-                      <div key={year} className="flex items-center mb-1">
-                        <div className="w-12 shrink-0 text-xs text-muted-foreground font-medium pr-2 text-right">{year}</div>
-                        {Array.from({ length: 12 }, (_, mi) => {
-                          const monthNum = mi + 1;
-                          const cell = activeHeatmapData.cells.find(c => c.year === year && c.month === monthNum);
-                          if (!cell) return <div key={monthNum} className="flex-1 mx-0.5 h-10 rounded bg-muted/30" />;
-                          const intensity = Math.min(Math.abs(cell.returnPct) / 5, 1);
-                          const bg = cell.returnPct >= 0
-                            ? `rgba(16,185,129,${0.15 + intensity * 0.75})`
-                            : `rgba(239,68,68,${0.15 + intensity * 0.75})`;
-                          const label = `${MONTHS[monthNum - 1]} ${year}`;
-                          return (
-                            <div
-                              key={monthNum}
-                              className="flex-1 mx-0.5 h-10 rounded flex items-center justify-center text-[10px] font-medium cursor-default transition-transform hover:scale-105"
-                              style={{ backgroundColor: bg, color: intensity > 0.5 ? "#fff" : undefined }}
-                              data-testid={`heatmap-cell-${year}-${monthNum}`}
-                              onMouseEnter={e => {
-                                const rect = (e.target as HTMLElement).getBoundingClientRect();
-                                const ymKey = `${year}-${String(monthNum).padStart(2, "0")}`;
-                                setTooltip({
-                                  x: rect.left + rect.width / 2,
-                                  y: rect.top,
-                                  data: {
-                                    label,
-                                    returnPct: cell.returnPct,
-                                    absoluteChange: cell.absoluteChange,
-                                    currency,
-                                    platformBreakdown: platformBreakdownByMonth?.[ymKey]?.filter(p => !excludedPlatforms.has(p.platformId)),
-                                  },
-                                });
-                              }}
-                              onMouseLeave={() => setTooltip(null)}
-                            >
-                              {heatmapMode === "pct" ? fmtPct(cell.returnPct) : formatCompactCurrency(cell.absoluteChange, currency)}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
-                  </div>
+          {/* Combined Heatmaps */}
+          <Card data-testid="heatmaps-card">
+            <CardHeader className="pb-0">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                  <CardTitle>Heatmaps</CardTitle>
+                  <CardDescription>Monthly calendar returns and portfolio breakdown in one place</CardDescription>
                 </div>
-              ) : (
-                <p className="text-muted-foreground text-sm">Not enough history data to build heatmap.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {tooltip && (
-            <div className="fixed z-50 pointer-events-none" style={{ left: tooltip.x, top: tooltip.y - 8, transform: "translate(-50%, -100%)" }}>
-              <HeatmapTooltipCard {...tooltip.data} />
-            </div>
-          )}
-
-          {/* Portfolio Heatmap */}
-          <Card data-testid="portfolio-heatmap-card">
-            <CardHeader>
-              <CardTitle>Portfolio Heatmap</CardTitle>
-              <CardDescription>Drill into your portfolio by category → platform → asset. Green = positive return, red = negative.</CardDescription>
+              </div>
             </CardHeader>
-            <CardContent>
-              {platforms && (
-                <PortfolioHeatmap
-                  assets={analyticsAssets ?? []}
-                  platforms={platforms}
-                  excludedPlatforms={excludedPlatforms}
-                  currency={currency}
-                />
-              )}
+            <CardContent className="pt-4">
+              <Tabs defaultValue="monthly" onValueChange={setActiveHeatmapTab}>
+                <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
+                  <TabsList>
+                    <TabsTrigger value="monthly" data-testid="heatmap-tab-monthly">Monthly Calendar</TabsTrigger>
+                    <TabsTrigger value="portfolio" data-testid="heatmap-tab-portfolio">Portfolio Breakdown</TabsTrigger>
+                  </TabsList>
+                  {activeHeatmapTab === "monthly" && (
+                    <div className="flex items-center rounded-md border p-0.5 shrink-0">
+                      <button type="button" onClick={() => setHeatmapMode("pct")} className={cn("px-2.5 py-1 text-xs font-medium rounded transition-colors", heatmapMode === "pct" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")} data-testid="heatmap-toggle-pct">%</button>
+                      <button type="button" onClick={() => setHeatmapMode("value")} className={cn("px-2.5 py-1 text-xs font-medium rounded transition-colors", heatmapMode === "value" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")} data-testid="heatmap-toggle-value">{getCurrencySymbol(currency)}</button>
+                    </div>
+                  )}
+                </div>
+
+                <TabsContent value="monthly">
+                  {activeHeatmapData ? (
+                    <div className="overflow-x-auto">
+                      <div className="min-w-[600px]">
+                        <div className="flex mb-1">
+                          <div className="w-12 shrink-0" />
+                          {MONTHS.map(m => (
+                            <div key={m} className="flex-1 text-center text-xs text-muted-foreground font-medium">{m}</div>
+                          ))}
+                        </div>
+                        {activeHeatmapData.years.map(year => (
+                          <div key={year} className="flex items-center mb-1">
+                            <div className="w-12 shrink-0 text-xs text-muted-foreground font-medium pr-2 text-right">{year}</div>
+                            {Array.from({ length: 12 }, (_, mi) => {
+                              const monthNum = mi + 1;
+                              const cell = activeHeatmapData.cells.find(c => c.year === year && c.month === monthNum);
+                              if (!cell) return <div key={monthNum} className="flex-1 mx-0.5 h-10 rounded bg-muted/30" />;
+                              const intensity = Math.min(Math.abs(cell.returnPct) / 5, 1);
+                              const bg = cell.returnPct >= 0
+                                ? `rgba(16,185,129,${0.15 + intensity * 0.75})`
+                                : `rgba(239,68,68,${0.15 + intensity * 0.75})`;
+                              const label = `${MONTHS[monthNum - 1]} ${year}`;
+                              return (
+                                <div
+                                  key={monthNum}
+                                  className="flex-1 mx-0.5 h-10 rounded flex items-center justify-center text-[10px] font-medium cursor-default transition-transform hover:scale-105"
+                                  style={{ backgroundColor: bg, color: intensity > 0.5 ? "#fff" : undefined }}
+                                  data-testid={`heatmap-cell-${year}-${monthNum}`}
+                                  onMouseEnter={e => {
+                                    const rect = (e.target as HTMLElement).getBoundingClientRect();
+                                    const ymKey = `${year}-${String(monthNum).padStart(2, "0")}`;
+                                    setTooltip({
+                                      x: rect.left + rect.width / 2,
+                                      y: rect.top,
+                                      data: {
+                                        label,
+                                        returnPct: cell.returnPct,
+                                        absoluteChange: cell.absoluteChange,
+                                        currency,
+                                        platformBreakdown: platformBreakdownByMonth?.[ymKey]?.filter(p => !excludedPlatforms.has(p.platformId)),
+                                      },
+                                    });
+                                  }}
+                                  onMouseLeave={() => setTooltip(null)}
+                                >
+                                  {heatmapMode === "pct" ? fmtPct(cell.returnPct) : formatCompactCurrency(cell.absoluteChange, currency)}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">Not enough history data to build heatmap.</p>
+                  )}
+                  {tooltip && (
+                    <div className="fixed z-50 pointer-events-none" style={{ left: tooltip.x, top: tooltip.y - 8, transform: "translate(-50%, -100%)" }}>
+                      <HeatmapTooltipCard {...tooltip.data} />
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="portfolio">
+                  {platforms && (
+                    <PortfolioHeatmap
+                      assets={analyticsAssets ?? []}
+                      platforms={platforms}
+                      excludedPlatforms={excludedPlatforms}
+                      currency={currency}
+                    />
+                  )}
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
 
