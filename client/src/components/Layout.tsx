@@ -91,16 +91,19 @@ export function Layout({ children, sidebarTop, sidebarExtra, platformFilter }: {
                 const stale = isPlatformStale(p.lastValuationDate);
                 const excluded = platformFilter ? platformFilter.excludedPlatforms.has(p.id) : false;
                 return (
-                  <div key={p.id} className="relative">
+                  <div
+                    key={p.id}
+                    className={cn(
+                      "flex flex-col rounded-lg overflow-hidden transition-all",
+                      excluded && "opacity-40"
+                    )}
+                  >
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Link href={`/platforms/${encodeURIComponent(p.name.toLowerCase().replace(/\s+/g, '-'))}`}>
                           <div
                             data-testid={`sidebar-platform-${p.id}`}
-                            className={cn(
-                              "relative flex items-center justify-center p-2 rounded-lg hover:bg-muted transition-all cursor-pointer",
-                              excluded && "opacity-40"
-                            )}
+                            className="relative flex items-center justify-center p-2 hover:bg-muted transition-colors cursor-pointer"
                           >
                             <PlatformIcon
                               icon={p.icon}
@@ -126,6 +129,7 @@ export function Layout({ children, sidebarTop, sidebarExtra, platformFilter }: {
                     </Tooltip>
                     {platformFilter && (
                       <button
+                        type="button"
                         onClick={e => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -133,8 +137,7 @@ export function Layout({ children, sidebarTop, sidebarExtra, platformFilter }: {
                         }}
                         data-testid={`filter-platform-${p.id}`}
                         title={excluded ? `Include ${p.name}` : `Exclude ${p.name}`}
-                        type="button"
-                        className="absolute top-0.5 left-0.5 w-2.5 h-2.5 rounded-full border-2 border-card transition-all z-10 hover:scale-125"
+                        className="h-1.5 w-full transition-colors hover:opacity-75 shrink-0"
                         style={{ backgroundColor: excluded ? "#888" : p.color }}
                       />
                     )}
