@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ComposedChart,
@@ -80,30 +80,20 @@ export function WaterfallChart({ currency, excludedPlatforms }: WaterfallChartPr
   const [granularity, setGranularity] = useState<Granularity>("month");
   const [viewMode, setViewMode] = useState<ViewMode>("combined");
 
-  // Debounce the excluded-platform key so rapid toggling doesn't fire a
-  // new waterfall request on every click — only after 400ms of inactivity.
-  const excludedKey = Array.from(excludedPlatforms).sort().join(",");
-  const [debouncedExcludeKey, setDebouncedExcludeKey] = useState(excludedKey);
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedExcludeKey(excludedKey), 400);
-    return () => clearTimeout(t);
-  }, [excludedKey]);
-
-  const debouncedExcludeParam = debouncedExcludeKey
-    ? `&excludePlatforms=${debouncedExcludeKey}`
+  const excludeParam = excludedPlatforms.size > 0
+    ? `&excludePlatforms=${Array.from(excludedPlatforms).join(",")}`
     : "";
 
   const { data: waterfallData, isLoading } = useQuery<WaterfallPeriod[]>({
-    queryKey: ["/api/portfolio/waterfall", granularity, debouncedExcludeKey],
+    queryKey: ["/api/portfolio/waterfall", granularity, Array.from(excludedPlatforms).sort().join(",")],
     queryFn: async () => {
       const res = await fetch(
-        `/api/portfolio/waterfall?granularity=${granularity}${debouncedExcludeParam}`,
+        `/api/portfolio/waterfall?granularity=${granularity}${excludeParam}`,
         { credentials: "include" }
       );
       if (!res.ok) throw new Error("Failed to fetch waterfall data");
       return res.json();
     },
-    placeholderData: (previousData) => previousData,
   });
 
   const allPlatforms = useMemo(() => {

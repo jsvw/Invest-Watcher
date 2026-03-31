@@ -278,15 +278,6 @@ export default function Dashboard() {
     [excludedPlatforms]
   );
 
-  // Debounced version — used as query keys for expensive server queries.
-  // Fires 400ms after the last platform toggle, so rapid clicking only
-  // produces one network request instead of one per click.
-  const [debouncedExcludedKey, setDebouncedExcludedKey] = useState(excludedPlatformKey);
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedExcludedKey(excludedPlatformKey), 400);
-    return () => clearTimeout(t);
-  }, [excludedPlatformKey]);
-
   // ── Queries ──────────────────────────────────────────────────────────────
   const { data: savedFilters } = useQuery<DashboardFilter[]>({
     queryKey: ['/api/dashboard-filters'],
@@ -311,13 +302,12 @@ export default function Dashboard() {
   });
 
   const { data: history, isLoading: isHistoryLoading } = useQuery({
-    queryKey: [api.portfolio.history.path, range, specificYear, specificMonth, debouncedExcludedKey],
+    queryKey: [api.portfolio.history.path, range, specificYear, specificMonth, excludedPlatformKey],
     queryFn: async () => {
       let url = `${api.portfolio.history.path}?range=${range}`;
       if (specificYear) url += `&year=${specificYear}`;
       if (specificMonth) url += `&month_select=${specificMonth}`;
-      // Use debouncedExcludedKey so the URL param is always in sync with the query key.
-      if (debouncedExcludedKey) url += `&excludePlatforms=${debouncedExcludedKey}`;
+      if (excludedPlatforms.size > 0) url += `&excludePlatforms=${Array.from(excludedPlatforms).join(',')}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch history");
       return await res.json();
@@ -325,21 +315,16 @@ export default function Dashboard() {
     placeholderData: (previousData) => previousData,
   });
 
-  // Fetch all platforms' MoM data once (no server-side filtering).
-  // Filtering is done client-side in the useMemo below so stat cards
-  // update instantly without a network round-trip.
-  const { data: allPlatformMomData } = useQuery<PlatformMomEntry[]>({
-    queryKey: ['/api/portfolio/platform-mom'],
+  const { data: platformMomData } = useQuery<PlatformMomEntry[]>({
+    queryKey: ['/api/portfolio/platform-mom', excludedPlatformKey],
     queryFn: async () => {
-      const res = await fetch('/api/portfolio/platform-mom', { credentials: "include" });
+      let url = '/api/portfolio/platform-mom';
+      if (excludedPlatforms.size > 0) url += `?excludePlatforms=${Array.from(excludedPlatforms).join(',')}`;
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch platform MoM");
       return await res.json();
     }
   });
-  const platformMomData = useMemo(
-    () => allPlatformMomData?.filter(p => !excludedPlatforms.has(p.platformId)),
-    [allPlatformMomData, excludedPlatforms]
-  );
 
   const { data: historyData } = useQuery<HistoryPoint[]>({
     queryKey: ["/api/portfolio/history", "all"],
