@@ -131,10 +131,31 @@ export async function scrapeRoboCash(email: string, password: string): Promise<R
       await new Promise(resolve => setTimeout(resolve, 3000));
     }
 
-    console.log("[RoboCash Scraper] Extracting total funds from summary page...");
-    await page.waitForSelector('.value_roundings', { timeout: 15000 }).catch(() => {
-      console.log("[RoboCash Scraper] .value_roundings not found, will try fallbacks");
-    });
+    console.log("[RoboCash Scraper] Extracting balance from page...");
+
+    // Dump page text and all numeric leaf nodes for diagnostics
+    const diag = await page.evaluate(`(function() {
+      var url = window.location.href;
+      var bodyText = (document.body.innerText || "").substring(0, 1000);
+      var nums = [];
+      var allEls = document.querySelectorAll("*");
+      for (var i = 0; i < allEls.length; i++) {
+        var el = allEls[i];
+        if (el.children.length > 0) continue;
+        var t = (el.textContent || "").trim();
+        if (/[0-9]/.test(t) && t.length < 40 && el.parentElement) {
+          var cls = el.className || "";
+          var par = (el.parentElement.textContent || "").trim().substring(0, 80);
+          nums.push({ text: t, class: cls, parent: par });
+        }
+        if (nums.length >= 30) break;
+      }
+      return { url: url, bodyText: bodyText, nums: nums };
+    })()`) as unknown as { url: string; bodyText: string; nums: Array<{text: string; class: string; parent: string}> };
+
+    console.log("[RoboCash Scraper] Page URL:", diag.url);
+    console.log("[RoboCash Scraper] Page text (first 1000):", diag.bodyText);
+    console.log("[RoboCash Scraper] Numeric leaf nodes:", JSON.stringify(diag.nums));
 
     const totalBalance = await page.evaluate(`(function() {
       var extractNumber = function(text) {
@@ -159,105 +180,75 @@ export async function scrapeRoboCash(email: string, password: string): Promise<R
       };
 
       var findValueNearLabel = function(labelText) {
-        var allElements = document.querySelectorAll('*');
+        var allElements = document.querySelectorAll("*");
         for (var i = 0; i < allElements.length; i++) {
           var el = allElements[i];
           if (el.children.length > 0) continue;
-          var txt = el.textContent ? el.textContent.trim().toLowerCase() : "";
+          var txt = (el.textContent || "").trim().toLowerCase();
           if (txt.indexOf(labelText.toLowerCase()) === -1) continue;
           if (txt.length > labelText.length * 3) continue;
-
-          var container = el.parentElement;
-          for (var lvl = 0; lvl < 5 && container; lvl++) {
-            var vals = container.querySelectorAll('.value_roundings');
-            if (vals.length > 0) {
-              var num = extractNumber(vals[0].textContent);
-              if (num !== null) return num;
+          var prev = el.previousElementSibling;
+          if (prev) { var pv = extractNumber(prev.textContent); if (pv !== null) return pv; }
+          var next = el.nextElementSibling;
+          if (next) { var nv = extractNumber(next.textContent); if (nv !== null) return nv; }
+          if (el.parentElement) {
+            var sibs = Array.from(el.parentElement.children);
+            for (var s = 0; s < sibs.length; s++) {
+              if (sibs[s] !== el) { var sv = extractNumber(sibs[s].textContent); if (sv !== null) return sv; }
             }
-            container = container.parentElement;
-          }
-
-          var sibling = el.nextElementSibling;
-          for (var s = 0; s < 5 && sibling; s++) {
-            var sVals = sibling.querySelectorAll('.value_roundings');
-            if (sVals.length > 0) {
-              var sNum = extractNumber(sVals[0].textContent);
-              if (sNum !== null) return sNum;
-            }
-            if (sibling.classList.contains('value_roundings')) {
-              var directNum = extractNumber(sibling.textContent);
-              if (directNum !== null) return directNum;
-            }
-            sibling = sibling.nextElementSibling;
+            var pp = el.parentElement.previousElementSibling;
+            if (pp) { var ppv = extractNumber(pp.textContent); if (ppv !== null) return ppv; }
+            var pn = el.parentElement.nextElementSibling;
+            if (pn) { var pnv = extractNumber(pn.textContent); if (pnv !== null) return pnv; }
           }
         }
         return null;
       };
 
-      var allValueEls = document.querySelectorAll('.value_roundings');
-      var allValues = [];
-      for (var i = 0; i < allValueEls.length; i++) {
-        var el = allValueEls[i];
-        var num = extractNumber(el.textContent);
-        var labelEl = el.closest('[class]');
-        var parent = el.parentElement;
-        var nearbyLabel = '';
-        if (parent) {
-          var siblings = parent.querySelectorAll('*');
-          for (var j = 0; j < siblings.length; j++) {
-            var sib = siblings[j];
-            if (sib !== el && sib.children.length === 0 && sib.textContent && sib.textContent.trim().length > 0 && sib.textContent.trim().length < 50) {
-              nearbyLabel = sib.textContent.trim();
-              break;
-            }
-          }
-        }
-        if (!nearbyLabel && parent && parent.parentElement) {
-          var grandparent = parent.parentElement;
-          var gSiblings = grandparent.querySelectorAll('*');
-          for (var k = 0; k < gSiblings.length; k++) {
-            var gs = gSiblings[k];
-            if (gs !== el && gs.children.length === 0 && gs.textContent && gs.textContent.trim().length > 0 && gs.textContent.trim().length < 50 && !gs.classList.contains('value_roundings')) {
-              nearbyLabel = gs.textContent.trim();
-              break;
-            }
-          }
-        }
-        allValues.push({ raw: el.textContent ? el.textContent.trim() : '', num: num, label: nearbyLabel });
-      }
-      console.log("[RoboCash Scraper] All .value_roundings elements: " + JSON.stringify(allValues));
-
-      var totalFunds = findValueNearLabel("Total funds");
-      var interest = findValueNearLabel("Interest by today");
-      console.log("[RoboCash Scraper] Total funds: " + totalFunds + ", Interest by today: " + interest);
-
-      if (totalFunds !== null && interest !== null) {
-        var sum = totalFunds + interest;
-        console.log("[RoboCash Scraper] Sum (Total funds + Interest): " + sum);
-        return sum;
-      }
-
-      if (totalFunds !== null) {
-        console.log("[RoboCash Scraper] Only found Total funds (no Interest), returning: " + totalFunds);
-        return totalFunds;
-      }
-
-      var candidates = [];
-      for (var i = 0; i < allValueEls.length; i++) {
-        var num = extractNumber(allValueEls[i].textContent);
-        if (num !== null && num >= 0) {
-          candidates.push(num);
+      // Try known label patterns for the total portfolio balance
+      var labelCandidates = [
+        "total balance", "total funds", "portfolio", "net worth",
+        "my balance", "account balance", "wallet", "total"
+      ];
+      for (var li = 0; li < labelCandidates.length; li++) {
+        var lv = findValueNearLabel(labelCandidates[li]);
+        if (lv !== null && lv > 0) {
+          console.log("[RoboCash Scraper] Found via label '" + labelCandidates[li] + "': " + lv);
+          return lv;
         }
       }
-      console.log("[RoboCash Scraper] All numeric candidates: " + JSON.stringify(candidates));
-      if (candidates.length >= 2) {
-        var sum = 0;
-        for (var i = 0; i < candidates.length; i++) sum += candidates[i];
-        console.log("[RoboCash Scraper] Sum of all candidates: " + sum);
+
+      // Try old .value_roundings class (legacy layout)
+      var oldEls = document.querySelectorAll(".value_roundings");
+      if (oldEls.length > 0) {
+        var nums = [];
+        for (var i = 0; i < oldEls.length; i++) {
+          var n = extractNumber(oldEls[i].textContent);
+          if (n !== null && n >= 0) nums.push(n);
+        }
+        if (nums.length > 0) {
+          nums.sort(function(a, b) { return b - a; });
+          console.log("[RoboCash Scraper] Found via .value_roundings: " + nums[0]);
+          return nums[0];
+        }
       }
-      if (candidates.length > 0) {
-        candidates.sort(function(a, b) { return b - a; });
-        return candidates[0];
+
+      // Fallback: collect all numeric leaf nodes and return the largest >= 100
+      var allEls = document.querySelectorAll("*");
+      var allNums = [];
+      for (var i = 0; i < allEls.length; i++) {
+        var el = allEls[i];
+        if (el.children.length > 0) continue;
+        var t = (el.textContent || "").trim();
+        if (t.length < 40) {
+          var n = extractNumber(t);
+          if (n !== null && n >= 100) allNums.push(n);
+        }
+      }
+      if (allNums.length > 0) {
+        allNums.sort(function(a, b) { return b - a; });
+        console.log("[RoboCash Scraper] Fallback largest numeric: " + allNums[0]);
+        return allNums[0];
       }
 
       return 0;
