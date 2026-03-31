@@ -1,11 +1,10 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, TrendingUp, Menu, X, LogOut, Settings, Coffee, Plus, AlertTriangle } from "lucide-react";
+import { LayoutDashboard, Menu, X, LogOut, Settings, Plus, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/App";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { APP_VERSION } from "@/lib/version";
 import { usePlatforms } from "@/hooks/use-platforms";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { AddPlatformDialog } from "@/components/AddPlatformDialog";
@@ -51,11 +50,7 @@ export function Layout({ children, sidebarExtra }: { children: React.ReactNode; 
   return (
     <div className="h-screen bg-background flex flex-col md:flex-row overflow-hidden">
       {/* Mobile Header */}
-      <div className="md:hidden flex items-center justify-between p-4 border-b bg-card">
-        <div className="flex items-center gap-2 font-display text-xl font-bold text-primary">
-          <TrendingUp className="h-6 w-6" />
-          <span>InvestTrack</span>
-        </div>
+      <div className="md:hidden flex items-center justify-end p-4 border-b bg-card">
         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
           {isMobileMenuOpen ? <X /> : <Menu />}
         </button>
@@ -68,27 +63,19 @@ export function Layout({ children, sidebarExtra }: { children: React.ReactNode; 
       )}>
         {/* Scrollable top section */}
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="flex items-center gap-2 font-display text-2xl font-bold text-primary mb-8">
+          {hasStaleValuation && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="relative shrink-0 cursor-default">
-                  <TrendingUp className="h-8 w-8" />
-                  {hasStaleValuation && (
-                    <AlertTriangle
-                      className="absolute -top-1.5 -right-1.5 h-4 w-4 text-amber-500"
-                      data-testid="icon-stale-valuation-warning"
-                    />
-                  )}
+                <div className="flex items-center gap-2 mb-4 px-1 text-amber-500 cursor-default">
+                  <AlertTriangle className="h-4 w-4 shrink-0" data-testid="icon-stale-valuation-warning" />
+                  <span className="text-xs font-medium">Some platforms are stale</span>
                 </div>
               </TooltipTrigger>
-              {hasStaleValuation && (
-                <TooltipContent side="right">
-                  <p>Some platforms haven't been updated in over 31 days</p>
-                </TooltipContent>
-              )}
+              <TooltipContent side="right">
+                <p>Some platforms haven't been updated in over 31 days</p>
+              </TooltipContent>
             </Tooltip>
-            <span>InvestTrack</span>
-          </div>
+          )}
 
           <nav className="space-y-2">
             {navItems.map((item) => {
@@ -193,22 +180,6 @@ export function Layout({ children, sidebarExtra }: { children: React.ReactNode; 
               </div>
             </div>
           )}
-          <a
-            href="https://buymeacoffee.com/investmenttracker"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 bg-amber-500/10 hover:bg-amber-500/20 rounded-xl p-4 border border-amber-500/30 transition-colors"
-            data-testid="link-buy-me-coffee"
-          >
-            <Coffee className="h-5 w-5 text-amber-500 flex-shrink-0" />
-            <div>
-              <h4 className="font-semibold text-sm text-amber-600 dark:text-amber-400">Buy me a coffee</h4>
-              <p className="text-xs text-muted-foreground">Support this project</p>
-            </div>
-          </a>
-          <div className="text-center text-xs text-muted-foreground/60" data-testid="text-app-version">
-            v{APP_VERSION}
-          </div>
         </div>
       </aside>
 
