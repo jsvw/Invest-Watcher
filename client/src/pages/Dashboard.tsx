@@ -315,16 +315,16 @@ export default function Dashboard() {
     placeholderData: (previousData) => previousData,
   });
 
-  const { data: platformMomData } = useQuery<PlatformMomEntry[]>({
-    queryKey: ['/api/portfolio/platform-mom', excludedPlatformKey],
+  const { data: allPlatformMomData } = useQuery<PlatformMomEntry[]>({
+    queryKey: ['/api/portfolio/platform-mom'],
     queryFn: async () => {
-      let url = '/api/portfolio/platform-mom';
-      if (excludedPlatforms.size > 0) url += `?excludePlatforms=${Array.from(excludedPlatforms).join(',')}`;
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch('/api/portfolio/platform-mom', { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch platform MoM");
       return await res.json();
     }
   });
+
+  const platformMomData = allPlatformMomData?.filter(p => !excludedPlatforms.has(p.platformId));
 
   const { data: historyData } = useQuery<HistoryPoint[]>({
     queryKey: ["/api/portfolio/history", "all"],

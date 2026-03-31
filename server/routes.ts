@@ -1100,25 +1100,16 @@ export async function registerRoutes(
   app.get('/api/portfolio/platform-mom', requireAuth, async (req, res) => {
     try {
       const userId = getAuthenticatedUserId(req)!;
-      const excludePlatforms = req.query.excludePlatforms 
-        ? (req.query.excludePlatforms as string).split(',').map(Number).filter(n => !isNaN(n))
-        : [];
       
       const userPlatforms = await storage.getPlatforms(userId);
       const userValuations = await storage.getAllValuationsForUser(userId);
       const userInvestments = await storage.getAllInvestmentsForUser(userId);
       const userWithdrawals = await storage.getAllWithdrawalsForUser(userId);
       
-      // Filter out excluded platforms
-      const filteredPlatforms = userPlatforms.filter((p: any) => !excludePlatforms.includes(p.id));
-      const filteredValuations = userValuations.filter((v: any) => !excludePlatforms.includes(v.platformId));
-      const filteredInvestments = userInvestments.filter((i: any) => !excludePlatforms.includes(i.platformId));
-      const filteredWithdrawals = userWithdrawals.filter((w: any) => !excludePlatforms.includes(w.platformId));
-      
       // Calculate per-platform MoM using actual valuation months (not calendar months)
-      const platformMom = filteredPlatforms.map((platform: any) => {
+      const platformMom = userPlatforms.map((platform: any) => {
         // Get valuations for this platform
-        const platformVals = filteredValuations
+        const platformVals = userValuations
           .filter((v: any) => v.platformId === platform.id)
           .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
         
@@ -1149,7 +1140,7 @@ export async function registerRoutes(
           const monthStart = new Date(year, month - 1, 1);
           const monthEnd = new Date(year, month, 0, 23, 59, 59);
           
-          const investmentsDuringMonth = filteredInvestments
+          const investmentsDuringMonth = userInvestments
             .filter((i: any) => i.platformId === platform.id)
             .filter((i: any) => {
               const d = new Date(i.date);
@@ -1157,7 +1148,7 @@ export async function registerRoutes(
             })
             .reduce((sum: number, i: any) => sum + Number(i.amount), 0);
           
-          const withdrawalsDuringMonth = filteredWithdrawals
+          const withdrawalsDuringMonth = userWithdrawals
             .filter((w: any) => w.platformId === platform.id)
             .filter((w: any) => {
               const d = new Date(w.date);
