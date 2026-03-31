@@ -28,10 +28,10 @@ export function formatCurrency(
       style: "currency",
       currency: currencyCode,
       minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 0,
     }).format(numValue);
   } catch {
-    return `${config.symbol}${numValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+    return `${config.symbol}${numValue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   }
 }
 
