@@ -51,6 +51,16 @@ interface HistoryPoint {
   invested: number;
 }
 
+interface PlatformMomEntry {
+  platformId: number;
+  name: string;
+  customIconUrl: string | null;
+  currentValue: number;
+  prevValue: number;
+  momChange: number;
+  momGrowthPercent: number;
+}
+
 interface InvestmentFlowResponse {
   months: Record<string, string | number>[];
   platforms: { name: string; color: string }[];
@@ -305,6 +315,17 @@ export default function Dashboard() {
     },
     placeholderData: (previousData) => previousData,
   });
+
+  const { data: allPlatformMomData } = useQuery<PlatformMomEntry[]>({
+    queryKey: ['/api/portfolio/platform-mom'],
+    queryFn: async () => {
+      const res = await fetch('/api/portfolio/platform-mom', { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch platform MoM");
+      return await res.json();
+    }
+  });
+
+  const platformMomData = allPlatformMomData?.filter(p => !excludedPlatforms.has(p.platformId));
 
   const { data: historyData } = useQuery<HistoryPoint[]>({
     queryKey: ["/api/portfolio/history", "all"],
@@ -702,25 +723,11 @@ export default function Dashboard() {
     return { items: itemsWithPct, sources, destinations, flows, currentDonut, targetDonut };
   }, [activePlatforms, platforms]);
 
-  const latestMonthMomData = useMemo(() => {
-    if (!platformBreakdownByMonth) return null;
-    const keys = Object.keys(platformBreakdownByMonth).sort();
-    if (keys.length === 0) return null;
-    const latestKey = keys[keys.length - 1];
-    return platformBreakdownByMonth[latestKey].filter(e => !excludedPlatforms.has(e.platformId));
-  }, [platformBreakdownByMonth, excludedPlatforms]);
-
   const momMap = useMemo(() => {
     const m = new Map<number, number>();
-    if (!platformBreakdownByMonth) return m;
-    const keys = Object.keys(platformBreakdownByMonth).sort();
-    if (keys.length === 0) return m;
-    const latestKey = keys[keys.length - 1];
-    for (const d of platformBreakdownByMonth[latestKey]) {
-      if (d.gainPct != null) m.set(d.platformId, d.gainPct);
-    }
+    if (platformMomData) for (const d of platformMomData) m.set(d.platformId, d.momGrowthPercent);
     return m;
-  }, [platformBreakdownByMonth]);
+  }, [platformMomData]);
 
   const tableData = useMemo(() => {
     if (!activePlatforms) return [];
@@ -983,33 +990,33 @@ export default function Dashboard() {
             <StatCard
               title="MoM Performance"
               value={(() => {
-                if (!latestMonthMomData || latestMonthMomData.length === 0) return "N/A";
-                const totalMomChange = latestMonthMomData.reduce((sum, p) => sum + p.gain, 0);
+                if (!platformMomData || platformMomData.length === 0) return "N/A";
+                const totalMomChange = platformMomData.reduce((sum, p) => sum + p.momChange, 0);
                 return formatCurrency(totalMomChange, currency);
               })()}
               trend={(() => {
-                if (!latestMonthMomData || latestMonthMomData.length === 0) return undefined;
-                const totalMomChange = latestMonthMomData.reduce((sum, p) => sum + p.gain, 0);
+                if (!platformMomData || platformMomData.length === 0) return undefined;
+                const totalMomChange = platformMomData.reduce((sum, p) => sum + p.momChange, 0);
                 return totalMomChange >= 0 ? "up" : "down";
               })()}
               trendValue={(() => {
-                if (!latestMonthMomData || latestMonthMomData.length === 0) return "";
-                const totalPrevValue = latestMonthMomData.reduce((sum, p) => sum + p.prevVal, 0);
-                const totalMomChange = latestMonthMomData.reduce((sum, p) => sum + p.gain, 0);
+                if (!platformMomData || platformMomData.length === 0) return "";
+                const totalPrevValue = platformMomData.reduce((sum, p) => sum + p.prevValue, 0);
+                const totalMomChange = platformMomData.reduce((sum, p) => sum + p.momChange, 0);
                 const growthPercent = totalPrevValue > 0 ? (totalMomChange / totalPrevValue) * 100 : 0;
                 return `${growthPercent.toFixed(1)}%`;
               })()}
               icon={TrendingUp}
               className={(() => {
-                if (!latestMonthMomData || latestMonthMomData.length === 0) return "border-l-muted";
-                const totalMomChange = latestMonthMomData.reduce((sum, p) => sum + p.gain, 0);
+                if (!platformMomData || platformMomData.length === 0) return "border-l-muted";
+                const totalMomChange = platformMomData.reduce((sum, p) => sum + p.momChange, 0);
                 return totalMomChange >= 0 ? "border-l-emerald-500" : "border-l-rose-500";
               })()}
-              platformBreakdown={latestMonthMomData?.map(p => ({
+              platformBreakdown={platformMomData?.map(p => ({
                 name: p.name,
-                value: `${(p.gainPct ?? 0) >= 0 ? '+' : ''}${(p.gainPct ?? 0).toFixed(1)}% (${p.gain >= 0 ? '+' : ''}${formatCurrency(p.gain, currency)})`,
-                iconUrl: activePlatforms?.find(ap => ap.id === p.platformId)?.customIconUrl ?? null,
-                sortValue: p.gainPct ?? 0
+                value: `${p.momGrowthPercent >= 0 ? '+' : ''}${p.momGrowthPercent.toFixed(1)}% (${p.momChange >= 0 ? '+' : ''}${formatCurrency(p.momChange, currency)})`,
+                iconUrl: p.customIconUrl,
+                sortValue: p.momGrowthPercent
               })) || []}
               data-testid="stat-mom-profit"
             />
@@ -1124,26 +1131,16 @@ export default function Dashboard() {
                 {chartData && chartData.length > 0 ? (() => {
                   const mappedData = chartData.map((h: any, i: number, arr: any[]) => {
                     const prev = arr[i - 1];
+                    const totalChange = i === 0 ? 0 : (h.value - prev.value) - (h.invested - prev.invested);
                     const gain = h.value - h.invested;
                     const gainPct = h.invested > 0 ? (gain / h.invested) * 100 : 0;
-                    let monthlyChange = 0;
-                    let monthlyChangePct = 0;
-                    if (i > 0 && platformBreakdownByMonth) {
-                      const yearMonth = h.date.substring(0, 7);
-                      const entries = platformBreakdownByMonth[yearMonth];
-                      if (entries) {
-                        const filtered = entries.filter((e: PlatformGain) => !excludedPlatforms.has(e.platformId));
-                        monthlyChange = filtered.reduce((s: number, e: PlatformGain) => s + e.gain, 0);
-                        const totalPrevVal = filtered.reduce((s: number, e: PlatformGain) => s + e.prevVal, 0);
-                        monthlyChangePct = totalPrevVal > 0 ? (monthlyChange / totalPrevVal) * 100 : 0;
-                      }
-                    }
+                    const monthlyChangePct = (i > 0 && prev.value > 0) ? (totalChange / prev.value) * 100 : 0;
                     return {
                       ...h,
                       timestamp: new Date(h.date).getTime(),
                       gain,
                       gainPct,
-                      monthlyChange,
+                      monthlyChange: totalChange,
                       monthlyChangePct,
                       valueChange: i === 0 ? null : h.value - prev.value,
                       investedChange: i === 0 ? null : h.invested - prev.invested,
