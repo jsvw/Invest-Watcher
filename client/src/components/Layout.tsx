@@ -134,8 +134,8 @@ export function Layout({ children, sidebarExtra }: { children: React.ReactNode; 
         {/* Fixed bottom section */}
         <div className="p-6 border-t space-y-4 flex-shrink-0">
           {user && (
-            <div className="flex items-center justify-between">
-              <div className="text-sm truncate">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm min-w-0">
                 <div className="font-medium">{user.name || "User"}</div>
                 <div className="text-xs text-muted-foreground truncate">{user.email}</div>
               </div>
