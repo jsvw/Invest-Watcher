@@ -945,7 +945,7 @@ export default function Dashboard() {
           )}
 
           {/* Stat cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <StatCard
               title="Total Portfolio Value"
               value={formatCurrency(totalValue, currency)}
@@ -985,6 +985,24 @@ export default function Dashboard() {
                 return { name: p.name, value: `${profit >= 0 ? '+' : ''}${formatCurrency(profit, currency)}`, percent: `${r >= 0 ? '+' : ''}${r.toFixed(1)}%`, iconUrl: (p as any).customIconUrl, sortValue: profit };
               })}
               data-testid="stat-net-profit"
+            />
+            <KpiCard
+              label="Total ROI"
+              value={kpis ? fmtPct(kpis.totalROI) : "—"}
+              sub="All-time return on invested capital"
+              icon={<Percent className="w-5 h-5 text-muted-foreground" />}
+              positive={kpis ? kpis.totalROI >= 0 : undefined}
+              chartData={roiOverTimeData.map(p => ({ label: p.label, value: p.roi }))}
+              currency={currency}
+            />
+            <KpiCard
+              label="Ann. Return"
+              value={kpis?.cagr != null ? fmtPct(kpis.cagr) : "—"}
+              sub={kpis?.twr != null ? `${fmtPct(kpis.twr)} cumulative · cash-flow adjusted` : "Time-weighted, annualized"}
+              icon={<TrendingUp className="w-5 h-5 text-muted-foreground" />}
+              positive={kpis?.cagr != null ? kpis.cagr >= 0 : undefined}
+              chartData={roiOverTimeData.map(p => ({ label: p.label, value: p.annualized }))}
+              currency={currency}
             />
             <StatCard
               title="MoM Performance"
@@ -1226,30 +1244,6 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
-
-          {/* ─────────────────── ANALYTICS SECTION ─────────────────── */}
-
-          {/* Analytics KPI Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard
-              label="Total ROI"
-              value={kpis ? fmtPct(kpis.totalROI) : "—"}
-              sub="All-time return on invested capital"
-              icon={<Percent className="w-5 h-5 text-muted-foreground" />}
-              positive={kpis ? kpis.totalROI >= 0 : undefined}
-              chartData={roiOverTimeData.map(p => ({ label: p.label, value: p.roi }))}
-              currency={currency}
-            />
-            <KpiCard
-              label="Ann. Return"
-              value={kpis?.cagr != null ? fmtPct(kpis.cagr) : "—"}
-              sub={kpis?.twr != null ? `${fmtPct(kpis.twr)} cumulative · cash-flow adjusted` : "Time-weighted, annualized"}
-              icon={<TrendingUp className="w-5 h-5 text-muted-foreground" />}
-              positive={kpis?.cagr != null ? kpis.cagr >= 0 : undefined}
-              chartData={roiOverTimeData.map(p => ({ label: p.label, value: p.annualized }))}
-              currency={currency}
-            />
-          </div>
 
           {/* Combined Heatmaps */}
           <Card data-testid="heatmaps-card">
