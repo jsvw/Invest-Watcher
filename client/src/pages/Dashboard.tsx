@@ -499,15 +499,24 @@ export default function Dashboard() {
   const chartData = useMemo(() => {
     if (!history || history.length === 0) return [];
 
+    const latestKey = format(new Date(history[history.length - 1].date), 'yyyy-MM');
+
     const monthMap = new Map<string, { value: number; invested: number; date: string; dist: number }>();
     for (const h of history) {
       const d = new Date(h.date);
       const key = format(d, 'yyyy-MM');
-      const target = new Date(d.getFullYear(), d.getMonth(), 10);
-      const dist = Math.abs(d.getTime() - target.getTime());
+      const isLatestMonth = key === latestKey;
       const existing = monthMap.get(key);
-      if (!existing || dist < existing.dist) {
-        monthMap.set(key, { value: h.value, invested: h.invested, date: h.date, dist });
+      if (isLatestMonth) {
+        if (!existing || d.getTime() > new Date(existing.date).getTime()) {
+          monthMap.set(key, { value: h.value, invested: h.invested, date: h.date, dist: 0 });
+        }
+      } else {
+        const target = new Date(d.getFullYear(), d.getMonth(), 10);
+        const dist = Math.abs(d.getTime() - target.getTime());
+        if (!existing || dist < existing.dist) {
+          monthMap.set(key, { value: h.value, invested: h.invested, date: h.date, dist });
+        }
       }
     }
 
