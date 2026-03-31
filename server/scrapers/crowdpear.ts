@@ -364,106 +364,106 @@ export async function scrapeCrowdPear(email: string, password: string, gmailAppP
 
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    const balanceResult = await page.evaluate(() => {
-      function extractNumber(text: string | null): number | null {
+    const balanceResult = await page.evaluate(`(function() {
+      var extractNumber = function(text) {
         if (!text) return null;
-        let cleaned = text.replace(/[^0-9.,-]/g, "");
-        if (cleaned.includes(",") && cleaned.includes(".")) {
+        var cleaned = text.replace(/[^0-9.,-]/g, "");
+        if (cleaned.indexOf(",") > -1 && cleaned.indexOf(".") > -1) {
           if (cleaned.lastIndexOf(",") > cleaned.lastIndexOf(".")) {
-            cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+            cleaned = cleaned.replace(/\\./g, "").replace(",", ".");
           } else {
             cleaned = cleaned.replace(/,/g, "");
           }
-        } else if (cleaned.includes(",")) {
-          const parts = cleaned.split(",");
+        } else if (cleaned.indexOf(",") > -1) {
+          var parts = cleaned.split(",");
           if (parts.length === 2 && parts[1].length <= 2) {
             cleaned = cleaned.replace(",", ".");
           } else {
             cleaned = cleaned.replace(/,/g, "");
           }
         }
-        const match = cleaned.match(/-?\d+\.?\d*/);
+        var match = cleaned.match(/-?\\d+\\.?\\d*/);
         return match ? parseFloat(match[0]) : null;
-      }
+      };
 
-      function findLabelledValue(labelPatterns: string[]): number | null {
-        const allEls = Array.from(document.querySelectorAll("*"));
-        for (const el of allEls) {
+      var findLabelledValue = function(labelPatterns) {
+        var allEls = Array.from(document.querySelectorAll("*"));
+        for (var i = 0; i < allEls.length; i++) {
+          var el = allEls[i];
           if (el.children.length > 5) continue;
-          const elText = (el.textContent || "").trim().toLowerCase();
-          if (!labelPatterns.some(p => elText.includes(p))) continue;
-
-          const prev = el.previousElementSibling;
-          if (prev) { const pv = extractNumber(prev.textContent); if (pv !== null) return pv; }
-          const next = el.nextElementSibling;
-          if (next) { const nv = extractNumber(next.textContent); if (nv !== null) return nv; }
+          var elText = (el.textContent || "").trim().toLowerCase();
+          var matched = false;
+          for (var p = 0; p < labelPatterns.length; p++) {
+            if (elText.indexOf(labelPatterns[p]) > -1) { matched = true; break; }
+          }
+          if (!matched) continue;
+          var prev = el.previousElementSibling;
+          if (prev) { var pv = extractNumber(prev.textContent); if (pv !== null) return pv; }
+          var next = el.nextElementSibling;
+          if (next) { var nv = extractNumber(next.textContent); if (nv !== null) return nv; }
           if (el.parentElement) {
-            const parentPrev = el.parentElement.previousElementSibling;
-            if (parentPrev) { const ppv = extractNumber(parentPrev.textContent); if (ppv !== null) return ppv; }
-            const parentNext = el.parentElement.nextElementSibling;
-            if (parentNext) { const pnv = extractNumber(parentNext.textContent); if (pnv !== null) return pnv; }
-            for (const sib of Array.from(el.parentElement.children)) {
-              if (sib !== el) { const sv = extractNumber(sib.textContent); if (sv !== null) return sv; }
+            var parentPrev = el.parentElement.previousElementSibling;
+            if (parentPrev) { var ppv = extractNumber(parentPrev.textContent); if (ppv !== null) return ppv; }
+            var parentNext = el.parentElement.nextElementSibling;
+            if (parentNext) { var pnv = extractNumber(parentNext.textContent); if (pnv !== null) return pnv; }
+            var sibs = Array.from(el.parentElement.children);
+            for (var s = 0; s < sibs.length; s++) {
+              if (sibs[s] !== el) { var sv = extractNumber(sibs[s].textContent); if (sv !== null) return sv; }
             }
           }
         }
         return null;
-      }
+      };
 
-      // 1. Find the main invested/portfolio balance
-      let mainBalance: number | null = null;
-      const balanceEl = document.querySelector(".Balance_balance__-D0Zw");
+      var mainBalance = null;
+      var balanceEl = document.querySelector(".Balance_balance__-D0Zw");
       if (balanceEl) mainBalance = extractNumber(balanceEl.textContent);
-
       if (mainBalance === null) {
-        const balanceEls = document.querySelectorAll('[class*="Balance_balance"]');
-        for (const el of Array.from(balanceEls)) {
-          const n = extractNumber((el as HTMLElement).textContent);
-          if (n !== null && n > 0) { mainBalance = n; break; }
+        var balanceEls = document.querySelectorAll('[class*="Balance_balance"]');
+        for (var bi = 0; bi < balanceEls.length; bi++) {
+          var bn = extractNumber(balanceEls[bi].textContent);
+          if (bn !== null && bn > 0) { mainBalance = bn; break; }
         }
       }
       if (mainBalance === null) {
         mainBalance = findLabelledValue(["total balance", "portfolio value", "invested", "my investments"]);
       }
       if (mainBalance === null) {
-        const antEls = document.querySelectorAll(".ant-typography");
-        const candidates: number[] = [];
-        for (const el of Array.from(antEls)) {
-          const txt = (el as HTMLElement).textContent || "";
-          if (/[\d.,]+/.test(txt) && (txt.includes("\u20ac") || txt.includes("EUR"))) {
-            const amount = extractNumber(txt);
-            if (amount !== null && amount > 0) candidates.push(amount);
+        var antEls = document.querySelectorAll(".ant-typography");
+        var candidates = [];
+        for (var ai = 0; ai < antEls.length; ai++) {
+          var txt = antEls[ai].textContent || "";
+          if (/[\\d.,]+/.test(txt) && (txt.indexOf("\\u20ac") > -1 || txt.indexOf("EUR") > -1)) {
+            var amt = extractNumber(txt);
+            if (amt !== null && amt > 0) candidates.push(amt);
           }
         }
-        if (candidates.length > 0) mainBalance = candidates.sort((a, b) => b - a)[0];
+        if (candidates.length > 0) {
+          candidates.sort(function(a, b) { return b - a; });
+          mainBalance = candidates[0];
+        }
       }
       if (mainBalance === null) mainBalance = 0;
 
-      // 2. Find "Available for investment" cash balance
-      let availableBalance: number | null = findLabelledValue([
-        "available for investment",
-        "available to invest",
-        "available funds",
-        "cash available",
-        "available balance",
+      var availableBalance = findLabelledValue([
+        "available for investment", "available to invest",
+        "available funds", "cash available", "available balance"
       ]);
-
       if (availableBalance === null) {
-        const pageText = document.body.innerText || "";
-        const patterns = [
-          /([\d.,]+)\s*[\u20ac]?\s*\n?\s*Available\s+for\s+investment/i,
-          /[\u20ac]\s*([\d.,]+)\s*\n?\s*Available\s+for\s+investment/i,
-          /Available\s+for\s+investment[\s\S]{0,30}[\u20ac]?\s*([\d.,]+)/i,
+        var pageText = document.body.innerText || "";
+        var pats = [
+          new RegExp("([\\\\d.,]+)\\\\s*\\\\n?\\\\s*Available\\\\s+for\\\\s+investment", "i"),
+          new RegExp("Available\\\\s+for\\\\s+investment[\\\\s\\\\S]{0,30}([\\\\d.,]+)", "i")
         ];
-        for (const pattern of patterns) {
-          const m = pageText.match(pattern);
-          if (m) { const av = extractNumber(m[1]); if (av !== null) { availableBalance = av; break; } }
+        for (var pi = 0; pi < pats.length; pi++) {
+          var pm = pageText.match(pats[pi]);
+          if (pm) { var av = extractNumber(pm[1]); if (av !== null) { availableBalance = av; break; } }
         }
       }
       if (availableBalance === null) availableBalance = 0;
 
-      return { mainBalance, availableBalance };
-    });
+      return { mainBalance: mainBalance, availableBalance: availableBalance };
+    })()`) as unknown as { mainBalance: number; availableBalance: number };
 
     const totalBalance = balanceResult.mainBalance + balanceResult.availableBalance;
     console.log(`[CrowdPear Scraper] mainBalance=${balanceResult.mainBalance} availableBalance=${balanceResult.availableBalance}`);
