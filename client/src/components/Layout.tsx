@@ -164,27 +164,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* Fixed bottom section */}
         <div className="p-6 border-t space-y-4 flex-shrink-0">
           {user && (
-            <div className="flex items-center justify-between">
-              <div className="text-sm truncate">
-                <div className="font-medium">{user.name || "User"}</div>
-                <div className="text-xs text-muted-foreground truncate">{user.email}</div>
-              </div>
-              <div className="flex items-center gap-1">
-                <Link href="/settings">
-                  <Button variant="ghost" size="icon" title="Settings" data-testid="button-settings">
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                </Link>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleLogout}
-                  title="Log out"
-                  data-testid="button-logout"
-                >
-                  <LogOut className="h-4 w-4" />
+            <div className="flex items-center gap-1">
+              <Link href="/settings">
+                <Button variant="ghost" size="icon" title="Settings" data-testid="button-settings">
+                  <Settings className="h-4 w-4" />
                 </Button>
-              </div>
+              </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleLogout}
+                title="Log out"
+                data-testid="button-logout"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
             </div>
           )}
           <a
