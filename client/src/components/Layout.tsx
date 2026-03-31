@@ -10,8 +10,9 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { AddPlatformDialog } from "@/components/AddPlatformDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-export function Layout({ children, sidebarExtra, platformFilter }: {
+export function Layout({ children, sidebarTop, sidebarExtra, platformFilter }: {
   children: React.ReactNode;
+  sidebarTop?: React.ReactNode;
   sidebarExtra?: React.ReactNode;
   platformFilter?: { excludedPlatforms: Set<number>; onToggle: (id: number) => void };
 }) {
@@ -77,8 +78,14 @@ export function Layout({ children, sidebarExtra, platformFilter }: {
           )}
 
 
+          {sidebarTop && (
+            <div className="mb-3">
+              {sidebarTop}
+            </div>
+          )}
+
           {/* Platform icon grid */}
-          <div className="mt-6">
+          <div className="mt-2">
             <div className="grid grid-cols-3 gap-1.5">
               {platforms?.map((p) => {
                 const stale = isPlatformStale(p.lastValuationDate);

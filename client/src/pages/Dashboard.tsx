@@ -946,7 +946,7 @@ export default function Dashboard() {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <Layout sidebarExtra={filterSidebar} platformFilter={{ excludedPlatforms, onToggle: togglePlatform }}>
+    <Layout sidebarTop={filterSidebar} platformFilter={{ excludedPlatforms, onToggle: togglePlatform }}>
       <div className="space-y-6 pb-12">
 
           {/* Header */}
