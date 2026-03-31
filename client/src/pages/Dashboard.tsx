@@ -231,6 +231,7 @@ export default function Dashboard() {
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
   const [chartType, setChartType] = useState<"line" | "bar">("line");
+  const [chartValueMode, setChartValueMode] = useState<"value" | "pct">("value");
 
   // ── Allocation targets state ─────────────────────────────────────────────
   const [localTargets, setLocalTargets] = useState<Record<number, string>>({});
@@ -795,6 +796,8 @@ export default function Dashboard() {
       <div className="rounded-xl border border-border bg-card shadow-lg px-4 py-3 text-sm min-w-[200px]">
         <p className="font-semibold text-foreground mb-2">{label ? format(new Date(label), 'MMM dd, yyyy') : ''}</p>
         {payload.map((entry: any) => {
+          const isPct = entry.dataKey === 'gainPct' || entry.dataKey === 'monthlyChangePct';
+          const isSigned = entry.dataKey === 'monthlyChange' || entry.dataKey === 'gain' || isPct;
           const deltaKey = entry.dataKey === 'value' ? 'valueChange'
             : entry.dataKey === 'invested' ? 'investedChange'
             : entry.dataKey === 'gain' ? 'gainChange'
@@ -808,9 +811,11 @@ export default function Dashboard() {
               </div>
               <div className="text-right">
                 <span className="font-semibold text-foreground">
-                  {entry.dataKey === 'monthlyChange' || entry.dataKey === 'gain'
-                    ? `${entry.value >= 0 ? '+' : ''}${formatCurrency(entry.value, currency)}`
-                    : formatCurrency(entry.value, currency)}
+                  {isPct
+                    ? `${entry.value >= 0 ? '+' : ''}${fmtPct(entry.value)}`
+                    : isSigned
+                      ? `${entry.value >= 0 ? '+' : ''}${formatCurrency(entry.value, currency)}`
+                      : formatCurrency(entry.value, currency)}
                 </span>
                 {delta != null && delta !== 0 && (
                   <span className={cn("ml-2 text-xs font-medium", delta >= 0 ? "text-emerald-500" : "text-rose-500")}>
@@ -1093,25 +1098,41 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              <Tabs value={chartView} onValueChange={v => setChartView(v as any)} className="mb-4">
-                <TabsList>
-                  <TabsTrigger value="overview" data-testid="tab-chart-overview">Value Overview</TabsTrigger>
-                  <TabsTrigger value="profit" data-testid="tab-chart-profit">Profit/Loss</TabsTrigger>
-                  <TabsTrigger value="monthly" data-testid="tab-chart-monthly">Monthly Growth</TabsTrigger>
-                  <TabsTrigger value="all" data-testid="tab-chart-all">All</TabsTrigger>
-                </TabsList>
-              </Tabs>
+              <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                <Tabs value={chartView} onValueChange={v => setChartView(v as any)}>
+                  <TabsList>
+                    <TabsTrigger value="overview" data-testid="tab-chart-overview">Value Overview</TabsTrigger>
+                    <TabsTrigger value="profit" data-testid="tab-chart-profit">Profit/Loss</TabsTrigger>
+                    <TabsTrigger value="monthly" data-testid="tab-chart-monthly">Monthly Growth</TabsTrigger>
+                    <TabsTrigger value="all" data-testid="tab-chart-all">All</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                {chartView !== "overview" && (
+                  <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
+                    <button onClick={() => setChartValueMode("value")} className={cn("px-2.5 py-1.5 transition-colors", chartValueMode === "value" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-chart-mode-value">
+                      {getCurrencySymbol(currency)}
+                    </button>
+                    <button onClick={() => setChartValueMode("pct")} className={cn("px-2.5 py-1.5 transition-colors", chartValueMode === "pct" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-chart-mode-pct">
+                      %
+                    </button>
+                  </div>
+                )}
+              </div>
               <div className="h-[400px] w-full">
                 {chartData && chartData.length > 0 ? (() => {
                   const mappedData = chartData.map((h: any, i: number, arr: any[]) => {
                     const prev = arr[i - 1];
                     const totalChange = i === 0 ? 0 : (h.value - prev.value) - (h.invested - prev.invested);
                     const gain = h.value - h.invested;
+                    const gainPct = h.invested > 0 ? (gain / h.invested) * 100 : 0;
+                    const monthlyChangePct = (i > 0 && prev.value > 0) ? (totalChange / prev.value) * 100 : 0;
                     return {
                       ...h,
                       timestamp: new Date(h.date).getTime(),
                       gain,
+                      gainPct,
                       monthlyChange: totalChange,
+                      monthlyChangePct,
                       valueChange: i === 0 ? null : h.value - prev.value,
                       investedChange: i === 0 ? null : h.invested - prev.invested,
                       gainChange: i === 0 ? null : (h.value - h.invested) - (prev.value - prev.invested),
@@ -1144,6 +1165,11 @@ export default function Dashboard() {
                     />
                   );
 
+                  const profitKey = chartValueMode === "pct" ? "gainPct" : "gain";
+                  const monthlyKey = chartValueMode === "pct" ? "monthlyChangePct" : "monthlyChange";
+                  const profitAxisFmt = (v: number) => chartValueMode === "pct" ? fmtPct(v) : formatAxisValue(v, true);
+                  const monthlyAxisFmt = (v: number) => chartValueMode === "pct" ? fmtPct(v) : formatAxisValue(v, true);
+
                   if (chartType === "bar") {
                     return (
                       <ResponsiveContainer width="100%" height="100%">
@@ -1154,7 +1180,7 @@ export default function Dashboard() {
                             <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={value => formatAxisValue(value)} domain={[0, 'auto']} />
                           )}
                           {(chartView === "profit" || chartView === "monthly") && (
-                            <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={value => formatAxisValue(value, true)} domain={['auto', 'auto']} />
+                            <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={chartView === "profit" ? profitAxisFmt : monthlyAxisFmt} domain={['auto', 'auto']} />
                           )}
                           <Tooltip content={<ChartTooltip />} />
                           <Legend verticalAlign="top" height={36} />
@@ -1170,12 +1196,12 @@ export default function Dashboard() {
                             </>
                           )}
                           {chartView === "profit" && (
-                            <Bar dataKey="gain" name="Profit/Loss" yAxisId="left" isAnimationActive={false} radius={[3, 3, 3, 3]}>
+                            <Bar dataKey={profitKey} name="Profit/Loss" yAxisId="left" isAnimationActive={false} radius={[3, 3, 3, 3]}>
                               {mappedData.map((entry: any, i: number) => <Cell key={i} fill={entry.gain >= 0 ? '#10b981' : '#ef4444'} />)}
                             </Bar>
                           )}
                           {chartView === "monthly" && (
-                            <Bar dataKey="monthlyChange" name="Monthly Growth" yAxisId="left" isAnimationActive={false} radius={[3, 3, 3, 3]}>
+                            <Bar dataKey={monthlyKey} name="Monthly Growth" yAxisId="left" isAnimationActive={false} radius={[3, 3, 3, 3]}>
                               {mappedData.map((entry: any, i: number) => <Cell key={i} fill={entry.monthlyChange >= 0 ? '#10b981' : '#ef4444'} />)}
                             </Bar>
                           )}
@@ -1193,10 +1219,10 @@ export default function Dashboard() {
                           <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={value => formatAxisValue(value)} domain={['auto', 'auto']} />
                         )}
                         {(chartView === "profit" || chartView === "all") && (
-                          <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={value => formatAxisValue(value, true)} domain={['auto', 'auto']} />
+                          <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={profitAxisFmt} domain={['auto', 'auto']} />
                         )}
                         {(chartView === "monthly" || chartView === "all") && (
-                          <YAxis yAxisId="monthly" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={value => formatAxisValue(value, true)} domain={['auto', 'auto']} />
+                          <YAxis yAxisId="monthly" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={monthlyAxisFmt} domain={['auto', 'auto']} />
                         )}
                         <Tooltip content={<ChartTooltip />} />
                         <Legend verticalAlign="top" height={36} />
@@ -1207,10 +1233,10 @@ export default function Dashboard() {
                           </>
                         )}
                         {(chartView === "profit" || chartView === "all") && (
-                          <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
+                          <Line type="monotone" dataKey={profitKey} name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 4 }} isAnimationActive={false} />
                         )}
                         {(chartView === "monthly" || chartView === "all") && (
-                          <Line type="monotone" dataKey="monthlyChange" name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 7 }} isAnimationActive={false} />
+                          <Line type="monotone" dataKey={monthlyKey} name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 7 }} isAnimationActive={false} />
                         )}
                       </LineChart>
                     </ResponsiveContainer>
