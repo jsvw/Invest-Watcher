@@ -1731,7 +1731,7 @@ export default function Dashboard() {
 
         {/* ── Sticky right filter panel ─────────────────────────────────── */}
         {platforms && platforms.length > 0 && (
-          <div className="sticky top-8 w-48 shrink-0 space-y-3" data-testid="platform-filter-bar">
+          <div className="sticky top-8 w-48 shrink-0 space-y-3 bg-card border border-border rounded-xl p-3 shadow-sm" data-testid="platform-filter-bar">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               <Filter className="w-3.5 h-3.5" />
               Platforms
