@@ -1338,142 +1338,6 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Platform Performance + Allocation Targets */}
-          {platforms && platforms.length > 0 && (() => {
-            const totalPortfolioValue = platforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
-            const totalTargetPct = platforms.reduce((s, p) => {
-              const t = localTargets[p.id];
-              return s + (t !== '' && t != null ? Number(t) : 0);
-            }, 0);
-            const totalRequired = platforms.reduce((s, p) => {
-              const t = localTargets[p.id];
-              if (t === '' || t == null) return s;
-              const targetVal = (Number(t) / 100) * totalPortfolioValue;
-              const needed = targetVal - (Number(p.currentValue) || 0);
-              return needed > 0 ? s + needed : s;
-            }, 0);
-
-            return (
-              <Card className="shadow-md">
-                <CardHeader>
-                  <div className="flex items-center justify-between flex-wrap gap-3">
-                    <div className="flex items-center gap-2">
-                      <Target className="w-5 h-5 text-primary" />
-                      <div>
-                        <CardTitle>Platform Performance</CardTitle>
-                        <CardDescription>Value, ROI and allocation targets per platform</CardDescription>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className={cn("text-sm font-semibold px-3 py-1 rounded-full",
-                        Math.abs(totalTargetPct - 100) < 0.1 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                        : totalTargetPct > 100 ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
-                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                      )}>
-                        {totalTargetPct.toFixed(1)}% / 100%
-                      </div>
-                      <Button size="sm" onClick={() => saveTargetsMutation.mutate()} disabled={saveTargetsMutation.isPending} data-testid="button-save-targets">
-                        {saveTargetsMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />}
-                        Save Targets
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="divide-y divide-border">
-                    {platforms.map(p => {
-                      const val = Number(p.currentValue) || 0;
-                      const invested = Number(p.totalInvested) || 0;
-                      const gain = val - invested;
-                      const gainPct = invested > 0 ? (gain / invested) * 100 : 0;
-                      const currentPct = totalPortfolioValue > 0 ? (val / totalPortfolioValue) * 100 : 0;
-                      const targetStr = localTargets[p.id] ?? '';
-                      const targetNum = targetStr !== '' ? Number(targetStr) : null;
-                      const targetVal = targetNum != null ? (targetNum / 100) * totalPortfolioValue : null;
-                      const required = targetVal != null ? targetVal - val : null;
-                      const delta = targetNum != null ? targetNum - currentPct : null;
-
-                      return (
-                        <div key={p.id} className="flex items-center gap-4 px-6 py-3 hover:bg-muted/20 transition-colors flex-wrap">
-                          <Link href={`/platforms/${encodeURIComponent(p.name.toLowerCase().replace(/\s+/g, '-'))}`} className="flex items-center gap-3 group flex-1 min-w-[140px]">
-                            <div className="group-hover:scale-110 transition-transform">
-                              <PlatformIcon icon={(p as any).icon} customIconUrl={(p as any).customIconUrl} color={p.color} name={p.name} size="md" />
-                            </div>
-                            <div>
-                              <div className="font-semibold text-sm group-hover:text-primary transition-colors">{p.name}</div>
-                              <div className="text-xs text-muted-foreground">{p.category}</div>
-                            </div>
-                          </Link>
-                          <div className="text-right min-w-[100px]">
-                            <div className="text-sm font-medium">{formatCurrency(val, currency)}</div>
-                            <div className={cn("text-xs font-medium", gainPct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
-                              {gainPct >= 0 ? '+' : ''}{gainPct.toFixed(2)}%
-                            </div>
-                          </div>
-                          <div className="text-xs text-muted-foreground min-w-[55px] text-right">
-                            {currentPct.toFixed(1)}% alloc
-                          </div>
-                          <div className="flex items-center gap-2 min-w-[130px]">
-                            <Input
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.1"
-                              value={targetStr}
-                              placeholder="—"
-                              className="w-20 h-8 text-sm text-right"
-                              data-testid={`input-target-${p.id}`}
-                              onChange={e => {
-                                setLocalTargets(prev => ({ ...prev, [p.id]: e.target.value }));
-                                setTargetsDirty(true);
-                              }}
-                            />
-                            <span className="text-sm text-muted-foreground">%</span>
-                          </div>
-                          {delta != null ? (
-                            <div className={cn("flex items-center gap-1 text-xs font-medium min-w-[70px]",
-                              delta >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-                            )}>
-                              {delta >= 0 ? <ArrowUpCircle className="w-3.5 h-3.5" /> : <ArrowDownCircle className="w-3.5 h-3.5" />}
-                              {delta >= 0 ? '+' : ''}{delta.toFixed(1)}%
-                            </div>
-                          ) : (
-                            <div className="min-w-[70px]" />
-                          )}
-                          <div className="text-right min-w-[110px]">
-                            {required != null ? (
-                              required > 0.005 ? (
-                                <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                                  +{formatCurrency(required, currency)}
-                                </div>
-                              ) : required < -0.005 ? (
-                                <div className="text-sm font-semibold text-rose-600 dark:text-rose-400">
-                                  {formatCurrency(required, currency)} over
-                                </div>
-                              ) : (
-                                <div className="text-sm text-muted-foreground">On target</div>
-                              )
-                            ) : (
-                              <div className="text-xs text-muted-foreground">No target set</div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {totalRequired > 0 && (
-                    <div className="px-6 py-4 bg-muted/30 border-t border-border flex items-center justify-between flex-wrap gap-2">
-                      <span className="text-sm text-muted-foreground">Total additional investment needed</span>
-                      <span className="font-bold text-base text-emerald-600 dark:text-emerald-400">
-                        +{formatCurrency(totalRequired, currency)}
-                      </span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })()}
-
           {/* ─────────────────── ANALYTICS SECTION ─────────────────── */}
 
           {/* Analytics KPI Cards */}
@@ -1857,6 +1721,142 @@ export default function Dashboard() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Platform Performance + Allocation Targets */}
+          {platforms && platforms.length > 0 && (() => {
+            const totalPortfolioValue = platforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
+            const totalTargetPct = platforms.reduce((s, p) => {
+              const t = localTargets[p.id];
+              return s + (t !== '' && t != null ? Number(t) : 0);
+            }, 0);
+            const totalRequired = platforms.reduce((s, p) => {
+              const t = localTargets[p.id];
+              if (t === '' || t == null) return s;
+              const targetVal = (Number(t) / 100) * totalPortfolioValue;
+              const needed = targetVal - (Number(p.currentValue) || 0);
+              return needed > 0 ? s + needed : s;
+            }, 0);
+
+            return (
+              <Card className="shadow-md">
+                <CardHeader>
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-2">
+                      <Target className="w-5 h-5 text-primary" />
+                      <div>
+                        <CardTitle>Platform Performance</CardTitle>
+                        <CardDescription>Value, ROI and allocation targets per platform</CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className={cn("text-sm font-semibold px-3 py-1 rounded-full",
+                        Math.abs(totalTargetPct - 100) < 0.1 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                        : totalTargetPct > 100 ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
+                        : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                      )}>
+                        {totalTargetPct.toFixed(1)}% / 100%
+                      </div>
+                      <Button size="sm" onClick={() => saveTargetsMutation.mutate()} disabled={saveTargetsMutation.isPending} data-testid="button-save-targets">
+                        {saveTargetsMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />}
+                        Save Targets
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-border">
+                    {platforms.map(p => {
+                      const val = Number(p.currentValue) || 0;
+                      const invested = Number(p.totalInvested) || 0;
+                      const gain = val - invested;
+                      const gainPct = invested > 0 ? (gain / invested) * 100 : 0;
+                      const currentPct = totalPortfolioValue > 0 ? (val / totalPortfolioValue) * 100 : 0;
+                      const targetStr = localTargets[p.id] ?? '';
+                      const targetNum = targetStr !== '' ? Number(targetStr) : null;
+                      const targetVal = targetNum != null ? (targetNum / 100) * totalPortfolioValue : null;
+                      const required = targetVal != null ? targetVal - val : null;
+                      const delta = targetNum != null ? targetNum - currentPct : null;
+
+                      return (
+                        <div key={p.id} className="flex items-center gap-4 px-6 py-3 hover:bg-muted/20 transition-colors flex-wrap">
+                          <Link href={`/platforms/${encodeURIComponent(p.name.toLowerCase().replace(/\s+/g, '-'))}`} className="flex items-center gap-3 group flex-1 min-w-[140px]">
+                            <div className="group-hover:scale-110 transition-transform">
+                              <PlatformIcon icon={(p as any).icon} customIconUrl={(p as any).customIconUrl} color={p.color} name={p.name} size="md" />
+                            </div>
+                            <div>
+                              <div className="font-semibold text-sm group-hover:text-primary transition-colors">{p.name}</div>
+                              <div className="text-xs text-muted-foreground">{p.category}</div>
+                            </div>
+                          </Link>
+                          <div className="text-right min-w-[100px]">
+                            <div className="text-sm font-medium">{formatCurrency(val, currency)}</div>
+                            <div className={cn("text-xs font-medium", gainPct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                              {gainPct >= 0 ? '+' : ''}{gainPct.toFixed(2)}%
+                            </div>
+                          </div>
+                          <div className="text-xs text-muted-foreground min-w-[55px] text-right">
+                            {currentPct.toFixed(1)}% alloc
+                          </div>
+                          <div className="flex items-center gap-2 min-w-[130px]">
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.1"
+                              value={targetStr}
+                              placeholder="—"
+                              className="w-20 h-8 text-sm text-right"
+                              data-testid={`input-target-${p.id}`}
+                              onChange={e => {
+                                setLocalTargets(prev => ({ ...prev, [p.id]: e.target.value }));
+                                setTargetsDirty(true);
+                              }}
+                            />
+                            <span className="text-sm text-muted-foreground">%</span>
+                          </div>
+                          {delta != null ? (
+                            <div className={cn("flex items-center gap-1 text-xs font-medium min-w-[70px]",
+                              delta >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                            )}>
+                              {delta >= 0 ? <ArrowUpCircle className="w-3.5 h-3.5" /> : <ArrowDownCircle className="w-3.5 h-3.5" />}
+                              {delta >= 0 ? '+' : ''}{delta.toFixed(1)}%
+                            </div>
+                          ) : (
+                            <div className="min-w-[70px]" />
+                          )}
+                          <div className="text-right min-w-[110px]">
+                            {required != null ? (
+                              required > 0.005 ? (
+                                <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                                  +{formatCurrency(required, currency)}
+                                </div>
+                              ) : required < -0.005 ? (
+                                <div className="text-sm font-semibold text-rose-600 dark:text-rose-400">
+                                  {formatCurrency(required, currency)} over
+                                </div>
+                              ) : (
+                                <div className="text-sm text-muted-foreground">On target</div>
+                              )
+                            ) : (
+                              <div className="text-xs text-muted-foreground">No target set</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {totalRequired > 0 && (
+                    <div className="px-6 py-4 bg-muted/30 border-t border-border flex items-center justify-between flex-wrap gap-2">
+                      <span className="text-sm text-muted-foreground">Total additional investment needed</span>
+                      <span className="font-bold text-base text-emerald-600 dark:text-emerald-400">
+                        +{formatCurrency(totalRequired, currency)}
+                      </span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()}
 
       </div>
     </Layout>
