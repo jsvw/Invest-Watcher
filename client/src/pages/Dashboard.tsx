@@ -862,20 +862,16 @@ export default function Dashboard() {
   // ── Sidebar filter panel ─────────────────────────────────────────────────
   const filterSidebar = platforms && platforms.length > 0 ? (
     <div data-testid="platform-filter-bar">
-      <div className="flex items-center justify-between mb-2 px-1">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+      <div className="flex items-center gap-0.5 px-1">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1 mr-auto">
           <Filter className="w-3 h-3" />
           Filter
         </p>
-        <div className="flex items-center gap-0.5">
-          <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs" onClick={() => setExcludedPlatforms(new Set())} data-testid="filter-select-all">All</Button>
-          <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs" onClick={() => setExcludedPlatforms(new Set(platforms.map(p => p.id)))} data-testid="filter-deselect-all">None</Button>
-        </div>
-      </div>
-      <div className="pt-1 border-t">
+        <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs" onClick={() => setExcludedPlatforms(new Set())} data-testid="filter-select-all">All</Button>
+        <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs" onClick={() => setExcludedPlatforms(new Set(platforms.map(p => p.id)))} data-testid="filter-deselect-all">None</Button>
         <Popover open={filterPresetsOpen} onOpenChange={setFilterPresetsOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="w-full h-7 gap-1.5 text-xs" data-testid="button-filter-presets">
+            <Button variant="outline" size="sm" className="h-5 px-1.5 gap-1 text-xs" data-testid="button-filter-presets">
               <Bookmark className="w-3 h-3" />
               Presets
               {savedFilters && savedFilters.length > 0 && (

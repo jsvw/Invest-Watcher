@@ -126,6 +126,7 @@ export function Layout({ children, sidebarExtra, platformFilter }: {
                         }}
                         data-testid={`filter-platform-${p.id}`}
                         title={excluded ? `Include ${p.name}` : `Exclude ${p.name}`}
+                        type="button"
                         className="absolute top-0.5 left-0.5 w-2.5 h-2.5 rounded-full border-2 border-card transition-all z-10 hover:scale-125"
                         style={{ backgroundColor: excluded ? "#888" : p.color }}
                       />
