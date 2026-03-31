@@ -415,18 +415,18 @@ export async function scrapeCrowdPear(email: string, password: string, gmailAppP
         return null;
       };
 
+      // Take the LARGEST value across all Balance_balance elements — the total balance
+      // is always the biggest number (it includes all sub-balances like active loans + cash)
       var mainBalance = null;
-      var balanceEl = document.querySelector(".Balance_balance__-D0Zw");
-      if (balanceEl) mainBalance = extractNumber(balanceEl.textContent);
-      if (mainBalance === null) {
-        var balanceEls = document.querySelectorAll('[class*="Balance_balance"]');
-        for (var bi = 0; bi < balanceEls.length; bi++) {
-          var bn = extractNumber(balanceEls[bi].textContent);
-          if (bn !== null && bn > 0) { mainBalance = bn; break; }
+      var balanceEls = document.querySelectorAll('[class*="Balance_balance"]');
+      for (var bi = 0; bi < balanceEls.length; bi++) {
+        var bn = extractNumber(balanceEls[bi].textContent);
+        if (bn !== null && bn > 0) {
+          if (mainBalance === null || bn > mainBalance) mainBalance = bn;
         }
       }
       if (mainBalance === null) {
-        mainBalance = findLabelledValue(["total balance", "portfolio value", "invested", "my investments"]);
+        mainBalance = findLabelledValue(["total balance", "portfolio value", "my investments"]);
       }
       if (mainBalance === null) {
         var antEls = document.querySelectorAll(".ant-typography");
@@ -445,51 +445,11 @@ export async function scrapeCrowdPear(email: string, password: string, gmailAppP
       }
       if (mainBalance === null) mainBalance = 0;
 
-      var availableBalance = findLabelledValue([
-        "available for investment", "available to invest",
-        "available funds", "cash available", "available balance"
-      ]);
-      if (availableBalance === null) {
-        var pageText = document.body.innerText || "";
-        var pats = [
-          new RegExp("([\\\\d.,]+)\\\\s*\\\\n?\\\\s*Available\\\\s+for\\\\s+investment", "i"),
-          new RegExp("Available\\\\s+for\\\\s+investment[\\\\s\\\\S]{0,30}([\\\\d.,]+)", "i")
-        ];
-        for (var pi = 0; pi < pats.length; pi++) {
-          var pm = pageText.match(pats[pi]);
-          if (pm) { var av = extractNumber(pm[1]); if (av !== null) { availableBalance = av; break; } }
-        }
-      }
-      if (availableBalance === null) availableBalance = 0;
+      return mainBalance;
+    })()`) as unknown as number;
 
-      return { mainBalance: mainBalance, availableBalance: availableBalance };
-    })()`) as unknown as { mainBalance: number; availableBalance: number };
-
-    const totalBalance = balanceResult.mainBalance + balanceResult.availableBalance;
-    console.log(`[CrowdPear Scraper] mainBalance=${balanceResult.mainBalance} availableBalance=${balanceResult.availableBalance}`);
-
-    // Diagnostic: dump page text and elements near "available" so we can fix the selector
-    const diag = await page.evaluate(`(function() {
-      var text = document.body.innerText || "";
-      var idx = text.toLowerCase().indexOf("available");
-      var snippet = idx >= 0 ? text.substring(Math.max(0, idx - 100), idx + 300) : text.substring(0, 500);
-      var nums = [];
-      var allEls = document.querySelectorAll("*");
-      for (var i = 0; i < allEls.length; i++) {
-        var el = allEls[i];
-        if (el.children.length > 0) continue;
-        var t = (el.textContent || "").trim();
-        if (/[0-9]/.test(t) && t.length < 30 && el.parentElement) {
-          var par = (el.parentElement.textContent || "").trim().substring(0, 80);
-          nums.push(t + " | parent: " + par);
-        }
-        if (nums.length >= 20) break;
-      }
-      return { snippet: snippet, nums: nums };
-    })()`) as unknown as { snippet: string; nums: string[] };
-    console.log("[CrowdPear Debug] Page around 'available':", diag.snippet);
-    console.log("[CrowdPear Debug] Numeric leaf nodes:", diag.nums.join(" || "));
-
+    const totalBalance = balanceResult;
+    console.log(`[CrowdPear Scraper] totalBalance=${totalBalance}`);
     console.log(`[CrowdPear Scraper] Scraping complete. Total balance: ${totalBalance}`);
 
     return {
