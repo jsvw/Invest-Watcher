@@ -1505,73 +1505,7 @@ export default function Dashboard() {
           {/* Portfolio Waterfall */}
           <WaterfallChart currency={currency} excludedPlatforms={excludedPlatforms} />
 
-          {/* Platform Performance Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Platform Performance Table</CardTitle>
-              <CardDescription>Click a column header to sort — click a row to view platform details</CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm" data-testid="platform-performance-table">
-                  <thead>
-                    <tr className="border-b">
-                      {(
-                        [
-                          { key: "name", label: "Name" },
-                          { key: "invested", label: "Invested" },
-                          { key: "current", label: "Current Value" },
-                          { key: "pnl", label: "P&L" },
-                          { key: "roi", label: "ROI %" },
-                          { key: "mom", label: "MoM %" },
-                          { key: "target", label: "Target %" },
-                          { key: "delta", label: "Delta" },
-                        ] as { key: SortKey; label: string }[]
-                      ).map(({ key, label }) => (
-                        <th key={key} className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none whitespace-nowrap" onClick={() => toggleSort(key)} data-testid={`table-sort-${key}`}>
-                          {label}
-                          <SortIndicator col={key} />
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedTable.map(p => (
-                      <tr key={p.id} className="border-b last:border-0 hover:bg-muted/40 cursor-pointer transition-colors" onClick={() => navigate(`/platforms/${encodeURIComponent(p.name.toLowerCase().replace(/\s+/g, '-'))}`)} data-testid={`table-row-platform-${p.id}`}>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <PlatformIcon icon={p.icon} customIconUrl={p.customIconUrl} color={p.color} name={p.name} size="sm" />
-                            <span className="font-medium">{p.name}</span>
-                            <Badge variant="outline" className="text-[10px] py-0 h-4 hidden sm:inline-flex">{p.category}</Badge>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">{formatCurrency(p.invested, currency)}</td>
-                        <td className="px-4 py-3 font-medium">{formatCurrency(p.current, currency)}</td>
-                        <td className={cn("px-4 py-3 font-medium", p.pnl >= 0 ? "text-emerald-500" : "text-red-500")}>
-                          {p.pnl >= 0 ? "+" : ""}{formatCurrency(p.pnl, currency)}
-                        </td>
-                        <td className={cn("px-4 py-3 font-medium", p.roi >= 0 ? "text-emerald-500" : "text-red-500")}>{fmtPct(p.roi)}</td>
-                        <td className={cn("px-4 py-3", p.mom != null ? (p.mom >= 0 ? "text-emerald-500" : "text-red-500") : "text-muted-foreground")}>
-                          {p.mom != null ? fmtPct(p.mom) : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">{p.target != null ? `${p.target.toFixed(1)}%` : "—"}</td>
-                        <td className={cn("px-4 py-3", p.delta != null ? (p.delta >= 0 ? "text-emerald-500" : "text-red-500") : "text-muted-foreground")}>
-                          {p.delta != null ? `${p.delta >= 0 ? "+" : ""}${p.delta.toFixed(1)}%` : "—"}
-                        </td>
-                      </tr>
-                    ))}
-                    {sortedTable.length === 0 && (
-                      <tr>
-                        <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">No platforms found.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Platform Performance + Allocation Targets */}
+          {/* Platform Performance (combined table + allocation targets) */}
           {platforms && platforms.length > 0 && (() => {
             const totalPortfolioValue = platforms.reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
             const totalTargetPct = platforms.reduce((s, p) => {
@@ -1594,7 +1528,7 @@ export default function Dashboard() {
                       <Target className="w-5 h-5 text-primary" />
                       <div>
                         <CardTitle>Platform Performance</CardTitle>
-                        <CardDescription>Value, ROI and allocation targets per platform</CardDescription>
+                        <CardDescription>Table: click headers to sort, click a row to open — Targets: set allocation targets per platform</CardDescription>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -1612,97 +1546,163 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <div className="divide-y divide-border">
-                    {platforms.map(p => {
-                      const val = Number(p.currentValue) || 0;
-                      const invested = Number(p.totalInvested) || 0;
-                      const gain = val - invested;
-                      const gainPct = invested > 0 ? (gain / invested) * 100 : 0;
-                      const currentPct = totalPortfolioValue > 0 ? (val / totalPortfolioValue) * 100 : 0;
-                      const targetStr = localTargets[p.id] ?? '';
-                      const targetNum = targetStr !== '' ? Number(targetStr) : null;
-                      const targetVal = targetNum != null ? (targetNum / 100) * totalPortfolioValue : null;
-                      const required = targetVal != null ? targetVal - val : null;
-                      const delta = targetNum != null ? targetNum - currentPct : null;
-
-                      return (
-                        <div key={p.id} className="flex items-center gap-4 px-6 py-3 hover:bg-muted/20 transition-colors flex-wrap">
-                          <Link href={`/platforms/${encodeURIComponent(p.name.toLowerCase().replace(/\s+/g, '-'))}`} className="flex items-center gap-3 group flex-1 min-w-[140px]">
-                            <div className="group-hover:scale-110 transition-transform">
-                              <PlatformIcon icon={(p as any).icon} customIconUrl={(p as any).customIconUrl} color={p.color} name={p.name} size="md" />
-                            </div>
-                            <div>
-                              <div className="font-semibold text-sm group-hover:text-primary transition-colors">{p.name}</div>
-                              <div className="text-xs text-muted-foreground">{p.category}</div>
-                            </div>
-                          </Link>
-                          <div className="text-right min-w-[100px]">
-                            <div className="text-sm font-medium">{formatCurrency(val, currency)}</div>
-                            <div className={cn("text-xs font-medium", gainPct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
-                              {gainPct >= 0 ? '+' : ''}{gainPct.toFixed(2)}%
-                            </div>
-                          </div>
-                          <div className="text-xs text-muted-foreground min-w-[55px] text-right">
-                            {currentPct.toFixed(1)}% alloc
-                          </div>
-                          <div className="flex items-center gap-2 min-w-[130px]">
-                            <Input
-                              type="number"
-                              min="0"
-                              max="100"
-                              step="0.1"
-                              value={targetStr}
-                              placeholder="—"
-                              className="w-20 h-8 text-sm text-right"
-                              data-testid={`input-target-${p.id}`}
-                              onChange={e => {
-                                setLocalTargets(prev => ({ ...prev, [p.id]: e.target.value }));
-                                setTargetsDirty(true);
-                              }}
-                            />
-                            <span className="text-sm text-muted-foreground">%</span>
-                          </div>
-                          {delta != null ? (
-                            <div className={cn("flex items-center gap-1 text-xs font-medium min-w-[70px]",
-                              delta >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-                            )}>
-                              {delta >= 0 ? <ArrowUpCircle className="w-3.5 h-3.5" /> : <ArrowDownCircle className="w-3.5 h-3.5" />}
-                              {delta >= 0 ? '+' : ''}{delta.toFixed(1)}%
-                            </div>
-                          ) : (
-                            <div className="min-w-[70px]" />
-                          )}
-                          <div className="text-right min-w-[110px]">
-                            {required != null ? (
-                              required > 0.005 ? (
-                                <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                                  +{formatCurrency(required, currency)}
-                                </div>
-                              ) : required < -0.005 ? (
-                                <div className="text-sm font-semibold text-rose-600 dark:text-rose-400">
-                                  {formatCurrency(required, currency)} over
-                                </div>
-                              ) : (
-                                <div className="text-sm text-muted-foreground">On target</div>
-                              )
-                            ) : (
-                              <div className="text-xs text-muted-foreground">No target set</div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                <Tabs defaultValue="table">
+                  <div className="px-6 pb-0 border-b">
+                    <TabsList className="mb-0 rounded-none border-0 bg-transparent p-0 gap-1">
+                      <TabsTrigger value="table" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none pb-3">Table</TabsTrigger>
+                      <TabsTrigger value="targets" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none pb-3">Targets</TabsTrigger>
+                    </TabsList>
                   </div>
-                  {totalRequired > 0 && (
-                    <div className="px-6 py-4 bg-muted/30 border-t border-border flex items-center justify-between flex-wrap gap-2">
-                      <span className="text-sm text-muted-foreground">Total additional investment needed</span>
-                      <span className="font-bold text-base text-emerald-600 dark:text-emerald-400">
-                        +{formatCurrency(totalRequired, currency)}
-                      </span>
+                  <TabsContent value="table" className="mt-0">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm" data-testid="platform-performance-table">
+                        <thead>
+                          <tr className="border-b">
+                            {(
+                              [
+                                { key: "name", label: "Name" },
+                                { key: "invested", label: "Invested" },
+                                { key: "current", label: "Current Value" },
+                                { key: "pnl", label: "P&L" },
+                                { key: "roi", label: "ROI %" },
+                                { key: "mom", label: "MoM %" },
+                                { key: "target", label: "Target %" },
+                                { key: "delta", label: "Delta" },
+                              ] as { key: SortKey; label: string }[]
+                            ).map(({ key, label }) => (
+                              <th key={key} className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none whitespace-nowrap" onClick={() => toggleSort(key)} data-testid={`table-sort-${key}`}>
+                                {label}
+                                <SortIndicator col={key} />
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sortedTable.map(p => (
+                            <tr key={p.id} className="border-b last:border-0 hover:bg-muted/40 cursor-pointer transition-colors" onClick={() => navigate(`/platforms/${encodeURIComponent(p.name.toLowerCase().replace(/\s+/g, '-'))}`)} data-testid={`table-row-platform-${p.id}`}>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  <PlatformIcon icon={p.icon} customIconUrl={p.customIconUrl} color={p.color} name={p.name} size="sm" />
+                                  <span className="font-medium">{p.name}</span>
+                                  <Badge variant="outline" className="text-[10px] py-0 h-4 hidden sm:inline-flex">{p.category}</Badge>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-muted-foreground">{formatCurrency(p.invested, currency)}</td>
+                              <td className="px-4 py-3 font-medium">{formatCurrency(p.current, currency)}</td>
+                              <td className={cn("px-4 py-3 font-medium", p.pnl >= 0 ? "text-emerald-500" : "text-red-500")}>
+                                {p.pnl >= 0 ? "+" : ""}{formatCurrency(p.pnl, currency)}
+                              </td>
+                              <td className={cn("px-4 py-3 font-medium", p.roi >= 0 ? "text-emerald-500" : "text-red-500")}>{fmtPct(p.roi)}</td>
+                              <td className={cn("px-4 py-3", p.mom != null ? (p.mom >= 0 ? "text-emerald-500" : "text-red-500") : "text-muted-foreground")}>
+                                {p.mom != null ? fmtPct(p.mom) : "—"}
+                              </td>
+                              <td className="px-4 py-3 text-muted-foreground">{p.target != null ? `${p.target.toFixed(1)}%` : "—"}</td>
+                              <td className={cn("px-4 py-3", p.delta != null ? (p.delta >= 0 ? "text-emerald-500" : "text-red-500") : "text-muted-foreground")}>
+                                {p.delta != null ? `${p.delta >= 0 ? "+" : ""}${p.delta.toFixed(1)}%` : "—"}
+                              </td>
+                            </tr>
+                          ))}
+                          {sortedTable.length === 0 && (
+                            <tr>
+                              <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">No platforms found.</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
                     </div>
-                  )}
-                </CardContent>
+                  </TabsContent>
+                  <TabsContent value="targets" className="mt-0">
+                    <div className="divide-y divide-border">
+                      {platforms.map(p => {
+                        const val = Number(p.currentValue) || 0;
+                        const invested = Number(p.totalInvested) || 0;
+                        const gain = val - invested;
+                        const gainPct = invested > 0 ? (gain / invested) * 100 : 0;
+                        const currentPct = totalPortfolioValue > 0 ? (val / totalPortfolioValue) * 100 : 0;
+                        const targetStr = localTargets[p.id] ?? '';
+                        const targetNum = targetStr !== '' ? Number(targetStr) : null;
+                        const targetVal = targetNum != null ? (targetNum / 100) * totalPortfolioValue : null;
+                        const required = targetVal != null ? targetVal - val : null;
+                        const delta = targetNum != null ? targetNum - currentPct : null;
+
+                        return (
+                          <div key={p.id} className="flex items-center gap-4 px-6 py-3 hover:bg-muted/20 transition-colors flex-wrap">
+                            <Link href={`/platforms/${encodeURIComponent(p.name.toLowerCase().replace(/\s+/g, '-'))}`} className="flex items-center gap-3 group flex-1 min-w-[140px]">
+                              <div className="group-hover:scale-110 transition-transform">
+                                <PlatformIcon icon={(p as any).icon} customIconUrl={(p as any).customIconUrl} color={p.color} name={p.name} size="md" />
+                              </div>
+                              <div>
+                                <div className="font-semibold text-sm group-hover:text-primary transition-colors">{p.name}</div>
+                                <div className="text-xs text-muted-foreground">{p.category}</div>
+                              </div>
+                            </Link>
+                            <div className="text-right min-w-[100px]">
+                              <div className="text-sm font-medium">{formatCurrency(val, currency)}</div>
+                              <div className={cn("text-xs font-medium", gainPct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                                {gainPct >= 0 ? '+' : ''}{gainPct.toFixed(2)}%
+                              </div>
+                            </div>
+                            <div className="text-xs text-muted-foreground min-w-[55px] text-right">
+                              {currentPct.toFixed(1)}% alloc
+                            </div>
+                            <div className="flex items-center gap-2 min-w-[130px]">
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                value={targetStr}
+                                placeholder="—"
+                                className="w-20 h-8 text-sm text-right"
+                                data-testid={`input-target-${p.id}`}
+                                onChange={e => {
+                                  setLocalTargets(prev => ({ ...prev, [p.id]: e.target.value }));
+                                  setTargetsDirty(true);
+                                }}
+                              />
+                              <span className="text-sm text-muted-foreground">%</span>
+                            </div>
+                            {delta != null ? (
+                              <div className={cn("flex items-center gap-1 text-xs font-medium min-w-[70px]",
+                                delta >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                              )}>
+                                {delta >= 0 ? <ArrowUpCircle className="w-3.5 h-3.5" /> : <ArrowDownCircle className="w-3.5 h-3.5" />}
+                                {delta >= 0 ? '+' : ''}{delta.toFixed(1)}%
+                              </div>
+                            ) : (
+                              <div className="min-w-[70px]" />
+                            )}
+                            <div className="text-right min-w-[110px]">
+                              {required != null ? (
+                                required > 0.005 ? (
+                                  <div className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                                    +{formatCurrency(required, currency)}
+                                  </div>
+                                ) : required < -0.005 ? (
+                                  <div className="text-sm font-semibold text-rose-600 dark:text-rose-400">
+                                    {formatCurrency(required, currency)} over
+                                  </div>
+                                ) : (
+                                  <div className="text-sm text-muted-foreground">On target</div>
+                                )
+                              ) : (
+                                <div className="text-xs text-muted-foreground">No target set</div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {totalRequired > 0 && (
+                      <div className="px-6 py-4 bg-muted/30 border-t border-border flex items-center justify-between flex-wrap gap-2">
+                        <span className="text-sm text-muted-foreground">Total additional investment needed</span>
+                        <span className="font-bold text-base text-emerald-600 dark:text-emerald-400">
+                          +{formatCurrency(totalRequired, currency)}
+                        </span>
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
               </Card>
             );
           })()}
