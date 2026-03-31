@@ -41,18 +41,15 @@ interface PortfolioHeatmapProps {
 function extractMaker(name: string): string {
   const trimmed = name.trim();
 
-  // Skip leading year: "1988 Porsche 911..." → work on "Porsche 911..."
   const yearPrefix = trimmed.match(/^(\d{4})\s+(.+)$/);
   if (yearPrefix) return extractMaker(yearPrefix[2]);
 
-  // "Artist Name, Title, Year" pattern → everything before first comma is the maker
   const commaIdx = trimmed.indexOf(",");
   if (commaIdx > 0) {
     const beforeComma = trimmed.substring(0, commaIdx).trim();
     if (beforeComma.length > 0 && !/^\d+$/.test(beforeComma)) return beforeComma;
   }
 
-  // Known two-word brand prefixes (lowercase)
   const twoWordPrefixes = [
     "de bethune", "de tomaso", "aston martin", "rolls royce",
     "alfa romeo", "land rover", "château", "chateau", "domaine",
@@ -62,7 +59,6 @@ function extractMaker(name: string): string {
     if (lower.startsWith(prefix)) return trimmed.split(/\s+/).slice(0, 2).join(" ");
   }
 
-  // Default: first word (Nike, Porsche, Rolex, etc.)
   return trimmed.split(/\s+/)[0] ?? trimmed;
 }
 
@@ -140,6 +136,8 @@ function HeatCell({
   );
 }
 
+const ALL_SENTINEL = "__ALL__";
+
 export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currency }: PortfolioHeatmapProps) {
   const [displayMode, setDisplayMode] = useState<DisplayMode>("pct");
   const [drillCategory, setDrillCategory] = useState<string | null>(null);
@@ -175,11 +173,13 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
     return cells.sort((a, b) => b.currentValue - a.currentValue);
   }, [filteredPlatforms]);
 
-  // Level 2: platforms within category
+  // Level 2: platforms (within category or all)
   const levelTwoCells = useMemo((): HeatmapCell[] => {
     if (!drillCategory) return [];
-    return filteredPlatforms
-      .filter((p) => p.category === drillCategory)
+    const source = drillCategory === ALL_SENTINEL
+      ? filteredPlatforms
+      : filteredPlatforms.filter((p) => p.category === drillCategory);
+    return source
       .map((p) => {
         const currentValue = Number(p.currentValue) || 0;
         const invested = Number(p.totalInvested) || 0;
@@ -199,14 +199,19 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
   );
   const isItemValuations = drilledPlatform?.platformMode === "item_valuations";
 
-  const platformAssets = useMemo(
-    () => filteredAssets.filter((a) => a.platformId === drillPlatformId),
-    [filteredAssets, drillPlatformId]
-  );
+  // Assets for current platform — or ALL platforms when drillPlatformId === -1 (all-assets mode)
+  const platformAssets = useMemo(() => {
+    if (drillPlatformId === -1) return filteredAssets;
+    return filteredAssets.filter((a) => a.platformId === drillPlatformId);
+  }, [filteredAssets, drillPlatformId]);
 
   // Level 3: description groups (item_valuations) or direct assets (asset_returns)
   const levelThreeCells = useMemo((): HeatmapCell[] => {
     if (!drillPlatformId) return [];
+    if (drillPlatformId === -1) {
+      // All assets mode: group by platform name
+      return aggregateCells(platformAssets, (a) => a.platformName, false);
+    }
     if (isItemValuations) {
       return aggregateCells(
         platformAssets,
@@ -248,7 +253,7 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
   // Determine level
   const level = !drillCategory ? 1
     : !drillPlatformId ? 2
-    : !isItemValuations ? 3
+    : !isItemValuations || drillPlatformId === -1 ? 3
     : !drillAssetCategory ? 3
     : !drillMaker ? 4
     : 5;
@@ -277,11 +282,12 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
     return <p className="text-muted-foreground text-sm">No platforms to display. Try adjusting your filters.</p>;
   }
 
-  const activePlatformName = drilledPlatform?.name ?? null;
+  const activePlatformName = drillPlatformId === -1 ? "All Platforms" : (drilledPlatform?.name ?? null);
+  const categoryLabel = drillCategory === ALL_SENTINEL ? "All Categories" : drillCategory;
 
   const levelHint =
-    level === 1 ? "Click a category to drill down into its platforms."
-    : level === 2 ? "Click a platform to see its assets."
+    level === 1 ? "Click a category to drill in, or expand all at once."
+    : level === 2 ? "Click a platform to see its assets, or expand all at once."
     : level === 3 && isItemValuations ? "Click a group to explore by maker or brand."
     : level === 3 ? "Individual asset performance."
     : level === 4 ? "Click a maker to see individual assets."
@@ -306,7 +312,7 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
                 onClick={handleBreadcrumbCategory}
                 data-testid="breadcrumb-category"
               >
-                {drillCategory}
+                {categoryLabel}
               </button>
             </>
           )}
@@ -344,27 +350,53 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
           )}
         </nav>
 
-        <div className="flex items-center rounded-md border p-0.5 shrink-0">
-          <Button
-            variant="ghost" size="sm"
-            className={cn("px-2.5 py-1 h-auto text-xs font-medium rounded",
-              displayMode === "pct" ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setDisplayMode("pct")}
-            data-testid="portfolio-heatmap-toggle-pct"
-          >
-            % Return
-          </Button>
-          <Button
-            variant="ghost" size="sm"
-            className={cn("px-2.5 py-1 h-auto text-xs font-medium rounded",
-              displayMode === "abs" ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-            )}
-            onClick={() => setDisplayMode("abs")}
-            data-testid="portfolio-heatmap-toggle-abs"
-          >
-            Gain/Loss
-          </Button>
+        <div className="flex items-center gap-2">
+          {level === 1 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={() => setDrillCategory(ALL_SENTINEL)}
+              data-testid="heatmap-expand-all-platforms"
+            >
+              All platforms
+              <ChevronRight className="w-3 h-3" />
+            </Button>
+          )}
+          {level === 2 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={() => setDrillPlatformId(-1)}
+              data-testid="heatmap-expand-all-assets"
+            >
+              All assets
+              <ChevronRight className="w-3 h-3" />
+            </Button>
+          )}
+          <div className="flex items-center rounded-md border p-0.5 shrink-0">
+            <Button
+              variant="ghost" size="sm"
+              className={cn("px-2.5 py-1 h-auto text-xs font-medium rounded",
+                displayMode === "pct" ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+              onClick={() => setDisplayMode("pct")}
+              data-testid="portfolio-heatmap-toggle-pct"
+            >
+              % Return
+            </Button>
+            <Button
+              variant="ghost" size="sm"
+              className={cn("px-2.5 py-1 h-auto text-xs font-medium rounded",
+                displayMode === "abs" ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+              onClick={() => setDisplayMode("abs")}
+              data-testid="portfolio-heatmap-toggle-abs"
+            >
+              Gain/Loss
+            </Button>
+          </div>
         </div>
       </div>
 
