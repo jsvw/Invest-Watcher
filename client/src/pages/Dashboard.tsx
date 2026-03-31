@@ -11,7 +11,7 @@ import {
 import { PlatformIcon } from "@/components/PlatformIcon";
 import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend,
-  BarChart, Bar, Cell, AreaChart, Area, LabelList, ReferenceLine,
+  BarChart, Bar, Cell, LabelList,
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -73,22 +73,12 @@ interface KpiCardProps {
   icon: React.ReactNode;
   positive?: boolean;
   neutral?: boolean;
-  chartData?: { label: string; value: number }[];
-  chartIsCurrency?: boolean;
-  currency?: string;
 }
 
-function KpiCard({ label, value, sub, icon, positive, neutral, chartData, chartIsCurrency, currency }: KpiCardProps) {
-  const [hovered, setHovered] = useState(false);
+function KpiCard({ label, value, sub, icon, positive, neutral }: KpiCardProps) {
   const valueColor = neutral ? "text-foreground" : positive ? "text-emerald-500" : "text-red-500";
-  const chartColor = positive === false ? "#ef4444" : "#10b981";
-  const gradId = `sparkGrad-${label.replace(/\s+/g, "")}`;
   return (
-    <Card
-      data-testid={`kpi-card-${label.toLowerCase().replace(/\s+/g, "-")}`}
-      onMouseEnter={() => chartData?.length && setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
+    <Card data-testid={`kpi-card-${label.toLowerCase().replace(/\s+/g, "-")}`}>
       <CardContent className="pt-6">
         <div className="flex items-start justify-between">
           <div>
@@ -98,63 +88,6 @@ function KpiCard({ label, value, sub, icon, positive, neutral, chartData, chartI
           </div>
           <div className="p-2 rounded-lg bg-muted/50">{icon}</div>
         </div>
-        {chartData && chartData.length > 1 && (
-          <div
-            className="overflow-hidden transition-all duration-300 ease-in-out"
-            style={{ height: hovered ? 72 : 0, marginTop: hovered ? 12 : 0 }}
-          >
-            <div className="h-[72px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 2, right: 2, left: 0, bottom: 2 }}>
-                  <defs>
-                    <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={chartColor} stopOpacity={0.25} />
-                      <stop offset="95%" stopColor={chartColor} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <YAxis
-                    tickFormatter={(v: number) =>
-                      chartIsCurrency
-                        ? formatCompactCurrency(v, currency ?? "EUR")
-                        : `${v.toFixed(1)}%`
-                    }
-                    tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
-                    tickLine={false}
-                    axisLine={false}
-                    width={38}
-                    tickCount={3}
-                  />
-                  <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" strokeOpacity={0.4} />
-                  <Tooltip
-                    content={({ active, payload }: any) => {
-                      if (!active || !payload?.length) return null;
-                      const val = payload[0].value as number;
-                      const formatted = chartIsCurrency
-                        ? `${val >= 0 ? "+" : ""}${formatCompactCurrency(val, currency ?? "EUR")}`
-                        : fmtPct(val);
-                      return (
-                        <div className="bg-popover border rounded-md shadow-sm p-1.5 text-xs">
-                          <p className="text-muted-foreground mb-0.5">{payload[0].payload.label}</p>
-                          <p className={cn("font-semibold", val >= 0 ? "text-emerald-500" : "text-red-500")}>{formatted}</p>
-                        </div>
-                      );
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="value"
-                    stroke={chartColor}
-                    strokeWidth={1.5}
-                    fill={`url(#${gradId})`}
-                    dot={false}
-                    activeDot={{ r: 3, strokeWidth: 0 }}
-                    isAnimationActive={false}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );
@@ -635,53 +568,6 @@ export default function Dashboard() {
       .sort((a, b) => b.roi - a.roi);
   }, [activePlatforms]);
 
-  const roiOverTimeData = useMemo(() => {
-    if (platformBreakdownByMonth && activePlatforms) {
-      const monthKeys = Object.keys(platformBreakdownByMonth).sort();
-      const actualTotalInvested = activePlatforms.reduce((s, p) => s + (Number(p.totalInvested) || 0), 0);
-
-      let totalNetCash = 0;
-      for (const key of monthKeys) {
-        const entries = platformBreakdownByMonth[key].filter(p => !excludedPlatforms.has(p.platformId));
-        for (const e of entries) totalNetCash += e.currVal - e.prevVal - e.gain;
-      }
-
-      const baseCapital = actualTotalInvested - totalNetCash;
-      let twrFactor = 1;
-      let cumulativeNetCash = 0;
-      let monthsElapsed = 0;
-
-      return monthKeys.map(key => {
-        const entries = platformBreakdownByMonth[key].filter(p => !excludedPlatforms.has(p.platformId));
-        const gain = entries.reduce((s, p) => s + p.gain, 0);
-        const prevVal = entries.reduce((s, p) => s + p.prevVal, 0);
-        const currVal = entries.reduce((s, p) => s + p.currVal, 0);
-        const netCash = entries.reduce((s, p) => s + (p.currVal - p.prevVal - p.gain), 0);
-
-        if (prevVal > 0) twrFactor *= (1 + gain / prevVal);
-        cumulativeNetCash += netCash;
-        monthsElapsed += 1;
-
-        const totalInvestedAtMonth = baseCapital + cumulativeNetCash;
-        const totalGainAtMonth = currVal - totalInvestedAtMonth;
-        const roi = totalInvestedAtMonth > 0 ? (totalGainAtMonth / totalInvestedAtMonth) * 100 : 0;
-        const annualized = monthsElapsed > 0 && twrFactor > 0
-          ? (Math.pow(twrFactor, 12 / monthsElapsed) - 1) * 100
-          : 0;
-        const [y, m] = key.split("-");
-        const label = `${MONTHS[Number(m) - 1]} ${y}`;
-        return { date: `${key}-01`, label, roi, annualized, cumulative: totalGainAtMonth };
-      });
-    }
-    if (!historyData || historyData.length === 0) return [];
-    return historyData.map(p => {
-      const roi = p.invested > 0 ? ((p.value - p.invested) / p.invested) * 100 : 0;
-      const d = new Date(p.date);
-      const label = `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-      return { date: p.date, label, roi, annualized: roi, cumulative: p.value - p.invested };
-    });
-  }, [historyData, platformBreakdownByMonth, activePlatforms, excludedPlatforms]);
-
   const rebalancerData = useMemo(() => {
     if (!activePlatforms) return null;
     const totalPortfolioValue = (platforms ?? activePlatforms).reduce((s, p) => s + (Number(p.currentValue) || 0), 0);
@@ -976,8 +862,6 @@ export default function Dashboard() {
               sub={kpis?.twr != null ? `${fmtPct(kpis.twr)} cumulative · cash-flow adjusted` : "Time-weighted, annualized"}
               icon={<TrendingUp className="w-5 h-5 text-muted-foreground" />}
               positive={kpis?.cagr != null ? kpis.cagr >= 0 : undefined}
-              chartData={roiOverTimeData.map(p => ({ label: p.label, value: p.annualized }))}
-              currency={currency}
             />
             <StatCard
               title="MoM Performance"
