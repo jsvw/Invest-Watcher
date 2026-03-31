@@ -1203,36 +1203,6 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              {history && history.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                  <div className="p-4 rounded-lg bg-muted/50">
-                    <div className="text-sm text-muted-foreground">Total Invested</div>
-                    <div className="text-2xl font-bold" data-testid="text-chart-invested">
-                      {formatCurrency(history[history.length - 1].invested, currency)}
-                    </div>
-                  </div>
-                  <div className="p-4 rounded-lg bg-muted/50">
-                    <div className="text-sm text-muted-foreground">Current Value</div>
-                    <div className="text-2xl font-bold" data-testid="text-chart-value">
-                      {formatCurrency(history[history.length - 1].value, currency)}
-                    </div>
-                  </div>
-                  <div className="p-4 rounded-lg bg-muted/50">
-                    <div className="text-sm text-muted-foreground">Profit / Loss</div>
-                    {(() => {
-                      const profitLoss = history[history.length - 1].value - history[history.length - 1].invested;
-                      const profitPercent = history[history.length - 1].invested > 0
-                        ? (profitLoss / history[history.length - 1].invested) * 100 : 0;
-                      return (
-                        <div className={`text-2xl font-bold flex items-center gap-2 ${Math.abs(profitPercent) < 0.1 ? 'text-muted-foreground' : profitLoss >= 0 ? 'text-green-600' : 'text-red-600'}`} data-testid="text-chart-profit">
-                          {profitLoss >= 0 ? '+' : ''}{formatCurrency(profitLoss, currency)}
-                          <span className="text-sm font-normal">({profitLoss >= 0 ? '+' : ''}{profitPercent.toFixed(1)}%)</span>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-              )}
               <Tabs value={chartView} onValueChange={v => setChartView(v as any)} className="mb-4">
                 <TabsList>
                   <TabsTrigger value="overview" data-testid="tab-chart-overview">Value Overview</TabsTrigger>
