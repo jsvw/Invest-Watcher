@@ -1146,7 +1146,7 @@ export default function Dashboard() {
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                   <CardTitle>Heatmaps</CardTitle>
-                  <CardDescription>Monthly calendar returns and portfolio breakdown in one place</CardDescription>
+                  <CardDescription>Monthly calendar returns and portfolio breakdown in one place · based on 10th-to-10th of month snapshots</CardDescription>
                 </div>
               </div>
             </CardHeader>
