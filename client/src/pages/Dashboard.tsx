@@ -879,7 +879,7 @@ export default function Dashboard() {
               positive={kpis?.cagr != null ? kpis.cagr >= 0 : undefined}
             />
             <StatCard
-              title="MoM Performance"
+              title="Last 30 Days"
               value={(() => {
                 if (!platformMomData || platformMomData.length === 0) return "N/A";
                 const totalMomChange = platformMomData.reduce((sum, p) => sum + p.momChange, 0);
