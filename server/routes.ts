@@ -1106,64 +1106,62 @@ export async function registerRoutes(
       const userInvestments = await storage.getAllInvestmentsForUser(userId);
       const userWithdrawals = await storage.getAllWithdrawalsForUser(userId);
       
-      // Calculate per-platform MoM using actual valuation months (not calendar months)
+      // Calculate per-platform MoM using a rolling last-30-days window.
+      // Find the most recent valuation, then the closest valuation ~30 days before it.
       const platformMom = userPlatforms.map((platform: any) => {
-        // Get valuations for this platform
+        // Get all valuations for this platform sorted newest-first
         const platformVals = userValuations
           .filter((v: any) => v.platformId === platform.id)
           .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        
-        // Group valuations by month and get latest value for each month
-        const monthlyVals = new Map<string, number>();
-        platformVals.forEach((v: any) => {
-          const d = new Date(v.date);
-          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-          if (!monthlyVals.has(key)) {
-            monthlyVals.set(key, Number(v.value));
-          }
-        });
-        
-        // Get the two most recent months with valuations
-        const sortedMonths = Array.from(monthlyVals.keys()).sort().reverse();
-        const latestMonth = sortedMonths[0];
-        const previousMonth = sortedMonths[1];
-        
-        // Only calculate MoM if we have at least 2 months of valuation data
-        const hasEnoughData = latestMonth && previousMonth;
-        const currentValue = latestMonth ? monthlyVals.get(latestMonth)! : 0;
-        const prevValue = previousMonth ? monthlyVals.get(previousMonth)! : 0;
-        
-        // Calculate net investments during the latest month (investments - withdrawals)
-        let netInvestmentsDuringPeriod = 0;
-        if (latestMonth) {
-          const [year, month] = latestMonth.split('-').map(Number);
-          const monthStart = new Date(year, month - 1, 1);
-          const monthEnd = new Date(year, month, 0, 23, 59, 59);
-          
-          const investmentsDuringMonth = userInvestments
-            .filter((i: any) => i.platformId === platform.id)
-            .filter((i: any) => {
-              const d = new Date(i.date);
-              return d >= monthStart && d <= monthEnd;
-            })
-            .reduce((sum: number, i: any) => sum + Number(i.amount), 0);
-          
-          const withdrawalsDuringMonth = userWithdrawals
-            .filter((w: any) => w.platformId === platform.id)
-            .filter((w: any) => {
-              const d = new Date(w.date);
-              return d >= monthStart && d <= monthEnd;
-            })
-            .reduce((sum: number, w: any) => sum + Number(w.amount), 0);
-          
-          netInvestmentsDuringPeriod = investmentsDuringMonth - withdrawalsDuringMonth;
+
+        if (platformVals.length < 2) {
+          const currentValue = platformVals.length === 1 ? Number(platformVals[0].value) : 0;
+          return {
+            platformId: platform.id,
+            name: platform.name,
+            customIconUrl: (platform as any).customIconUrl,
+            currentValue,
+            prevValue: 0,
+            momChange: 0,
+            momGrowthPercent: 0
+          };
         }
-        
-        // MoM change = value change - net investments (to show actual growth, not deposits)
-        const rawChange = currentValue - prevValue;
-        const momChange = hasEnoughData ? rawChange - netInvestmentsDuringPeriod : 0;
-        const momGrowthPercent = hasEnoughData && prevValue > 0 ? (momChange / prevValue) * 100 : 0;
-        
+
+        // Most recent valuation is the "current" point
+        const latestVal = platformVals[0];
+        const currentValue = Number(latestVal.value);
+        const currentDate = new Date(latestVal.date);
+
+        // Target: exactly 30 days before the current date
+        const target = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        // Find the valuation (excluding the latest) whose date is closest to the target
+        const prevValEntry = platformVals
+          .slice(1)
+          .reduce((best: any, v: any) => {
+            const dist = Math.abs(new Date(v.date).getTime() - target.getTime());
+            const bestDist = Math.abs(new Date(best.date).getTime() - target.getTime());
+            return dist < bestDist ? v : best;
+          });
+
+        const prevValue = Number(prevValEntry.value);
+        const prevDate = new Date(prevValEntry.date);
+
+        // Net investments/withdrawals between the two data points (exclusive of prevDate, inclusive of currentDate)
+        const netInvestmentsDuringPeriod =
+          userInvestments
+            .filter((i: any) => i.platformId === platform.id)
+            .filter((i: any) => { const d = new Date(i.date); return d > prevDate && d <= currentDate; })
+            .reduce((sum: number, i: any) => sum + Number(i.amount), 0)
+          - userWithdrawals
+            .filter((w: any) => w.platformId === platform.id)
+            .filter((w: any) => { const d = new Date(w.date); return d > prevDate && d <= currentDate; })
+            .reduce((sum: number, w: any) => sum + Number(w.amount), 0);
+
+        // MoM change = value change − net deposits (organic growth only)
+        const momChange = (currentValue - prevValue) - netInvestmentsDuringPeriod;
+        const momGrowthPercent = prevValue > 0 ? (momChange / prevValue) * 100 : 0;
+
         return {
           platformId: platform.id,
           name: platform.name,
@@ -1265,27 +1263,30 @@ export async function registerRoutes(
       userWithdrawals.forEach(w => monthSet.add(toYM(w.date)));
       const sortedMonths = Array.from(monthSet).sort();
 
-      // For a given platform, get its value at the end of a given year-month
-      const getPlatformValueAtEndOfMonth = (platformId: number, ym: string): number => {
+      // For a given platform, get the valuation closest to the 10th of a given year-month.
+      // Searches all valuations (no boundary restriction) to find the nearest data point.
+      const getPlatformValueNearTenthOfMonth = (platformId: number, ym: string): { value: number; date: Date } => {
         const [year, month] = ym.split('-').map(Number);
-        const endOfMonth = new Date(year, month, 0, 23, 59, 59);
-        const relevant = userValuations
-          .filter(v => v.platformId === platformId && new Date(v.date) <= endOfMonth)
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        if (relevant.length === 0) return 0;
-        return Number(relevant[0].value);
+        const tenth = new Date(year, month - 1, 10).getTime();
+        const relevant = userValuations.filter(v => v.platformId === platformId);
+        if (relevant.length === 0) return { value: 0, date: new Date(tenth) };
+        const closest = relevant.reduce((best, v) => {
+          const dist = Math.abs(new Date(v.date).getTime() - tenth);
+          const bestDist = Math.abs(new Date(best.date).getTime() - tenth);
+          return dist < bestDist ? v : best;
+        });
+        return { value: Number(closest.value), date: new Date(closest.date) };
       };
 
-      // Net cash added to a platform in a specific year-month
-      const getNetCashInMonth = (platformId: number, ym: string): number => {
-        const [year, month] = ym.split('-').map(Number);
-        const start = new Date(year, month - 1, 1);
-        const end = new Date(year, month, 0, 23, 59, 59);
+      // Net cash added to a platform between two dates (exclusive start, inclusive end)
+      const getNetCashBetween = (platformId: number, fromDate: Date, toDate: Date): number => {
         const invested = userInvestments
-          .filter(i => i.platformId === platformId && new Date(i.date) >= start && new Date(i.date) <= end)
+          .filter(i => i.platformId === platformId)
+          .filter(i => { const d = new Date(i.date); return d > fromDate && d <= toDate; })
           .reduce((s, i) => s + Number(i.amount), 0);
         const withdrawn = userWithdrawals
-          .filter(w => w.platformId === platformId && new Date(w.date) >= start && new Date(w.date) <= end)
+          .filter(w => w.platformId === platformId)
+          .filter(w => { const d = new Date(w.date); return d > fromDate && d <= toDate; })
           .reduce((s, w) => s + Number(w.amount), 0);
         return invested - withdrawn;
       };
@@ -1298,13 +1299,13 @@ export async function registerRoutes(
         const breakdown: { platformId: number; name: string; color: string; prevVal: number; currVal: number; gain: number; gainPct: number | null }[] = [];
 
         for (const p of userPlatforms) {
-          const prevVal = getPlatformValueAtEndOfMonth(p.id, prevYM);
-          const currVal = getPlatformValueAtEndOfMonth(p.id, currYM);
-          const netCash = getNetCashInMonth(p.id, currYM);
-          const gain = currVal - prevVal - netCash;
-          const gainPct = prevVal > 0 ? (gain / prevVal) * 100 : null;
-          if (prevVal > 0 || currVal > 0) {
-            breakdown.push({ platformId: p.id, name: p.name, color: p.color, prevVal, currVal, gain, gainPct });
+          const prev = getPlatformValueNearTenthOfMonth(p.id, prevYM);
+          const curr = getPlatformValueNearTenthOfMonth(p.id, currYM);
+          const netCash = getNetCashBetween(p.id, prev.date, curr.date);
+          const gain = curr.value - prev.value - netCash;
+          const gainPct = prev.value > 0 ? (gain / prev.value) * 100 : null;
+          if (prev.value > 0 || curr.value > 0) {
+            breakdown.push({ platformId: p.id, name: p.name, color: p.color, prevVal: prev.value, currVal: curr.value, gain, gainPct });
           }
         }
 
