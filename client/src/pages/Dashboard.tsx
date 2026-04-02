@@ -849,7 +849,9 @@ export default function Dashboard() {
           .sort((a, b) => Math.abs(b.gain) - Math.abs(a.gain));
       }
       // Fallback: ymKey lookup from heatmap data (used for "all" view which still uses mappedData)
+      // Skip lookup for aggregated period keys like "2025-Q1" or "2025" — they are not valid dates
       if (!d?.date || !platformBreakdownByMonth) return null;
+      if (typeof d.date === 'string' && (d.date.includes('-Q') || /^\d{4}$/.test(d.date))) return null;
       const ymKey = format(new Date(d.date), 'yyyy-MM');
       const entries = platformBreakdownByMonth[ymKey]?.filter(p => !excludedPlatforms.has(p.platformId));
       if (!entries || entries.length === 0) return null;
@@ -858,9 +860,17 @@ export default function Dashboard() {
         .sort((a, b) => Math.abs(b.gain) - Math.abs(a.gain));
     })();
 
+    // Format the tooltip header label — handle aggregated period keys ("2025-Q1", "2025") gracefully
+    const fmtTooltipLabel = (l: string): string => {
+      if (!l) return '';
+      if (l.includes('-Q')) { const [y, q] = l.split('-'); return `${q} '${y.slice(2)}`; }
+      if (/^\d{4}$/.test(l)) return l;
+      try { return format(new Date(l), 'MMM dd, yyyy'); } catch { return l; }
+    };
+
     return (
       <div className="rounded-xl border border-border bg-card shadow-lg px-4 py-3 text-sm min-w-[220px]">
-        <p className="font-semibold text-foreground mb-2">{label ? format(new Date(label), 'MMM dd, yyyy') : ''}</p>
+        <p className="font-semibold text-foreground mb-2">{fmtTooltipLabel(label)}</p>
         {payload.map((entry: any) => {
           const isPct = entry.dataKey === 'gainPct' || entry.dataKey === 'monthlyChangePct';
           const isSigned = entry.dataKey === 'monthlyChange' || entry.dataKey === 'gain' || isPct;

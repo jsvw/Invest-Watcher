@@ -253,9 +253,16 @@ export default function PlatformDetails() {
   const PlatformChartTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || payload.length === 0) return null;
     const d = payload[0]?.payload;
+    // Format the tooltip header — aggregated period keys ("2025-Q1", "2025") must not be parsed as dates
+    const fmtLabel = (l: string): string => {
+      if (!l) return '';
+      if (l.includes('-Q')) { const [y, q] = l.split('-'); return `${q} '${y.slice(2)}`; }
+      if (/^\d{4}$/.test(l)) return l;
+      try { return format(new Date(l), 'MMM dd, yyyy'); } catch { return l; }
+    };
     return (
       <div className="rounded-xl border border-border bg-card shadow-lg px-4 py-3 text-sm min-w-[200px]">
-        <p className="font-semibold text-foreground mb-2">{label ? format(new Date(label), 'MMM dd, yyyy') : ''}</p>
+        <p className="font-semibold text-foreground mb-2">{fmtLabel(label)}</p>
         {payload.map((entry: any) => {
           const deltaKey = entry.dataKey === 'value' ? 'valueChange'
             : entry.dataKey === 'invested' ? 'investedChange'
