@@ -2,7 +2,7 @@ import { Layout } from "@/components/Layout";
 import { StatCard } from "@/components/StatCard";
 import { usePlatforms } from "@/hooks/use-platforms";
 import { useAuth } from "@/App";
-import { formatCurrency, formatCompactCurrency, getCurrencySymbol } from "@/lib/currency";
+import { formatCurrency, formatCurrencyRounded, formatCompactCurrency, getCurrencySymbol } from "@/lib/currency";
 import {
   Wallet, TrendingUp, DollarSign, Check, RefreshCw, Loader2, CheckCircle, XCircle,
   X, Save, Bookmark, Trash2, Target, ArrowUpCircle, ArrowDownCircle,
@@ -833,7 +833,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <StatCard
               title="Total Portfolio Value"
-              value={formatCurrency(totalValue, currency)}
+              value={formatCurrencyRounded(totalValue, currency)}
               icon={Wallet}
               className="border-l-primary"
               platformBreakdown={(activePlatforms || []).map(p => {
@@ -845,7 +845,7 @@ export default function Dashboard() {
             />
             <StatCard
               title="Total Invested"
-              value={formatCurrency(totalInvested, currency)}
+              value={formatCurrencyRounded(totalInvested, currency)}
               icon={DollarSign}
               className="border-l-blue-500"
               platformBreakdown={(activePlatforms || []).map(p => {
@@ -857,7 +857,7 @@ export default function Dashboard() {
             />
             <StatCard
               title="Net Profit / Loss"
-              value={formatCurrency(Math.abs(netProfit), currency)}
+              value={formatCurrencyRounded(Math.abs(netProfit), currency)}
               trend={netProfit >= 0 ? "up" : "down"}
               trendValue={`${roi.toFixed(2)}%`}
               icon={TrendingUp}
@@ -883,7 +883,7 @@ export default function Dashboard() {
               value={(() => {
                 if (!platformMomData || platformMomData.length === 0) return "N/A";
                 const totalMomChange = platformMomData.reduce((sum, p) => sum + p.momChange, 0);
-                return formatCurrency(totalMomChange, currency);
+                return formatCurrencyRounded(totalMomChange, currency);
               })()}
               trend={(() => {
                 if (!platformMomData || platformMomData.length === 0) return undefined;

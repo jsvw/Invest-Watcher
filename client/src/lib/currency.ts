@@ -27,6 +27,30 @@ export function formatCurrency(
     return new Intl.NumberFormat(config.locale, {
       style: "currency",
       currency: currencyCode,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(numValue);
+  } catch {
+    return `${config.symbol}${numValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+}
+
+export function formatCurrencyRounded(
+  value: number | string | null | undefined,
+  currencyCode: string = "EUR"
+): string {
+  const numValue = typeof value === "string" ? parseFloat(value) : value;
+
+  if (numValue == null || isNaN(numValue)) {
+    return getCurrencySymbol(currencyCode) + "0";
+  }
+
+  const config = CURRENCY_CONFIG[currencyCode] || CURRENCY_CONFIG.EUR;
+
+  try {
+    return new Intl.NumberFormat(config.locale, {
+      style: "currency",
+      currency: currencyCode,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(numValue);
