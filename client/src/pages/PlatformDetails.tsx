@@ -255,6 +255,7 @@ export default function PlatformDetails() {
     const d = payload[0]?.payload;
     // Format the tooltip header — aggregated period keys ("2025-Q1", "2025") must not be parsed as dates
     const fmtLabel = (l: unknown): string => {
+      if (typeof l === 'number') { try { return format(new Date(l), 'MMM dd, yyyy'); } catch { return String(l); } }
       if (!l || typeof l !== 'string') return String(l ?? '');
       if (l.includes('-Q')) { const [y, q] = l.split('-'); return `${q} '${y.slice(2)}`; }
       if (/^\d{4}$/.test(l)) return l;
