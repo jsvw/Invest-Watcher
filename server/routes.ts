@@ -71,10 +71,12 @@ export async function registerRoutes(
   // Setup authentication (must be before routes)
   setupAuth(app);
 
-  // One-time cleanup: remove duplicate same-day valuations on every server start
-  deduplicateSameDayValuations().catch(err =>
-    console.error("[startup] deduplicateSameDayValuations failed:", err)
-  );
+  // One-time cleanup: remove duplicate same-day valuations before serving requests
+  try {
+    await deduplicateSameDayValuations();
+  } catch (err) {
+    console.error("[startup] deduplicateSameDayValuations failed:", err);
+  }
 
   // Register AI integration routes
   registerChatRoutes(app);

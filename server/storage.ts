@@ -447,27 +447,29 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createValuation(valuation: InsertValuation): Promise<Valuation> {
-    const [newValuation] = await db.insert(valuations).values(valuation).returning();
+    return await db.transaction(async (tx) => {
+      const [newValuation] = await tx.insert(valuations).values(valuation).returning();
 
-    // Deduplicate: if multiple valuations exist for this platform on the same calendar day,
-    // keep only the one with the latest timestamp and delete the older ones.
-    const sameDayValuations = await db.select()
-      .from(valuations)
-      .where(and(
-        eq(valuations.platformId, newValuation.platformId),
-        sql`DATE_TRUNC('day', ${valuations.date}) = DATE_TRUNC('day', ${newValuation.date}::timestamp)`
-      ))
-      .orderBy(desc(valuations.date));
+      // Deduplicate: if multiple valuations exist for this platform on the same calendar day,
+      // keep only the one with the latest timestamp (tie-broken by highest id) and delete the rest.
+      const sameDayValuations = await tx.select()
+        .from(valuations)
+        .where(and(
+          eq(valuations.platformId, newValuation.platformId),
+          sql`DATE_TRUNC('day', ${valuations.date}) = DATE_TRUNC('day', ${newValuation.date}::timestamp)`
+        ))
+        .orderBy(desc(valuations.date), desc(valuations.id));
 
-    if (sameDayValuations.length > 1) {
-      const toKeep = sameDayValuations[0];
-      for (const v of sameDayValuations.slice(1)) {
-        await db.delete(valuations).where(eq(valuations.id, v.id));
+      if (sameDayValuations.length > 1) {
+        const toKeep = sameDayValuations[0];
+        for (const v of sameDayValuations.slice(1)) {
+          await tx.delete(valuations).where(eq(valuations.id, v.id));
+        }
+        return toKeep;
       }
-      return toKeep;
-    }
 
-    return newValuation;
+      return newValuation;
+    });
   }
 
   async updateValuation(id: number, valuation: Partial<InsertValuation>): Promise<Valuation> {
@@ -682,27 +684,29 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createAssetValuation(valuation: InsertAssetValuation): Promise<AssetValuation> {
-    const [newValuation] = await db.insert(assetValuations).values(valuation).returning();
+    return await db.transaction(async (tx) => {
+      const [newValuation] = await tx.insert(assetValuations).values(valuation).returning();
 
-    // Deduplicate: if multiple valuations exist for this asset on the same calendar day,
-    // keep only the one with the latest timestamp and delete the older ones.
-    const sameDayValuations = await db.select()
-      .from(assetValuations)
-      .where(and(
-        eq(assetValuations.assetId, newValuation.assetId),
-        sql`DATE_TRUNC('day', ${assetValuations.date}) = DATE_TRUNC('day', ${newValuation.date}::timestamp)`
-      ))
-      .orderBy(desc(assetValuations.date));
+      // Deduplicate: if multiple valuations exist for this asset on the same calendar day,
+      // keep only the one with the latest timestamp (tie-broken by highest id) and delete the rest.
+      const sameDayValuations = await tx.select()
+        .from(assetValuations)
+        .where(and(
+          eq(assetValuations.assetId, newValuation.assetId),
+          sql`DATE_TRUNC('day', ${assetValuations.date}) = DATE_TRUNC('day', ${newValuation.date}::timestamp)`
+        ))
+        .orderBy(desc(assetValuations.date), desc(assetValuations.id));
 
-    if (sameDayValuations.length > 1) {
-      const toKeep = sameDayValuations[0];
-      for (const v of sameDayValuations.slice(1)) {
-        await db.delete(assetValuations).where(eq(assetValuations.id, v.id));
+      if (sameDayValuations.length > 1) {
+        const toKeep = sameDayValuations[0];
+        for (const v of sameDayValuations.slice(1)) {
+          await tx.delete(assetValuations).where(eq(assetValuations.id, v.id));
+        }
+        return toKeep;
       }
-      return toKeep;
-    }
 
-    return newValuation;
+      return newValuation;
+    });
   }
 
   async updateAssetValuation(id: number, valuation: Partial<InsertAssetValuation>): Promise<AssetValuation> {
