@@ -647,13 +647,14 @@ export default function PlatformDetails() {
       }));
   }, [activeChartData, chartAggregation]);
 
-  const platAggXFmt = (d: string) => {
+  const platAggXFmt = (d: unknown) => {
+    if (typeof d !== 'string') return String(d ?? '');
     if (chartAggregation === "quarter") {
       const [y, q] = d.split("-");
       return `${q} '${y.slice(2)}`;
     }
     if (chartAggregation === "year") return d;
-    return format(new Date(d), 'MMM yy');
+    try { return format(new Date(d), 'MMM yy'); } catch { return d; }
   };
 
   const formatAxisValue = (value: number, showSign: boolean = false) => {
