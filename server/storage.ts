@@ -448,6 +448,25 @@ export class DatabaseStorage implements IStorage {
 
   async createValuation(valuation: InsertValuation): Promise<Valuation> {
     const [newValuation] = await db.insert(valuations).values(valuation).returning();
+
+    // Deduplicate: if multiple valuations exist for this platform on the same calendar day,
+    // keep only the one with the latest timestamp and delete the older ones.
+    const sameDayValuations = await db.select()
+      .from(valuations)
+      .where(and(
+        eq(valuations.platformId, newValuation.platformId),
+        sql`DATE_TRUNC('day', ${valuations.date}) = DATE_TRUNC('day', ${newValuation.date}::timestamp)`
+      ))
+      .orderBy(desc(valuations.date));
+
+    if (sameDayValuations.length > 1) {
+      const toKeep = sameDayValuations[0];
+      for (const v of sameDayValuations.slice(1)) {
+        await db.delete(valuations).where(eq(valuations.id, v.id));
+      }
+      return toKeep;
+    }
+
     return newValuation;
   }
 
@@ -664,6 +683,25 @@ export class DatabaseStorage implements IStorage {
 
   async createAssetValuation(valuation: InsertAssetValuation): Promise<AssetValuation> {
     const [newValuation] = await db.insert(assetValuations).values(valuation).returning();
+
+    // Deduplicate: if multiple valuations exist for this asset on the same calendar day,
+    // keep only the one with the latest timestamp and delete the older ones.
+    const sameDayValuations = await db.select()
+      .from(assetValuations)
+      .where(and(
+        eq(assetValuations.assetId, newValuation.assetId),
+        sql`DATE_TRUNC('day', ${assetValuations.date}) = DATE_TRUNC('day', ${newValuation.date}::timestamp)`
+      ))
+      .orderBy(desc(assetValuations.date));
+
+    if (sameDayValuations.length > 1) {
+      const toKeep = sameDayValuations[0];
+      for (const v of sameDayValuations.slice(1)) {
+        await db.delete(assetValuations).where(eq(assetValuations.id, v.id));
+      }
+      return toKeep;
+    }
+
     return newValuation;
   }
 
@@ -1283,3 +1321,44 @@ export class DatabaseStorage implements IStorage {
 }
 
 export const storage = new DatabaseStorage();
+
+/**
+ * One-time startup cleanup: removes older duplicate valuations where multiple records
+ * exist for the same platform (or asset) on the same calendar day. Keeps the record
+ * with the latest `date` timestamp in each duplicate group.
+ */
+export async function deduplicateSameDayValuations(): Promise<void> {
+  // --- Platform valuations ---
+  const dupPlatformRows = await db.execute(sql`
+    SELECT id
+    FROM valuations v
+    WHERE id NOT IN (
+      SELECT DISTINCT ON (platform_id, DATE_TRUNC('day', date)) id
+      FROM valuations
+      ORDER BY platform_id, DATE_TRUNC('day', date), date DESC
+    )
+  `);
+  const platformIds = (dupPlatformRows.rows as { id: number }[]).map(r => r.id);
+  for (const id of platformIds) {
+    await db.delete(valuations).where(eq(valuations.id, id));
+  }
+
+  // --- Asset valuations ---
+  const dupAssetRows = await db.execute(sql`
+    SELECT id
+    FROM asset_valuations av
+    WHERE id NOT IN (
+      SELECT DISTINCT ON (asset_id, DATE_TRUNC('day', date)) id
+      FROM asset_valuations
+      ORDER BY asset_id, DATE_TRUNC('day', date), date DESC
+    )
+  `);
+  const assetValIds = (dupAssetRows.rows as { id: number }[]).map(r => r.id);
+  for (const id of assetValIds) {
+    await db.delete(assetValuations).where(eq(assetValuations.id, id));
+  }
+
+  if (platformIds.length > 0 || assetValIds.length > 0) {
+    console.log(`[startup] Removed ${platformIds.length} duplicate platform valuation(s) and ${assetValIds.length} duplicate asset valuation(s).`);
+  }
+}

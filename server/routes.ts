@@ -1,6 +1,6 @@
 import type { Express, Request } from "express";
 import type { Server } from "http";
-import { storage } from "./storage";
+import { storage, deduplicateSameDayValuations } from "./storage";
 import { db } from "./db";
 import { valuations, assets, assetValuations, assetRepayments, insertAssetSchema, insertAssetValuationSchema, insertAssetRepaymentSchema } from "@shared/schema";
 import { api } from "@shared/routes";
@@ -70,7 +70,12 @@ export async function registerRoutes(
 ): Promise<Server> {
   // Setup authentication (must be before routes)
   setupAuth(app);
-  
+
+  // One-time cleanup: remove duplicate same-day valuations on every server start
+  deduplicateSameDayValuations().catch(err =>
+    console.error("[startup] deduplicateSameDayValuations failed:", err)
+  );
+
   // Register AI integration routes
   registerChatRoutes(app);
   registerImageRoutes(app);
