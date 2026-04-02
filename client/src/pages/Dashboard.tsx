@@ -165,9 +165,11 @@ export default function Dashboard() {
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
   const [chartType, setChartType] = useState<"line" | "bar">("line");
   const [chartValueMode, setChartValueMode] = useState<"value" | "pct">("value");
+  const [chartAggregation, setChartAggregation] = useState<"month" | "quarter" | "year">("month");
   const [displayedChartView, setDisplayedChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
   const [displayedChartType, setDisplayedChartType] = useState<"line" | "bar">("line");
   const [displayedChartValueMode, setDisplayedChartValueMode] = useState<"value" | "pct">("value");
+  const [displayedChartAggregation, setDisplayedChartAggregation] = useState<"month" | "quarter" | "year">("month");
   const [chartFading, setChartFading] = useState(false);
 
   // ── Allocation targets state ─────────────────────────────────────────────
@@ -208,10 +210,11 @@ export default function Dashboard() {
       setDisplayedChartView(chartView);
       setDisplayedChartType(chartType);
       setDisplayedChartValueMode(chartValueMode);
+      setDisplayedChartAggregation(chartAggregation);
       setChartFading(false);
     }, 160);
     return () => clearTimeout(t);
-  }, [chartView, chartType, chartValueMode]);
+  }, [chartView, chartType, chartValueMode, chartAggregation]);
 
   // ── Helper: togglePlatform ───────────────────────────────────────────────
   function togglePlatform(id: number) {
@@ -488,11 +491,7 @@ export default function Dashboard() {
     let exactYear: number | null = null;
     let exactYM: string | null = null;
 
-    if (range === "7d") {
-      cutoffMs = now.getTime() - 7 * 24 * 60 * 60 * 1000;
-    } else if (range === "month") {
-      cutoffMs = now.getTime() - 30 * 24 * 60 * 60 * 1000;
-    } else if (range === "quarter") {
+    if (range === "quarter") {
       cutoffMs = now.getTime() - 90 * 24 * 60 * 60 * 1000;
     } else if (range === "year") {
       cutoffMs = now.getTime() - 365 * 24 * 60 * 60 * 1000;
@@ -523,6 +522,53 @@ export default function Dashboard() {
         return true;
       });
   }, [platformBreakdownByMonth, excludedPlatforms, range]);
+
+  // ── Computed: aggregated monthly series (quarter / year averages) ─────────
+  const aggregatedSeriesData = useMemo(() => {
+    if (displayedChartAggregation === "month") return monthlySeriesData;
+
+    const groups = new Map<string, {
+      totalChange: number; totalChangePct: number; count: number;
+      platformTotals: Map<number, { gain: number; prevVal: number; name: string; color: string; platformId: number }>;
+    }>();
+
+    for (const entry of monthlySeriesData) {
+      const [y, m] = entry.date.split("-").map(Number);
+      const key = displayedChartAggregation === "quarter"
+        ? `${y}-Q${Math.ceil(m / 3)}`
+        : `${y}`;
+
+      if (!groups.has(key)) {
+        groups.set(key, { totalChange: 0, totalChangePct: 0, count: 0, platformTotals: new Map() });
+      }
+      const g = groups.get(key)!;
+      g.totalChange += entry.monthlyChange;
+      g.totalChangePct += entry.monthlyChangePct;
+      g.count++;
+      for (const pb of entry.platformBreakdown) {
+        const existing = g.platformTotals.get(pb.platformId);
+        if (existing) {
+          existing.gain += pb.gain;
+          existing.prevVal += pb.prevVal;
+        } else {
+          g.platformTotals.set(pb.platformId, { ...pb });
+        }
+      }
+    }
+
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, g]) => {
+        const avgChange = g.count > 0 ? g.totalChange / g.count : 0;
+        const avgChangePct = g.count > 0 ? g.totalChangePct / g.count : 0;
+        const platformBreakdown = Array.from(g.platformTotals.values()).map(p => ({
+          ...p,
+          gain: g.count > 0 ? p.gain / g.count : 0,
+          prevVal: g.count > 0 ? p.prevVal / g.count : 0,
+        }));
+        return { date: key, timestamp: 0, monthlyChange: avgChange, monthlyChangePct: avgChangePct, platformBreakdown };
+      });
+  }, [monthlySeriesData, displayedChartAggregation]);
 
   // ── Computed: analytics ──────────────────────────────────────────────────
   const excludedPlatformNames = useMemo(() => {
@@ -1051,8 +1097,6 @@ export default function Dashboard() {
                   setSpecificMonth(null);
                 }} className="w-auto">
                   <TabsList>
-                    <TabsTrigger value="7d">7D</TabsTrigger>
-                    <TabsTrigger value="month">1M</TabsTrigger>
                     <TabsTrigger value="quarter">3M</TabsTrigger>
                     <TabsTrigger value="year">1Y</TabsTrigger>
                     <TabsTrigger value="all">ALL</TabsTrigger>
@@ -1086,16 +1130,25 @@ export default function Dashboard() {
                     <TabsTrigger value="all" data-testid="tab-chart-all">All</TabsTrigger>
                   </TabsList>
                 </Tabs>
-                {chartView !== "overview" && (
-                  <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
-                    <button onClick={() => setChartValueMode("value")} className={cn("px-2.5 py-1.5 transition-colors", chartValueMode === "value" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-chart-mode-value">
-                      {getCurrencySymbol(currency)}
-                    </button>
-                    <button onClick={() => setChartValueMode("pct")} className={cn("px-2.5 py-1.5 transition-colors", chartValueMode === "pct" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-chart-mode-pct">
-                      %
-                    </button>
-                  </div>
-                )}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {chartView === "monthly" && (
+                    <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
+                      <button onClick={() => setChartAggregation("month")} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "month" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-month">Mo</button>
+                      <button onClick={() => setChartAggregation("quarter")} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "quarter" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-quarter">Qtr</button>
+                      <button onClick={() => setChartAggregation("year")} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "year" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-year">Yr</button>
+                    </div>
+                  )}
+                  {chartView !== "overview" && (
+                    <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
+                      <button onClick={() => setChartValueMode("value")} className={cn("px-2.5 py-1.5 transition-colors", chartValueMode === "value" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-chart-mode-value">
+                        {getCurrencySymbol(currency)}
+                      </button>
+                      <button onClick={() => setChartValueMode("pct")} className={cn("px-2.5 py-1.5 transition-colors", chartValueMode === "pct" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-chart-mode-pct">
+                        %
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className={cn("h-[400px] w-full transition-opacity duration-150", chartFading ? "opacity-0" : "opacity-100")}>
                 {(chartData && chartData.length > 0) || (displayedChartView === "monthly" && monthlySeriesData.length > 0) ? (() => {
@@ -1149,28 +1202,39 @@ export default function Dashboard() {
                   const profitAxisFmt = (v: number) => displayedChartValueMode === "pct" ? fmtPct(v) : formatAxisValue(v, true);
                   const monthlyAxisFmt = (v: number) => displayedChartValueMode === "pct" ? fmtPct(v) : formatAxisValue(v, true);
 
-                  // ── Monthly Growth: use heatmap-aligned 10th-to-10th series ───────────
-                  // This ensures the chart and heatmap always agree on monthly totals, and
-                  // the per-platform tooltip breakdown sums to exactly the headline figure.
+                  // ── Monthly Growth: use heatmap-aligned series, with optional aggregation ─
                   if (displayedChartView === "monthly") {
-                    if (monthlySeriesData.length === 0) {
+                    if (aggregatedSeriesData.length === 0) {
                       return (
                         <div className="h-full flex items-center justify-center text-muted-foreground">
-                          No monthly data available.
+                          No data available for this range.
                         </div>
                       );
                     }
+                    const aggXFmt = (d: string) => {
+                      if (displayedChartAggregation === "quarter") {
+                        const [y, q] = d.split("-");
+                        return `${q} '${y.slice(2)}`;
+                      }
+                      if (displayedChartAggregation === "year") return d;
+                      return format(new Date(d), 'MMM yy');
+                    };
+                    const aggSeriesName = displayedChartAggregation === "quarter"
+                      ? "Avg Monthly (Qtr)"
+                      : displayedChartAggregation === "year"
+                        ? "Avg Monthly (Yr)"
+                        : "Monthly Growth";
                     if (displayedChartType === "bar") {
                       return (
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={monthlySeriesData} barCategoryGap="20%">
+                          <BarChart data={aggregatedSeriesData} barCategoryGap="20%">
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                            <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={d => format(new Date(d), 'MMM yy')} interval="preserveStartEnd" />
+                            <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={aggXFmt} interval="preserveStartEnd" />
                             <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={monthlyAxisFmt} domain={['auto', 'auto']} />
                             <Tooltip content={<ChartTooltip />} />
                             <Legend verticalAlign="top" height={36} />
-                            <Bar dataKey={monthlyKey} name="Monthly Growth" yAxisId="left" animationDuration={350} radius={[3, 3, 3, 3]}>
-                              {monthlySeriesData.map((entry, i) => <Cell key={i} fill={entry.monthlyChange >= 0 ? '#10b981' : '#ef4444'} />)}
+                            <Bar dataKey={monthlyKey} name={aggSeriesName} yAxisId="left" animationDuration={350} radius={[3, 3, 3, 3]}>
+                              {aggregatedSeriesData.map((entry, i) => <Cell key={i} fill={entry.monthlyChange >= 0 ? '#10b981' : '#ef4444'} />)}
                             </Bar>
                           </BarChart>
                         </ResponsiveContainer>
@@ -1178,24 +1242,13 @@ export default function Dashboard() {
                     }
                     return (
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={monthlySeriesData}>
+                        <LineChart data={aggregatedSeriesData}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                          <XAxis
-                            dataKey="timestamp"
-                            type="number"
-                            scale="time"
-                            domain={['dataMin', 'dataMax']}
-                            stroke="hsl(var(--muted-foreground))"
-                            fontSize={12}
-                            tickLine={false}
-                            axisLine={false}
-                            tickFormatter={(ts) => format(new Date(ts), 'MMM yy')}
-                            ticks={monthlySeriesData.map(d => d.timestamp)}
-                          />
+                          <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={aggXFmt} interval="preserveStartEnd" />
                           <YAxis yAxisId="monthly" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={monthlyAxisFmt} domain={['auto', 'auto']} />
                           <Tooltip content={<ChartTooltip />} />
                           <Legend verticalAlign="top" height={36} />
-                          <Line type="monotone" dataKey={monthlyKey} name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 7 }} animationDuration={350} />
+                          <Line type="monotone" dataKey={monthlyKey} name={aggSeriesName} yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 7 }} animationDuration={350} />
                         </LineChart>
                       </ResponsiveContainer>
                     );
