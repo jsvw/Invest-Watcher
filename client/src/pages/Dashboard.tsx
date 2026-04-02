@@ -693,8 +693,22 @@ export default function Dashboard() {
   const ChartTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || payload.length === 0) return null;
     const d = payload[0]?.payload;
+
+    // Per-platform breakdown for Monthly Growth view
+    const isMonthlyView = displayedChartView === "monthly" ||
+      (displayedChartView === "all" && payload.some((e: any) => e.dataKey === "monthlyChange" || e.dataKey === "monthlyChangePct"));
+    const monthlyPlatformRows = (() => {
+      if (!isMonthlyView || !d?.date || !platformBreakdownByMonth) return null;
+      const ymKey = format(new Date(d.date), 'yyyy-MM');
+      const entries = platformBreakdownByMonth[ymKey]?.filter(p => !excludedPlatforms.has(p.platformId));
+      if (!entries || entries.length === 0) return null;
+      return entries
+        .filter(p => Math.abs(p.gain) > 0.005)
+        .sort((a, b) => Math.abs(b.gain) - Math.abs(a.gain));
+    })();
+
     return (
-      <div className="rounded-xl border border-border bg-card shadow-lg px-4 py-3 text-sm min-w-[200px]">
+      <div className="rounded-xl border border-border bg-card shadow-lg px-4 py-3 text-sm min-w-[220px]">
         <p className="font-semibold text-foreground mb-2">{label ? format(new Date(label), 'MMM dd, yyyy') : ''}</p>
         {payload.map((entry: any) => {
           const isPct = entry.dataKey === 'gainPct' || entry.dataKey === 'monthlyChangePct';
@@ -727,6 +741,25 @@ export default function Dashboard() {
             </div>
           );
         })}
+        {monthlyPlatformRows && monthlyPlatformRows.length > 0 && (
+          <>
+            <div className="border-t border-border mt-2 pt-2 space-y-0.5">
+              {monthlyPlatformRows.map(p => (
+                <div key={p.platformId} className="flex items-center justify-between gap-4 py-0.5">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
+                    <span className="text-muted-foreground text-xs truncate">{p.name}</span>
+                  </div>
+                  <span className={cn("text-xs font-semibold shrink-0", p.gain >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                    {displayedChartValueMode === "pct"
+                      ? (p.gainPct != null ? fmtPct(p.gainPct) : "—")
+                      : `${p.gain >= 0 ? '+' : ''}${formatCurrency(p.gain, currency)}`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     );
   };
