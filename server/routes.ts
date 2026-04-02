@@ -1550,17 +1550,19 @@ export async function registerRoutes(
 
       const sortedMonths = Array.from(valuationMonths).sort();
 
-      // Pre-sort valuations once (desc) for O(n) month-end lookups via early-exit find
-      const valuationsSortedDesc = [...platformValuations].sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-
-      // Returns the latest valuation snapshot on or before end-of-month, with its exact date
-      const getSnapshotAtEndOfMonth = (ym: string): { value: number; date: Date } | null => {
+      // For a given month, get the valuation closest to the 10th of that month.
+      // Matches the same strategy used by the main dashboard heatmap so numbers
+      // are consistent across the whole app.
+      const getSnapshotNearTenth = (ym: string): { value: number; date: Date } => {
         const [year, month] = ym.split('-').map(Number);
-        const endOfMonth = new Date(year, month, 0, 23, 59, 59);
-        const match = valuationsSortedDesc.find(v => new Date(v.date) <= endOfMonth);
-        return match ? { value: Number(match.value), date: new Date(match.date) } : null;
+        const tenth = new Date(year, month - 1, 10).getTime();
+        if (platformValuations.length === 0) return { value: 0, date: new Date(tenth) };
+        const closest = platformValuations.reduce((best, v) => {
+          const dist = Math.abs(new Date(v.date).getTime() - tenth);
+          const bestDist = Math.abs(new Date(best.date).getTime() - tenth);
+          return dist < bestDist ? v : best;
+        });
+        return { value: Number(closest.value), date: new Date(closest.date) };
       };
 
       // Only count cash flows between two snapshot dates (exclusive of prevDate, inclusive of upTo)
@@ -1580,8 +1582,7 @@ export async function registerRoutes(
 
       for (let i = 0; i < sortedMonths.length; i++) {
         const currYM = sortedMonths[i];
-        const currSnap = getSnapshotAtEndOfMonth(currYM);
-        if (!currSnap) continue;
+        const currSnap = getSnapshotNearTenth(currYM);
 
         const currVal = currSnap.value;
         const currDate = currSnap.date;
@@ -1590,8 +1591,9 @@ export async function registerRoutes(
         let prevVal = 0;
         let prevDate = epoch;
         if (i > 0) {
-          const prevSnap = getSnapshotAtEndOfMonth(sortedMonths[i - 1]);
-          if (prevSnap) { prevVal = prevSnap.value; prevDate = prevSnap.date; }
+          const prevSnap = getSnapshotNearTenth(sortedMonths[i - 1]);
+          prevVal = prevSnap.value;
+          prevDate = prevSnap.date;
         }
 
         const netCash = getNetCashBetween(prevDate, currDate);
