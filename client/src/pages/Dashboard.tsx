@@ -476,6 +476,54 @@ export default function Dashboard() {
     }));
   }, [history]);
 
+  // ── Computed: monthly growth series (heatmap-aligned, 10th-to-10th) ─────
+  // Uses the same platformBreakdownByMonth data as the heatmap so the
+  // Monthly Growth chart and heatmap always show identical totals.
+  const monthlySeriesData = useMemo(() => {
+    if (!platformBreakdownByMonth) return [];
+
+    // Compute a date cutoff from the current range selection (mirrors server logic)
+    const now = new Date();
+    let cutoffMs: number | null = null;
+    let exactYear: number | null = null;
+    let exactYM: string | null = null;
+
+    if (range === "7d") {
+      cutoffMs = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+    } else if (range === "month") {
+      cutoffMs = now.getTime() - 30 * 24 * 60 * 60 * 1000;
+    } else if (range === "quarter") {
+      cutoffMs = now.getTime() - 90 * 24 * 60 * 60 * 1000;
+    } else if (range === "year") {
+      cutoffMs = now.getTime() - 365 * 24 * 60 * 60 * 1000;
+    } else if (range.startsWith("year-")) {
+      exactYear = parseInt(range.split("-")[1]);
+    } else if (range.startsWith("month-")) {
+      const parts = range.split("-");
+      exactYM = `${parts[1]}-${parts[2].padStart(2, "0")}`;
+    }
+    // "all" → no cutoff
+
+    return Object.entries(platformBreakdownByMonth)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([ym, platforms]) => {
+        const filteredPlatforms = platforms.filter(p => !excludedPlatforms.has(p.platformId));
+        const monthlyChange = filteredPlatforms.reduce((s, p) => s + p.gain, 0);
+        const totalPrevVal = filteredPlatforms.reduce((s, p) => s + p.prevVal, 0);
+        const monthlyChangePct = totalPrevVal > 0 ? (monthlyChange / totalPrevVal) * 100 : 0;
+        const [year, month] = ym.split("-").map(Number);
+        const date = `${ym}-10`;
+        const timestamp = new Date(year, month - 1, 10).getTime();
+        return { date, timestamp, monthlyChange, monthlyChangePct, platformBreakdown: filteredPlatforms };
+      })
+      .filter(entry => {
+        if (exactYM !== null) return entry.date.substring(0, 7) === exactYM;
+        if (exactYear !== null) return parseInt(entry.date.substring(0, 4)) === exactYear;
+        if (cutoffMs !== null) return entry.timestamp >= cutoffMs;
+        return true;
+      });
+  }, [platformBreakdownByMonth, excludedPlatforms, range]);
+
   // ── Computed: analytics ──────────────────────────────────────────────────
   const excludedPlatformNames = useMemo(() => {
     if (!platforms) return new Set<string>();
@@ -698,7 +746,15 @@ export default function Dashboard() {
     const isMonthlyView = displayedChartView === "monthly" ||
       (displayedChartView === "all" && payload.some((e: any) => e.dataKey === "monthlyChange" || e.dataKey === "monthlyChangePct"));
     const monthlyPlatformRows = (() => {
-      if (!isMonthlyView || !d?.date || !platformBreakdownByMonth) return null;
+      if (!isMonthlyView) return null;
+      // Prefer inline platformBreakdown (present on monthlySeriesData points — sums to headline)
+      if (d?.platformBreakdown) {
+        return (d.platformBreakdown as PlatformGain[])
+          .filter(p => Math.abs(p.gain) > 0.005)
+          .sort((a, b) => Math.abs(b.gain) - Math.abs(a.gain));
+      }
+      // Fallback: ymKey lookup from heatmap data (used for "all" view which still uses mappedData)
+      if (!d?.date || !platformBreakdownByMonth) return null;
       const ymKey = format(new Date(d.date), 'yyyy-MM');
       const entries = platformBreakdownByMonth[ymKey]?.filter(p => !excludedPlatforms.has(p.platformId));
       if (!entries || entries.length === 0) return null;
@@ -1093,6 +1149,58 @@ export default function Dashboard() {
                   const profitAxisFmt = (v: number) => displayedChartValueMode === "pct" ? fmtPct(v) : formatAxisValue(v, true);
                   const monthlyAxisFmt = (v: number) => displayedChartValueMode === "pct" ? fmtPct(v) : formatAxisValue(v, true);
 
+                  // ── Monthly Growth: use heatmap-aligned 10th-to-10th series ───────────
+                  // This ensures the chart and heatmap always agree on monthly totals, and
+                  // the per-platform tooltip breakdown sums to exactly the headline figure.
+                  if (displayedChartView === "monthly") {
+                    if (monthlySeriesData.length === 0) {
+                      return (
+                        <div className="h-full flex items-center justify-center text-muted-foreground">
+                          No monthly data available.
+                        </div>
+                      );
+                    }
+                    if (displayedChartType === "bar") {
+                      return (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={monthlySeriesData} barCategoryGap="20%">
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                            <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={d => format(new Date(d), 'MMM yy')} interval="preserveStartEnd" />
+                            <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={monthlyAxisFmt} domain={['auto', 'auto']} />
+                            <Tooltip content={<ChartTooltip />} />
+                            <Legend verticalAlign="top" height={36} />
+                            <Bar dataKey={monthlyKey} name="Monthly Growth" yAxisId="left" animationDuration={350} radius={[3, 3, 3, 3]}>
+                              {monthlySeriesData.map((entry, i) => <Cell key={i} fill={entry.monthlyChange >= 0 ? '#10b981' : '#ef4444'} />)}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      );
+                    }
+                    return (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={monthlySeriesData}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                          <XAxis
+                            dataKey="timestamp"
+                            type="number"
+                            scale="time"
+                            domain={['dataMin', 'dataMax']}
+                            stroke="hsl(var(--muted-foreground))"
+                            fontSize={12}
+                            tickLine={false}
+                            axisLine={false}
+                            tickFormatter={(ts) => format(new Date(ts), 'MMM yy')}
+                            ticks={monthlySeriesData.map(d => d.timestamp)}
+                          />
+                          <YAxis yAxisId="monthly" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={monthlyAxisFmt} domain={['auto', 'auto']} />
+                          <Tooltip content={<ChartTooltip />} />
+                          <Legend verticalAlign="top" height={36} />
+                          <Line type="monotone" dataKey={monthlyKey} name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 7 }} animationDuration={350} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    );
+                  }
+
                   if (displayedChartType === "bar") {
                     return (
                       <ResponsiveContainer width="100%" height="100%">
@@ -1102,8 +1210,8 @@ export default function Dashboard() {
                           {(displayedChartView === "overview" || displayedChartView === "all") && (
                             <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={value => formatAxisValue(value)} domain={[0, 'auto']} />
                           )}
-                          {(displayedChartView === "profit" || displayedChartView === "monthly") && (
-                            <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={displayedChartView === "profit" ? profitAxisFmt : monthlyAxisFmt} domain={['auto', 'auto']} />
+                          {displayedChartView === "profit" && (
+                            <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={profitAxisFmt} domain={['auto', 'auto']} />
                           )}
                           <Tooltip content={<ChartTooltip />} />
                           <Legend verticalAlign="top" height={36} />
@@ -1123,11 +1231,6 @@ export default function Dashboard() {
                               {mappedData.map((entry: any, i: number) => <Cell key={i} fill={entry.gain >= 0 ? '#10b981' : '#ef4444'} />)}
                             </Bar>
                           )}
-                          {displayedChartView === "monthly" && (
-                            <Bar dataKey={monthlyKey} name="Monthly Growth" yAxisId="left" animationDuration={350} radius={[3, 3, 3, 3]}>
-                              {mappedData.map((entry: any, i: number) => <Cell key={i} fill={entry.monthlyChange >= 0 ? '#10b981' : '#ef4444'} />)}
-                            </Bar>
-                          )}
                         </BarChart>
                       </ResponsiveContainer>
                     );
@@ -1144,7 +1247,7 @@ export default function Dashboard() {
                         {(displayedChartView === "profit" || displayedChartView === "all") && (
                           <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={profitAxisFmt} domain={['auto', 'auto']} />
                         )}
-                        {(displayedChartView === "monthly" || displayedChartView === "all") && (
+                        {displayedChartView === "all" && (
                           <YAxis yAxisId="monthly" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={monthlyAxisFmt} domain={['auto', 'auto']} />
                         )}
                         <Tooltip content={<ChartTooltip />} />
@@ -1158,7 +1261,7 @@ export default function Dashboard() {
                         {(displayedChartView === "profit" || displayedChartView === "all") && (
                           <Line type="monotone" dataKey={profitKey} name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 4 }} animationDuration={350} />
                         )}
-                        {(displayedChartView === "monthly" || displayedChartView === "all") && (
+                        {displayedChartView === "all" && (
                           <Line type="monotone" dataKey={monthlyKey} name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 7 }} animationDuration={350} />
                         )}
                       </LineChart>
