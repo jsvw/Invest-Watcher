@@ -592,6 +592,36 @@ export default function Dashboard() {
     });
   }, [flowData, excludedPlatformNames]);
 
+  const [flowAggregation, setFlowAggregation] = useState<"month" | "quarter" | "year">("month");
+
+  const aggregatedFlowMonths = useMemo(() => {
+    if (flowAggregation === "month") return filteredFlowMonths;
+    const groups = new Map<string, Record<string, number>>();
+    for (const row of filteredFlowMonths) {
+      const m = row.month as string;
+      const [y, mo] = m.split("-").map(Number);
+      const key = flowAggregation === "quarter" ? `${y}-Q${Math.ceil(mo / 3)}` : `${y}`;
+      if (!groups.has(key)) groups.set(key, { __total__: 0 });
+      const g = groups.get(key)!;
+      for (const [k, v] of Object.entries(row)) {
+        if (k === "month") continue;
+        g[k] = (g[k] || 0) + ((v as number) || 0);
+      }
+    }
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, g]) => ({ month: key, ...g }));
+  }, [filteredFlowMonths, flowAggregation]);
+
+  function fmtFlowLabel(m: string): string {
+    if (m.includes("-Q")) {
+      const [y, q] = m.split("-");
+      return `${q} '${y.slice(2)}`;
+    }
+    if (/^\d{4}$/.test(m)) return m;
+    return fmtMonthLabel(m);
+  }
+
   const kpis = useMemo(() => {
     if (!activePlatforms || !historyData || historyData.length === 0) return null;
 
@@ -1551,19 +1581,26 @@ export default function Dashboard() {
 
           {/* Monthly Investment Flow */}
           <Card>
-            <CardHeader>
-              <CardTitle>Monthly Investment Flow</CardTitle>
-              <CardDescription>Net new capital deployed each month, broken down by platform</CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between gap-4 flex-wrap pb-2">
+              <div>
+                <CardTitle>Investment Flow</CardTitle>
+                <CardDescription>Net new capital deployed, broken down by platform</CardDescription>
+              </div>
+              <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
+                <button onClick={() => setFlowAggregation("month")} className={cn("px-2.5 py-1.5 transition-colors", flowAggregation === "month" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-flow-agg-month">Mo</button>
+                <button onClick={() => setFlowAggregation("quarter")} className={cn("px-2.5 py-1.5 transition-colors", flowAggregation === "quarter" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-flow-agg-quarter">Qtr</button>
+                <button onClick={() => setFlowAggregation("year")} className={cn("px-2.5 py-1.5 transition-colors", flowAggregation === "year" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-flow-agg-year">Yr</button>
+              </div>
             </CardHeader>
             <CardContent>
               {flowData && flowData.months.length > 0 && flowData.platforms ? (
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={filteredFlowMonths} margin={{ left: 4, top: 20 }}>
+                    <BarChart data={aggregatedFlowMonths} margin={{ left: 4, top: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="month" tickFormatter={fmtMonthLabel} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                      <XAxis dataKey="month" tickFormatter={fmtFlowLabel} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
                       <YAxis tickFormatter={v => formatCurrency(v, currency)} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={70} />
-                      <Tooltip formatter={(v: number, name: string) => [formatCurrency(v, currency), name]} labelFormatter={fmtMonthLabel} contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
+                      <Tooltip formatter={(v: number, name: string) => [formatCurrency(v, currency), name]} labelFormatter={fmtFlowLabel} contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
                       <Legend />
                       {filteredFlowPlatforms.map((p, i) => (
                         <Bar key={p.name} dataKey={p.name} stackId="flow" fill={p.color}>

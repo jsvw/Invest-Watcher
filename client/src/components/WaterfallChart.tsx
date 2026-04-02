@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { formatCurrency, formatCompactCurrency } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 
-type Granularity = "year" | "quarter";
+type Granularity = "month" | "quarter" | "year";
 type ViewMode = "combined" | "platform";
 
 interface PlatformBreakdown {
@@ -210,8 +210,9 @@ export function WaterfallChart({ currency, excludedPlatforms }: WaterfallChartPr
   }, [waterfallData, viewMode, granularity]);
 
   const granularityBtns: { key: Granularity; label: string }[] = [
-    { key: "year", label: "Year" },
-    { key: "quarter", label: "Quarter" },
+    { key: "month", label: "Mo" },
+    { key: "quarter", label: "Qtr" },
+    { key: "year", label: "Yr" },
   ];
 
   const viewModeBtns: { key: ViewMode; label: string }[] = [

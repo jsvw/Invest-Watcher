@@ -298,6 +298,7 @@ export default function PlatformDetails() {
   const [specificYear, setSpecificYear] = useState<string | null>(null);
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
+  const [chartAggregation, setChartAggregation] = useState<"month" | "quarter" | "year">("month");
   const [showAllPoints, setShowAllPoints] = useState(false);
   
   const { data: platforms } = usePlatforms();
@@ -615,6 +616,38 @@ export default function PlatformDetails() {
   }, [history]);
 
   const activeChartData = showAllPoints ? allPointsChartData : platformChartData;
+
+  const platAggregatedMonthlyData = useMemo(() => {
+    if (!activeChartData || chartAggregation === "month") return null;
+    const mapped = activeChartData.map((h: any, i: number, arr: any[]) => {
+      const prev = arr[i - 1];
+      const monthlyChange = i === 0 ? 0 : (h.value - prev.value) - (h.invested - prev.invested);
+      return { date: h.date, monthlyChange };
+    });
+    const groups = new Map<string, { total: number; count: number }>();
+    for (const pt of mapped) {
+      const d = new Date(pt.date);
+      const y = d.getFullYear();
+      const m = d.getMonth() + 1;
+      const key = chartAggregation === "quarter" ? `${y}-Q${Math.ceil(m / 3)}` : `${y}`;
+      if (!groups.has(key)) groups.set(key, { total: 0, count: 0 });
+      const g = groups.get(key)!;
+      g.total += pt.monthlyChange;
+      g.count++;
+    }
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, g]) => ({ date: key, monthlyChange: g.count > 0 ? g.total / g.count : 0 }));
+  }, [activeChartData, chartAggregation]);
+
+  const platAggXFmt = (d: string) => {
+    if (chartAggregation === "quarter") {
+      const [y, q] = d.split("-");
+      return `${q} '${y.slice(2)}`;
+    }
+    if (chartAggregation === "year") return d;
+    return format(new Date(d), 'MMM yy');
+  };
 
   const formatAxisValue = (value: number, showSign: boolean = false) => {
     const symbol = getCurrencySymbol(currency);
@@ -1050,18 +1083,39 @@ export default function PlatformDetails() {
                         <TabsTrigger value="all">All</TabsTrigger>
                       </TabsList>
                     </Tabs>
-                    <Button
-                      variant={showAllPoints ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setShowAllPoints(v => !v)}
-                      className="text-xs"
-                      data-testid="button-toggle-all-data-points"
-                    >
-                      {showAllPoints ? "Monthly view" : "All data points"}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {chartView === "monthly" && (
+                        <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
+                          <button onClick={() => setChartAggregation("month")} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "month" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-plat-agg-month">Mo</button>
+                          <button onClick={() => setChartAggregation("quarter")} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "quarter" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-plat-agg-quarter">Qtr</button>
+                          <button onClick={() => setChartAggregation("year")} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "year" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-plat-agg-year">Yr</button>
+                        </div>
+                      )}
+                      <Button
+                        variant={showAllPoints ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setShowAllPoints(v => !v)}
+                        className="text-xs"
+                        data-testid="button-toggle-all-data-points"
+                      >
+                        {showAllPoints ? "Monthly view" : "All data points"}
+                      </Button>
+                    </div>
                   </div>
                   <div className="h-[400px] w-full">
                     {activeChartData && activeChartData.length > 0 ? (
+                      chartView === "monthly" && platAggregatedMonthlyData ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={platAggregatedMonthlyData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                            <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={platAggXFmt} interval="preserveStartEnd" />
+                            <YAxis yAxisId="monthly" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />
+                            <Tooltip formatter={(v: number) => [formatAxisValue(v, true), chartAggregation === "quarter" ? "Avg Monthly (Qtr)" : "Avg Monthly (Yr)"]} labelFormatter={platAggXFmt} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
+                            <Legend verticalAlign="top" height={36} />
+                            <Line type="monotone" dataKey="monthlyChange" name={chartAggregation === "quarter" ? "Avg Monthly (Qtr)" : "Avg Monthly (Yr)"} yAxisId="monthly" stroke="#f59e0b" strokeWidth={3} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 7 }} animationDuration={350} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      ) : (
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={activeChartData.map((h: any, i: number, arr: any[]) => {
                           const prev = arr[i - 1];
@@ -1100,93 +1154,31 @@ export default function PlatformDetails() {
                             })()}
                           />
                           {(chartView === "overview" || chartView === "all") && (
-                            <YAxis 
-                              yAxisId="left"
-                              stroke="hsl(var(--muted-foreground))" 
-                              fontSize={12} 
-                              tickLine={false} 
-                              axisLine={false} 
-                              tickFormatter={(value) => formatAxisValue(value)}
-                              domain={['auto', 'auto']}
-                            />
+                            <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisValue(value)} domain={['auto', 'auto']} />
                           )}
                           {(chartView === "profit" || chartView === "all") && (
-                            <YAxis 
-                              yAxisId="right"
-                              orientation="right"
-                              stroke="#10b981" 
-                              fontSize={12} 
-                              tickLine={false} 
-                              axisLine={false} 
-                              tickFormatter={(value) => formatAxisValue(value, true)}
-                              domain={['auto', 'auto']}
-                            />
+                            <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisValue(value, true)} domain={['auto', 'auto']} />
                           )}
                           {(chartView === "monthly" || chartView === "all") && (
-                            <YAxis 
-                              yAxisId="monthly"
-                              orientation="right"
-                              stroke="#f59e0b" 
-                              fontSize={12} 
-                              tickLine={false} 
-                              axisLine={false} 
-                              tickFormatter={(value) => formatAxisValue(value, true)}
-                              domain={['auto', 'auto']}
-                            />
+                            <YAxis yAxisId="monthly" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisValue(value, true)} domain={['auto', 'auto']} />
                           )}
                           <Tooltip content={<PlatformChartTooltip />} />
                           <Legend verticalAlign="top" height={36}/>
                           {(chartView === "overview" || chartView === "all") && (
                             <>
-                              <Line 
-                                type="monotone" 
-                                dataKey="value" 
-                                name="Current Value"
-                                yAxisId="left"
-                                stroke={platform.color} 
-                                strokeWidth={4}
-                                dot={{ r: 5, fill: platform.color, strokeWidth: 0 }}
-                                activeDot={{ r: 7 }}
-                              />
-                              <Line 
-                                type="monotone" 
-                                dataKey="invested" 
-                                name="Total Invested"
-                                yAxisId="left"
-                                stroke="#8884d8" 
-                                strokeWidth={3}
-                                strokeDasharray="5 5"
-                                dot={{ r: 5, fill: '#8884d8', strokeWidth: 0 }}
-                              />
+                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={4} dot={{ r: 5, fill: platform.color, strokeWidth: 0 }} activeDot={{ r: 7 }} />
+                              <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 5, fill: '#8884d8', strokeWidth: 0 }} />
                             </>
                           )}
                           {(chartView === "profit" || chartView === "all") && (
-                            <Line 
-                              type="monotone" 
-                              dataKey="gain" 
-                              name="Profit/Loss"
-                              yAxisId="right"
-                              stroke="#10b981" 
-                              strokeWidth={chartView === "all" ? 3 : 4}
-                              dot={{ r: 5, fill: '#10b981', strokeWidth: 0 }}
-                              activeDot={{ r: 7 }}
-                            />
+                            <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={chartView === "all" ? 3 : 4} dot={{ r: 5, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 7 }} />
                           )}
                           {(chartView === "monthly" || chartView === "all") && (
-                            <Line 
-                              type="monotone" 
-                              dataKey="monthlyChange" 
-                              name="Monthly Growth"
-                              yAxisId="monthly"
-                              stroke="#f59e0b" 
-                              strokeWidth={chartView === "all" ? 3 : 4}
-                              dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }}
-                              activeDot={{ r: 7 }}
-                            />
+                            <Line type="monotone" dataKey="monthlyChange" name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={chartView === "all" ? 3 : 4} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 7 }} />
                           )}
-
                         </LineChart>
                       </ResponsiveContainer>
+                      )
                     ) : (
                       <div className="h-full flex items-center justify-center text-muted-foreground">
                         No performance history available.
@@ -1514,18 +1506,39 @@ export default function PlatformDetails() {
                         <TabsTrigger value="all" data-testid="tab-platform-chart-all">All</TabsTrigger>
                       </TabsList>
                     </Tabs>
-                    <Button
-                      variant={showAllPoints ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setShowAllPoints(v => !v)}
-                      className="text-xs"
-                      data-testid="button-toggle-all-data-points-standard"
-                    >
-                      {showAllPoints ? "Monthly view" : "All data points"}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {chartView === "monthly" && (
+                        <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
+                          <button onClick={() => setChartAggregation("month")} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "month" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-plat-agg-month-std">Mo</button>
+                          <button onClick={() => setChartAggregation("quarter")} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "quarter" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-plat-agg-quarter-std">Qtr</button>
+                          <button onClick={() => setChartAggregation("year")} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "year" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-plat-agg-year-std">Yr</button>
+                        </div>
+                      )}
+                      <Button
+                        variant={showAllPoints ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setShowAllPoints(v => !v)}
+                        className="text-xs"
+                        data-testid="button-toggle-all-data-points-standard"
+                      >
+                        {showAllPoints ? "Monthly view" : "All data points"}
+                      </Button>
+                    </div>
                   </div>
                   <div className="h-[400px] w-full">
                     {activeChartData && activeChartData.length > 0 ? (
+                      chartView === "monthly" && platAggregatedMonthlyData ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={platAggregatedMonthlyData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                            <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={platAggXFmt} interval="preserveStartEnd" />
+                            <YAxis yAxisId="monthly" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />
+                            <Tooltip formatter={(v: number) => [formatAxisValue(v, true), chartAggregation === "quarter" ? "Avg Monthly (Qtr)" : "Avg Monthly (Yr)"]} labelFormatter={platAggXFmt} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
+                            <Legend verticalAlign="top" height={36} />
+                            <Line type="monotone" dataKey="monthlyChange" name={chartAggregation === "quarter" ? "Avg Monthly (Qtr)" : "Avg Monthly (Yr)"} yAxisId="monthly" stroke="#f59e0b" strokeWidth={3} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 7 }} animationDuration={350} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      ) : (
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={activeChartData.map((h: any, i: number, arr: any[]) => {
                           const prev = arr[i - 1];
@@ -1564,93 +1577,31 @@ export default function PlatformDetails() {
                             })()}
                           />
                           {(chartView === "overview" || chartView === "all") && (
-                            <YAxis 
-                              yAxisId="left"
-                              stroke="hsl(var(--muted-foreground))" 
-                              fontSize={12} 
-                              tickLine={false} 
-                              axisLine={false} 
-                              tickFormatter={(value) => formatAxisValue(value)}
-                              domain={['auto', 'auto']}
-                            />
+                            <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisValue(value)} domain={['auto', 'auto']} />
                           )}
                           {(chartView === "profit" || chartView === "all") && (
-                            <YAxis 
-                              yAxisId="right"
-                              orientation="right"
-                              stroke="#10b981" 
-                              fontSize={12} 
-                              tickLine={false} 
-                              axisLine={false} 
-                              tickFormatter={(value) => formatAxisValue(value, true)}
-                              domain={['auto', 'auto']}
-                            />
+                            <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisValue(value, true)} domain={['auto', 'auto']} />
                           )}
                           {(chartView === "monthly" || chartView === "all") && (
-                            <YAxis 
-                              yAxisId="monthly"
-                              orientation="right"
-                              stroke="#f59e0b" 
-                              fontSize={12} 
-                              tickLine={false} 
-                              axisLine={false} 
-                              tickFormatter={(value) => formatAxisValue(value, true)}
-                              domain={['auto', 'auto']}
-                            />
+                            <YAxis yAxisId="monthly" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisValue(value, true)} domain={['auto', 'auto']} />
                           )}
                           <Tooltip content={<PlatformChartTooltip />} />
                           <Legend verticalAlign="top" height={36}/>
                           {(chartView === "overview" || chartView === "all") && (
                             <>
-                              <Line 
-                                type="monotone" 
-                                dataKey="value" 
-                                name="Current Value"
-                                yAxisId="left"
-                                stroke={platform.color} 
-                                strokeWidth={4}
-                                dot={{ r: 5, fill: platform.color, strokeWidth: 0 }}
-                                activeDot={{ r: 7 }}
-                              />
-                              <Line 
-                                type="monotone" 
-                                dataKey="invested" 
-                                name="Total Invested"
-                                yAxisId="left"
-                                stroke="#8884d8" 
-                                strokeWidth={3}
-                                strokeDasharray="5 5"
-                                dot={{ r: 5, fill: '#8884d8', strokeWidth: 0 }}
-                              />
+                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={4} dot={{ r: 5, fill: platform.color, strokeWidth: 0 }} activeDot={{ r: 7 }} />
+                              <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 5, fill: '#8884d8', strokeWidth: 0 }} />
                             </>
                           )}
                           {(chartView === "profit" || chartView === "all") && (
-                            <Line 
-                              type="monotone" 
-                              dataKey="gain" 
-                              name="Profit/Loss"
-                              yAxisId="right"
-                              stroke="#10b981" 
-                              strokeWidth={chartView === "all" ? 3 : 4}
-                              dot={{ r: 5, fill: '#10b981', strokeWidth: 0 }}
-                              activeDot={{ r: 7 }}
-                            />
+                            <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={chartView === "all" ? 3 : 4} dot={{ r: 5, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 7 }} />
                           )}
                           {(chartView === "monthly" || chartView === "all") && (
-                            <Line 
-                              type="monotone" 
-                              dataKey="monthlyChange" 
-                              name="Monthly Growth"
-                              yAxisId="monthly"
-                              stroke="#f59e0b" 
-                              strokeWidth={chartView === "all" ? 3 : 4}
-                              dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }}
-                              activeDot={{ r: 7 }}
-                            />
+                            <Line type="monotone" dataKey="monthlyChange" name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={chartView === "all" ? 3 : 4} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 7 }} />
                           )}
-
                         </LineChart>
                       </ResponsiveContainer>
+                      )
                     ) : (
                       <div className="h-full flex items-center justify-center text-muted-foreground">
                         No performance history available.
