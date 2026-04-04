@@ -61,6 +61,12 @@ interface PlatformMomEntry {
   momGrowthPercent: number;
 }
 
+interface RollingReturns {
+  d7:  { change: number; pct: number };
+  d30: { change: number; pct: number };
+  d90: { change: number; pct: number };
+}
+
 interface InvestmentFlowResponse {
   months: Record<string, string | number>[];
   platforms: { name: string; color: string }[];
@@ -272,6 +278,15 @@ export default function Dashboard() {
     queryFn: async () => {
       const res = await fetch('/api/portfolio/platform-mom', { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch platform MoM");
+      return await res.json();
+    }
+  });
+
+  const { data: rollingReturns } = useQuery<RollingReturns>({
+    queryKey: ['/api/portfolio/rolling-returns'],
+    queryFn: async () => {
+      const res = await fetch('/api/portfolio/rolling-returns', { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch rolling returns");
       return await res.json();
     }
   });
@@ -1073,39 +1088,33 @@ export default function Dashboard() {
               icon={<TrendingUp className="w-5 h-5 text-muted-foreground" />}
               positive={kpis?.cagr != null ? kpis.cagr >= 0 : undefined}
             />
-            <StatCard
-              title="Last 30 Days"
-              value={(() => {
-                if (!platformMomData || platformMomData.length === 0) return "N/A";
-                const totalMomChange = platformMomData.reduce((sum, p) => sum + p.momChange, 0);
-                return formatCurrencyRounded(totalMomChange, currency);
-              })()}
-              trend={(() => {
-                if (!platformMomData || platformMomData.length === 0) return undefined;
-                const totalMomChange = platformMomData.reduce((sum, p) => sum + p.momChange, 0);
-                return totalMomChange >= 0 ? "up" : "down";
-              })()}
-              trendValue={(() => {
-                if (!platformMomData || platformMomData.length === 0) return "";
-                const totalPrevValue = platformMomData.reduce((sum, p) => sum + p.prevValue, 0);
-                const totalMomChange = platformMomData.reduce((sum, p) => sum + p.momChange, 0);
-                const growthPercent = totalPrevValue > 0 ? (totalMomChange / totalPrevValue) * 100 : 0;
-                return `${growthPercent.toFixed(1)}%`;
-              })()}
-              icon={TrendingUp}
-              className={(() => {
-                if (!platformMomData || platformMomData.length === 0) return "border-l-muted";
-                const totalMomChange = platformMomData.reduce((sum, p) => sum + p.momChange, 0);
-                return totalMomChange >= 0 ? "border-l-emerald-500" : "border-l-rose-500";
-              })()}
-              platformBreakdown={platformMomData?.map(p => ({
-                name: p.name,
-                value: `${p.momGrowthPercent >= 0 ? '+' : ''}${p.momGrowthPercent.toFixed(1)}% (${p.momChange >= 0 ? '+' : ''}${formatCurrency(p.momChange, currency)})`,
-                iconUrl: p.customIconUrl,
-                sortValue: p.momGrowthPercent
-              })) || []}
-              data-testid="stat-mom-profit"
-            />
+            <Card className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-emerald-500" data-testid="stat-rolling-returns">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Performance</CardTitle>
+                <TrendingUp className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="pt-0">
+                {rollingReturns ? (
+                  <table className="w-full text-xs">
+                    <tbody>
+                      {([["7d", rollingReturns.d7], ["30d", rollingReturns.d30], ["90d", rollingReturns.d90]] as [string, { change: number; pct: number }][]).map(([label, w]) => (
+                        <tr key={label} className="border-b border-border/40 last:border-0">
+                          <td className="py-1 pr-2 text-muted-foreground font-medium w-8">{label}</td>
+                          <td className={cn("py-1 pr-2 font-semibold tabular-nums text-right", w.change >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                            {w.change >= 0 ? "+" : ""}{formatCurrencyRounded(w.change, currency)}
+                          </td>
+                          <td className={cn("py-1 text-right tabular-nums", w.pct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                            {w.pct >= 0 ? "+" : ""}{w.pct.toFixed(2)}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="text-muted-foreground text-xs">Loading...</p>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Portfolio Performance Chart */}

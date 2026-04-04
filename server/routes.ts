@@ -1187,6 +1187,75 @@ export async function registerRoutes(
     }
   });
 
+  // --- Portfolio rolling returns: 7d / 30d / 90d windows ---
+  app.get('/api/portfolio/rolling-returns', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const userPlatforms = await storage.getPlatforms(userId);
+      const userValuations = await storage.getAllValuationsForUser(userId);
+      const userInvestments = await storage.getAllInvestmentsForUser(userId);
+      const userWithdrawals = await storage.getAllWithdrawalsForUser(userId);
+
+      const computeWindow = (days: number) => {
+        let totalCurrent = 0;
+        let totalPrev = 0;
+        let totalNetFlow = 0;
+
+        for (const platform of userPlatforms as any[]) {
+          const platformVals = userValuations
+            .filter((v: any) => v.platformId === platform.id)
+            .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+          if (platformVals.length < 2) {
+            totalCurrent += platformVals.length === 1 ? Number(platformVals[0].value) : 0;
+            continue;
+          }
+
+          const latestVal = platformVals[0];
+          const currentValue = Number(latestVal.value);
+          const currentDate = new Date(latestVal.date);
+          const target = new Date(currentDate.getTime() - days * 24 * 60 * 60 * 1000);
+
+          const prevValEntry = platformVals.slice(1).reduce((best: any, v: any) => {
+            const dist = Math.abs(new Date(v.date).getTime() - target.getTime());
+            const bestDist = Math.abs(new Date(best.date).getTime() - target.getTime());
+            return dist < bestDist ? v : best;
+          });
+
+          const prevValue = Number(prevValEntry.value);
+          const prevDate = new Date(prevValEntry.date);
+
+          const netFlow =
+            userInvestments
+              .filter((i: any) => i.platformId === platform.id)
+              .filter((i: any) => { const d = new Date(i.date); return d > prevDate && d <= currentDate; })
+              .reduce((sum: number, i: any) => sum + Number(i.amount), 0)
+            - userWithdrawals
+              .filter((w: any) => w.platformId === platform.id)
+              .filter((w: any) => { const d = new Date(w.date); return d > prevDate && d <= currentDate; })
+              .reduce((sum: number, w: any) => sum + Number(w.amount), 0);
+
+          totalCurrent += currentValue;
+          totalPrev += prevValue;
+          totalNetFlow += netFlow;
+        }
+
+        const change = (totalCurrent - totalPrev) - totalNetFlow;
+        const pct = totalPrev > 0 ? (change / totalPrev) * 100 : 0;
+        return { change, pct };
+      };
+
+      res.json({
+        d7: computeWindow(7),
+        d30: computeWindow(30),
+        d90: computeWindow(90),
+      });
+    } catch (error) {
+      console.error("Error fetching rolling returns:", error);
+      res.status(500).json({ message: "Failed to fetch rolling returns" });
+    }
+  });
+
   // --- Analytics: Investment Flow ---
   app.get('/api/analytics/investment-flow', requireAuth, async (req, res) => {
     try {
