@@ -1191,13 +1191,7 @@ export async function registerRoutes(
   app.get('/api/portfolio/platform-rolling-returns', requireAuth, async (req, res) => {
     try {
       const userId = getAuthenticatedUserId(req)!;
-      const excludePlatformIds = req.query.excludePlatforms
-        ? (req.query.excludePlatforms as string).split(',').map(Number).filter(n => !isNaN(n))
-        : [];
-      const allPlatforms = await storage.getPlatforms(userId);
-      const userPlatforms = excludePlatformIds.length > 0
-        ? allPlatforms.filter((p: any) => !excludePlatformIds.includes(p.id))
-        : allPlatforms;
+      const userPlatforms = await storage.getPlatforms(userId);
       const userValuations = await storage.getAllValuationsForUser(userId);
       const userInvestments = await storage.getAllInvestmentsForUser(userId);
       const userWithdrawals = await storage.getAllWithdrawalsForUser(userId);
@@ -1209,7 +1203,7 @@ export async function registerRoutes(
             .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
           if (platformVals.length < 2) {
-            return { platformId: platform.id, name: platform.name, color: platform.color || '#6b7280', change: 0, pct: 0 };
+            return { platformId: platform.id, name: platform.name, color: platform.color || '#6b7280', change: 0, pct: 0, prevValue: 0 };
           }
 
           const latestVal = platformVals[0];
@@ -1238,7 +1232,7 @@ export async function registerRoutes(
 
           const change = (currentValue - prevValue) - netFlow;
           const pct = prevValue > 0 ? (change / prevValue) * 100 : 0;
-          return { platformId: platform.id, name: platform.name, color: platform.color || '#6b7280', change, pct };
+          return { platformId: platform.id, name: platform.name, color: platform.color || '#6b7280', change, pct, prevValue };
         });
 
       res.json({

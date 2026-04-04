@@ -67,6 +67,7 @@ interface PlatformRollingEntry {
   color: string;
   change: number;
   pct: number;
+  prevValue: number;
 }
 
 interface PlatformRollingReturns {
@@ -307,32 +308,38 @@ export default function Dashboard() {
   const platformMomData = allPlatformMomData?.filter(p => !excludedPlatforms.has(p.platformId));
 
   const { data: historyData } = useQuery<HistoryPoint[]>({
-    queryKey: ["/api/portfolio/history", "all", excludedPlatformKey],
+    queryKey: ["/api/portfolio/history", "all"],
     queryFn: async () => {
-      let url = "/api/portfolio/history?range=all";
-      if (excludedPlatforms.size > 0) url += `&excludePlatforms=${Array.from(excludedPlatforms).join(',')}`;
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch("/api/portfolio/history?range=all", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch history");
       return res.json();
     },
   });
 
-  const rollingReturns = historyData && historyData.length >= 2 ? {
-    d7:  computeRollingReturn(7,  historyData),
-    d30: computeRollingReturn(30, historyData),
-    d90: computeRollingReturn(90, historyData),
-  } : undefined;
-
   const { data: platformRollingReturns } = useQuery<PlatformRollingReturns>({
-    queryKey: ['/api/portfolio/platform-rolling-returns', excludedPlatformKey],
+    queryKey: ['/api/portfolio/platform-rolling-returns'],
     queryFn: async () => {
-      let url = '/api/portfolio/platform-rolling-returns';
-      if (excludedPlatforms.size > 0) url += `?excludePlatforms=${Array.from(excludedPlatforms).join(',')}`;
-      const res = await fetch(url, { credentials: 'include' });
+      const res = await fetch('/api/portfolio/platform-rolling-returns', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch platform rolling returns');
       return res.json();
     },
   });
+
+  const rollingReturns = useMemo(() => {
+    if (!platformRollingReturns) return undefined;
+    const computeWindow = (entries: PlatformRollingEntry[]) => {
+      const active = entries.filter(p => !excludedPlatforms.has(p.platformId));
+      const totalChange = active.reduce((sum, p) => sum + p.change, 0);
+      const totalPrevValue = active.reduce((sum, p) => sum + p.prevValue, 0);
+      const pct = totalPrevValue > 0 ? (totalChange / totalPrevValue) * 100 : 0;
+      return { change: totalChange, pct };
+    };
+    return {
+      d7:  computeWindow(platformRollingReturns.d7),
+      d30: computeWindow(platformRollingReturns.d30),
+      d90: computeWindow(platformRollingReturns.d90),
+    };
+  }, [platformRollingReturns, excludedPlatforms]);
 
   const { data: platformBreakdownByMonth } = useQuery<Record<string, PlatformGain[]>>({
     queryKey: ["/api/analytics/monthly-platform-breakdown"],
@@ -1129,7 +1136,8 @@ export default function Dashboard() {
                       const key = label === "7d" ? "d7" : label === "30d" ? "d30" : "d90";
                       const w = rollingReturns?.[key];
                       const platforms = platformRollingReturns?.[key]
-                        ?.slice()
+                        ?.filter(p => !excludedPlatforms.has(p.platformId))
+                        .slice()
                         .sort((a, b) => b.change - a.change);
                       return (
                         <UITooltip key={label}>
