@@ -628,7 +628,10 @@ export default function Dashboard() {
         const last = rows[rows.length - 1];
         const gain = last.value - last.invested;
         const gainPct = last.invested > 0 ? (gain / last.invested) * 100 : 0;
-        return { date: key, value: last.value, invested: last.invested, gain, gainPct };
+        const baseAmount = Math.min(last.value, last.invested);
+        const gainPortion = Math.max(0, gain);
+        const lostPortion = Math.max(0, -gain);
+        return { date: key, value: last.value, invested: last.invested, gain, gainPct, baseAmount, gainPortion, lostPortion };
       });
   }, [chartData, displayedChartAggregation]);
 
@@ -1352,8 +1355,13 @@ export default function Dashboard() {
                             <Tooltip content={<ChartTooltip />} />
                             <Legend verticalAlign="top" height={36} />
                             {(displayedChartView === "overview" || displayedChartView === "all") && <>
-                              <Bar dataKey="value" name="Current Value" stackId="ov" yAxisId="left" fill="hsl(var(--primary))" animationDuration={350} radius={[3, 3, 0, 0]} />
-                              <Bar dataKey="invested" name="Invested" stackId="ov2" yAxisId="left" fill="#3b82f6" animationDuration={350} />
+                              <Bar dataKey="baseAmount" name="Invested" stackId="stack" yAxisId="left" fill="#3b82f6" animationDuration={350} />
+                              <Bar dataKey="gainPortion" name="Profit" stackId="stack" yAxisId="left" animationDuration={350} radius={[3, 3, 0, 0]}>
+                                {aggregatedChartData!.map((_: any, i: number) => <Cell key={i} fill="#10b981" />)}
+                              </Bar>
+                              <Bar dataKey="lostPortion" name="Loss" stackId="stack" yAxisId="left" animationDuration={350} radius={[3, 3, 0, 0]}>
+                                {aggregatedChartData!.map((_: any, i: number) => <Cell key={i} fill="#ef4444" />)}
+                              </Bar>
                             </>}
                             {(displayedChartView === "profit" || displayedChartView === "all") && (
                               <Bar dataKey={profitKeyAgg} name="Profit/Loss" yAxisId={displayedChartView === "all" ? "right" : "left"} animationDuration={350} radius={[3, 3, 3, 3]}>
