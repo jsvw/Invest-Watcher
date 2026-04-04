@@ -602,14 +602,8 @@ export default function Dashboard() {
     return Array.from(groups.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, g]) => {
-        const avgChange = g.count > 0 ? g.totalChange / g.count : 0;
-        const avgChangePct = g.count > 0 ? g.totalChangePct / g.count : 0;
-        const platformBreakdown = Array.from(g.platformTotals.values()).map(p => ({
-          ...p,
-          gain: g.count > 0 ? p.gain / g.count : 0,
-          prevVal: g.count > 0 ? p.prevVal / g.count : 0,
-        }));
-        return { date: key, timestamp: 0, monthlyChange: avgChange, monthlyChangePct: avgChangePct, platformBreakdown };
+        const platformBreakdown = Array.from(g.platformTotals.values());
+        return { date: key, timestamp: 0, monthlyChange: g.totalChange, monthlyChangePct: g.totalChangePct, platformBreakdown };
       });
   }, [monthlySeriesData, displayedChartAggregation]);
 
@@ -1242,23 +1236,31 @@ export default function Dashboard() {
                   >
                     <LineChartIcon className="w-4 h-4" />
                   </button>
-                  <button
-                    onClick={() => setChartType("bar")}
-                    className={cn("px-2 py-1.5 transition-colors", chartType === "bar" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
-                    data-testid="button-chart-type-bar"
-                  >
-                    <BarChart2 className="w-4 h-4" />
-                  </button>
+                  {chartView !== "all" && (
+                    <button
+                      onClick={() => setChartType("bar")}
+                      className={cn("px-2 py-1.5 transition-colors", chartType === "bar" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+                      data-testid="button-chart-type-bar"
+                    >
+                      <BarChart2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-                <Tabs value={chartView} onValueChange={v => setChartView(v as any)}>
+                <Tabs value={chartView} onValueChange={v => {
+                  const next = v as typeof chartView;
+                  if (next === "all" && chartType === "bar") setChartType("line");
+                  setChartView(next);
+                }}>
                   <TabsList>
                     <TabsTrigger value="overview" data-testid="tab-chart-overview">Value Overview</TabsTrigger>
                     <TabsTrigger value="profit" data-testid="tab-chart-profit">Profit/Loss</TabsTrigger>
-                    <TabsTrigger value="monthly" data-testid="tab-chart-monthly">Monthly Growth</TabsTrigger>
+                    <TabsTrigger value="monthly" data-testid="tab-chart-monthly">
+                      {chartAggregation === "quarter" ? "Quarterly Growth" : chartAggregation === "year" ? "Yearly Growth" : "Monthly Growth"}
+                    </TabsTrigger>
                     <TabsTrigger value="all" data-testid="tab-chart-all">All</TabsTrigger>
                   </TabsList>
                 </Tabs>
@@ -1411,9 +1413,9 @@ export default function Dashboard() {
                       return format(new Date(d), 'MMM yy');
                     };
                     const aggSeriesName = displayedChartAggregation === "quarter"
-                      ? "Avg Monthly (Qtr)"
+                      ? "Quarterly Growth"
                       : displayedChartAggregation === "year"
-                        ? "Avg Monthly (Yr)"
+                        ? "Yearly Growth"
                         : "Monthly Growth";
                     if (displayedChartType === "bar") {
                       return (
