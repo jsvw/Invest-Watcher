@@ -61,8 +61,7 @@ interface PlatformMomEntry {
   momGrowthPercent: number;
 }
 
-function computeRollingReturn(days: number, historyData: HistoryPoint[]): { change: number; pct: number } | null {
-  if (!historyData || historyData.length < 2) return null;
+function computeRollingReturn(days: number, historyData: HistoryPoint[]): { change: number; pct: number } {
   const sorted = [...historyData].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const latest = sorted[0];
   const target = new Date(new Date(latest.date).getTime() - days * 24 * 60 * 60 * 1000);
