@@ -284,11 +284,6 @@ export default function Dashboard() {
 
   const { data: rollingReturns } = useQuery<RollingReturns>({
     queryKey: ['/api/portfolio/rolling-returns'],
-    queryFn: async () => {
-      const res = await fetch('/api/portfolio/rolling-returns', { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch rolling returns");
-      return await res.json();
-    }
   });
 
   const platformMomData = allPlatformMomData?.filter(p => !excludedPlatforms.has(p.platformId));
@@ -1088,31 +1083,30 @@ export default function Dashboard() {
               icon={<TrendingUp className="w-5 h-5 text-muted-foreground" />}
               positive={kpis?.cagr != null ? kpis.cagr >= 0 : undefined}
             />
-            <Card className="hover:shadow-lg transition-all duration-300 border-l-4 border-l-emerald-500" data-testid="stat-rolling-returns">
+            <Card className={cn("hover:shadow-lg transition-all duration-300 border-l-4", rollingReturns ? (rollingReturns.d30.change >= 0 ? "border-l-emerald-500" : "border-l-rose-500") : "border-l-muted")} data-testid="stat-rolling-returns">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Performance</CardTitle>
                 <TrendingUp className="w-4 h-4 text-muted-foreground" />
               </CardHeader>
               <CardContent className="pt-0">
-                {rollingReturns ? (
-                  <table className="w-full text-xs">
-                    <tbody>
-                      {([["7d", rollingReturns.d7], ["30d", rollingReturns.d30], ["90d", rollingReturns.d90]] as [string, { change: number; pct: number }][]).map(([label, w]) => (
+                <table className="w-full text-xs">
+                  <tbody>
+                    {(["7d", "30d", "90d"] as const).map((label) => {
+                      const w = rollingReturns?.[label === "7d" ? "d7" : label === "30d" ? "d30" : "d90"];
+                      return (
                         <tr key={label} className="border-b border-border/40 last:border-0">
                           <td className="py-1 pr-2 text-muted-foreground font-medium w-8">{label}</td>
-                          <td className={cn("py-1 pr-2 font-semibold tabular-nums text-right", w.change >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
-                            {w.change >= 0 ? "+" : ""}{formatCurrencyRounded(w.change, currency)}
+                          <td className={cn("py-1 pr-2 font-semibold tabular-nums text-right", !w ? "text-muted-foreground" : w.change >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                            {!w ? "—" : `${w.change >= 0 ? "+" : ""}${formatCurrencyRounded(w.change, currency)}`}
                           </td>
-                          <td className={cn("py-1 text-right tabular-nums", w.pct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
-                            {w.pct >= 0 ? "+" : ""}{w.pct.toFixed(2)}%
+                          <td className={cn("py-1 text-right tabular-nums", !w ? "text-muted-foreground" : w.pct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                            {!w ? "—" : `${w.pct >= 0 ? "+" : ""}${w.pct.toFixed(2)}%`}
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <p className="text-muted-foreground text-xs">Loading...</p>
-                )}
+                      );
+                    })}
+                  </tbody>
+                </table>
               </CardContent>
             </Card>
           </div>
