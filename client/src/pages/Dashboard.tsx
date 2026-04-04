@@ -330,7 +330,7 @@ export default function Dashboard() {
     const computeWindow = (entries: PlatformRollingEntry[]) => {
       const active = entries.filter(p => !excludedPlatforms.has(p.platformId));
       const totalChange = active.reduce((sum, p) => sum + p.change, 0);
-      const totalPrevValue = active.reduce((sum, p) => sum + p.prevValue, 0);
+      const totalPrevValue = active.reduce((sum, p) => sum + (p.prevValue ?? 0), 0);
       const pct = totalPrevValue > 0 ? (totalChange / totalPrevValue) * 100 : 0;
       return { change: totalChange, pct };
     };
