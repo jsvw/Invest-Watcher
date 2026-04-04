@@ -61,10 +61,19 @@ interface PlatformMomEntry {
   momGrowthPercent: number;
 }
 
-interface RollingReturns {
-  d7:  { change: number; pct: number };
-  d30: { change: number; pct: number };
-  d90: { change: number; pct: number };
+function computeRollingReturn(days: number, historyData: HistoryPoint[]): { change: number; pct: number } | null {
+  if (!historyData || historyData.length < 2) return null;
+  const sorted = [...historyData].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const latest = sorted[0];
+  const target = new Date(new Date(latest.date).getTime() - days * 24 * 60 * 60 * 1000);
+  const prev = sorted.slice(1).reduce((best, v) => {
+    const dist = Math.abs(new Date(v.date).getTime() - target.getTime());
+    const bestDist = Math.abs(new Date(best.date).getTime() - target.getTime());
+    return dist < bestDist ? v : best;
+  });
+  const change = (latest.value - prev.value) - (latest.invested - prev.invested);
+  const pct = prev.value > 0 ? (change / prev.value) * 100 : 0;
+  return { change, pct };
 }
 
 interface InvestmentFlowResponse {
@@ -282,10 +291,6 @@ export default function Dashboard() {
     }
   });
 
-  const { data: rollingReturns } = useQuery<RollingReturns>({
-    queryKey: ['/api/portfolio/rolling-returns'],
-  });
-
   const platformMomData = allPlatformMomData?.filter(p => !excludedPlatforms.has(p.platformId));
 
   const { data: historyData } = useQuery<HistoryPoint[]>({
@@ -296,6 +301,12 @@ export default function Dashboard() {
       return res.json();
     },
   });
+
+  const rollingReturns = historyData && historyData.length >= 2 ? {
+    d7:  computeRollingReturn(7,  historyData),
+    d30: computeRollingReturn(30, historyData),
+    d90: computeRollingReturn(90, historyData),
+  } : undefined;
 
   const { data: platformBreakdownByMonth } = useQuery<Record<string, PlatformGain[]>>({
     queryKey: ["/api/analytics/monthly-platform-breakdown"],
