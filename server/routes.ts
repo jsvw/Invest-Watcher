@@ -1191,7 +1191,13 @@ export async function registerRoutes(
   app.get('/api/portfolio/platform-rolling-returns', requireAuth, async (req, res) => {
     try {
       const userId = getAuthenticatedUserId(req)!;
-      const userPlatforms = await storage.getPlatforms(userId);
+      const excludePlatformIds = req.query.excludePlatforms
+        ? (req.query.excludePlatforms as string).split(',').map(Number).filter(n => !isNaN(n))
+        : [];
+      const allPlatforms = await storage.getPlatforms(userId);
+      const userPlatforms = excludePlatformIds.length > 0
+        ? allPlatforms.filter((p: any) => !excludePlatformIds.includes(p.id))
+        : allPlatforms;
       const userValuations = await storage.getAllValuationsForUser(userId);
       const userInvestments = await storage.getAllInvestmentsForUser(userId);
       const userWithdrawals = await storage.getAllWithdrawalsForUser(userId);

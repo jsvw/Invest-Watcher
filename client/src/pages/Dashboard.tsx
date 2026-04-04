@@ -307,9 +307,11 @@ export default function Dashboard() {
   const platformMomData = allPlatformMomData?.filter(p => !excludedPlatforms.has(p.platformId));
 
   const { data: historyData } = useQuery<HistoryPoint[]>({
-    queryKey: ["/api/portfolio/history", "all"],
+    queryKey: ["/api/portfolio/history", "all", excludedPlatformKey],
     queryFn: async () => {
-      const res = await fetch("/api/portfolio/history?range=all", { credentials: "include" });
+      let url = "/api/portfolio/history?range=all";
+      if (excludedPlatforms.size > 0) url += `&excludePlatforms=${Array.from(excludedPlatforms).join(',')}`;
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch history");
       return res.json();
     },
@@ -322,9 +324,11 @@ export default function Dashboard() {
   } : undefined;
 
   const { data: platformRollingReturns } = useQuery<PlatformRollingReturns>({
-    queryKey: ['/api/portfolio/platform-rolling-returns'],
+    queryKey: ['/api/portfolio/platform-rolling-returns', excludedPlatformKey],
     queryFn: async () => {
-      const res = await fetch('/api/portfolio/platform-rolling-returns', { credentials: 'include' });
+      let url = '/api/portfolio/platform-rolling-returns';
+      if (excludedPlatforms.size > 0) url += `?excludePlatforms=${Array.from(excludedPlatforms).join(',')}`;
+      const res = await fetch(url, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch platform rolling returns');
       return res.json();
     },
