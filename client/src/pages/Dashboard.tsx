@@ -61,6 +61,20 @@ interface PlatformMomEntry {
   momGrowthPercent: number;
 }
 
+interface PlatformRollingEntry {
+  platformId: number;
+  name: string;
+  color: string;
+  change: number;
+  pct: number;
+}
+
+interface PlatformRollingReturns {
+  d7:  PlatformRollingEntry[];
+  d30: PlatformRollingEntry[];
+  d90: PlatformRollingEntry[];
+}
+
 function computeRollingReturn(days: number, historyData: HistoryPoint[]): { change: number; pct: number } {
   const sorted = [...historyData].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   const latest = sorted[0];
@@ -306,6 +320,15 @@ export default function Dashboard() {
     d30: computeRollingReturn(30, historyData),
     d90: computeRollingReturn(90, historyData),
   } : undefined;
+
+  const { data: platformRollingReturns } = useQuery<PlatformRollingReturns>({
+    queryKey: ['/api/portfolio/platform-rolling-returns'],
+    queryFn: async () => {
+      const res = await fetch('/api/portfolio/platform-rolling-returns', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch platform rolling returns');
+      return res.json();
+    },
+  });
 
   const { data: platformBreakdownByMonth } = useQuery<Record<string, PlatformGain[]>>({
     queryKey: ["/api/analytics/monthly-platform-breakdown"],
@@ -1102,17 +1125,50 @@ export default function Dashboard() {
                 <table className="w-full text-xs">
                   <tbody>
                     {(["7d", "30d", "90d"] as const).map((label) => {
-                      const w = rollingReturns?.[label === "7d" ? "d7" : label === "30d" ? "d30" : "d90"];
+                      const key = label === "7d" ? "d7" : label === "30d" ? "d30" : "d90";
+                      const w = rollingReturns?.[key];
+                      const platforms = platformRollingReturns?.[key]
+                        ?.slice()
+                        .sort((a, b) => b.change - a.change);
                       return (
-                        <tr key={label} className="border-b border-border/40 last:border-0">
-                          <td className="py-1 pr-2 text-muted-foreground font-medium w-8">{label}</td>
-                          <td className={cn("py-1 pr-2 font-semibold tabular-nums text-right", !w ? "text-muted-foreground" : w.change >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
-                            {!w ? "—" : `${w.change >= 0 ? "+" : ""}${formatCurrencyRounded(w.change, currency)}`}
-                          </td>
-                          <td className={cn("py-1 text-right tabular-nums", !w ? "text-muted-foreground" : w.pct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
-                            {!w ? "—" : `${w.pct >= 0 ? "+" : ""}${w.pct.toFixed(2)}%`}
-                          </td>
-                        </tr>
+                        <UITooltip key={label}>
+                          <TooltipTrigger asChild>
+                            <tr className="border-b border-border/40 last:border-0 cursor-default hover:bg-muted/30 transition-colors">
+                              <td className="py-1 pr-2 text-muted-foreground font-medium w-8">{label}</td>
+                              <td className={cn("py-1 pr-2 font-semibold tabular-nums text-right", !w ? "text-muted-foreground" : w.change >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                                {!w ? "—" : `${w.change >= 0 ? "+" : ""}${formatCurrencyRounded(w.change, currency)}`}
+                              </td>
+                              <td className={cn("py-1 text-right tabular-nums", !w ? "text-muted-foreground" : w.pct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                                {!w ? "—" : `${w.pct >= 0 ? "+" : ""}${w.pct.toFixed(2)}%`}
+                              </td>
+                            </tr>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" sideOffset={8} className="p-3 w-64">
+                            <p className="text-xs font-semibold mb-2 text-foreground">{label} platform breakdown</p>
+                            {platforms && platforms.length > 0 ? (
+                              <div className="space-y-1">
+                                {platforms.map((p) => (
+                                  <div key={p.platformId} className="flex items-center justify-between gap-2 text-xs">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
+                                      <span className="truncate text-muted-foreground">{p.name}</span>
+                                    </div>
+                                    <div className="flex gap-2 tabular-nums flex-shrink-0 font-medium">
+                                      <span className={p.change >= 0 ? "text-emerald-500 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400"}>
+                                        {p.change >= 0 ? "+" : ""}{formatCurrencyRounded(p.change, currency)}
+                                      </span>
+                                      <span className={cn("text-muted-foreground", p.pct >= 0 ? "text-emerald-500/70 dark:text-emerald-400/70" : "text-rose-500/70 dark:text-rose-400/70")}>
+                                        {p.pct >= 0 ? "+" : ""}{p.pct.toFixed(2)}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">Loading…</p>
+                            )}
+                          </TooltipContent>
+                        </UITooltip>
                       );
                     })}
                   </tbody>
