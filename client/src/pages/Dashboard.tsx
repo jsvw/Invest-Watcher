@@ -1345,6 +1345,12 @@ export default function Dashboard() {
                       return d;
                     };
                     const profitKeyAgg = displayedChartValueMode === "pct" ? "gainPct" : "gain";
+                    const growthSeriesNameAgg = displayedChartAggregation === "quarter" ? "Quarterly Growth" : "Yearly Growth";
+                    const growthKeyAgg = displayedChartValueMode === "pct" ? "growthChangePct" : "growthChange";
+                    const mergedAggData = aggregatedChartData.map((row: any) => {
+                      const series = aggregatedSeriesData.find(s => s.date === row.date);
+                      return { ...row, growthChange: series?.monthlyChange ?? null, growthChangePct: series?.monthlyChangePct ?? null };
+                    });
                     if (displayedChartType === "bar") {
                       return (
                         <ResponsiveContainer width="100%" height="100%">
@@ -1376,11 +1382,12 @@ export default function Dashboard() {
                     }
                     return (
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={aggregatedChartData}>
+                        <LineChart data={mergedAggData}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                           <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={aggXFmt2} interval="preserveStartEnd" />
                           {(displayedChartView === "overview" || displayedChartView === "all") && <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={v => formatAxisValue(v)} domain={['auto', 'auto']} />}
                           {(displayedChartView === "profit" || displayedChartView === "all") && <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={profitAxisFmt} domain={['auto', 'auto']} />}
+                          {displayedChartView === "all" && <YAxis yAxisId="growth" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={monthlyAxisFmt} domain={['auto', 'auto']} />}
                           <Tooltip content={<ChartTooltip />} />
                           <Legend verticalAlign="top" height={36} />
                           {(displayedChartView === "overview" || displayedChartView === "all") && <>
@@ -1389,6 +1396,9 @@ export default function Dashboard() {
                           </>}
                           {(displayedChartView === "profit" || displayedChartView === "all") && (
                             <Line type="monotone" dataKey={profitKeyAgg} name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={2} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 5 }} animationDuration={350} />
+                          )}
+                          {displayedChartView === "all" && (
+                            <Line type="monotone" dataKey={growthKeyAgg} name={growthSeriesNameAgg} yAxisId="growth" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />
                           )}
                         </LineChart>
                       </ResponsiveContainer>
