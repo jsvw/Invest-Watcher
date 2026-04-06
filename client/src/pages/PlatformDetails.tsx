@@ -567,22 +567,25 @@ export default function PlatformDetails() {
           return chgA3 - chgB3;
         }
         case "duration": {
-          const endA = a.exitDate ? new Date(a.exitDate) : new Date();
-          const endB = b.exitDate ? new Date(b.exitDate) : new Date();
+          const now = new Date();
+          const endA = a.exitDate ? new Date(Math.min(new Date(a.exitDate).getTime(), now.getTime())) : now;
+          const endB = b.exitDate ? new Date(Math.min(new Date(b.exitDate).getTime(), now.getTime())) : now;
           const durA = a.acquisitionDate ? endA.getTime() - new Date(a.acquisitionDate).getTime() : 0;
           const durB = b.acquisitionDate ? endB.getTime() - new Date(b.acquisitionDate).getTime() : 0;
           return durB - durA; // Longest first
         }
         case "duration-asc": {
-          const endA2 = a.exitDate ? new Date(a.exitDate) : new Date();
-          const endB2 = b.exitDate ? new Date(b.exitDate) : new Date();
+          const now2 = new Date();
+          const endA2 = a.exitDate ? new Date(Math.min(new Date(a.exitDate).getTime(), now2.getTime())) : now2;
+          const endB2 = b.exitDate ? new Date(Math.min(new Date(b.exitDate).getTime(), now2.getTime())) : now2;
           const durA2 = a.acquisitionDate ? endA2.getTime() - new Date(a.acquisitionDate).getTime() : Infinity;
           const durB2 = b.acquisitionDate ? endB2.getTime() - new Date(b.acquisitionDate).getTime() : Infinity;
           return durA2 - durB2; // Shortest first
         }
         case "rpm": {
-          const rpmDurA = a.acquisitionDate ? ((a.exitDate ? new Date(a.exitDate) : new Date()).getTime() - new Date(a.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44) : 0;
-          const rpmDurB = b.acquisitionDate ? ((b.exitDate ? new Date(b.exitDate) : new Date()).getTime() - new Date(b.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44) : 0;
+          const now3 = new Date();
+          const rpmDurA = a.acquisitionDate ? (new Date(Math.min(a.exitDate ? new Date(a.exitDate).getTime() : now3.getTime(), now3.getTime())).getTime() - new Date(a.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44) : 0;
+          const rpmDurB = b.acquisitionDate ? (new Date(Math.min(b.exitDate ? new Date(b.exitDate).getTime() : now3.getTime(), now3.getTime())).getTime() - new Date(b.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44) : 0;
           const invA = Number(a.investedAmount) || 0;
           const invB = Number(b.investedAmount) || 0;
           const rpmA = rpmDurA > 0 && invA > 0 ? ((a.profitLoss || 0) / invA / rpmDurA) * 100 : -Infinity;
@@ -1465,13 +1468,18 @@ export default function PlatformDetails() {
                             </div>
                             <div className="text-muted-foreground text-sm" data-testid={`text-duration-${asset.id}`}>
                               {asset.acquisitionDate
-                                ? `${Math.floor(((asset.exitDate ? new Date(asset.exitDate) : new Date()).getTime() - new Date(asset.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44))}mo`
+                                ? (() => {
+                                    const now = new Date();
+                                    const end = asset.exitDate ? new Date(Math.min(new Date(asset.exitDate).getTime(), now.getTime())) : now;
+                                    return `${Math.floor((end.getTime() - new Date(asset.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44))}mo`;
+                                  })()
                                 : '-'}
                             </div>
                             <div className="text-sm" data-testid={`text-rpm-${asset.id}`}>
                               {(() => {
                                 if (!asset.acquisitionDate) return <span className="text-muted-foreground">-</span>;
-                                const durMs = (asset.exitDate ? new Date(asset.exitDate) : new Date()).getTime() - new Date(asset.acquisitionDate).getTime();
+                                const now = new Date();
+                                const durMs = (asset.exitDate ? new Date(Math.min(new Date(asset.exitDate).getTime(), now.getTime())) : now).getTime() - new Date(asset.acquisitionDate).getTime();
                                 const durationMonths = durMs / (1000 * 60 * 60 * 24 * 30.44);
                                 const invested = Number(asset.investedAmount) || 0;
                                 if (durationMonths <= 0 || invested <= 0) return <span className="text-muted-foreground">-</span>;

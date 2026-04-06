@@ -73,6 +73,16 @@ function getDurationMonths(acquisitionDate: string | null, exitDate: string | nu
   return (end.getTime() - new Date(acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44);
 }
 
+// Like getDurationMonths but caps the end date at today so APY and RPM
+// reflect actual elapsed time, not a future planned exit date.
+function getElapsedMonths(acquisitionDate: string | null, exitDate: string | null): number {
+  if (!acquisitionDate) return 0;
+  const today = new Date();
+  const planned = exitDate ? new Date(exitDate) : today;
+  const end = planned < today ? planned : today;
+  return (end.getTime() - new Date(acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44);
+}
+
 function computeApy(roi: number, durationMonths: number): number | null {
   if (durationMonths <= 0) return null;
   return (Math.pow(1 + roi / 100, 12 / durationMonths) - 1) * 100;
@@ -82,7 +92,7 @@ function weightedAvgDuration(items: EnrichedAsset[]): number {
   let totalWeight = 0;
   let totalWeighted = 0;
   for (const a of items) {
-    const months = getDurationMonths(a.acquisitionDate, a.exitDate);
+    const months = getElapsedMonths(a.acquisitionDate, a.exitDate);
     if (months <= 0 || a.invested <= 0) continue;
     totalWeight += a.invested;
     totalWeighted += a.invested * months;
@@ -98,7 +108,7 @@ function aggregateCells(items: EnrichedAsset[], groupFn: (a: EnrichedAsset) => s
     existing.currentValue += a.currentValue;
     existing.invested += a.invested;
     existing.gainLoss += a.gainLoss;
-    const months = getDurationMonths(a.acquisitionDate, a.exitDate);
+    const months = getElapsedMonths(a.acquisitionDate, a.exitDate);
     if (months > 0 && a.invested > 0) {
       existing.wMonths += a.invested * months;
       existing.wWeight += a.invested;
@@ -231,7 +241,7 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
     for (const a of filteredAssets) {
       const cat = platCatMap.get(a.platformId);
       if (!cat) continue;
-      const months = getDurationMonths(a.acquisitionDate, a.exitDate);
+      const months = getElapsedMonths(a.acquisitionDate, a.exitDate);
       if (months <= 0 || a.invested <= 0) continue;
       const d = durMap.get(cat) ?? { wMonths: 0, wWeight: 0 };
       d.wMonths += a.invested * months; d.wWeight += a.invested;
@@ -280,7 +290,7 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
     // Weighted duration per platform from enriched assets (for non-standard platforms)
     const durMap = new Map<number, { wMonths: number; wWeight: number }>();
     for (const a of filteredAssets) {
-      const months = getDurationMonths(a.acquisitionDate, a.exitDate);
+      const months = getElapsedMonths(a.acquisitionDate, a.exitDate);
       if (months <= 0 || a.invested <= 0) continue;
       const d = durMap.get(a.platformId) ?? { wMonths: 0, wWeight: 0 };
       d.wMonths += a.invested * months; d.wWeight += a.invested;
@@ -344,7 +354,7 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
       );
     }
     return platformAssets.map((a) => {
-      const months = getDurationMonths(a.acquisitionDate, a.exitDate);
+      const months = getElapsedMonths(a.acquisitionDate, a.exitDate);
       return {
         id: a.assetId, label: a.assetName,
         currentValue: a.currentValue, invested: a.invested, gainLoss: a.gainLoss, roi: a.roi,
@@ -371,7 +381,7 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
     return descriptionAssets
       .filter((a) => extractMaker(a.assetName) === drillMaker)
       .map((a) => {
-        const months = getDurationMonths(a.acquisitionDate, a.exitDate);
+        const months = getElapsedMonths(a.acquisitionDate, a.exitDate);
         return {
           id: a.assetId, label: a.assetName,
           currentValue: a.currentValue, invested: a.invested, gainLoss: a.gainLoss, roi: a.roi,
