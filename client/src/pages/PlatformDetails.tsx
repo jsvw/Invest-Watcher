@@ -593,8 +593,9 @@ export default function PlatformDetails() {
           return rpmB - rpmA; // Highest first
         }
         case "rpm-asc": {
-          const rpmDurA2 = a.acquisitionDate ? ((a.exitDate ? new Date(a.exitDate) : new Date()).getTime() - new Date(a.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44) : 0;
-          const rpmDurB2 = b.acquisitionDate ? ((b.exitDate ? new Date(b.exitDate) : new Date()).getTime() - new Date(b.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44) : 0;
+          const now4 = new Date();
+          const rpmDurA2 = a.acquisitionDate ? (new Date(Math.min(a.exitDate ? new Date(a.exitDate).getTime() : now4.getTime(), now4.getTime())).getTime() - new Date(a.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44) : 0;
+          const rpmDurB2 = b.acquisitionDate ? (new Date(Math.min(b.exitDate ? new Date(b.exitDate).getTime() : now4.getTime(), now4.getTime())).getTime() - new Date(b.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44) : 0;
           const invA2 = Number(a.investedAmount) || 0;
           const invB2 = Number(b.investedAmount) || 0;
           const rpmA2 = rpmDurA2 > 0 && invA2 > 0 ? ((a.profitLoss || 0) / invA2 / rpmDurA2) * 100 : Infinity;
