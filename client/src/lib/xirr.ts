@@ -39,3 +39,29 @@ export function xirr(cashFlows: { date: Date; amount: number }[]): number | null
 
   return null;
 }
+
+const MIN_HISTORY_MONTHS = 2;
+const MS_PER_MONTH = 30.44 * 24 * 3600 * 1000;
+
+/**
+ * Validated XIRR for standard-mode platform APY.
+ * Returns null when:
+ *   - fewer than 2 cash flows
+ *   - no negative cash flow (no investment recorded)
+ *   - history spans less than 2 months
+ *   - Newton-Raphson fails to converge
+ */
+export function computeXirrApy(
+  cashFlows: { date: Date; amount: number }[]
+): number | null {
+  if (cashFlows.length < 2) return null;
+
+  const hasInvestment = cashFlows.some((cf) => cf.amount < 0);
+  if (!hasInvestment) return null;
+
+  const sorted = [...cashFlows].sort((a, b) => a.date.getTime() - b.date.getTime());
+  const spanMs = sorted[sorted.length - 1].date.getTime() - sorted[0].date.getTime();
+  if (spanMs < MIN_HISTORY_MONTHS * MS_PER_MONTH) return null;
+
+  return xirr(sorted);
+}

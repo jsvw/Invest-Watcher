@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCompactCurrency } from "@/lib/currency";
-import { xirr } from "@/lib/xirr";
+import { computeXirrApy } from "@/lib/xirr";
 import type { PlatformResponse } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 
@@ -257,7 +257,7 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
           const cv = Number(p.currentValue) || 0;
           if (cv > 0) combined.push({ date: today, amount: cv });
         }
-        apy = combined.length >= 2 ? xirr(combined) : null;
+        apy = computeXirrApy(combined);
       } else {
         // Duration-based APY from asset acquisition dates
         const d = durMap.get(cat);
@@ -302,7 +302,7 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
             amount: cf.amount,
           }));
           if (currentValue > 0) combined.push({ date: today, amount: currentValue });
-          apy = combined.length >= 2 ? xirr(combined) : null;
+          apy = computeXirrApy(combined);
         } else {
           const d = durMap.get(p.id);
           const avgMonths = d && d.wWeight > 0 ? d.wMonths / d.wWeight : 0;
