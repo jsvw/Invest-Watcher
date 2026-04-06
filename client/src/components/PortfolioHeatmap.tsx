@@ -32,6 +32,7 @@ interface HeatmapCell {
   roi: number;
   apy: number | null;
   hasChildren: boolean;
+  childCount?: number;
 }
 
 type DisplayMode = "pct" | "abs";
@@ -100,8 +101,14 @@ function weightedAvgDuration(items: EnrichedAsset[]): number {
   return totalWeight > 0 ? totalWeighted / totalWeight : 0;
 }
 
-function aggregateCells(items: EnrichedAsset[], groupFn: (a: EnrichedAsset) => string, hasChildren: boolean): HeatmapCell[] {
+function aggregateCells(
+  items: EnrichedAsset[],
+  groupFn: (a: EnrichedAsset) => string,
+  hasChildren: boolean,
+  childGroupFn?: (a: EnrichedAsset) => string,
+): HeatmapCell[] {
   const map = new Map<string, { currentValue: number; invested: number; gainLoss: number; wMonths: number; wWeight: number }>();
+  const childSets = new Map<string, Set<string>>();
   for (const a of items) {
     const key = groupFn(a);
     const existing = map.get(key) ?? { currentValue: 0, invested: 0, gainLoss: 0, wMonths: 0, wWeight: 0 };
@@ -114,13 +121,19 @@ function aggregateCells(items: EnrichedAsset[], groupFn: (a: EnrichedAsset) => s
       existing.wWeight += a.invested;
     }
     map.set(key, existing);
+    if (childGroupFn) {
+      const cs = childSets.get(key) ?? new Set<string>();
+      cs.add(childGroupFn(a));
+      childSets.set(key, cs);
+    }
   }
   const cells: HeatmapCell[] = [];
   for (const [key, data] of map.entries()) {
     const roi = data.invested > 0 ? (data.gainLoss / data.invested) * 100 : 0;
     const avgMonths = data.wWeight > 0 ? data.wMonths / data.wWeight : 0;
     const apy = computeApy(roi, avgMonths);
-    cells.push({ id: key, label: key, currentValue: data.currentValue, invested: data.invested, gainLoss: data.gainLoss, roi, apy, hasChildren });
+    const childCount = childGroupFn ? childSets.get(key)?.size : undefined;
+    cells.push({ id: key, label: key, currentValue: data.currentValue, invested: data.invested, gainLoss: data.gainLoss, roi, apy, hasChildren, childCount });
   }
   return cells.sort((a, b) => b.currentValue - a.currentValue);
 }
@@ -164,7 +177,12 @@ function HeatCell({
       <div className="flex items-start justify-between gap-1">
         <span className="text-sm font-semibold leading-tight truncate">{cell.label}</span>
         {cell.hasChildren && onClick && (
-          <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-70 mt-0.5" />
+          <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
+            {cell.childCount !== undefined && (
+              <span className="text-[9px] font-semibold opacity-70 leading-none">{cell.childCount}</span>
+            )}
+            <ChevronRight className="w-3.5 h-3.5 opacity-70" />
+          </div>
         )}
       </div>
       <div className="mt-auto space-y-0.5">
@@ -275,7 +293,7 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
         apy = computeApy(roi, avgMonths);
       }
 
-      cells.push({ id: cat, label: cat, currentValue: data.currentValue, invested: data.invested, gainLoss, roi, apy, hasChildren: true });
+      cells.push({ id: cat, label: cat, currentValue: data.currentValue, invested: data.invested, gainLoss, roi, apy, hasChildren: true, childCount: catPlatformMap.get(cat)?.length });
     }
     return cells.sort((a, b) => b.currentValue - a.currentValue);
   }, [filteredPlatforms, filteredAssets, cfMap]);
@@ -289,12 +307,14 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
       : filteredPlatforms.filter((p) => p.category === drillCategory);
     // Weighted duration per platform from enriched assets (for non-standard platforms)
     const durMap = new Map<number, { wMonths: number; wWeight: number }>();
+    const assetCountMap = new Map<number, number>();
     for (const a of filteredAssets) {
       const months = getElapsedMonths(a.acquisitionDate, a.exitDate);
       if (months <= 0 || a.invested <= 0) continue;
       const d = durMap.get(a.platformId) ?? { wMonths: 0, wWeight: 0 };
       d.wMonths += a.invested * months; d.wWeight += a.invested;
       durMap.set(a.platformId, d);
+      assetCountMap.set(a.platformId, (assetCountMap.get(a.platformId) ?? 0) + 1);
     }
     return source
       .map((p) => {
@@ -302,6 +322,7 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
         const invested = Number(p.totalInvested) || 0;
         const gainLoss = currentValue - invested;
         const roi = invested > 0 ? (gainLoss / invested) * 100 : 0;
+        const hasChildren = p.platformMode === "asset_returns" || p.platformMode === "item_valuations";
 
         let apy: number | null = null;
         if (p.platformMode === "standard") {
@@ -321,7 +342,8 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
 
         return {
           id: p.id, label: p.name, currentValue, invested, gainLoss, roi, apy,
-          hasChildren: p.platformMode === "asset_returns" || p.platformMode === "item_valuations",
+          hasChildren,
+          childCount: hasChildren ? assetCountMap.get(p.id) : undefined,
         };
       })
       .sort((a, b) => b.currentValue - a.currentValue);
@@ -350,7 +372,8 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
       return aggregateCells(
         platformAssets,
         (a) => a.assetCategory ?? "Uncategorized",
-        true
+        true,
+        (a) => extractMaker(a.assetName),
       );
     }
     return platformAssets.map((a) => {
@@ -372,7 +395,7 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
   // Level 4: maker groups within description group
   const levelFourCells = useMemo((): HeatmapCell[] => {
     if (!drillAssetCategory) return [];
-    return aggregateCells(descriptionAssets, (a) => extractMaker(a.assetName), true);
+    return aggregateCells(descriptionAssets, (a) => extractMaker(a.assetName), true, (a) => String(a.assetId));
   }, [drillAssetCategory, descriptionAssets]);
 
   // Level 5: individual assets within maker group
