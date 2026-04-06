@@ -629,7 +629,7 @@ export default function PlatformDetails() {
       avgDurationMonths = durations.reduce((s, d) => s + d, 0) / durations.length;
     }
 
-    return { bestActive, avgExitRoi, exitedCount: exited.length, avgDurationMonths };
+    return { bestActive, avgExitRoi, exitedCount: exited.length, avgExitRoiCount: exitedWithInvested.length, avgDurationMonths };
   }, [assets, platformMode]);
 
   const { data: history, isLoading: isHistoryLoading } = useQuery({
@@ -2335,8 +2335,8 @@ export default function PlatformDetails() {
                             : '—'}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {assetAnalytics.exitedCount > 0
-                            ? `across ${assetAnalytics.exitedCount} exited asset${assetAnalytics.exitedCount !== 1 ? 's' : ''}`
+                          {assetAnalytics.avgExitRoiCount > 0
+                            ? `across ${assetAnalytics.avgExitRoiCount} exited asset${assetAnalytics.avgExitRoiCount !== 1 ? 's' : ''}`
                             : 'No exits yet'}
                         </p>
                       </CardContent>
