@@ -605,14 +605,15 @@ export default function PlatformDetails() {
       }
     }
 
-    // Avg ROI on exit
+    // Avg ROI on exit (only include assets with valid invested amount)
     const exited = assets.filter(a => a.status === "exited" || a.status === "matured");
     let avgExitRoi: number | null = null;
-    if (exited.length > 0) {
-      const rois = exited.map(a => {
+    const exitedWithInvested = exited.filter(a => Number(a.investedAmount) > 0);
+    if (exitedWithInvested.length > 0) {
+      const rois = exitedWithInvested.map(a => {
         const invested = Number(a.investedAmount);
         const pl = Number(a.profitLoss ?? 0);
-        return invested > 0 ? (pl / invested) * 100 : 0;
+        return (pl / invested) * 100;
       });
       avgExitRoi = rois.reduce((s, r) => s + r, 0) / rois.length;
     }
