@@ -2349,7 +2349,11 @@ export default function PlatformDetails() {
                             : '—'}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {assetAnalytics.avgDurationMonths !== null ? 'from acquisition to exit' : 'No exits yet'}
+                          {assetAnalytics.avgDurationMonths !== null
+                            ? 'from acquisition to exit'
+                            : assetAnalytics.exitedCount > 0
+                            ? 'Insufficient date data'
+                            : 'No exits yet'}
                         </p>
                       </CardContent>
                     </Card>
