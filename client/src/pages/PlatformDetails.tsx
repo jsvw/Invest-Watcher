@@ -477,11 +477,19 @@ export default function PlatformDetails() {
   
   const [assetNameFilter, setAssetNameFilter] = useState("");
   const [assetSort, setAssetSort] = useState<"name" | "name-desc" | "date" | "date-asc" | "invested" | "invested-asc" | "value" | "value-asc" | "return" | "return-asc" | "exit" | "exit-desc" | "change" | "change-asc">("date");
+  const [assetStatusFilter, setAssetStatusFilter] = useState<"all" | "active" | "exited">("all");
   
   const filteredAndSortedAssets = useMemo(() => {
     if (!assets) return [];
     
     let result = [...assets];
+    
+    // Filter by status
+    if (assetStatusFilter === "active") {
+      result = result.filter(asset => asset.status === "active");
+    } else if (assetStatusFilter === "exited") {
+      result = result.filter(asset => asset.status === "exited" || asset.status === "matured");
+    }
     
     // Filter by name
     if (assetNameFilter.trim()) {
@@ -564,7 +572,7 @@ export default function PlatformDetails() {
     });
     
     return result;
-  }, [assets, assetNameFilter, assetSort]);
+  }, [assets, assetNameFilter, assetSort, assetStatusFilter]);
 
   const totalActivelyInvested = useMemo(() => {
     if (!assets) return 0;
@@ -579,6 +587,14 @@ export default function PlatformDetails() {
       .filter(asset => asset.status === "active")
       .reduce((sum, asset) => sum + Number(asset.currentValue || asset.investedAmount), 0);
   }, [assets]);
+
+  const totalFilteredInvested = useMemo(() => {
+    return filteredAndSortedAssets.reduce((sum, asset) => sum + Number(asset.investedAmount) + Number((asset as any).bonusAmount || 0), 0);
+  }, [filteredAndSortedAssets]);
+
+  const totalFilteredValue = useMemo(() => {
+    return filteredAndSortedAssets.reduce((sum, asset) => sum + Number(asset.currentValue || asset.investedAmount), 0);
+  }, [filteredAndSortedAssets]);
 
   const { data: history, isLoading: isHistoryLoading } = useQuery({
     queryKey: [api.portfolio.history.path, id, range, specificYear, specificMonth],
@@ -1230,10 +1246,22 @@ export default function PlatformDetails() {
                     </CardDescription>
                   </div>
                   <div className="text-sm text-muted-foreground flex gap-3" data-testid="text-active-invested">
-                    <span>Invested: <span className="font-medium text-foreground">{formatCurrency(totalActivelyInvested, currency)}</span></span>
-                    <span>Value: <span className="font-medium text-foreground">{formatCurrency(totalActiveCurrentValue, currency)}</span></span>
+                    <span>Invested: <span className="font-medium text-foreground">{formatCurrency(totalFilteredInvested, currency)}</span></span>
+                    <span>Value: <span className="font-medium text-foreground">{formatCurrency(totalFilteredValue, currency)}</span></span>
                   </div>
                   <div className="flex gap-2 flex-wrap items-center">
+                    <div className="flex rounded-md border overflow-hidden text-xs font-medium" data-testid="toggle-asset-status">
+                      {(["all", "active", "exited"] as const).map((s) => (
+                        <button
+                          key={s}
+                          onClick={() => setAssetStatusFilter(s)}
+                          data-testid={`toggle-status-${s}`}
+                          className={`px-2.5 py-1.5 capitalize transition-colors ${assetStatusFilter === s ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
+                        >
+                          {s === "all" ? "All" : s === "active" ? "Active" : "Exited"}
+                        </button>
+                      ))}
+                    </div>
                     <div className="relative">
                       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
@@ -1334,7 +1362,11 @@ export default function PlatformDetails() {
                         </div>
                       ) : filteredAndSortedAssets.length === 0 ? (
                         <div className="p-8 text-center text-muted-foreground">
-                          No {platformMode === "asset_returns" ? "assets" : "items"} matching "{assetNameFilter}"
+                          {assetStatusFilter === "active"
+                            ? `No active ${platformMode === "asset_returns" ? "assets" : "items"} recorded yet.`
+                            : assetStatusFilter === "exited"
+                            ? `No exited ${platformMode === "asset_returns" ? "assets" : "items"} recorded yet.`
+                            : `No ${platformMode === "asset_returns" ? "assets" : "items"} matching "${assetNameFilter}"`}
                         </div>
                       ) : (
                         filteredAndSortedAssets.map((asset) => {
