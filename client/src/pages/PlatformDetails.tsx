@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search, ArrowUpDown, Trash2, RotateCcw, BarChart3, RefreshCw, Loader2 } from "lucide-react";
+import { TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search, ArrowUp, ArrowDown, ChevronsUpDown, Trash2, RotateCcw, BarChart3, RefreshCw, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -476,7 +476,7 @@ export default function PlatformDetails() {
   });
   
   const [assetNameFilter, setAssetNameFilter] = useState("");
-  const [assetSort, setAssetSort] = useState<"name" | "name-desc" | "date" | "date-asc" | "invested" | "invested-asc" | "value" | "value-asc" | "return" | "return-asc" | "exit" | "exit-desc" | "change" | "change-asc">("date");
+  const [assetSort, setAssetSort] = useState<"name" | "name-desc" | "date" | "date-asc" | "invested" | "invested-asc" | "value" | "value-asc" | "return" | "return-asc" | "exit" | "exit-desc" | "change" | "change-asc" | "duration" | "duration-asc">("date");
   const [assetStatusFilter, setAssetStatusFilter] = useState<"all" | "active" | "exited">("all");
   
   const filteredAndSortedAssets = useMemo(() => {
@@ -565,6 +565,20 @@ export default function PlatformDetails() {
           const prevB3 = (b as any).previousValue;
           const chgB3 = prevB3 !== undefined ? curB3 - prevB3 : Infinity;
           return chgA3 - chgB3;
+        }
+        case "duration": {
+          const endA = a.exitDate ? new Date(a.exitDate) : new Date();
+          const endB = b.exitDate ? new Date(b.exitDate) : new Date();
+          const durA = a.acquisitionDate ? endA.getTime() - new Date(a.acquisitionDate).getTime() : 0;
+          const durB = b.acquisitionDate ? endB.getTime() - new Date(b.acquisitionDate).getTime() : 0;
+          return durB - durA; // Longest first
+        }
+        case "duration-asc": {
+          const endA2 = a.exitDate ? new Date(a.exitDate) : new Date();
+          const endB2 = b.exitDate ? new Date(b.exitDate) : new Date();
+          const durA2 = a.acquisitionDate ? endA2.getTime() - new Date(a.acquisitionDate).getTime() : Infinity;
+          const durB2 = b.acquisitionDate ? endB2.getTime() - new Date(b.acquisitionDate).getTime() : Infinity;
+          return durA2 - durB2; // Shortest first
         }
         default:
           return 0;
@@ -1307,67 +1321,6 @@ export default function PlatformDetails() {
                         data-testid="input-filter-name"
                       />
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="gap-1" data-testid="button-sort">
-                          <ArrowUpDown className="h-3.5 w-3.5" />
-                          <span className="hidden sm:inline">Sort</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuItem onClick={() => setAssetSort("name")} data-testid="sort-name">
-                          {assetSort === "name" && "✓ "}Name (A-Z)
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setAssetSort("name-desc")} data-testid="sort-name-desc">
-                          {assetSort === "name-desc" && "✓ "}Name (Z-A)
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => setAssetSort("date")} data-testid="sort-date">
-                          {assetSort === "date" && "✓ "}Date (Newest)
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setAssetSort("date-asc")} data-testid="sort-date-asc">
-                          {assetSort === "date-asc" && "✓ "}Date (Oldest)
-                        </DropdownMenuItem>
-                        {platformMode === "asset_returns" && (
-                          <>
-                            <DropdownMenuItem onClick={() => setAssetSort("exit")} data-testid="sort-exit">
-                              {assetSort === "exit" && "✓ "}Exit (Nearest)
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setAssetSort("exit-desc")} data-testid="sort-exit-desc">
-                              {assetSort === "exit-desc" && "✓ "}Exit (Furthest)
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => setAssetSort("invested")} data-testid="sort-invested">
-                          {assetSort === "invested" && "✓ "}Invested (Highest)
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setAssetSort("invested-asc")} data-testid="sort-invested-asc">
-                          {assetSort === "invested-asc" && "✓ "}Invested (Lowest)
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => setAssetSort("value")} data-testid="sort-value">
-                          {assetSort === "value" && "✓ "}Value (Highest)
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setAssetSort("value-asc")} data-testid="sort-value-asc">
-                          {assetSort === "value-asc" && "✓ "}Value (Lowest)
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => setAssetSort("return")} data-testid="sort-return">
-                          {assetSort === "return" && "✓ "}Return (Highest)
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setAssetSort("return-asc")} data-testid="sort-return-asc">
-                          {assetSort === "return-asc" && "✓ "}Return (Lowest)
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => setAssetSort("change")} data-testid="sort-change">
-                          {assetSort === "change" && "✓ "}Change (Highest)
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setAssetSort("change-asc")} data-testid="sort-change-asc">
-                          {assetSort === "change-asc" && "✓ "}Change (Lowest)
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
                     {platformMode === "item_valuations" && (
                       <AssetValuationImportDialog platformId={id} />
                     )}
@@ -1380,14 +1333,30 @@ export default function PlatformDetails() {
                 <CardContent className="p-0">
                   <div className="rounded-md border">
                     <div className={`grid ${platformMode === "asset_returns" ? "grid-cols-[0.8fr_0.8fr_1.2fr_1.2fr_0.5fr_0.8fr_0.7fr_0.8fr_1.8fr_minmax(9rem,9rem)]" : "grid-cols-[1fr_1.5fr_1fr_0.8fr_0.7fr_0.8fr_1.5fr_minmax(9rem,9rem)]"} p-4 bg-muted/50 font-medium text-sm gap-2`}>
-                      <div>Date</div>
-                      {platformMode === "asset_returns" && <div>Exit</div>}
-                      <div>Name</div>
-                      <div>Invested</div>
+                      <button onClick={() => setAssetSort(assetSort === "date" ? "date-asc" : "date")} className="flex items-center gap-1 hover:text-foreground text-left" data-testid="sort-date">
+                        Date {assetSort === "date" ? <ArrowDown className="h-3 w-3 shrink-0" /> : assetSort === "date-asc" ? <ArrowUp className="h-3 w-3 shrink-0" /> : <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-40" />}
+                      </button>
+                      {platformMode === "asset_returns" && (
+                        <button onClick={() => setAssetSort(assetSort === "exit" ? "exit-desc" : "exit")} className="flex items-center gap-1 hover:text-foreground text-left" data-testid="sort-exit">
+                          Exit {assetSort === "exit" ? <ArrowUp className="h-3 w-3 shrink-0" /> : assetSort === "exit-desc" ? <ArrowDown className="h-3 w-3 shrink-0" /> : <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-40" />}
+                        </button>
+                      )}
+                      <button onClick={() => setAssetSort(assetSort === "name" ? "name-desc" : "name")} className="flex items-center gap-1 hover:text-foreground text-left" data-testid="sort-name">
+                        Name {assetSort === "name" ? <ArrowUp className="h-3 w-3 shrink-0" /> : assetSort === "name-desc" ? <ArrowDown className="h-3 w-3 shrink-0" /> : <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-40" />}
+                      </button>
+                      <button onClick={() => setAssetSort(assetSort === "invested" ? "invested-asc" : "invested")} className="flex items-center gap-1 hover:text-foreground text-left" data-testid="sort-invested">
+                        Invested {assetSort === "invested" ? <ArrowDown className="h-3 w-3 shrink-0" /> : assetSort === "invested-asc" ? <ArrowUp className="h-3 w-3 shrink-0" /> : <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-40" />}
+                      </button>
                       {platformMode === "asset_returns" && <div>Yield</div>}
-                      <div>Value</div>
-                      <div>Duration</div>
-                      <div>Change</div>
+                      <button onClick={() => setAssetSort(assetSort === "value" ? "value-asc" : "value")} className="flex items-center gap-1 hover:text-foreground text-left" data-testid="sort-value">
+                        Value {assetSort === "value" ? <ArrowDown className="h-3 w-3 shrink-0" /> : assetSort === "value-asc" ? <ArrowUp className="h-3 w-3 shrink-0" /> : <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-40" />}
+                      </button>
+                      <button onClick={() => setAssetSort(assetSort === "duration" ? "duration-asc" : "duration")} className="flex items-center gap-1 hover:text-foreground text-left" data-testid="sort-duration">
+                        Duration {assetSort === "duration" ? <ArrowDown className="h-3 w-3 shrink-0" /> : assetSort === "duration-asc" ? <ArrowUp className="h-3 w-3 shrink-0" /> : <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-40" />}
+                      </button>
+                      <button onClick={() => setAssetSort(assetSort === "change" ? "change-asc" : "change")} className="flex items-center gap-1 hover:text-foreground text-left" data-testid="sort-change">
+                        Change {assetSort === "change" ? <ArrowDown className="h-3 w-3 shrink-0" /> : assetSort === "change-asc" ? <ArrowUp className="h-3 w-3 shrink-0" /> : <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-40" />}
+                      </button>
                       <div>Status</div>
                       <div className="text-right">Actions</div>
                     </div>
