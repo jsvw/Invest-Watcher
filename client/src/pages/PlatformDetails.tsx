@@ -581,13 +581,6 @@ export default function PlatformDetails() {
       .reduce((sum, asset) => sum + Number(asset.investedAmount) + Number((asset as any).bonusAmount || 0), 0);
   }, [assets]);
 
-  const totalActiveCurrentValue = useMemo(() => {
-    if (!assets) return 0;
-    return assets
-      .filter(asset => asset.status === "active")
-      .reduce((sum, asset) => sum + Number(asset.currentValue || asset.investedAmount), 0);
-  }, [assets]);
-
   const totalFilteredInvested = useMemo(() => {
     return filteredAndSortedAssets.reduce((sum, asset) => sum + Number(asset.investedAmount) + Number((asset as any).bonusAmount || 0), 0);
   }, [filteredAndSortedAssets]);
@@ -1362,11 +1355,18 @@ export default function PlatformDetails() {
                         </div>
                       ) : filteredAndSortedAssets.length === 0 ? (
                         <div className="p-8 text-center text-muted-foreground">
-                          {assetStatusFilter === "active"
-                            ? `No active ${platformMode === "asset_returns" ? "assets" : "items"} recorded yet.`
-                            : assetStatusFilter === "exited"
-                            ? `No exited ${platformMode === "asset_returns" ? "assets" : "items"} recorded yet.`
-                            : `No ${platformMode === "asset_returns" ? "assets" : "items"} matching "${assetNameFilter}"`}
+                          {(() => {
+                            const kind = platformMode === "asset_returns" ? "assets" : "items";
+                            const hasName = assetNameFilter.trim().length > 0;
+                            const hasStatus = assetStatusFilter !== "all";
+                            if (hasStatus && hasName) {
+                              return `No ${assetStatusFilter} ${kind} matching "${assetNameFilter.trim()}"`;
+                            }
+                            if (hasStatus) {
+                              return `No ${assetStatusFilter} ${kind} recorded yet.`;
+                            }
+                            return `No ${kind} matching "${assetNameFilter}"`;
+                          })()}
                         </div>
                       ) : (
                         filteredAndSortedAssets.map((asset) => {
