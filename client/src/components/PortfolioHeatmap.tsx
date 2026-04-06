@@ -85,7 +85,7 @@ function getElapsedMonths(acquisitionDate: string | null, exitDate: string | nul
 
 function computeApy(roi: number, durationMonths: number): number | null {
   if (durationMonths <= 0) return null;
-  return (Math.pow(1 + roi / 100, 12 / durationMonths) - 1) * 100;
+  return roi * (12 / durationMonths);
 }
 
 function weightedAvgDuration(items: EnrichedAsset[]): number {
@@ -174,7 +174,7 @@ function HeatCell({
             : `${cell.gainLoss >= 0 ? "+" : ""}${formatCompactCurrency(cell.gainLoss, currency)}`}
         </div>
         {cell.apy !== null && (
-          <div className="text-[10px] opacity-75">{fmtPct(cell.apy)} APY</div>
+          <div className="text-[10px] opacity-75">{fmtPct(cell.apy)} p.a.</div>
         )}
         <div className="text-[10px] opacity-80">
           {formatCompactCurrency(cell.currentValue, currency)} / {formatCompactCurrency(cell.invested, currency)} invested
