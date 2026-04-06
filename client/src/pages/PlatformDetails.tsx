@@ -2337,6 +2337,8 @@ export default function PlatformDetails() {
                         <p className="text-xs text-muted-foreground mt-1">
                           {assetAnalytics.avgExitRoiCount > 0
                             ? `across ${assetAnalytics.avgExitRoiCount} exited asset${assetAnalytics.avgExitRoiCount !== 1 ? 's' : ''}`
+                            : assetAnalytics.exitedCount > 0
+                            ? 'No valid cost basis'
                             : 'No exits yet'}
                         </p>
                       </CardContent>
