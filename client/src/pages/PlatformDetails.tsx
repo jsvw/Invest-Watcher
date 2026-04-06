@@ -1379,13 +1379,14 @@ export default function PlatformDetails() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="rounded-md border">
-                    <div className={`grid ${platformMode === "asset_returns" ? "grid-cols-[0.8fr_0.8fr_1.2fr_1.2fr_0.5fr_0.8fr_0.8fr_1.8fr_minmax(9rem,9rem)]" : "grid-cols-[1fr_1.5fr_1fr_1fr_0.8fr_1.5fr_minmax(9rem,9rem)]"} p-4 bg-muted/50 font-medium text-sm gap-2`}>
+                    <div className={`grid ${platformMode === "asset_returns" ? "grid-cols-[0.8fr_0.8fr_1.2fr_1.2fr_0.5fr_0.8fr_0.7fr_0.8fr_1.8fr_minmax(9rem,9rem)]" : "grid-cols-[1fr_1.5fr_1fr_0.8fr_0.7fr_0.8fr_1.5fr_minmax(9rem,9rem)]"} p-4 bg-muted/50 font-medium text-sm gap-2`}>
                       <div>Date</div>
                       {platformMode === "asset_returns" && <div>Exit</div>}
                       <div>Name</div>
                       <div>Invested</div>
                       {platformMode === "asset_returns" && <div>Yield</div>}
                       <div>Value</div>
+                      <div>Duration</div>
                       <div>Change</div>
                       <div>Status</div>
                       <div className="text-right">Actions</div>
@@ -1419,7 +1420,7 @@ export default function PlatformDetails() {
                           return (
                           <div 
                             key={asset.id} 
-                            className={`grid ${platformMode === "asset_returns" ? "grid-cols-[0.8fr_0.8fr_1.2fr_1.2fr_0.5fr_0.8fr_0.8fr_1.8fr_minmax(9rem,9rem)]" : "grid-cols-[1fr_1.5fr_1fr_1fr_0.8fr_1.5fr_minmax(9rem,9rem)]"} p-4 text-sm hover:bg-muted/30 transition-colors items-center gap-2`}
+                            className={`grid ${platformMode === "asset_returns" ? "grid-cols-[0.8fr_0.8fr_1.2fr_1.2fr_0.5fr_0.8fr_0.7fr_0.8fr_1.8fr_minmax(9rem,9rem)]" : "grid-cols-[1fr_1.5fr_1fr_0.8fr_0.7fr_0.8fr_1.5fr_minmax(9rem,9rem)]"} p-4 text-sm hover:bg-muted/30 transition-colors items-center gap-2`}
                             data-testid={`row-asset-${asset.id}`}
                           >
                             <div className="text-muted-foreground">
@@ -1471,6 +1472,11 @@ export default function PlatformDetails() {
                             )}
                             <div className="font-medium">
                               {formatCurrency(assetCurrentVal, currency)}
+                            </div>
+                            <div className="text-muted-foreground text-sm" data-testid={`text-duration-${asset.id}`}>
+                              {asset.acquisitionDate
+                                ? `${Math.floor(((asset.exitDate ? new Date(asset.exitDate) : new Date()).getTime() - new Date(asset.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44))}mo`
+                                : '-'}
                             </div>
                             <div>
                               {assetChange !== null ? (
