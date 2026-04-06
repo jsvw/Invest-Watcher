@@ -1,7 +1,9 @@
 import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCompactCurrency } from "@/lib/currency";
+import { xirr } from "@/lib/xirr";
 import type { PlatformResponse } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 
@@ -181,6 +183,18 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
   const [drillAssetCategory, setDrillAssetCategory] = useState<string | null>(null);
   const [drillMaker, setDrillMaker] = useState<string | null>(null);
 
+  const { data: rawCashFlows } = useQuery<{ platformId: number; cashFlows: { date: string; amount: number }[] }[]>({
+    queryKey: ["/api/analytics/platform-cashflows"],
+  });
+
+  const cfMap = useMemo(() => {
+    const m = new Map<number, { date: string; amount: number }[]>();
+    for (const entry of rawCashFlows ?? []) {
+      m.set(entry.platformId, entry.cashFlows);
+    }
+    return m;
+  }, [rawCashFlows]);
+
   const filteredAssets = useMemo(
     () => assets.filter((a) => !excludedPlatforms.has(a.platformId)),
     [assets, excludedPlatforms]
@@ -193,6 +207,7 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
 
   // Level 1: platform categories
   const levelOneCells = useMemo((): HeatmapCell[] => {
+    const today = new Date();
     const map = new Map<string, { currentValue: number; invested: number }>();
     for (const p of filteredPlatforms) {
       const existing = map.get(p.category) ?? { currentValue: 0, invested: 0 };
@@ -200,7 +215,16 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
       existing.invested += Number(p.totalInvested) || 0;
       map.set(p.category, existing);
     }
-    // Weighted duration per category from enriched assets
+
+    // Group platforms by category
+    const catPlatformMap = new Map<string, PlatformResponse[]>();
+    for (const p of filteredPlatforms) {
+      const arr = catPlatformMap.get(p.category) ?? [];
+      arr.push(p);
+      catPlatformMap.set(p.category, arr);
+    }
+
+    // Weighted duration per category from enriched assets (for non-standard platforms)
     const platCatMap = new Map<number, string>();
     for (const p of filteredPlatforms) platCatMap.set(p.id, p.category);
     const durMap = new Map<string, { wMonths: number; wWeight: number }>();
@@ -213,25 +237,47 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
       d.wMonths += a.invested * months; d.wWeight += a.invested;
       durMap.set(cat, d);
     }
+
     const cells: HeatmapCell[] = [];
     for (const [cat, data] of map.entries()) {
       const gainLoss = data.currentValue - data.invested;
       const roi = data.invested > 0 ? (gainLoss / data.invested) * 100 : 0;
-      const d = durMap.get(cat);
-      const avgMonths = d && d.wWeight > 0 ? d.wMonths / d.wWeight : 0;
-      const apy = computeApy(roi, avgMonths);
+
+      let apy: number | null = null;
+      const catPlatforms = catPlatformMap.get(cat) ?? [];
+      const allStandard = catPlatforms.length > 0 && catPlatforms.every((p) => p.platformMode === "standard");
+
+      if (allStandard) {
+        // Use XIRR for pure standard-mode categories
+        const combined: { date: Date; amount: number }[] = [];
+        for (const p of catPlatforms) {
+          for (const cf of cfMap.get(p.id) ?? []) {
+            combined.push({ date: new Date(cf.date), amount: cf.amount });
+          }
+          const cv = Number(p.currentValue) || 0;
+          if (cv > 0) combined.push({ date: today, amount: cv });
+        }
+        apy = combined.length >= 2 ? xirr(combined) : null;
+      } else {
+        // Duration-based APY from asset acquisition dates
+        const d = durMap.get(cat);
+        const avgMonths = d && d.wWeight > 0 ? d.wMonths / d.wWeight : 0;
+        apy = computeApy(roi, avgMonths);
+      }
+
       cells.push({ id: cat, label: cat, currentValue: data.currentValue, invested: data.invested, gainLoss, roi, apy, hasChildren: true });
     }
     return cells.sort((a, b) => b.currentValue - a.currentValue);
-  }, [filteredPlatforms, filteredAssets]);
+  }, [filteredPlatforms, filteredAssets, cfMap]);
 
   // Level 2: platforms (within category or all)
   const levelTwoCells = useMemo((): HeatmapCell[] => {
     if (!drillCategory) return [];
+    const today = new Date();
     const source = drillCategory === ALL_SENTINEL
       ? filteredPlatforms
       : filteredPlatforms.filter((p) => p.category === drillCategory);
-    // Weighted duration per platform from enriched assets
+    // Weighted duration per platform from enriched assets (for non-standard platforms)
     const durMap = new Map<number, { wMonths: number; wWeight: number }>();
     for (const a of filteredAssets) {
       const months = getDurationMonths(a.acquisitionDate, a.exitDate);
@@ -246,16 +292,30 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
         const invested = Number(p.totalInvested) || 0;
         const gainLoss = currentValue - invested;
         const roi = invested > 0 ? (gainLoss / invested) * 100 : 0;
-        const d = durMap.get(p.id);
-        const avgMonths = d && d.wWeight > 0 ? d.wMonths / d.wWeight : 0;
-        const apy = computeApy(roi, avgMonths);
+
+        let apy: number | null = null;
+        if (p.platformMode === "standard") {
+          // Use XIRR for standard-mode platforms
+          const cfs = cfMap.get(p.id) ?? [];
+          const combined: { date: Date; amount: number }[] = cfs.map((cf) => ({
+            date: new Date(cf.date),
+            amount: cf.amount,
+          }));
+          if (currentValue > 0) combined.push({ date: today, amount: currentValue });
+          apy = combined.length >= 2 ? xirr(combined) : null;
+        } else {
+          const d = durMap.get(p.id);
+          const avgMonths = d && d.wWeight > 0 ? d.wMonths / d.wWeight : 0;
+          apy = computeApy(roi, avgMonths);
+        }
+
         return {
           id: p.id, label: p.name, currentValue, invested, gainLoss, roi, apy,
           hasChildren: p.platformMode === "asset_returns" || p.platformMode === "item_valuations",
         };
       })
       .sort((a, b) => b.currentValue - a.currentValue);
-  }, [drillCategory, filteredPlatforms, filteredAssets]);
+  }, [drillCategory, filteredPlatforms, filteredAssets, cfMap]);
 
   const drilledPlatform = useMemo(
     () => (drillPlatformId ? platforms.find((p) => p.id === drillPlatformId) : null),

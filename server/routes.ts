@@ -1591,6 +1591,39 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/analytics/platform-cashflows', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+
+      const allInvestments = await storage.getAllInvestmentsForUser(userId);
+      const allWithdrawals = await storage.getAllWithdrawalsForUser(userId);
+
+      const map = new Map<number, { date: string; amount: number }[]>();
+
+      for (const inv of allInvestments) {
+        const cfs = map.get(inv.platformId) ?? [];
+        cfs.push({ date: new Date(inv.date).toISOString(), amount: -(Number(inv.amount) || 0) });
+        map.set(inv.platformId, cfs);
+      }
+
+      for (const wd of allWithdrawals) {
+        const cfs = map.get(wd.platformId) ?? [];
+        cfs.push({ date: new Date(wd.date).toISOString(), amount: Number(wd.amount) || 0 });
+        map.set(wd.platformId, cfs);
+      }
+
+      const result = Array.from(map.entries()).map(([platformId, cashFlows]) => ({
+        platformId,
+        cashFlows: cashFlows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+      }));
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching platform cashflows:", error);
+      res.status(500).json({ message: "Failed to fetch platform cashflows" });
+    }
+  });
+
   app.get('/api/platforms/:id/monthly-returns', requireAuth, async (req, res) => {
     try {
       const userId = getAuthenticatedUserId(req)!;
