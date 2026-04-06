@@ -1564,7 +1564,7 @@ export async function registerRoutes(
         for (const asset of platformAssets) {
           const currentValue = asset.currentValue ?? Number(asset.investedAmount);
           const invested = Number(asset.investedAmount);
-          const gainLoss = currentValue - invested;
+          const gainLoss = asset.profitLoss ?? (currentValue - invested);
           const roi = invested > 0 ? (gainLoss / invested) * 100 : 0;
           enrichedAssets.push({
             assetId: asset.id,
