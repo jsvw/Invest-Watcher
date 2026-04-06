@@ -605,15 +605,14 @@ export default function PlatformDetails() {
       }
     }
 
-    // Avg ROI on exit (only include assets with valid invested amount)
+    // Avg ROI on exit across all exited/matured assets (zero invested = 0% ROI)
     const exited = assets.filter(a => a.status === "exited" || a.status === "matured");
     let avgExitRoi: number | null = null;
-    const exitedWithInvested = exited.filter(a => Number(a.investedAmount) > 0);
-    if (exitedWithInvested.length > 0) {
-      const rois = exitedWithInvested.map(a => {
+    if (exited.length > 0) {
+      const rois = exited.map(a => {
         const invested = Number(a.investedAmount);
         const pl = Number(a.profitLoss ?? 0);
-        return (pl / invested) * 100;
+        return invested > 0 ? (pl / invested) * 100 : 0;
       });
       avgExitRoi = rois.reduce((s, r) => s + r, 0) / rois.length;
     }
@@ -629,7 +628,7 @@ export default function PlatformDetails() {
       avgDurationMonths = durations.reduce((s, d) => s + d, 0) / durations.length;
     }
 
-    return { bestActive, avgExitRoi, exitedCount: exited.length, avgExitRoiCount: exitedWithInvested.length, avgDurationMonths };
+    return { bestActive, avgExitRoi, exitedCount: exited.length, avgDurationMonths };
   }, [assets, platformMode]);
 
   const { data: history, isLoading: isHistoryLoading } = useQuery({
@@ -2318,7 +2317,7 @@ export default function PlatformDetails() {
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Best Performance Active Asset</p>
                         <p className={`text-2xl font-bold font-display ${assetAnalytics.bestActive !== null ? (assetAnalytics.bestActive.roi >= 0 ? 'text-emerald-500' : 'text-red-500') : ''}`}>
                           {assetAnalytics.bestActive !== null
-                            ? `${assetAnalytics.bestActive.roi >= 0 ? '+' : ''}${assetAnalytics.bestActive.roi.toFixed(2)}%`
+                            ? `${assetAnalytics.bestActive.roi >= 0 ? '+' : ''}${assetAnalytics.bestActive.roi.toFixed(1)}%`
                             : '—'}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1 truncate" title={assetAnalytics.bestActive?.name}>
@@ -2331,14 +2330,12 @@ export default function PlatformDetails() {
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Avg. Return on Exit</p>
                         <p className={`text-2xl font-bold font-display ${assetAnalytics.avgExitRoi !== null ? (assetAnalytics.avgExitRoi >= 0 ? 'text-emerald-500' : 'text-red-500') : ''}`}>
                           {assetAnalytics.avgExitRoi !== null
-                            ? `${assetAnalytics.avgExitRoi >= 0 ? '+' : ''}${assetAnalytics.avgExitRoi.toFixed(2)}%`
+                            ? `${assetAnalytics.avgExitRoi >= 0 ? '+' : ''}${assetAnalytics.avgExitRoi.toFixed(1)}%`
                             : '—'}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {assetAnalytics.avgExitRoiCount > 0
-                            ? `across ${assetAnalytics.avgExitRoiCount} exited asset${assetAnalytics.avgExitRoiCount !== 1 ? 's' : ''}`
-                            : assetAnalytics.exitedCount > 0
-                            ? 'No valid cost basis'
+                          {assetAnalytics.exitedCount > 0
+                            ? `across ${assetAnalytics.exitedCount} exited asset${assetAnalytics.exitedCount !== 1 ? 's' : ''}`
                             : 'No exits yet'}
                         </p>
                       </CardContent>
