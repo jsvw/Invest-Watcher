@@ -476,7 +476,7 @@ export default function PlatformDetails() {
   });
   
   const [assetNameFilter, setAssetNameFilter] = useState("");
-  const [assetSort, setAssetSort] = useState<"name" | "name-desc" | "date" | "date-asc" | "invested" | "invested-asc" | "value" | "value-asc" | "return" | "return-asc" | "exit" | "exit-desc" | "change" | "change-asc" | "duration" | "duration-asc">("date");
+  const [assetSort, setAssetSort] = useState<"name" | "name-desc" | "date" | "date-asc" | "invested" | "invested-asc" | "value" | "value-asc" | "return" | "return-asc" | "exit" | "exit-desc" | "change" | "change-asc" | "duration" | "duration-asc" | "rpm" | "rpm-asc">("date");
   const [assetStatusFilter, setAssetStatusFilter] = useState<"all" | "active" | "exited">("all");
   
   const filteredAndSortedAssets = useMemo(() => {
@@ -579,6 +579,20 @@ export default function PlatformDetails() {
           const durA2 = a.acquisitionDate ? endA2.getTime() - new Date(a.acquisitionDate).getTime() : Infinity;
           const durB2 = b.acquisitionDate ? endB2.getTime() - new Date(b.acquisitionDate).getTime() : Infinity;
           return durA2 - durB2; // Shortest first
+        }
+        case "rpm": {
+          const rpmDurA = a.acquisitionDate ? ((a.exitDate ? new Date(a.exitDate) : new Date()).getTime() - new Date(a.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44) : 0;
+          const rpmDurB = b.acquisitionDate ? ((b.exitDate ? new Date(b.exitDate) : new Date()).getTime() - new Date(b.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44) : 0;
+          const rpmA = rpmDurA > 0 ? (a.profitLoss || 0) / rpmDurA : -Infinity;
+          const rpmB = rpmDurB > 0 ? (b.profitLoss || 0) / rpmDurB : -Infinity;
+          return rpmB - rpmA; // Highest first
+        }
+        case "rpm-asc": {
+          const rpmDurA2 = a.acquisitionDate ? ((a.exitDate ? new Date(a.exitDate) : new Date()).getTime() - new Date(a.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44) : 0;
+          const rpmDurB2 = b.acquisitionDate ? ((b.exitDate ? new Date(b.exitDate) : new Date()).getTime() - new Date(b.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44) : 0;
+          const rpmA2 = rpmDurA2 > 0 ? (a.profitLoss || 0) / rpmDurA2 : Infinity;
+          const rpmB2 = rpmDurB2 > 0 ? (b.profitLoss || 0) / rpmDurB2 : Infinity;
+          return rpmA2 - rpmB2; // Lowest first
         }
         default:
           return 0;
@@ -1332,7 +1346,7 @@ export default function PlatformDetails() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="rounded-md border">
-                    <div className={`grid ${platformMode === "asset_returns" ? "grid-cols-[0.8fr_0.8fr_1.2fr_1.2fr_0.5fr_0.8fr_0.7fr_0.8fr_1.8fr_minmax(9rem,9rem)]" : "grid-cols-[1fr_1.5fr_1fr_0.8fr_0.7fr_0.8fr_1.5fr_minmax(9rem,9rem)]"} p-4 bg-muted/50 font-medium text-sm gap-2`}>
+                    <div className={`grid ${platformMode === "asset_returns" ? "grid-cols-[0.8fr_0.8fr_1.2fr_1.2fr_0.5fr_0.8fr_0.7fr_0.7fr_0.8fr_1.8fr_minmax(9rem,9rem)]" : "grid-cols-[1fr_1.5fr_1fr_0.8fr_0.7fr_0.7fr_0.8fr_1.5fr_minmax(9rem,9rem)]"} p-4 bg-muted/50 font-medium text-sm gap-2`}>
                       <button onClick={() => setAssetSort(assetSort === "date" ? "date-asc" : "date")} className="flex items-center gap-1 hover:text-foreground text-left" data-testid="sort-date">
                         Date {assetSort === "date" ? <ArrowDown className="h-3 w-3 shrink-0" /> : assetSort === "date-asc" ? <ArrowUp className="h-3 w-3 shrink-0" /> : <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-40" />}
                       </button>
@@ -1353,6 +1367,9 @@ export default function PlatformDetails() {
                       </button>
                       <button onClick={() => setAssetSort(assetSort === "duration" ? "duration-asc" : "duration")} className="flex items-center gap-1 hover:text-foreground text-left" data-testid="sort-duration">
                         Duration {assetSort === "duration" ? <ArrowDown className="h-3 w-3 shrink-0" /> : assetSort === "duration-asc" ? <ArrowUp className="h-3 w-3 shrink-0" /> : <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-40" />}
+                      </button>
+                      <button onClick={() => setAssetSort(assetSort === "rpm" ? "rpm-asc" : "rpm")} className="flex items-center gap-1 hover:text-foreground text-left" data-testid="sort-rpm">
+                        Avg/mo {assetSort === "rpm" ? <ArrowDown className="h-3 w-3 shrink-0" /> : assetSort === "rpm-asc" ? <ArrowUp className="h-3 w-3 shrink-0" /> : <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-40" />}
                       </button>
                       <button onClick={() => setAssetSort(assetSort === "change" ? "change-asc" : "change")} className="flex items-center gap-1 hover:text-foreground text-left" data-testid="sort-change">
                         Change {assetSort === "change" ? <ArrowDown className="h-3 w-3 shrink-0" /> : assetSort === "change-asc" ? <ArrowUp className="h-3 w-3 shrink-0" /> : <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-40" />}
@@ -1389,7 +1406,7 @@ export default function PlatformDetails() {
                           return (
                           <div 
                             key={asset.id} 
-                            className={`grid ${platformMode === "asset_returns" ? "grid-cols-[0.8fr_0.8fr_1.2fr_1.2fr_0.5fr_0.8fr_0.7fr_0.8fr_1.8fr_minmax(9rem,9rem)]" : "grid-cols-[1fr_1.5fr_1fr_0.8fr_0.7fr_0.8fr_1.5fr_minmax(9rem,9rem)]"} p-4 text-sm hover:bg-muted/30 transition-colors items-center gap-2`}
+                            className={`grid ${platformMode === "asset_returns" ? "grid-cols-[0.8fr_0.8fr_1.2fr_1.2fr_0.5fr_0.8fr_0.7fr_0.7fr_0.8fr_1.8fr_minmax(9rem,9rem)]" : "grid-cols-[1fr_1.5fr_1fr_0.8fr_0.7fr_0.7fr_0.8fr_1.5fr_minmax(9rem,9rem)]"} p-4 text-sm hover:bg-muted/30 transition-colors items-center gap-2`}
                             data-testid={`row-asset-${asset.id}`}
                           >
                             <div className="text-muted-foreground">
@@ -1446,6 +1463,20 @@ export default function PlatformDetails() {
                               {asset.acquisitionDate
                                 ? `${Math.floor(((asset.exitDate ? new Date(asset.exitDate) : new Date()).getTime() - new Date(asset.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44))}mo`
                                 : '-'}
+                            </div>
+                            <div className="text-sm" data-testid={`text-rpm-${asset.id}`}>
+                              {(() => {
+                                if (!asset.acquisitionDate) return <span className="text-muted-foreground">-</span>;
+                                const durMs = (asset.exitDate ? new Date(asset.exitDate) : new Date()).getTime() - new Date(asset.acquisitionDate).getTime();
+                                const durationMonths = durMs / (1000 * 60 * 60 * 24 * 30.44);
+                                if (durationMonths <= 0) return <span className="text-muted-foreground">-</span>;
+                                const rpm = (asset.profitLoss || 0) / durationMonths;
+                                return (
+                                  <span className={rpm >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                                    {rpm >= 0 ? '+' : ''}{formatCurrency(rpm, currency)}/mo
+                                  </span>
+                                );
+                              })()}
                             </div>
                             <div>
                               {assetChange !== null ? (
