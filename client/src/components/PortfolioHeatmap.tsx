@@ -17,6 +17,8 @@ export interface EnrichedAsset {
   invested: number;
   gainLoss: number;
   roi: number;
+  acquisitionDate: string | null;
+  exitDate: string | null;
 }
 
 interface HeatmapCell {
@@ -26,6 +28,7 @@ interface HeatmapCell {
   invested: number;
   gainLoss: number;
   roi: number;
+  apy: number | null;
   hasChildren: boolean;
 }
 
@@ -62,20 +65,50 @@ function extractMaker(name: string): string {
   return trimmed.split(/\s+/)[0] ?? trimmed;
 }
 
+function getDurationMonths(acquisitionDate: string | null, exitDate: string | null): number {
+  if (!acquisitionDate) return 0;
+  const end = exitDate ? new Date(exitDate) : new Date();
+  return (end.getTime() - new Date(acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44);
+}
+
+function computeApy(roi: number, durationMonths: number): number | null {
+  if (durationMonths <= 0) return null;
+  return (Math.pow(1 + roi / 100, 12 / durationMonths) - 1) * 100;
+}
+
+function weightedAvgDuration(items: EnrichedAsset[]): number {
+  let totalWeight = 0;
+  let totalWeighted = 0;
+  for (const a of items) {
+    const months = getDurationMonths(a.acquisitionDate, a.exitDate);
+    if (months <= 0 || a.invested <= 0) continue;
+    totalWeight += a.invested;
+    totalWeighted += a.invested * months;
+  }
+  return totalWeight > 0 ? totalWeighted / totalWeight : 0;
+}
+
 function aggregateCells(items: EnrichedAsset[], groupFn: (a: EnrichedAsset) => string, hasChildren: boolean): HeatmapCell[] {
-  const map = new Map<string, { currentValue: number; invested: number; gainLoss: number }>();
+  const map = new Map<string, { currentValue: number; invested: number; gainLoss: number; wMonths: number; wWeight: number }>();
   for (const a of items) {
     const key = groupFn(a);
-    const existing = map.get(key) ?? { currentValue: 0, invested: 0, gainLoss: 0 };
+    const existing = map.get(key) ?? { currentValue: 0, invested: 0, gainLoss: 0, wMonths: 0, wWeight: 0 };
     existing.currentValue += a.currentValue;
     existing.invested += a.invested;
     existing.gainLoss += a.gainLoss;
+    const months = getDurationMonths(a.acquisitionDate, a.exitDate);
+    if (months > 0 && a.invested > 0) {
+      existing.wMonths += a.invested * months;
+      existing.wWeight += a.invested;
+    }
     map.set(key, existing);
   }
   const cells: HeatmapCell[] = [];
   for (const [key, data] of map.entries()) {
     const roi = data.invested > 0 ? (data.gainLoss / data.invested) * 100 : 0;
-    cells.push({ id: key, label: key, ...data, roi, hasChildren });
+    const avgMonths = data.wWeight > 0 ? data.wMonths / data.wWeight : 0;
+    const apy = computeApy(roi, avgMonths);
+    cells.push({ id: key, label: key, currentValue: data.currentValue, invested: data.invested, gainLoss: data.gainLoss, roi, apy, hasChildren });
   }
   return cells.sort((a, b) => b.currentValue - a.currentValue);
 }
@@ -128,6 +161,9 @@ function HeatCell({
             ? fmtPct(cell.roi)
             : `${cell.gainLoss >= 0 ? "+" : ""}${formatCompactCurrency(cell.gainLoss, currency)}`}
         </div>
+        {cell.apy !== null && (
+          <div className="text-[10px] opacity-75">{fmtPct(cell.apy)} APY</div>
+        )}
         <div className="text-[10px] opacity-80">
           {formatCompactCurrency(cell.currentValue, currency)} / {formatCompactCurrency(cell.invested, currency)} invested
         </div>
@@ -164,14 +200,30 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
       existing.invested += Number(p.totalInvested) || 0;
       map.set(p.category, existing);
     }
+    // Weighted duration per category from enriched assets
+    const platCatMap = new Map<number, string>();
+    for (const p of filteredPlatforms) platCatMap.set(p.id, p.category);
+    const durMap = new Map<string, { wMonths: number; wWeight: number }>();
+    for (const a of filteredAssets) {
+      const cat = platCatMap.get(a.platformId);
+      if (!cat) continue;
+      const months = getDurationMonths(a.acquisitionDate, a.exitDate);
+      if (months <= 0 || a.invested <= 0) continue;
+      const d = durMap.get(cat) ?? { wMonths: 0, wWeight: 0 };
+      d.wMonths += a.invested * months; d.wWeight += a.invested;
+      durMap.set(cat, d);
+    }
     const cells: HeatmapCell[] = [];
     for (const [cat, data] of map.entries()) {
       const gainLoss = data.currentValue - data.invested;
       const roi = data.invested > 0 ? (gainLoss / data.invested) * 100 : 0;
-      cells.push({ id: cat, label: cat, currentValue: data.currentValue, invested: data.invested, gainLoss, roi, hasChildren: true });
+      const d = durMap.get(cat);
+      const avgMonths = d && d.wWeight > 0 ? d.wMonths / d.wWeight : 0;
+      const apy = computeApy(roi, avgMonths);
+      cells.push({ id: cat, label: cat, currentValue: data.currentValue, invested: data.invested, gainLoss, roi, apy, hasChildren: true });
     }
     return cells.sort((a, b) => b.currentValue - a.currentValue);
-  }, [filteredPlatforms]);
+  }, [filteredPlatforms, filteredAssets]);
 
   // Level 2: platforms (within category or all)
   const levelTwoCells = useMemo((): HeatmapCell[] => {
@@ -179,19 +231,31 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
     const source = drillCategory === ALL_SENTINEL
       ? filteredPlatforms
       : filteredPlatforms.filter((p) => p.category === drillCategory);
+    // Weighted duration per platform from enriched assets
+    const durMap = new Map<number, { wMonths: number; wWeight: number }>();
+    for (const a of filteredAssets) {
+      const months = getDurationMonths(a.acquisitionDate, a.exitDate);
+      if (months <= 0 || a.invested <= 0) continue;
+      const d = durMap.get(a.platformId) ?? { wMonths: 0, wWeight: 0 };
+      d.wMonths += a.invested * months; d.wWeight += a.invested;
+      durMap.set(a.platformId, d);
+    }
     return source
       .map((p) => {
         const currentValue = Number(p.currentValue) || 0;
         const invested = Number(p.totalInvested) || 0;
         const gainLoss = currentValue - invested;
         const roi = invested > 0 ? (gainLoss / invested) * 100 : 0;
+        const d = durMap.get(p.id);
+        const avgMonths = d && d.wWeight > 0 ? d.wMonths / d.wWeight : 0;
+        const apy = computeApy(roi, avgMonths);
         return {
-          id: p.id, label: p.name, currentValue, invested, gainLoss, roi,
+          id: p.id, label: p.name, currentValue, invested, gainLoss, roi, apy,
           hasChildren: p.platformMode === "asset_returns" || p.platformMode === "item_valuations",
         };
       })
       .sort((a, b) => b.currentValue - a.currentValue);
-  }, [drillCategory, filteredPlatforms]);
+  }, [drillCategory, filteredPlatforms, filteredAssets]);
 
   const drilledPlatform = useMemo(
     () => (drillPlatformId ? platforms.find((p) => p.id === drillPlatformId) : null),
@@ -219,11 +283,15 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
         true
       );
     }
-    return platformAssets.map((a) => ({
-      id: a.assetId, label: a.assetName,
-      currentValue: a.currentValue, invested: a.invested, gainLoss: a.gainLoss, roi: a.roi,
-      hasChildren: false,
-    })).sort((a, b) => b.currentValue - a.currentValue);
+    return platformAssets.map((a) => {
+      const months = getDurationMonths(a.acquisitionDate, a.exitDate);
+      return {
+        id: a.assetId, label: a.assetName,
+        currentValue: a.currentValue, invested: a.invested, gainLoss: a.gainLoss, roi: a.roi,
+        apy: computeApy(a.roi, months),
+        hasChildren: false,
+      };
+    }).sort((a, b) => b.currentValue - a.currentValue);
   }, [drillPlatformId, isItemValuations, platformAssets]);
 
   const descriptionAssets = useMemo(
@@ -242,11 +310,15 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
     if (!drillMaker) return [];
     return descriptionAssets
       .filter((a) => extractMaker(a.assetName) === drillMaker)
-      .map((a) => ({
-        id: a.assetId, label: a.assetName,
-        currentValue: a.currentValue, invested: a.invested, gainLoss: a.gainLoss, roi: a.roi,
-        hasChildren: false,
-      }))
+      .map((a) => {
+        const months = getDurationMonths(a.acquisitionDate, a.exitDate);
+        return {
+          id: a.assetId, label: a.assetName,
+          currentValue: a.currentValue, invested: a.invested, gainLoss: a.gainLoss, roi: a.roi,
+          apy: computeApy(a.roi, months),
+          hasChildren: false,
+        };
+      })
       .sort((a, b) => b.currentValue - a.currentValue);
   }, [drillMaker, descriptionAssets]);
 

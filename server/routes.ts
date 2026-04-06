@@ -1555,6 +1555,8 @@ export async function registerRoutes(
         invested: number;
         roi: number;
         gainLoss: number;
+        acquisitionDate: string | null;
+        exitDate: string | null;
       }[] = [];
 
       for (const platform of assetPlatforms) {
@@ -1576,6 +1578,8 @@ export async function registerRoutes(
             invested: Math.round(invested * 100) / 100,
             gainLoss: Math.round(gainLoss * 100) / 100,
             roi: Math.round(roi * 100) / 100,
+            acquisitionDate: asset.acquisitionDate ?? null,
+            exitDate: asset.exitDate ?? null,
           });
         }
       }
