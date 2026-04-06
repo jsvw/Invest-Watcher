@@ -591,12 +591,13 @@ export default function PlatformDetails() {
 
   const assetAnalytics = useMemo(() => {
     if (!assets || assets.length === 0) return null;
+    if (platformMode !== "asset_returns" && platformMode !== "item_valuations") return null;
 
     // Best active asset by ROI%
-    const active = assets.filter((a: any) => a.status === "active" && a.currentValue !== undefined);
+    const active = assets.filter(a => a.status === "active" && a.currentValue !== undefined);
     let bestActive: { name: string; roi: number } | null = null;
     for (const a of active) {
-      const invested = Number(a.investedAmount) + Number((a as any).bonusAmount || 0);
+      const invested = Number(a.investedAmount) + Number(a.bonusAmount || 0);
       if (invested <= 0) continue;
       const roi = ((Number(a.currentValue) - invested) / invested) * 100;
       if (bestActive === null || roi > bestActive.roi) {
@@ -605,30 +606,30 @@ export default function PlatformDetails() {
     }
 
     // Avg ROI on exit
-    const exited = assets.filter((a: any) => a.status === "exited" || a.status === "matured");
+    const exited = assets.filter(a => a.status === "exited" || a.status === "matured");
     let avgExitRoi: number | null = null;
     if (exited.length > 0) {
-      const rois = exited.map((a: any) => {
+      const rois = exited.map(a => {
         const invested = Number(a.investedAmount);
-        const pl = Number((a as any).profitLoss ?? 0);
+        const pl = Number(a.profitLoss ?? 0);
         return invested > 0 ? (pl / invested) * 100 : 0;
       });
-      avgExitRoi = rois.reduce((s: number, r: number) => s + r, 0) / rois.length;
+      avgExitRoi = rois.reduce((s, r) => s + r, 0) / rois.length;
     }
 
     // Avg holding duration (months)
     let avgDurationMonths: number | null = null;
-    const exitedWithDates = exited.filter((a: any) => a.acquisitionDate && a.exitDate);
+    const exitedWithDates = exited.filter(a => a.acquisitionDate && a.exitDate);
     if (exitedWithDates.length > 0) {
-      const durations = exitedWithDates.map((a: any) => {
-        const ms = new Date(a.exitDate).getTime() - new Date(a.acquisitionDate).getTime();
+      const durations = exitedWithDates.map(a => {
+        const ms = new Date(a.exitDate!).getTime() - new Date(a.acquisitionDate).getTime();
         return ms / (1000 * 60 * 60 * 24 * 30.44);
       });
-      avgDurationMonths = durations.reduce((s: number, d: number) => s + d, 0) / durations.length;
+      avgDurationMonths = durations.reduce((s, d) => s + d, 0) / durations.length;
     }
 
     return { bestActive, avgExitRoi, exitedCount: exited.length, avgDurationMonths };
-  }, [assets]);
+  }, [assets, platformMode]);
 
   const { data: history, isLoading: isHistoryLoading } = useQuery({
     queryKey: [api.portfolio.history.path, id, range, specificYear, specificMonth],
@@ -2313,7 +2314,7 @@ export default function PlatformDetails() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Card className="bg-gradient-to-br from-card to-muted/30" data-testid="analytics-stat-best-active">
                       <CardContent className="pt-5 pb-4">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Best Active Asset</p>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Best Performance Active Asset</p>
                         <p className={`text-2xl font-bold font-display ${assetAnalytics.bestActive !== null ? (assetAnalytics.bestActive.roi >= 0 ? 'text-emerald-500' : 'text-red-500') : ''}`}>
                           {assetAnalytics.bestActive !== null
                             ? `${assetAnalytics.bestActive.roi >= 0 ? '+' : ''}${assetAnalytics.bestActive.roi.toFixed(2)}%`
