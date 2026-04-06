@@ -639,8 +639,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createAsset(asset: InsertAsset): Promise<Asset> {
-    const [newAsset] = await db.insert(assets).values(asset).returning();
-    return newAsset;
+    return await db.transaction(async (tx) => {
+      const [newAsset] = await tx.insert(assets).values(asset).returning();
+      await tx.insert(assetValuations).values({
+        assetId: newAsset.id,
+        value: asset.investedAmount,
+        date: asset.acquisitionDate,
+      });
+      return newAsset;
+    });
   }
 
   async updateAsset(id: number, asset: Partial<InsertAsset>): Promise<Asset> {
