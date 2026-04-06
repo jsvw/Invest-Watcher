@@ -583,15 +583,19 @@ export default function PlatformDetails() {
         case "rpm": {
           const rpmDurA = a.acquisitionDate ? ((a.exitDate ? new Date(a.exitDate) : new Date()).getTime() - new Date(a.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44) : 0;
           const rpmDurB = b.acquisitionDate ? ((b.exitDate ? new Date(b.exitDate) : new Date()).getTime() - new Date(b.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44) : 0;
-          const rpmA = rpmDurA > 0 ? (a.profitLoss || 0) / rpmDurA : -Infinity;
-          const rpmB = rpmDurB > 0 ? (b.profitLoss || 0) / rpmDurB : -Infinity;
+          const invA = Number(a.investedAmount) || 0;
+          const invB = Number(b.investedAmount) || 0;
+          const rpmA = rpmDurA > 0 && invA > 0 ? ((a.profitLoss || 0) / invA / rpmDurA) * 100 : -Infinity;
+          const rpmB = rpmDurB > 0 && invB > 0 ? ((b.profitLoss || 0) / invB / rpmDurB) * 100 : -Infinity;
           return rpmB - rpmA; // Highest first
         }
         case "rpm-asc": {
           const rpmDurA2 = a.acquisitionDate ? ((a.exitDate ? new Date(a.exitDate) : new Date()).getTime() - new Date(a.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44) : 0;
           const rpmDurB2 = b.acquisitionDate ? ((b.exitDate ? new Date(b.exitDate) : new Date()).getTime() - new Date(b.acquisitionDate).getTime()) / (1000 * 60 * 60 * 24 * 30.44) : 0;
-          const rpmA2 = rpmDurA2 > 0 ? (a.profitLoss || 0) / rpmDurA2 : Infinity;
-          const rpmB2 = rpmDurB2 > 0 ? (b.profitLoss || 0) / rpmDurB2 : Infinity;
+          const invA2 = Number(a.investedAmount) || 0;
+          const invB2 = Number(b.investedAmount) || 0;
+          const rpmA2 = rpmDurA2 > 0 && invA2 > 0 ? ((a.profitLoss || 0) / invA2 / rpmDurA2) * 100 : Infinity;
+          const rpmB2 = rpmDurB2 > 0 && invB2 > 0 ? ((b.profitLoss || 0) / invB2 / rpmDurB2) * 100 : Infinity;
           return rpmA2 - rpmB2; // Lowest first
         }
         default:
@@ -1469,11 +1473,12 @@ export default function PlatformDetails() {
                                 if (!asset.acquisitionDate) return <span className="text-muted-foreground">-</span>;
                                 const durMs = (asset.exitDate ? new Date(asset.exitDate) : new Date()).getTime() - new Date(asset.acquisitionDate).getTime();
                                 const durationMonths = durMs / (1000 * 60 * 60 * 24 * 30.44);
-                                if (durationMonths <= 0) return <span className="text-muted-foreground">-</span>;
-                                const rpm = (asset.profitLoss || 0) / durationMonths;
+                                const invested = Number(asset.investedAmount) || 0;
+                                if (durationMonths <= 0 || invested <= 0) return <span className="text-muted-foreground">-</span>;
+                                const rpm = ((asset.profitLoss || 0) / invested / durationMonths) * 100;
                                 return (
                                   <span className={rpm >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                                    {rpm >= 0 ? '+' : ''}{formatCurrency(rpm, currency)}/mo
+                                    {rpm >= 0 ? '+' : ''}{rpm.toFixed(2)}%/mo
                                   </span>
                                 );
                               })()}
