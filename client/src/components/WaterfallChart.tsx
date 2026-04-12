@@ -278,23 +278,20 @@ export function WaterfallChart({ currency, excludedPlatforms, granularity }: Wat
     return rows;
   }, [waterfallData, granularity]);
 
-  if (isLoading) return <Skeleton className="h-[300px] w-full" />;
+  if (isLoading) return <Skeleton className="h-full w-full" />;
 
   if (!chartRows.length) {
     return (
-      <div className="h-[300px] flex items-center justify-center text-muted-foreground text-sm">
+      <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
         No data available
       </div>
     );
   }
 
-  const minWidth = Math.max(600, chartRows.length * 16);
-
   return (
-    <div className="space-y-3">
-      <div className="h-[300px] overflow-x-auto" data-testid="waterfall-chart-container">
-        <div style={{ minWidth }}>
-          <ResponsiveContainer width="100%" height={300}>
+    <div className="flex flex-col h-full gap-2">
+      <div className="flex-1 min-h-0" data-testid="waterfall-chart-container">
+        <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
               data={chartRows}
               margin={{ top: 8, right: 16, left: 0, bottom: 28 }}
@@ -331,7 +328,6 @@ export function WaterfallChart({ currency, excludedPlatforms, granularity }: Wat
               <Bar dataKey="bar_neg" stackId="wf" shape={<CombinedBar />} isAnimationActive={false} legendType="none" />
             </ComposedChart>
           </ResponsiveContainer>
-        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground px-1">
