@@ -365,8 +365,20 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
   const levelThreeCells = useMemo((): HeatmapCell[] => {
     if (!drillPlatformId) return [];
     if (drillPlatformId === -1) {
-      // All assets mode: group by platform name
-      return aggregateCells(platformAssets, (a) => a.platformName, false);
+      // All assets mode: show every individual asset as a flat list
+      return platformAssets.map((a) => {
+        const months = getElapsedMonths(a.acquisitionDate, a.exitDate);
+        return {
+          id: a.assetId,
+          label: a.assetName,
+          currentValue: a.currentValue,
+          invested: a.invested,
+          gainLoss: a.gainLoss,
+          roi: a.roi,
+          apy: computeApy(a.roi, months),
+          hasChildren: false,
+        };
+      }).sort((a, b) => b.currentValue - a.currentValue);
     }
     if (isItemValuations) {
       return aggregateCells(
