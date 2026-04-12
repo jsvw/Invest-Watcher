@@ -745,6 +745,12 @@ export default function Dashboard() {
     return { totalROI, cagr, twr, bestPlatform, ageDays, ageMonths };
   }, [activePlatforms, historyData, platformBreakdownByMonth, excludedPlatforms]);
 
+  const avgMomPct = useMemo(() => {
+    if (!monthlySeriesData || monthlySeriesData.length === 0) return null;
+    const sum = monthlySeriesData.reduce((s, e) => s + e.monthlyChangePct, 0);
+    return sum / monthlySeriesData.length;
+  }, [monthlySeriesData]);
+
   const activeHeatmapData = useMemo(() => {
     if (!platformBreakdownByMonth) return null;
 
@@ -1121,7 +1127,7 @@ export default function Dashboard() {
             <KpiCard
               label="Ann. Return"
               value={kpis?.cagr != null ? fmtPct(kpis.cagr) : "—"}
-              sub={kpis?.twr != null ? `${fmtPct(kpis.twr)} cumulative · cash-flow adjusted` : "Time-weighted, annualized"}
+              sub={avgMomPct != null ? `avg ${fmtPct(avgMomPct)} / month` : undefined}
               icon={<TrendingUp className="w-5 h-5 text-muted-foreground" />}
               positive={kpis?.cagr != null ? kpis.cagr >= 0 : undefined}
             />
