@@ -1217,12 +1217,12 @@ export default function PlatformDetails() {
                             <Tooltip formatter={(v: number, name: string) => [formatAxisValue(v, name === "Profit/Loss" || name === "Monthly Growth" || name === "Quarterly Growth" || name === "Yearly Growth"), name]} labelFormatter={platAggXFmt} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
                             <Legend verticalAlign="top" height={36} />
                             {(chartView === "overview" || chartView === "all") && <>
-                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={3} dot={{ r: 4, fill: platform.color, strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />
-                              <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 4, fill: '#8884d8', strokeWidth: 0 }} animationDuration={350} />
+                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={3} dot={false} activeDot={{ r: 6 }} animationDuration={350} />
+                              <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={false} animationDuration={350} />
                             </>}
-                            {(chartView === "profit" || chartView === "all") && <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />}
-                            {chartView === "monthly" && <Line type="monotone" dataKey="totalMonthlyChange" name={chartAggregation === "quarter" ? "Quarterly Growth" : "Yearly Growth"} yAxisId="monthly" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />}
-                            {chartView === "all" && <Line type="monotone" dataKey="monthlyChange" name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />}
+                            {(chartView === "profit" || chartView === "all") && <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6 }} animationDuration={350} />}
+                            {chartView === "monthly" && <Line type="monotone" dataKey="totalMonthlyChange" name={chartAggregation === "quarter" ? "Quarterly Growth" : "Yearly Growth"} yAxisId="monthly" stroke="#f59e0b" strokeWidth={3} dot={false} activeDot={{ r: 6 }} animationDuration={350} />}
+                            {chartView === "all" && <Line type="monotone" dataKey="monthlyChange" name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={3} dot={false} activeDot={{ r: 6 }} animationDuration={350} />}
                           </LineChart>
                         </ResponsiveContainer>
                       ) : (
@@ -1276,15 +1276,15 @@ export default function PlatformDetails() {
                           <Legend verticalAlign="top" height={36}/>
                           {(chartView === "overview" || chartView === "all") && (
                             <>
-                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={4} dot={{ r: 5, fill: platform.color, strokeWidth: 0 }} activeDot={{ r: 7 }} />
-                              <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 5, fill: '#8884d8', strokeWidth: 0 }} />
+                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={4} dot={false} activeDot={{ r: 7 }} />
+                              <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={false} />
                             </>
                           )}
                           {(chartView === "profit" || chartView === "all") && (
-                            <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={chartView === "all" ? 3 : 4} dot={{ r: 5, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 7 }} />
+                            <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={chartView === "all" ? 3 : 4} dot={false} activeDot={{ r: 7 }} />
                           )}
                           {(chartView === "monthly" || chartView === "all") && (
-                            <Line type="monotone" dataKey="monthlyChange" name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={chartView === "all" ? 3 : 4} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 7 }} />
+                            <Line type="monotone" dataKey="monthlyChange" name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={chartView === "all" ? 3 : 4} dot={false} activeDot={{ r: 7 }} />
                           )}
                         </LineChart>
                       </ResponsiveContainer>
@@ -1653,12 +1653,12 @@ export default function PlatformDetails() {
                             <Tooltip formatter={(v: number, name: string) => [formatAxisValue(v, name === "Profit/Loss" || name === "Monthly Growth" || name === "Quarterly Growth" || name === "Yearly Growth"), name]} labelFormatter={platAggXFmt} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
                             <Legend verticalAlign="top" height={36} />
                             {(chartView === "overview" || chartView === "all") && <>
-                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={3} dot={{ r: 4, fill: platform.color, strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />
-                              <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 4, fill: '#8884d8', strokeWidth: 0 }} animationDuration={350} />
+                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={3} dot={false} activeDot={{ r: 6 }} animationDuration={350} />
+                              <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={false} animationDuration={350} />
                             </>}
-                            {(chartView === "profit" || chartView === "all") && <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />}
-                            {chartView === "monthly" && <Line type="monotone" dataKey="totalMonthlyChange" name={chartAggregation === "quarter" ? "Quarterly Growth" : "Yearly Growth"} yAxisId="monthly" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />}
-                            {chartView === "all" && <Line type="monotone" dataKey="monthlyChange" name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />}
+                            {(chartView === "profit" || chartView === "all") && <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6 }} animationDuration={350} />}
+                            {chartView === "monthly" && <Line type="monotone" dataKey="totalMonthlyChange" name={chartAggregation === "quarter" ? "Quarterly Growth" : "Yearly Growth"} yAxisId="monthly" stroke="#f59e0b" strokeWidth={3} dot={false} activeDot={{ r: 6 }} animationDuration={350} />}
+                            {chartView === "all" && <Line type="monotone" dataKey="monthlyChange" name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={3} dot={false} activeDot={{ r: 6 }} animationDuration={350} />}
                           </LineChart>
                         </ResponsiveContainer>
                       ) : (
@@ -1712,15 +1712,15 @@ export default function PlatformDetails() {
                           <Legend verticalAlign="top" height={36}/>
                           {(chartView === "overview" || chartView === "all") && (
                             <>
-                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={4} dot={{ r: 5, fill: platform.color, strokeWidth: 0 }} activeDot={{ r: 7 }} />
-                              <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 5, fill: '#8884d8', strokeWidth: 0 }} />
+                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={4} dot={false} activeDot={{ r: 7 }} />
+                              <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={false} />
                             </>
                           )}
                           {(chartView === "profit" || chartView === "all") && (
-                            <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={chartView === "all" ? 3 : 4} dot={{ r: 5, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 7 }} />
+                            <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={chartView === "all" ? 3 : 4} dot={false} activeDot={{ r: 7 }} />
                           )}
                           {(chartView === "monthly" || chartView === "all") && (
-                            <Line type="monotone" dataKey="monthlyChange" name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={chartView === "all" ? 3 : 4} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 7 }} />
+                            <Line type="monotone" dataKey="monthlyChange" name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={chartView === "all" ? 3 : 4} dot={false} activeDot={{ r: 7 }} />
                           )}
                         </LineChart>
                       </ResponsiveContainer>

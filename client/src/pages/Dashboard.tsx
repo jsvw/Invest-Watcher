@@ -1425,14 +1425,14 @@ export default function Dashboard() {
                           <Tooltip content={<ChartTooltip />} />
                           <Legend verticalAlign="top" height={36} />
                           {(displayedChartView === "overview" || displayedChartView === "all") && <>
-                            <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke="hsl(var(--primary))" strokeWidth={4} dot={{ r: 4, fill: 'hsl(var(--primary))', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />
-                            <Line type="monotone" dataKey="invested" name="Invested" yAxisId="left" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 4, fill: '#3b82f6', strokeWidth: 0 }} animationDuration={350} />
+                            <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke="hsl(var(--primary))" strokeWidth={4} dot={false} activeDot={{ r: 6 }} animationDuration={350} />
+                            <Line type="monotone" dataKey="invested" name="Invested" yAxisId="left" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={false} animationDuration={350} />
                           </>}
                           {(displayedChartView === "profit" || displayedChartView === "all") && (
-                            <Line type="monotone" dataKey={profitKeyAgg} name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={2} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 5 }} animationDuration={350} />
+                            <Line type="monotone" dataKey={profitKeyAgg} name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 5 }} animationDuration={350} />
                           )}
                           {displayedChartView === "all" && (
-                            <Line type="monotone" dataKey={growthKeyAgg} name={growthSeriesNameAgg} yAxisId="growth" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />
+                            <Line type="monotone" dataKey={growthKeyAgg} name={growthSeriesNameAgg} yAxisId="growth" stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{ r: 6 }} animationDuration={350} />
                           )}
                         </LineChart>
                       </ResponsiveContainer>
@@ -1485,7 +1485,7 @@ export default function Dashboard() {
                           <YAxis yAxisId="monthly" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={monthlyAxisFmt} domain={['auto', 'auto']} />
                           <Tooltip content={<ChartTooltip />} />
                           <Legend verticalAlign="top" height={36} />
-                          <Line type="monotone" dataKey={monthlyKey} name={aggSeriesName} yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 7 }} animationDuration={350} />
+                          <Line type="monotone" dataKey={monthlyKey} name={aggSeriesName} yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{ r: 7 }} animationDuration={350} />
                         </LineChart>
                       </ResponsiveContainer>
                     );
@@ -1552,7 +1552,7 @@ export default function Dashboard() {
                           <Line type="monotone" dataKey={profitKey} name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 4 }} animationDuration={350} />
                         )}
                         {displayedChartView === "all" && (
-                          <Line type="monotone" dataKey={monthlyKey} name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={{ r: 5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 7 }} animationDuration={350} />
+                          <Line type="monotone" dataKey={monthlyKey} name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{ r: 7 }} animationDuration={350} />
                         )}
                       </LineChart>
                     </ResponsiveContainer>

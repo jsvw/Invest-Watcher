@@ -76,7 +76,7 @@ function AssetValuationHoverContent({ assetId, assetName, currency }: { assetId:
                 <XAxis dataKey="timestamp" type="number" scale="time" domain={['dataMin', 'dataMax']} tick={{ fontSize: 10 }} tickFormatter={(ts) => format(new Date(ts), 'MMM yy')} ticks={(() => { const seen = new Set<string>(); return chartData.filter((entry: any) => { const key = format(new Date(entry.date), 'yyyy-MM'); if (seen.has(key)) return false; seen.add(key); return true; }).map((entry: any) => new Date(entry.date).getTime()); })()} />
                 <YAxis tick={{ fontSize: 10 }} domain={[yMin, yMax]} tickFormatter={(value) => value >= 1000 ? `${currencySymbol}${(value / 1000).toFixed(0)}k` : `${currencySymbol}${Math.round(value)}`} width={40} />
                 <Tooltip formatter={(value: number) => [`${currencySymbol}${value.toLocaleString()}${currencySuffix}`, "Value"]} labelFormatter={(ts) => format(new Date(ts), 'MMM dd, yyyy')} contentStyle={{ fontSize: '12px' }} />
-                <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3.5} dot={{ r: 4, fill: '#3b82f6', strokeWidth: 0 }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3.5} dot={false} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>

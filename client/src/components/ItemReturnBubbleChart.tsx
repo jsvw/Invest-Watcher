@@ -101,7 +101,7 @@ function MiniValuationChart({ data, currency }: { data: ValuationPoint[]; curren
             dataKey="value" 
             stroke="#8884d8" 
             strokeWidth={3.5}
-            dot={{ r: 4, fill: '#8884d8', strokeWidth: 0 }}
+            dot={false}
           />
         </LineChart>
       </ResponsiveContainer>
