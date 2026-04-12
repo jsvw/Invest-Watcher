@@ -45,10 +45,10 @@ function formatPeriodLabel(period: string, granularity: Granularity): string {
   if (granularity === "year") return period;
   if (granularity === "quarter") {
     const [y, q] = period.split("-");
-    return `${q} '${y.slice(2)}`;
+    return `${q} ${y}`;
   }
   const [y, m] = period.split("-");
-  return `${MONTHS[parseInt(m) - 1]} '${y.slice(2)}`;
+  return `${MONTHS[parseInt(m) - 1]} ${y}`;
 }
 
 const OPEN_COLOR = "#94a3b8";
@@ -278,12 +278,12 @@ export function WaterfallChart({ currency, excludedPlatforms, granularity }: Wat
     return rows;
   }, [waterfallData, granularity]);
 
-  if (isLoading) return <Skeleton className="h-[340px] w-full" />;
+  if (isLoading) return <Skeleton className="h-[300px] w-full" />;
 
   if (!chartRows.length) {
     return (
-      <div className="h-[340px] flex items-center justify-center text-muted-foreground text-sm">
-        No data available.
+      <div className="h-[300px] flex items-center justify-center text-muted-foreground text-sm">
+        No data available
       </div>
     );
   }
@@ -292,9 +292,9 @@ export function WaterfallChart({ currency, excludedPlatforms, granularity }: Wat
 
   return (
     <div className="space-y-3">
-      <div className="h-[340px] overflow-x-auto" data-testid="waterfall-chart-container">
+      <div className="h-[300px] overflow-x-auto" data-testid="waterfall-chart-container">
         <div style={{ minWidth }}>
-          <ResponsiveContainer width="100%" height={340}>
+          <ResponsiveContainer width="100%" height={300}>
             <ComposedChart
               data={chartRows}
               margin={{ top: 8, right: 16, left: 0, bottom: 28 }}

@@ -6,7 +6,7 @@ import { formatCurrency, formatCurrencyRounded, formatCompactCurrency, getCurren
 import {
   Wallet, TrendingUp, DollarSign, Check, RefreshCw, Loader2, CheckCircle, XCircle,
   X, Save, Bookmark, Trash2, Target, ArrowUpCircle, ArrowDownCircle,
-  LineChart as LineChartIcon, BarChart2, Filter, Percent, CandlestickChart,
+  LineChart as LineChartIcon, BarChart2, Filter, Percent, GitCommitHorizontal,
 } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import {
@@ -1264,7 +1264,7 @@ export default function Dashboard() {
                       className={cn("px-2 py-1.5 transition-colors", chartType === "waterfall" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
                       data-testid="button-chart-type-waterfall"
                     >
-                      <CandlestickChart className="w-4 h-4" />
+                      <GitCommitHorizontal className="w-4 h-4" />
                     </button>
                   )}
                 </div>
