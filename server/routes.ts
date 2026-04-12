@@ -2032,6 +2032,13 @@ export async function registerRoutes(
     }
   });
 
+  function fmtValDiff(newVal: number, prevValNum: number | null, sym: string): string {
+    if (prevValNum === null) return "";
+    const diff = newVal - prevValNum;
+    const sign = diff >= 0 ? "+" : "-";
+    return ` (${sign}${sym}${Math.abs(diff).toFixed(2)})`;
+  }
+
   app.post('/api/platforms/:platformId/scrape', requireAuth, async (req, res) => {
     try {
       const userId = getAuthenticatedUserId(req)!;
@@ -2074,9 +2081,12 @@ export async function registerRoutes(
         const investedEur = creds.investedEur ? parseFloat(creds.investedEur) : null;
         const result = await scrapeStockTicker(ticker, shares, targetCurrency, avgPrice, investedEur);
         const todayStr = today.toISOString().split("T")[0];
+        let prevValNum: number | null = null;
 
         if (result.valueInTargetCurrency > 0) {
           const existingVals = await storage.getValuations(platformId);
+          const prevVal = existingVals.find(v => new Date(v.date).toISOString().split("T")[0] !== todayStr);
+          if (prevVal) prevValNum = parseFloat(prevVal.value);
           const sameDayVal = existingVals.find(v =>
             new Date(v.date).toISOString().split("T")[0] === todayStr
           );
@@ -2092,16 +2102,17 @@ export async function registerRoutes(
         }
 
         const sym = (c: string) => ({ EUR: "€", USD: "$", GBP: "£" }[c] || c + " ");
+        const currSym = sym(targetCurrency);
         await storage.updateScraperConfig(config.id, userId, {
           lastScrapeAt: new Date(),
           lastScrapeStatus: "success",
-          lastScrapeMessage: `${ticker}: ${shares} shares × $${result.stockPrice.toFixed(2)} = $${result.valueInStockCurrency.toFixed(2)} (FX ${result.fxRate.toFixed(4)}) = ${sym(targetCurrency)}${result.valueInTargetCurrency.toFixed(2)}`,
+          lastScrapeMessage: `${ticker}: ${shares} shares × $${result.stockPrice.toFixed(2)} = $${result.valueInStockCurrency.toFixed(2)} (FX ${result.fxRate.toFixed(4)}) = ${currSym}${result.valueInTargetCurrency.toFixed(2)}`,
         });
 
         return res.json({
           success: true,
           data: result,
-          message: `${ticker}: ${shares} shares × $${result.stockPrice.toFixed(2)} = ${sym(targetCurrency)}${result.valueInTargetCurrency.toFixed(2)}`,
+          message: `${ticker}: ${shares} shares × $${result.stockPrice.toFixed(2)} = ${currSym}${result.valueInTargetCurrency.toFixed(2)}${fmtValDiff(result.valueInTargetCurrency, prevValNum, currSym)}`,
         });
       }
 
@@ -2137,8 +2148,11 @@ export async function registerRoutes(
         }
 
         const totalValue = matchedPie.currentValue;
+        let prevValNum: number | null = null;
         if (totalValue > 0) {
           const existingVals = await storage.getValuations(platformId);
+          const prevVal = existingVals.find(v => new Date(v.date).toISOString().split("T")[0] !== todayStr);
+          if (prevVal) prevValNum = parseFloat(prevVal.value);
           const sameDayVal = existingVals.find(v =>
             new Date(v.date).toISOString().split("T")[0] === todayStr
           );
@@ -2189,10 +2203,11 @@ export async function registerRoutes(
           lastScrapeMessage: `Pie "${matchedPie.pieName}": Value=${totalValue.toFixed(2)}, Invested=${matchedPie.investedValue.toFixed(2)}, P/L=${matchedPie.result.toFixed(2)} (${matchedPie.resultPercent.toFixed(1)}%)`,
         });
 
+        const t212Sym = ({ EUR: "€", USD: "$", GBP: "£" }[platform!.currency || "EUR"] || (platform!.currency || "EUR") + " ");
         return res.json({
           success: true,
           data: matchedPie,
-          message: `Synced "${matchedPie.pieName}": Value=${totalValue.toFixed(2)}, Invested=${matchedPie.investedValue.toFixed(2)}`,
+          message: `Synced "${matchedPie.pieName}": Value=${t212Sym}${totalValue.toFixed(2)}${fmtValDiff(totalValue, prevValNum, t212Sym)}, Invested=${t212Sym}${matchedPie.investedValue.toFixed(2)}`,
         });
       }
 
@@ -2212,9 +2227,12 @@ export async function registerRoutes(
           balanceData = await scrapeCrowdPear(creds.email, creds.password, creds.gmailAppPassword, creds.gmailEmail);
         }
 
+        const todayStr = today.toISOString().split("T")[0];
+        let prevValNum: number | null = null;
         if (balanceData.totalBalance > 0) {
           const existingVals = await storage.getValuations(platformId);
-          const todayStr = today.toISOString().split("T")[0];
+          const prevVal = existingVals.find(v => new Date(v.date).toISOString().split("T")[0] !== todayStr);
+          if (prevVal) prevValNum = parseFloat(prevVal.value);
           const sameDayVal = existingVals.find(v =>
             new Date(v.date).toISOString().split("T")[0] === todayStr
           );
@@ -2248,9 +2266,10 @@ export async function registerRoutes(
           }
         }
 
-        const msgParts = [`Total: €${balanceData.totalBalance.toFixed(2)}`];
+        const platSym = ({ EUR: "€", USD: "$", GBP: "£" }[platform!.currency || "EUR"] || (platform!.currency || "EUR") + " ");
+        const msgParts = [`Total: ${platSym}${balanceData.totalBalance.toFixed(2)}${fmtValDiff(balanceData.totalBalance, prevValNum, platSym)}`];
         if (balanceData.totalInvested) {
-          msgParts.push(`Invested: €${balanceData.totalInvested.toFixed(2)}`);
+          msgParts.push(`Invested: ${platSym}${balanceData.totalInvested.toFixed(2)}`);
         }
 
         await storage.updateScraperConfig(config.id, userId, {
@@ -2262,7 +2281,7 @@ export async function registerRoutes(
         return res.json({
           success: true,
           data: balanceData,
-          message: `Successfully scraped. Total balance: €${balanceData.totalBalance.toFixed(2)}${balanceData.totalInvested ? `, Invested: €${balanceData.totalInvested.toFixed(2)}` : ""}`,
+          message: msgParts.join(", "),
         });
       }
 
@@ -2274,9 +2293,12 @@ export async function registerRoutes(
         return res.status(400).json({ message: `Unknown scraper type: ${config.scraperType}` });
       }
 
+      let monefitPrevValNum: number | null = null;
       if (scraperResult.totalBalance > 0) {
         const existingVals = await storage.getValuations(platformId);
         const todayStr = today.toISOString().split("T")[0];
+        const prevVal = existingVals.find(v => new Date(v.date).toISOString().split("T")[0] !== todayStr);
+        if (prevVal) monefitPrevValNum = parseFloat(prevVal.value);
         const sameDayVal = existingVals.find(v => 
           new Date(v.date).toISOString().split("T")[0] === todayStr
         );
@@ -2368,10 +2390,11 @@ export async function registerRoutes(
         lastScrapeMessage: `Total: €${scraperResult.totalBalance.toFixed(2)}, Invested: €${scraperResult.totalInvested.toFixed(2)}, Vaults: ${scraperResult.vaults.length}`,
       });
 
+      const monefitSym = ({ EUR: "€", USD: "$", GBP: "£" }[platform.currency || "EUR"] || (platform.currency || "EUR") + " ");
       res.json({
         success: true,
         data: scraperResult,
-        message: `Successfully scraped. Total balance: €${scraperResult.totalBalance.toFixed(2)}, Total invested: €${scraperResult.totalInvested.toFixed(2)}`,
+        message: `Total: ${monefitSym}${scraperResult.totalBalance.toFixed(2)}${fmtValDiff(scraperResult.totalBalance, monefitPrevValNum, monefitSym)}, Invested: ${monefitSym}${scraperResult.totalInvested.toFixed(2)}`,
       });
     } catch (err: any) {
       console.error("Scrape error:", err);
