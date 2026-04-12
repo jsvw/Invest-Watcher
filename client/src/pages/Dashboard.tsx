@@ -184,6 +184,7 @@ export default function Dashboard() {
 
   // ── Shared filter state ──────────────────────────────────────────────────
   const [excludedPlatforms, setExcludedPlatforms] = useState<Set<number>>(new Set());
+  const [singleSelectMode, setSingleSelectMode] = useState(false);
   const [filterPresetsOpen, setFilterPresetsOpen] = useState(false);
   const [filterPresetName, setFilterPresetName] = useState("");
 
@@ -2028,9 +2029,15 @@ export default function Dashboard() {
                 return (
                   <button
                     key={p.id}
-                    onClick={() => togglePlatform(p.id)}
+                    onClick={() => {
+                      if (singleSelectMode) {
+                        setExcludedPlatforms(new Set(platforms.filter(o => o.id !== p.id).map(o => o.id)));
+                      } else {
+                        togglePlatform(p.id);
+                      }
+                    }}
                     data-testid={`filter-platform-${p.id}`}
-                    title={excluded ? `Include ${p.name}` : `Exclude ${p.name}`}
+                    title={singleSelectMode ? `Show only ${p.name}` : excluded ? `Include ${p.name}` : `Exclude ${p.name}`}
                     className={cn(
                       "w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all text-left",
                       excluded
@@ -2045,8 +2052,9 @@ export default function Dashboard() {
               })}
             </div>
             <div className="flex items-center gap-1 pt-1 border-t">
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs flex-1" onClick={() => setExcludedPlatforms(new Set())} data-testid="filter-select-all">All</Button>
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs flex-1" onClick={() => setExcludedPlatforms(new Set(platforms.map(p => p.id)))} data-testid="filter-deselect-all">None</Button>
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs flex-1" onClick={() => { setSingleSelectMode(false); setExcludedPlatforms(new Set()); }} data-testid="filter-select-all">All</Button>
+              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs flex-1" onClick={() => { setSingleSelectMode(false); setExcludedPlatforms(new Set(platforms.map(p => p.id))); }} data-testid="filter-deselect-all">None</Button>
+              <Button variant={singleSelectMode ? "default" : "ghost"} size="sm" className="h-6 px-2 text-xs flex-1" onClick={() => setSingleSelectMode(v => !v)} data-testid="filter-single-select">Single</Button>
             </div>
             <Popover open={filterPresetsOpen} onOpenChange={setFilterPresetsOpen}>
               <PopoverTrigger asChild>
