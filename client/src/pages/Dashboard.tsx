@@ -2086,6 +2086,35 @@ export default function Dashboard() {
               </PopoverTrigger>
               <PopoverContent side="left" align="start" className="w-72 p-3" data-testid="popover-filter-presets">
                 <div className="space-y-3">
+                  {platforms && (() => {
+                    const cats = Array.from(new Set(platforms.map((p: any) => p.category).filter(Boolean))).sort() as string[];
+                    if (!cats.length) return null;
+                    return (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1.5">Filter by category</p>
+                        <div className="flex flex-wrap gap-1">
+                          {cats.map(cat => (
+                            <button
+                              key={cat}
+                              type="button"
+                              className="px-2 py-0.5 text-xs rounded-full border border-border bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                              onClick={() => {
+                                const excluded = new Set(
+                                  platforms.filter((p: any) => p.category !== cat).map((p: any) => p.id)
+                                );
+                                setExcludedPlatforms(excluded);
+                                setFilterPresetsOpen(false);
+                              }}
+                              data-testid={`button-category-filter-${cat.toLowerCase().replace(/\s+/g, '-')}`}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  <div className="border-t pt-3">
                   <p className="text-sm font-medium">Saved Filter Presets</p>
                   {savedFilters && savedFilters.length > 0 ? (
                     <div className="space-y-1 max-h-48 overflow-y-auto">
@@ -2145,6 +2174,7 @@ export default function Dashboard() {
                         <Save className="w-3.5 h-3.5" />
                       </Button>
                     </div>
+                  </div>
                   </div>
                 </div>
               </PopoverContent>
