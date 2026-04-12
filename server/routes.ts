@@ -2653,9 +2653,11 @@ export async function registerRoutes(
 
       const needDbDividendFallback = !t212Data.dividendsLoaded || (t212Data.dividendsLoaded && (!t212Data.rawDividends || t212Data.rawDividends.size === 0));
       const dividendsAlreadyOnInstruments = matchedPie.instruments.some(i => i.dividendsReceived != null && i.dividendsReceived > 0);
+      const DIVIDEND_START = '2024-07-01';
       if (needDbDividendFallback && !dividendsAlreadyOnInstruments && hasDbDividends) {
         const divMap = new Map<string, { total: number; count: number; lastDate: string; history: { amount: number; paidOn: string; quantity: number }[] }>();
         for (const row of dbDividends) {
+          if (row.paidOn < DIVIDEND_START) continue;
           const existing = divMap.get(row.ticker);
           const amt = Number(row.amount);
           const qty = row.quantity ? Number(row.quantity) : 0;
@@ -2677,6 +2679,19 @@ export async function registerRoutes(
             inst.lastDividendDate = div.lastDate;
             inst.dividendHistory = div.history;
           }
+        }
+      }
+      for (const inst of matchedPie.instruments) {
+        if (!inst.dividendHistory) continue;
+        inst.dividendHistory = inst.dividendHistory.filter((d: any) => d.paidOn >= DIVIDEND_START);
+        if (inst.dividendHistory.length === 0) {
+          inst.dividendsReceived = null;
+          inst.dividendCount = null;
+          inst.lastDividendDate = null;
+        } else {
+          inst.dividendsReceived = inst.dividendHistory.reduce((s: number, d: any) => s + d.amount, 0);
+          inst.dividendCount = inst.dividendHistory.length;
+          inst.lastDividendDate = inst.dividendHistory.reduce((latest: string, d: any) => d.paidOn > latest ? d.paidOn : latest, inst.dividendHistory[0].paidOn);
         }
       }
 
@@ -2770,8 +2785,10 @@ export async function registerRoutes(
             new Date(h.date).getTime() === new Date(latestDate).getTime()
           );
 
+          const DIVIDEND_START_CACHE = '2024-07-01';
           const divMap = new Map<string, { total: number; count: number; lastDate: string; history: { amount: number; paidOn: string; quantity: number }[] }>();
           for (const row of dbDividends) {
+            if (row.paidOn < DIVIDEND_START_CACHE) continue;
             const existing = divMap.get(row.ticker);
             const amt = Number(row.amount);
             const qty = row.quantity ? Number(row.quantity) : 0;
@@ -2892,9 +2909,11 @@ export async function registerRoutes(
 
       const needDbDividendFallback = !t212Data.dividendsLoaded || (t212Data.dividendsLoaded && (!t212Data.rawDividends || t212Data.rawDividends.size === 0));
       const dividendsAlreadyOnInstruments = matchedPie.instruments.some(i => i.dividendsReceived != null && i.dividendsReceived > 0);
+      const DIVIDEND_START_LIVE = '2024-07-01';
       if (needDbDividendFallback && !dividendsAlreadyOnInstruments && hasDbDividends) {
         const divMap = new Map<string, { total: number; count: number; lastDate: string; history: { amount: number; paidOn: string; quantity: number }[] }>();
         for (const row of dbDividends) {
+          if (row.paidOn < DIVIDEND_START_LIVE) continue;
           const existing = divMap.get(row.ticker);
           const amt = Number(row.amount);
           const qty = row.quantity ? Number(row.quantity) : 0;
@@ -2916,6 +2935,19 @@ export async function registerRoutes(
             inst.lastDividendDate = div.lastDate;
             inst.dividendHistory = div.history;
           }
+        }
+      }
+      for (const inst of matchedPie.instruments) {
+        if (!inst.dividendHistory) continue;
+        inst.dividendHistory = inst.dividendHistory.filter((d: any) => d.paidOn >= DIVIDEND_START_LIVE);
+        if (inst.dividendHistory.length === 0) {
+          inst.dividendsReceived = null;
+          inst.dividendCount = null;
+          inst.lastDividendDate = null;
+        } else {
+          inst.dividendsReceived = inst.dividendHistory.reduce((s: number, d: any) => s + d.amount, 0);
+          inst.dividendCount = inst.dividendHistory.length;
+          inst.lastDividendDate = inst.dividendHistory.reduce((latest: string, d: any) => d.paidOn > latest ? d.paidOn : latest, inst.dividendHistory[0].paidOn);
         }
       }
 
