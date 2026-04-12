@@ -1305,7 +1305,7 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
-              <div className={cn("h-[400px] w-full transition-opacity duration-150", chartFading ? "opacity-0" : "opacity-100")}>
+              <div className={cn("w-full transition-opacity duration-150", displayedChartType === "waterfall" ? "h-auto" : "h-[400px]", chartFading ? "opacity-0" : "opacity-100")}>
                 {(chartData && chartData.length > 0) || (displayedChartView === "monthly" && monthlySeriesData.length > 0) ? (() => {
                   const mappedData = chartData.map((h: any, i: number, arr: any[]) => {
                     const prev = arr[i - 1];
