@@ -20,7 +20,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { format, formatDistanceToNow } from "date-fns";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend, BarChart, Bar, Cell } from "recharts";
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -39,7 +39,6 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { ScraperConfigDialog } from "@/components/ScraperConfigDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
-import { BarChart as RechartsBarChart, Bar, XAxis as BarXAxis, YAxis as BarYAxis, Tooltip as BarTooltip, ResponsiveContainer as BarContainer, Cell as BarCell } from "recharts";
 
 function TickerPriceHover({ ticker, currency, children }: { ticker: string; currency: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -731,6 +730,7 @@ export default function PlatformDetails() {
       g.monthlyChanges.push(monthlyChange);
     });
     const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+    const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
     return Array.from(groups.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, g]) => ({
@@ -739,6 +739,7 @@ export default function PlatformDetails() {
         invested: avg(g.investeds),
         gain: avg(g.gains),
         monthlyChange: avg(g.monthlyChanges),
+        totalMonthlyChange: sum(g.monthlyChanges),
       }));
   }, [activeChartData, chartAggregation]);
 
@@ -1182,7 +1183,7 @@ export default function PlatformDetails() {
                       <TabsList>
                         <TabsTrigger value="overview">Value Overview</TabsTrigger>
                         <TabsTrigger value="profit">Profit/Loss</TabsTrigger>
-                        <TabsTrigger value="monthly">Monthly Growth</TabsTrigger>
+                        <TabsTrigger value="monthly">{chartAggregation === "quarter" ? "Quarterly Growth" : chartAggregation === "year" ? "Yearly Growth" : "Monthly Growth"}</TabsTrigger>
                         <TabsTrigger value="all">All</TabsTrigger>
                       </TabsList>
                     </Tabs>
@@ -1206,23 +1207,36 @@ export default function PlatformDetails() {
                   <div className="h-[400px] w-full">
                     {activeChartData && activeChartData.length > 0 ? (
                       platAggregatedData ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={platAggregatedData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                            <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={platAggXFmt} interval="preserveStartEnd" />
-                            {(chartView === "overview" || chartView === "all") && <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v)} domain={['auto', 'auto']} />}
-                            {(chartView === "profit" || chartView === "all") && <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />}
-                            {(chartView === "monthly" || chartView === "all") && <YAxis yAxisId="monthly" orientation={chartView === "monthly" ? "right" : "right"} stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />}
-                            <Tooltip formatter={(v: number, name: string) => [formatAxisValue(v, name === "Monthly Growth" || name === "Profit/Loss"), name]} labelFormatter={platAggXFmt} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
-                            <Legend verticalAlign="top" height={36} />
-                            {(chartView === "overview" || chartView === "all") && <>
-                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={3} dot={{ r: 4, fill: platform.color, strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />
-                              <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 4, fill: '#8884d8', strokeWidth: 0 }} animationDuration={350} />
-                            </>}
-                            {(chartView === "profit" || chartView === "all") && <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />}
-                            {(chartView === "monthly" || chartView === "all") && <Line type="monotone" dataKey="monthlyChange" name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />}
-                          </LineChart>
-                        </ResponsiveContainer>
+                        chartView === "monthly" ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={platAggregatedData} barCategoryGap="20%">
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                              <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={platAggXFmt} interval="preserveStartEnd" />
+                              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />
+                              <Tooltip formatter={(v: number) => [formatAxisValue(v, true), chartAggregation === "quarter" ? "Quarterly Growth" : "Yearly Growth"]} labelFormatter={platAggXFmt} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
+                              <Legend verticalAlign="top" height={36} />
+                              <Bar dataKey="totalMonthlyChange" name={chartAggregation === "quarter" ? "Quarterly Growth" : "Yearly Growth"} animationDuration={350} radius={[3, 3, 3, 3]}>
+                                {platAggregatedData.map((entry, i) => <Cell key={i} fill={entry.totalMonthlyChange >= 0 ? '#10b981' : '#ef4444'} />)}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={platAggregatedData}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                              <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={platAggXFmt} interval="preserveStartEnd" />
+                              {(chartView === "overview" || chartView === "all") && <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v)} domain={['auto', 'auto']} />}
+                              {(chartView === "profit" || chartView === "all") && <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />}
+                              <Tooltip formatter={(v: number, name: string) => [formatAxisValue(v, name === "Profit/Loss"), name]} labelFormatter={platAggXFmt} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
+                              <Legend verticalAlign="top" height={36} />
+                              {(chartView === "overview" || chartView === "all") && <>
+                                <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={3} dot={{ r: 4, fill: platform.color, strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />
+                                <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 4, fill: '#8884d8', strokeWidth: 0 }} animationDuration={350} />
+                              </>}
+                              {(chartView === "profit" || chartView === "all") && <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />}
+                            </LineChart>
+                          </ResponsiveContainer>
+                        )
                       ) : (
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={activeChartData.map((h: any, i: number, arr: any[]) => {
@@ -1617,7 +1631,7 @@ export default function PlatformDetails() {
                       <TabsList>
                         <TabsTrigger value="overview" data-testid="tab-platform-chart-overview">Value Overview</TabsTrigger>
                         <TabsTrigger value="profit" data-testid="tab-platform-chart-profit">Profit/Loss</TabsTrigger>
-                        <TabsTrigger value="monthly" data-testid="tab-platform-chart-monthly">Monthly Growth</TabsTrigger>
+                        <TabsTrigger value="monthly" data-testid="tab-platform-chart-monthly">{chartAggregation === "quarter" ? "Quarterly Growth" : chartAggregation === "year" ? "Yearly Growth" : "Monthly Growth"}</TabsTrigger>
                         <TabsTrigger value="all" data-testid="tab-platform-chart-all">All</TabsTrigger>
                       </TabsList>
                     </Tabs>
@@ -1641,23 +1655,36 @@ export default function PlatformDetails() {
                   <div className="h-[400px] w-full">
                     {activeChartData && activeChartData.length > 0 ? (
                       platAggregatedData ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={platAggregatedData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                            <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={platAggXFmt} interval="preserveStartEnd" />
-                            {(chartView === "overview" || chartView === "all") && <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v)} domain={['auto', 'auto']} />}
-                            {(chartView === "profit" || chartView === "all") && <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />}
-                            {(chartView === "monthly" || chartView === "all") && <YAxis yAxisId="monthly" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />}
-                            <Tooltip formatter={(v: number, name: string) => [formatAxisValue(v, name === "Monthly Growth" || name === "Profit/Loss"), name]} labelFormatter={platAggXFmt} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
-                            <Legend verticalAlign="top" height={36} />
-                            {(chartView === "overview" || chartView === "all") && <>
-                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={3} dot={{ r: 4, fill: platform.color, strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />
-                              <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 4, fill: '#8884d8', strokeWidth: 0 }} animationDuration={350} />
-                            </>}
-                            {(chartView === "profit" || chartView === "all") && <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />}
-                            {(chartView === "monthly" || chartView === "all") && <Line type="monotone" dataKey="monthlyChange" name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />}
-                          </LineChart>
-                        </ResponsiveContainer>
+                        chartView === "monthly" ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={platAggregatedData} barCategoryGap="20%">
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                              <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={platAggXFmt} interval="preserveStartEnd" />
+                              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />
+                              <Tooltip formatter={(v: number) => [formatAxisValue(v, true), chartAggregation === "quarter" ? "Quarterly Growth" : "Yearly Growth"]} labelFormatter={platAggXFmt} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
+                              <Legend verticalAlign="top" height={36} />
+                              <Bar dataKey="totalMonthlyChange" name={chartAggregation === "quarter" ? "Quarterly Growth" : "Yearly Growth"} animationDuration={350} radius={[3, 3, 3, 3]}>
+                                {platAggregatedData.map((entry, i) => <Cell key={i} fill={entry.totalMonthlyChange >= 0 ? '#10b981' : '#ef4444'} />)}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={platAggregatedData}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                              <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={platAggXFmt} interval="preserveStartEnd" />
+                              {(chartView === "overview" || chartView === "all") && <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v)} domain={['auto', 'auto']} />}
+                              {(chartView === "profit" || chartView === "all") && <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />}
+                              <Tooltip formatter={(v: number, name: string) => [formatAxisValue(v, name === "Profit/Loss"), name]} labelFormatter={platAggXFmt} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
+                              <Legend verticalAlign="top" height={36} />
+                              {(chartView === "overview" || chartView === "all") && <>
+                                <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={3} dot={{ r: 4, fill: platform.color, strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />
+                                <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 4, fill: '#8884d8', strokeWidth: 0 }} animationDuration={350} />
+                              </>}
+                              {(chartView === "profit" || chartView === "all") && <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />}
+                            </LineChart>
+                          </ResponsiveContainer>
+                        )
                       ) : (
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={activeChartData.map((h: any, i: number, arr: any[]) => {
@@ -2012,13 +2039,13 @@ export default function PlatformDetails() {
                                               </p>
                                               {inst.dividendHistory && inst.dividendHistory.length > 1 && (
                                                 <div className="h-24">
-                                                  <BarContainer width="100%" height="100%">
-                                                    <RechartsBarChart data={inst.dividendHistory.map((d: any) => ({ date: format(new Date(d.paidOn), 'MMM yy'), amount: d.amount }))} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                                                      <BarXAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                                                      <BarTooltip formatter={(val: number) => formatCurrency(val, currency)} labelStyle={{ fontSize: 11 }} contentStyle={{ fontSize: 12, borderRadius: 6 }} />
+                                                  <ResponsiveContainer width="100%" height="100%">
+                                                    <BarChart data={inst.dividendHistory.map((d: any) => ({ date: format(new Date(d.paidOn), 'MMM yy'), amount: d.amount }))} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                                                      <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                                                      <Tooltip formatter={(val: number) => formatCurrency(val, currency)} labelStyle={{ fontSize: 11 }} contentStyle={{ fontSize: 12, borderRadius: 6 }} />
                                                       <Bar dataKey="amount" fill="hsl(var(--chart-2))" radius={[3, 3, 0, 0]} />
-                                                    </RechartsBarChart>
-                                                  </BarContainer>
+                                                    </BarChart>
+                                                  </ResponsiveContainer>
                                                 </div>
                                               )}
                                               <div className="max-h-40 overflow-y-auto">
@@ -2388,8 +2415,8 @@ export default function PlatformDetails() {
                   </CardHeader>
                   <CardContent>
                     <div className="h-[280px]">
-                      <BarContainer width="100%" height="100%">
-                        <RechartsBarChart
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
                           data={monthlyReturns?.map(m => {
                             const [y, mo] = m.month.split('-');
                             return {
@@ -2401,21 +2428,21 @@ export default function PlatformDetails() {
                           }) || []}
                           margin={{ top: 4, right: 8, bottom: 8, left: 8 }}
                         >
-                          <BarXAxis
+                          <XAxis
                             dataKey="label"
                             tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                             axisLine={false}
                             tickLine={false}
                             interval="preserveStartEnd"
                           />
-                          <BarYAxis
+                          <YAxis
                             tickFormatter={(v: number) => `${formatCurrency(v, currency)}`}
                             tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                             axisLine={false}
                             tickLine={false}
                             width={68}
                           />
-                          <BarTooltip
+                          <Tooltip
                             contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.12)', fontSize: 12 }}
                             formatter={(val: number, _: string, item: { payload?: { gainPct?: number | null } }) => [
                               `${val >= 0 ? '+' : ''}${formatCurrency(val, currency)}${item.payload?.gainPct != null ? ` (${item.payload.gainPct >= 0 ? '+' : ''}${item.payload.gainPct.toFixed(2)}%)` : ''}`,
@@ -2424,11 +2451,11 @@ export default function PlatformDetails() {
                           />
                           <Bar dataKey="gain" radius={[3, 3, 0, 0]}>
                             {monthlyReturns?.map((m, i) => (
-                              <BarCell key={i} fill={m.gain >= 0 ? '#10b981' : '#ef4444'} />
+                              <Cell key={i} fill={m.gain >= 0 ? '#10b981' : '#ef4444'} />
                             ))}
                           </Bar>
-                        </RechartsBarChart>
-                      </BarContainer>
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
                   </CardContent>
                 </Card>
