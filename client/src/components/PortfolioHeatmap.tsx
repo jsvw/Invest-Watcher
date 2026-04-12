@@ -206,6 +206,7 @@ const ALL_SENTINEL = "__ALL__";
 
 export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currency }: PortfolioHeatmapProps) {
   const [displayMode, setDisplayMode] = useState<DisplayMode>("pct");
+  const [sortBy, setSortBy] = useState<"value" | "roi" | "gain" | "apy">("value");
   const [drillCategory, setDrillCategory] = useState<string | null>(null);
   const [drillPlatformId, setDrillPlatformId] = useState<number | null>(null);
   const [drillAssetCategory, setDrillAssetCategory] = useState<string | null>(null);
@@ -442,6 +443,19 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
     : level === 2 ? levelTwoCells
     : levelOneCells;
 
+  const sortedCells = useMemo(() => {
+    return [...currentCells].sort((a, b) => {
+      if (sortBy === "roi") return b.roi - a.roi;
+      if (sortBy === "gain") return b.gainLoss - a.gainLoss;
+      if (sortBy === "apy") {
+        const aa = a.apy ?? -Infinity;
+        const ba = b.apy ?? -Infinity;
+        return ba - aa;
+      }
+      return b.currentValue - a.currentValue;
+    });
+  }, [currentCells, sortBy]);
+
   function handleBreadcrumbAll() {
     setDrillCategory(null); setDrillPlatformId(null); setDrillAssetCategory(null); setDrillMaker(null);
   }
@@ -553,6 +567,21 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
             </Button>
           )}
           <div className="flex items-center rounded-md border p-0.5 shrink-0">
+            {(["value", "roi", "gain", "apy"] as const).map((key) => (
+              <Button
+                key={key}
+                variant="ghost" size="sm"
+                className={cn("px-2.5 py-1 h-auto text-xs font-medium rounded",
+                  sortBy === key ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                )}
+                onClick={() => setSortBy(key)}
+                data-testid={`heatmap-sort-${key}`}
+              >
+                {key === "value" ? "Value" : key === "roi" ? "Return %" : key === "gain" ? "Gain" : "p.a."}
+              </Button>
+            ))}
+          </div>
+          <div className="flex items-center rounded-md border p-0.5 shrink-0">
             <Button
               variant="ghost" size="sm"
               className={cn("px-2.5 py-1 h-auto text-xs font-medium rounded",
@@ -579,11 +608,11 @@ export function PortfolioHeatmap({ assets, platforms, excludedPlatforms, currenc
 
       <p className="text-xs text-muted-foreground">{levelHint}</p>
 
-      {currentCells.length === 0 ? (
+      {sortedCells.length === 0 ? (
         <p className="text-muted-foreground text-sm">No data available at this level.</p>
       ) : (
         <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4" data-testid="heatmap-grid">
-          {currentCells.map((cell) => (
+          {sortedCells.map((cell) => (
             <HeatCell
               key={cell.id}
               cell={cell}
