@@ -1227,13 +1227,15 @@ export default function PlatformDetails() {
                               <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={platAggXFmt} interval="preserveStartEnd" />
                               {(chartView === "overview" || chartView === "all") && <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v)} domain={['auto', 'auto']} />}
                               {(chartView === "profit" || chartView === "all") && <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />}
-                              <Tooltip formatter={(v: number, name: string) => [formatAxisValue(v, name === "Profit/Loss"), name]} labelFormatter={platAggXFmt} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
+                              {chartView === "all" && <YAxis yAxisId="monthly" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />}
+                              <Tooltip formatter={(v: number, name: string) => [formatAxisValue(v, name === "Profit/Loss" || name === "Monthly Growth"), name]} labelFormatter={platAggXFmt} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
                               <Legend verticalAlign="top" height={36} />
                               {(chartView === "overview" || chartView === "all") && <>
                                 <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={3} dot={{ r: 4, fill: platform.color, strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />
                                 <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 4, fill: '#8884d8', strokeWidth: 0 }} animationDuration={350} />
                               </>}
                               {(chartView === "profit" || chartView === "all") && <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />}
+                              {chartView === "all" && <Line type="monotone" dataKey="monthlyChange" name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />}
                             </LineChart>
                           </ResponsiveContainer>
                         )
@@ -1675,13 +1677,15 @@ export default function PlatformDetails() {
                               <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={platAggXFmt} interval="preserveStartEnd" />
                               {(chartView === "overview" || chartView === "all") && <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v)} domain={['auto', 'auto']} />}
                               {(chartView === "profit" || chartView === "all") && <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />}
-                              <Tooltip formatter={(v: number, name: string) => [formatAxisValue(v, name === "Profit/Loss"), name]} labelFormatter={platAggXFmt} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
+                              {chartView === "all" && <YAxis yAxisId="monthly" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />}
+                              <Tooltip formatter={(v: number, name: string) => [formatAxisValue(v, name === "Profit/Loss" || name === "Monthly Growth"), name]} labelFormatter={platAggXFmt} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
                               <Legend verticalAlign="top" height={36} />
                               {(chartView === "overview" || chartView === "all") && <>
                                 <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={3} dot={{ r: 4, fill: platform.color, strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />
                                 <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={{ r: 4, fill: '#8884d8', strokeWidth: 0 }} animationDuration={350} />
                               </>}
                               {(chartView === "profit" || chartView === "all") && <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />}
+                              {chartView === "all" && <Line type="monotone" dataKey="monthlyChange" name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={350} />}
                             </LineChart>
                           </ResponsiveContainer>
                         )
