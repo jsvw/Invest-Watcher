@@ -17,6 +17,8 @@ import fs from "fs";
 import { setupAuth, requireAuth, getAuthenticatedUserId } from "./auth";
 import { encrypt, decrypt } from "./encryption";
 
+const DIVIDEND_START = '2024-07-01';
+
 // Configure multer for file uploads
 const upload = multer({ dest: "/tmp/uploads/" });
 
@@ -2653,7 +2655,6 @@ export async function registerRoutes(
 
       const needDbDividendFallback = !t212Data.dividendsLoaded || (t212Data.dividendsLoaded && (!t212Data.rawDividends || t212Data.rawDividends.size === 0));
       const dividendsAlreadyOnInstruments = matchedPie.instruments.some(i => i.dividendsReceived != null && i.dividendsReceived > 0);
-      const DIVIDEND_START = '2024-07-01';
       if (needDbDividendFallback && !dividendsAlreadyOnInstruments && hasDbDividends) {
         const divMap = new Map<string, { total: number; count: number; lastDate: string; history: { amount: number; paidOn: string; quantity: number }[] }>();
         for (const row of dbDividends) {
@@ -2785,10 +2786,9 @@ export async function registerRoutes(
             new Date(h.date).getTime() === new Date(latestDate).getTime()
           );
 
-          const DIVIDEND_START_CACHE = '2024-07-01';
           const divMap = new Map<string, { total: number; count: number; lastDate: string; history: { amount: number; paidOn: string; quantity: number }[] }>();
           for (const row of dbDividends) {
-            if (row.paidOn < DIVIDEND_START_CACHE) continue;
+            if (row.paidOn < DIVIDEND_START) continue;
             const existing = divMap.get(row.ticker);
             const amt = Number(row.amount);
             const qty = row.quantity ? Number(row.quantity) : 0;
@@ -2909,11 +2909,10 @@ export async function registerRoutes(
 
       const needDbDividendFallback = !t212Data.dividendsLoaded || (t212Data.dividendsLoaded && (!t212Data.rawDividends || t212Data.rawDividends.size === 0));
       const dividendsAlreadyOnInstruments = matchedPie.instruments.some(i => i.dividendsReceived != null && i.dividendsReceived > 0);
-      const DIVIDEND_START_LIVE = '2024-07-01';
       if (needDbDividendFallback && !dividendsAlreadyOnInstruments && hasDbDividends) {
         const divMap = new Map<string, { total: number; count: number; lastDate: string; history: { amount: number; paidOn: string; quantity: number }[] }>();
         for (const row of dbDividends) {
-          if (row.paidOn < DIVIDEND_START_LIVE) continue;
+          if (row.paidOn < DIVIDEND_START) continue;
           const existing = divMap.get(row.ticker);
           const amt = Number(row.amount);
           const qty = row.quantity ? Number(row.quantity) : 0;
@@ -2939,7 +2938,7 @@ export async function registerRoutes(
       }
       for (const inst of matchedPie.instruments) {
         if (!inst.dividendHistory) continue;
-        inst.dividendHistory = inst.dividendHistory.filter((d: any) => d.paidOn >= DIVIDEND_START_LIVE);
+        inst.dividendHistory = inst.dividendHistory.filter((d: any) => d.paidOn >= DIVIDEND_START);
         if (inst.dividendHistory.length === 0) {
           inst.dividendsReceived = null;
           inst.dividendCount = null;
