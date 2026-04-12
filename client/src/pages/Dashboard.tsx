@@ -6,7 +6,7 @@ import { formatCurrency, formatCurrencyRounded, formatCompactCurrency, getCurren
 import {
   Wallet, TrendingUp, DollarSign, Check, RefreshCw, Loader2, CheckCircle, XCircle,
   X, Save, Bookmark, Trash2, Target, ArrowUpCircle, ArrowDownCircle,
-  LineChart as LineChartIcon, BarChart2, Filter, Percent,
+  LineChart as LineChartIcon, BarChart2, Filter, Percent, CandlestickChart,
 } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import {
@@ -193,11 +193,11 @@ export default function Dashboard() {
   const [specificYear, setSpecificYear] = useState<string | null>(null);
   const [specificMonth, setSpecificMonth] = useState<string | null>(null);
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
-  const [chartType, setChartType] = useState<"line" | "bar">("line");
+  const [chartType, setChartType] = useState<"line" | "bar" | "waterfall">("line");
   const [chartValueMode, setChartValueMode] = useState<"value" | "pct">("value");
   const [chartAggregation, setChartAggregation] = useState<"month" | "quarter" | "year">("month");
   const [displayedChartView, setDisplayedChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
-  const [displayedChartType, setDisplayedChartType] = useState<"line" | "bar">("line");
+  const [displayedChartType, setDisplayedChartType] = useState<"line" | "bar" | "waterfall">("line");
   const [displayedChartValueMode, setDisplayedChartValueMode] = useState<"value" | "pct">("value");
   const [displayedChartAggregation, setDisplayedChartAggregation] = useState<"month" | "quarter" | "year">("month");
   const [chartFading, setChartFading] = useState(false);
@@ -1258,6 +1258,15 @@ export default function Dashboard() {
                       <BarChart2 className="w-4 h-4" />
                     </button>
                   )}
+                  {chartView === "overview" && (
+                    <button
+                      onClick={() => setChartType("waterfall")}
+                      className={cn("px-2 py-1.5 transition-colors", chartType === "waterfall" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+                      data-testid="button-chart-type-waterfall"
+                    >
+                      <CandlestickChart className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -1266,6 +1275,7 @@ export default function Dashboard() {
                 <Tabs value={chartView} onValueChange={v => {
                   const next = v as typeof chartView;
                   if (next === "all" && chartType === "bar") setChartType("line");
+                  if (next !== "overview" && chartType === "waterfall") setChartType("line");
                   setChartView(next);
                 }}>
                   <TabsList>
@@ -1346,6 +1356,17 @@ export default function Dashboard() {
                   const monthlyKey = displayedChartValueMode === "pct" ? "monthlyChangePct" : "monthlyChange";
                   const profitAxisFmt = (v: number) => displayedChartValueMode === "pct" ? fmtPct(v) : formatAxisValue(v, true);
                   const monthlyAxisFmt = (v: number) => displayedChartValueMode === "pct" ? fmtPct(v) : formatAxisValue(v, true);
+
+                  // ── Waterfall view (overview tab only) ─────────────────────────────
+                  if (displayedChartView === "overview" && displayedChartType === "waterfall") {
+                    return (
+                      <WaterfallChart
+                        currency={currency}
+                        excludedPlatforms={excludedPlatforms}
+                        granularity={displayedChartAggregation}
+                      />
+                    );
+                  }
 
                   // ── Aggregated overview/profit/all: use end-of-period snapshots ─────
                   if (displayedChartAggregation !== "month" && aggregatedChartData && displayedChartView !== "monthly") {
@@ -1808,9 +1829,6 @@ export default function Dashboard() {
               )}
             </CardContent>
           </Card>
-
-          {/* Portfolio Waterfall */}
-          <WaterfallChart currency={currency} excludedPlatforms={excludedPlatforms} />
 
           {/* Platform Performance (combined table + allocation targets) */}
           {platforms != null && (() => {
