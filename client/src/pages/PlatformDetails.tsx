@@ -476,7 +476,7 @@ export default function PlatformDetails() {
   
   const [assetNameFilter, setAssetNameFilter] = useState("");
   const [assetSort, setAssetSort] = useState<"name" | "name-desc" | "date" | "date-asc" | "invested" | "invested-asc" | "value" | "value-asc" | "return" | "return-asc" | "exit" | "exit-desc" | "change" | "change-asc" | "duration" | "duration-asc" | "rpm" | "rpm-asc">("date");
-  const [assetStatusFilter, setAssetStatusFilter] = useState<"all" | "active" | "exited">("all");
+  const [assetStatusFilter, setAssetStatusFilter] = useState<"all" | "active" | "exited">("active");
   
   const filteredAndSortedAssets = useMemo(() => {
     if (!assets) return [];
