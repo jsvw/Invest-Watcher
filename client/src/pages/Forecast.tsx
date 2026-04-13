@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, DollarSign, Percent, Info, Pencil, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 interface ForecastMonth {
   label: string;
@@ -126,9 +126,19 @@ export default function Forecast() {
     return `/api/forecast?overrides=${encodeURIComponent(param)}`;
   }, [growthOverrides]);
 
-  const { data, isLoading } = useQuery<ForecastResponse>({
-    queryKey: [forecastUrl],
+  const { data, isLoading, refetch } = useQuery<ForecastResponse>({
+    queryKey: ["/api/forecast"],
+    queryFn: async () => {
+      const res = await fetch(forecastUrl, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch forecast");
+      return res.json();
+    },
+    staleTime: 0,
   });
+
+  useEffect(() => {
+    refetch();
+  }, [forecastUrl]);
 
   const projectedYearEndValue = data?.months[11]?.totalValue ?? 0;
   const projectedIncome = data?.months.reduce((sum, m) => sum + m.income, 0) ?? 0;
