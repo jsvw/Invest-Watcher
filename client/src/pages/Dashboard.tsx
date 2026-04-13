@@ -201,7 +201,7 @@ export default function Dashboard() {
   const [displayedChartValueMode, setDisplayedChartValueMode] = useState<"value" | "pct">("value");
   const [displayedChartAggregation, setDisplayedChartAggregation] = useState<"month" | "quarter" | "year">("month");
   const [chartFading, setChartFading] = useState(false);
-  const [forecastRange, setForecastRange] = useState<null | "3m" | "1y">(null);
+  const [forecastRange, setForecastRange] = useState<null | "3m" | "1y" | "3q" | "3y">(null);
 
   // ── Allocation targets state ─────────────────────────────────────────────
   const [localTargets, setLocalTargets] = useState<Record<number, string>>({});
@@ -538,7 +538,8 @@ export default function Dashboard() {
   // ── Computed: forecast extension from historical avg monthly return ───────
   const forecastCombined = useMemo(() => {
     if (!forecastRange || chartData.length < 2) return null;
-    const months = forecastRange === "3m" ? 3 : 12;
+    const FORECAST_MONTHS: Record<string, number> = { "3m": 3, "3q": 9, "1y": 12, "3y": 36 };
+    const months = FORECAST_MONTHS[forecastRange] ?? 3;
 
     // Average net profit rate over last 12 months (strip out new capital flows)
     const lookback = Math.min(12, chartData.length - 1);
@@ -1277,12 +1278,13 @@ export default function Dashboard() {
                   </div>
                 )}
                 <Tabs
-                  value={forecastRange === "3m" ? "forecast-3m" : forecastRange === "1y" ? "forecast-1y" : (range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range)}
+                  value={forecastRange ? `forecast-${forecastRange}` : (range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range)}
                   onValueChange={val => {
-                    if (val === "forecast-3m") {
-                      setForecastRange("3m"); setRange("all"); setSpecificYear(null); setSpecificMonth(null); setChartType("line");
-                    } else if (val === "forecast-1y") {
-                      setForecastRange("1y"); setRange("all"); setSpecificYear(null); setSpecificMonth(null); setChartType("line");
+                    const FORECAST_MAP: Record<string, "3m" | "3q" | "1y" | "3y"> = {
+                      "forecast-3m": "3m", "forecast-3q": "3q", "forecast-1y": "1y", "forecast-3y": "3y",
+                    };
+                    if (val in FORECAST_MAP) {
+                      setForecastRange(FORECAST_MAP[val]); setRange("all"); setSpecificYear(null); setSpecificMonth(null); setChartType("line");
                     } else {
                       setRange(val); setSpecificYear(null); setSpecificMonth(null); setForecastRange(null);
                     }
@@ -1293,10 +1295,16 @@ export default function Dashboard() {
                     <TabsTrigger value="quarter">3M</TabsTrigger>
                     <TabsTrigger value="year">1Y</TabsTrigger>
                     <TabsTrigger value="all">ALL</TabsTrigger>
-                    {chartView === "overview" && <>
-                      <TabsTrigger value="forecast-3m" data-testid="button-forecast-3m">+3M</TabsTrigger>
-                      <TabsTrigger value="forecast-1y" data-testid="button-forecast-1y">+1Y</TabsTrigger>
-                    </>}
+                    {chartView === "overview" && (() => {
+                      const opts = chartAggregation === "quarter"
+                        ? [{ value: "forecast-3q", label: "+3Q" }, { value: "forecast-1y", label: "+1Y" }]
+                        : chartAggregation === "year"
+                          ? [{ value: "forecast-1y", label: "+1Y" }, { value: "forecast-3y", label: "+3Y" }]
+                          : [{ value: "forecast-3m", label: "+3M" }, { value: "forecast-1y", label: "+1Y" }];
+                      return opts.map(o => (
+                        <TabsTrigger key={o.value} value={o.value} data-testid={`button-${o.value}`}>{o.label}</TabsTrigger>
+                      ));
+                    })()}
                   </TabsList>
                 </Tabs>
                 <div className="flex items-center border rounded-md overflow-hidden">
@@ -1348,9 +1356,9 @@ export default function Dashboard() {
                 </Tabs>
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
-                    <button onClick={() => setChartAggregation("month")} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "month" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-month">Mo</button>
-                    <button onClick={() => setChartAggregation("quarter")} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "quarter" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-quarter">Qtr</button>
-                    <button onClick={() => setChartAggregation("year")} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "year" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-year">Yr</button>
+                    <button onClick={() => { setChartAggregation("month"); setForecastRange(null); }} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "month" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-month">Mo</button>
+                    <button onClick={() => { setChartAggregation("quarter"); setForecastRange(null); }} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "quarter" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-quarter">Qtr</button>
+                    <button onClick={() => { setChartAggregation("year"); setForecastRange(null); }} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "year" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-year">Yr</button>
                   </div>
                   {chartView !== "overview" && (
                     <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
