@@ -25,6 +25,7 @@ interface ForecastPlatform {
   name: string;
   category: string;
   endValue: number;
+  currentValue: number;
   totalIncome: number;
   method: string;
   expectedGrowthPct: number | null;
@@ -310,7 +311,7 @@ export default function Forecast() {
                       <th className="text-left py-3 pr-4 font-medium" data-testid="th-platform">Platform</th>
                       <th className="text-left py-3 pr-4 font-medium" data-testid="th-category">Category</th>
                       <th className="text-right py-3 pr-4 font-medium" data-testid="th-end-value">Projected Year-End</th>
-                      <th className="text-right py-3 pr-4 font-medium" data-testid="th-income">Projected Income</th>
+                      <th className="text-right py-3 pr-4 font-medium" data-testid="th-income">Adjusted Income</th>
                       <th className="text-left py-3 font-medium" data-testid="th-method">Growth Rate</th>
                     </tr>
                   </thead>
@@ -338,13 +339,16 @@ export default function Forecast() {
                               {formatCurrency(platform.endValue, currency)}
                             </td>
                             <td className="py-3 pr-4 text-right" data-testid={`forecast-income-${platform.platformId}`}>
-                              {platform.totalIncome > 0 ? (
-                                <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                                  {formatCurrency(platform.totalIncome, currency)}
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground">—</span>
-                              )}
+                              {(() => {
+                                const adj = platform.endValue - platform.currentValue;
+                                return adj !== 0 ? (
+                                  <span className={adj > 0 ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-red-500 dark:text-red-400 font-medium"}>
+                                    {adj > 0 ? "+" : ""}{formatCurrency(adj, currency)}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                );
+                              })()}
                             </td>
                             <td className="py-3" data-testid={`forecast-method-${platform.platformId}`}>
                               {isStandard ? (

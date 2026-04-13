@@ -3325,6 +3325,7 @@ export async function registerRoutes(
         name: string;
         category: string;
         endValue: number;
+        currentValue: number;
         totalIncome: number;
         method: string;
         expectedGrowthPct: number | null;
@@ -3381,11 +3382,13 @@ export async function registerRoutes(
             monthlyIncome.push(monthlyIncomeSum);
           }
 
+          const currentAssetValue = platformAssets.reduce((sum, a) => sum + Number(a.investedAmount), 0);
           platformProjections.push({
             platformId: platform.id,
             name: platform.name,
             category: platform.category,
             endValue: monthlyValues[11] ?? 0,
+            currentValue: currentAssetValue,
             totalIncome: monthlyIncome.reduce((a, b) => a + b, 0),
             method: 'Asset Yields',
             expectedGrowthPct: null,
@@ -3412,6 +3415,7 @@ export async function registerRoutes(
               name: platform.name,
               category: platform.category,
               endValue: latestValue,
+              currentValue: latestValue,
               totalIncome: 0,
               method: 'Rate Not Set',
               expectedGrowthPct: null,
@@ -3432,6 +3436,7 @@ export async function registerRoutes(
             name: platform.name,
             category: platform.category,
             endValue: monthlyValues[11] ?? latestValue,
+            currentValue: latestValue,
             totalIncome: 0,
             method: `${storedPct}%/yr`,
             expectedGrowthPct: storedPct,
@@ -3464,6 +3469,7 @@ export async function registerRoutes(
               name: platform.name,
               category: platform.category,
               endValue: monthlyValues[11] ?? currentItemValue,
+              currentValue: currentItemValue,
               totalIncome: 0,
               method: `${itemStoredPct}%/yr`,
               expectedGrowthPct: itemStoredPct,
@@ -3476,6 +3482,7 @@ export async function registerRoutes(
               name: platform.name,
               category: platform.category,
               endValue: currentItemValue,
+              currentValue: currentItemValue,
               totalIncome: 0,
               method: 'Held Flat (item valuations)',
               expectedGrowthPct: null,
@@ -3517,6 +3524,7 @@ export async function registerRoutes(
         name: p.name,
         category: p.category,
         endValue: p.endValue,
+        currentValue: p.currentValue,
         totalIncome: p.totalIncome,
         method: p.method,
         expectedGrowthPct: p.expectedGrowthPct,
