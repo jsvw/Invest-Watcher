@@ -44,7 +44,8 @@ function computeProjections(payments: Payment[], heldSet: Set<string>, today: Da
     if (dates.length < 2) continue;
     const { label, days } = detectFrequency(dates);
     const lastDate = parseISO(dates[dates.length - 1]);
-    const avgAmount = history.reduce((s, h) => s + h.amount, 0) / history.length;
+    const recentHistory = sorted.slice(-4);
+    const avgAmount = recentHistory.reduce((s, h) => s + h.amount, 0) / recentHistory.length;
 
     let next = new Date(lastDate);
     next.setDate(next.getDate() + days);
