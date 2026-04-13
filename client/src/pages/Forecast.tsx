@@ -119,22 +119,15 @@ export default function Forecast() {
   const [editingPlatformId, setEditingPlatformId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
 
-  const overrideParam = useMemo(() => {
+  const forecastUrl = useMemo(() => {
     const entries = Object.entries(growthOverrides);
-    if (entries.length === 0) return "";
-    return entries.map(([id, rate]) => `${id}:${rate}`).join(",");
+    if (entries.length === 0) return "/api/forecast";
+    const param = entries.map(([id, rate]) => `${id}:${rate}`).join(",");
+    return `/api/forecast?overrides=${encodeURIComponent(param)}`;
   }, [growthOverrides]);
 
   const { data, isLoading } = useQuery<ForecastResponse>({
-    queryKey: ["/api/forecast", overrideParam],
-    queryFn: async () => {
-      const url = overrideParam
-        ? `/api/forecast?overrides=${encodeURIComponent(overrideParam)}`
-        : "/api/forecast";
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch forecast");
-      return res.json();
-    },
+    queryKey: [forecastUrl],
   });
 
   const projectedYearEndValue = data?.months[11]?.totalValue ?? 0;
