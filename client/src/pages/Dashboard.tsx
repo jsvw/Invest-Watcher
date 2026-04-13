@@ -540,15 +540,19 @@ export default function Dashboard() {
     if (!forecastRange || chartData.length < 2) return null;
     const months = forecastRange === "3m" ? 3 : 12;
 
-    // Geometric mean over last 12 months (or all available)
+    // Average net profit rate over last 12 months (strip out new capital flows)
     const lookback = Math.min(12, chartData.length - 1);
     const recent = chartData.slice(chartData.length - 1 - lookback);
-    let product = 1, count = 0;
+    let rateSum = 0, count = 0;
     for (let i = 1; i < recent.length; i++) {
-      const prev = recent[i - 1].value, curr = recent[i].value;
-      if (prev > 0 && curr > 0) { product *= curr / prev; count++; }
+      const prev = recent[i - 1], curr = recent[i];
+      if (prev.value > 0) {
+        const netGain = (curr.value - prev.value) - (curr.invested - prev.invested);
+        rateSum += netGain / prev.value;
+        count++;
+      }
     }
-    const avgMonthlyRate = count > 0 ? Math.pow(product, 1 / count) - 1 : 0;
+    const avgMonthlyRate = count > 0 ? rateSum / count : 0;
 
     const last = chartData[chartData.length - 1];
     const lastDate = new Date(last.date);
