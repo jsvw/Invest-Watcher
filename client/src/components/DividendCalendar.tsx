@@ -122,7 +122,7 @@ export function DividendCalendar({ payments, heldTickers, currency }: Props) {
       const m = months.find(x => x.key === key);
       if (m) m.projected += proj.amount;
     }
-    return months;
+    return months.filter(m => m.historical > 0 || m.projected > 0);
   }, [payments, projections, today]);
 
   const calendarCells = useMemo(() => {
