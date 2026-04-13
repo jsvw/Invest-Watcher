@@ -620,6 +620,10 @@ export default function PlatformDetails() {
     return filteredAndSortedAssets.reduce((sum, asset) => sum + Number(asset.investedAmount) + Number((asset as any).bonusAmount || 0), 0);
   }, [filteredAndSortedAssets]);
 
+  const totalFilteredBonus = useMemo(() => {
+    return filteredAndSortedAssets.reduce((sum, asset) => sum + Number((asset as any).bonusAmount || 0), 0);
+  }, [filteredAndSortedAssets]);
+
   const totalFilteredValue = useMemo(() => {
     return filteredAndSortedAssets.reduce((sum, asset) => sum + Number(asset.currentValue || asset.investedAmount), 0);
   }, [filteredAndSortedAssets]);
@@ -1319,7 +1323,7 @@ export default function PlatformDetails() {
                     </CardDescription>
                   </div>
                   <div className="text-sm text-muted-foreground flex gap-3" data-testid="text-active-invested">
-                    <span>Invested: <span className="font-medium text-foreground">{formatCurrency(totalFilteredInvested, currency)}</span></span>
+                    <span>Invested: <span className="font-medium text-foreground">{formatCurrency(totalFilteredInvested, currency)}</span>{totalFilteredBonus > 0 && <span className="text-xs ml-1">(+{formatCurrency(totalFilteredBonus, currency)} bonus)</span>}</span>
                     <span>Value: <span className="font-medium text-foreground">{formatCurrency(totalFilteredValue, currency)}</span></span>
                   </div>
                   <div className="flex gap-2 flex-wrap items-center">
