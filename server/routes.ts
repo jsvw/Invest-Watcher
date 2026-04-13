@@ -3440,7 +3440,6 @@ export async function registerRoutes(
           });
 
         } else if (mode === 'item_valuations') {
-          // Spec: hold flat at quantity × latest pricePerUnit per asset.
           const platformAssets = await db.select().from(assets)
             .where(eq(assets.platformId, platform.id));
 
@@ -3451,17 +3450,39 @@ export async function registerRoutes(
             currentItemValue += qty * price;
           }
 
-          platformProjections.push({
-            platformId: platform.id,
-            name: platform.name,
-            category: platform.category,
-            endValue: currentItemValue,
-            totalIncome: 0,
-            method: 'Held Flat (item valuations)',
-            expectedGrowthPct: null,
-            monthlyValues: Array(12).fill(currentItemValue),
-            monthlyIncome: Array(12).fill(0),
-          });
+          const itemStoredPct = platform.expectedGrowthPct != null
+            ? Number(platform.expectedGrowthPct)
+            : null;
+
+          if (itemStoredPct !== null) {
+            const monthlyRate = (itemStoredPct / 100) / 12;
+            const monthlyValues = Array.from({ length: 12 }, (_, i) =>
+              currentItemValue * (1 + monthlyRate) ** (i + 1)
+            );
+            platformProjections.push({
+              platformId: platform.id,
+              name: platform.name,
+              category: platform.category,
+              endValue: monthlyValues[11] ?? currentItemValue,
+              totalIncome: 0,
+              method: `${itemStoredPct}%/yr`,
+              expectedGrowthPct: itemStoredPct,
+              monthlyValues,
+              monthlyIncome: Array(12).fill(0),
+            });
+          } else {
+            platformProjections.push({
+              platformId: platform.id,
+              name: platform.name,
+              category: platform.category,
+              endValue: currentItemValue,
+              totalIncome: 0,
+              method: 'Held Flat (item valuations)',
+              expectedGrowthPct: null,
+              monthlyValues: Array(12).fill(currentItemValue),
+              monthlyIncome: Array(12).fill(0),
+            });
+          }
         }
       }
 

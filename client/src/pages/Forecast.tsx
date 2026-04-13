@@ -319,7 +319,7 @@ export default function Forecast() {
                       .map((platform) => {
                         const isEditing = editingPlatformId === platform.platformId;
                         const isSaving = savingId === platform.platformId;
-                        const isStandard = platform.method !== "Asset Yields" && !platform.method.startsWith("Held Flat");
+                        const isStandard = platform.method !== "Asset Yields";
 
                         return (
                           <tr
