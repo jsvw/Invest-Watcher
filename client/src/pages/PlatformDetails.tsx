@@ -2110,7 +2110,7 @@ export default function PlatformDetails() {
                                               {inst.dividendHistory && inst.dividendHistory.length > 1 && (
                                                 <div className="h-24">
                                                   <ResponsiveContainer width="100%" height="100%">
-                                                    <BarChart data={inst.dividendHistory.map((d: any) => ({ date: format(new Date(d.paidOn), 'MMM yy'), amount: d.amount }))} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                                                    <BarChart data={(() => { const m = new Map<string, number>(); inst.dividendHistory.forEach((d: any) => { const k = format(new Date(d.paidOn), 'MMM yy'); m.set(k, (m.get(k) ?? 0) + d.amount); }); return Array.from(m, ([date, amount]) => ({ date, amount })); })()} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                                                       <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
                                                       <Tooltip formatter={(val: number) => formatCurrency(val, currency)} labelStyle={{ fontSize: 11 }} contentStyle={{ fontSize: 12, borderRadius: 6 }} />
                                                       <Bar dataKey="amount" fill="hsl(var(--chart-2))" radius={[3, 3, 0, 0]} />
