@@ -54,7 +54,6 @@ export interface IStorage {
   getPlatform(id: number, userId: number): Promise<PlatformResponse | undefined>;
   createPlatform(platform: InsertPlatform, userId: number): Promise<Platform>;
   updatePlatform(id: number, platform: Partial<InsertPlatform>, userId: number): Promise<Platform>;
-  updatePlatformGrowthPct(platformId: number, userId: number, pct: number | null): Promise<void>;
   deletePlatform(id: number, userId: number): Promise<void>;
 
   // Investments (require platform ownership verification in routes)
@@ -243,7 +242,6 @@ export class DatabaseStorage implements IStorage {
         currency: row.currency,
         platformMode: row.platform_mode,
         targetAllocation: row.target_allocation != null ? Number(row.target_allocation) : null,
-        expectedGrowthPct: row.expected_growth_pct != null ? String(row.expected_growth_pct) : null,
         createdAt: row.created_at,
         currentValue: Number(row.current_value) || 0,
         totalInvested: totalInvested - totalWithdrawn,
@@ -301,7 +299,6 @@ export class DatabaseStorage implements IStorage {
       currency: row.currency,
       platformMode: row.platform_mode,
       targetAllocation: row.target_allocation != null ? Number(row.target_allocation) : null,
-      expectedGrowthPct: row.expected_growth_pct != null ? String(row.expected_growth_pct) : null,
       createdAt: row.created_at,
       currentValue: Number(row.current_value) || 0,
       totalInvested: totalInvested - totalWithdrawn,
@@ -322,14 +319,6 @@ export class DatabaseStorage implements IStorage {
       .returning();
     if (!updated) throw new Error("Platform not found");
     return updated;
-  }
-
-  async updatePlatformGrowthPct(platformId: number, userId: number, pct: number | null): Promise<void> {
-    const [updated] = await db.update(platforms)
-      .set({ expectedGrowthPct: pct !== null ? String(pct) : null })
-      .where(and(eq(platforms.id, platformId), eq(platforms.userId, userId)))
-      .returning();
-    if (!updated) throw new Error("Platform not found");
   }
 
   async deletePlatform(id: number, userId: number): Promise<void> {

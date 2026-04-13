@@ -12,7 +12,6 @@ const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const PlatformDetails = lazy(() => import("@/pages/PlatformDetails"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Imports = lazy(() => import("@/pages/Imports"));
-const Forecast = lazy(() => import("@/pages/Forecast"));
 
 function PageLoader() {
   return (
@@ -115,9 +114,6 @@ function Router() {
       </Route>
       <Route path="/imports">
         {(params) => <ProtectedRoute component={Imports} {...params} />}
-      </Route>
-      <Route path="/forecast">
-        {(params) => <ProtectedRoute component={Forecast} {...params} />}
       </Route>
       <Route component={NotFound} />
     </Switch>

@@ -30,7 +30,6 @@ export const platforms = pgTable("platforms", {
   currency: text("currency").notNull().default("USD"), // e.g., 'USD', 'EUR', 'GBP'
   platformMode: text("platform_mode").notNull().default("standard"), // 'standard', 'asset_returns', 'item_valuations'
   targetAllocation: numeric("target_allocation"), // target % of total portfolio (0-100)
-  expectedGrowthPct: numeric("expected_growth_pct"), // user-set expected annual growth % for forecast
   createdAt: timestamp("created_at").defaultNow(),
 });
 
