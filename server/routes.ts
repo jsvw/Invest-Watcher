@@ -2943,6 +2943,7 @@ export async function registerRoutes(
           const totalResult = instruments.reduce((sum, i) => sum + (i.ppl ?? 0), 0);
 
           const creds = JSON.parse(decrypt(config.credentials));
+          const totalDividendsGained = instruments.reduce((sum, i) => sum + (i.dividendsReceived ?? 0), 0);
           const responseData = {
             pieName: creds.pieName || platform.name,
             currentValue: totalValue,
@@ -2950,7 +2951,7 @@ export async function registerRoutes(
             cash: 0,
             result: totalResult,
             resultPercent: totalInvested > 0 ? (totalResult / totalInvested) * 100 : 0,
-            dividendsGained: null,
+            dividendsGained: totalDividendsGained,
             dividendsReinvested: null,
             dividendsInCash: null,
             instruments,
