@@ -205,7 +205,8 @@ export async function registerRoutes(
       await storage.updatePlatformGrowthPct(platformId, userId, parsed);
       res.json({ ok: true });
     } catch (err: any) {
-      res.status(404).json({ message: err.message ?? "Platform not found" });
+      const isNotFound = err.message === "Platform not found";
+      res.status(isNotFound ? 404 : 500).json({ message: err.message ?? "Unexpected error" });
     }
   });
 
@@ -3393,21 +3394,12 @@ export async function registerRoutes(
           });
 
         } else if (mode === 'standard') {
-          // Derive the platform's average monthly growth rate from its most recent 6 months
-          // of valuations. Compound that rate forward from the latest valuation's value.
-          const sixMonthsAgo = new Date(now);
-          sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
+          // Seed value from latest valuation record
           const platformVals = userValuations
             .filter(v => v.platformId === platform.id)
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-          // Seed value is the explicit latest valuation record (not the cached currentValue)
-          const latestValRecord = platformVals[0];
-          const latestValue = latestValRecord ? Number(latestValRecord.value) : 0;
-
-          // Use valuations within the last 6 months, up to 6 records, for rate derivation
-          const recentVals = platformVals.filter(v => new Date(v.date) >= sixMonthsAgo).slice(0, 6);
+          const latestValue = platformVals[0] ? Number(platformVals[0].value) : 0;
 
           const storedPct = platform.expectedGrowthPct !== null && platform.expectedGrowthPct !== undefined
             ? Number(platform.expectedGrowthPct)
