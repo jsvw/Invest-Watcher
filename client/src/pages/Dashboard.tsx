@@ -1276,32 +1276,29 @@ export default function Dashboard() {
                     </Select>
                   </div>
                 )}
-                <Tabs value={forecastRange ? "__forecast__" : (range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range)} onValueChange={val => {
-                  setRange(val);
-                  setSpecificYear(null);
-                  setSpecificMonth(null);
-                  setForecastRange(null);
-                }} className="w-auto">
+                <Tabs
+                  value={forecastRange === "3m" ? "forecast-3m" : forecastRange === "1y" ? "forecast-1y" : (range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range)}
+                  onValueChange={val => {
+                    if (val === "forecast-3m") {
+                      setForecastRange("3m"); setRange("all"); setSpecificYear(null); setSpecificMonth(null); setChartType("line");
+                    } else if (val === "forecast-1y") {
+                      setForecastRange("1y"); setRange("all"); setSpecificYear(null); setSpecificMonth(null); setChartType("line");
+                    } else {
+                      setRange(val); setSpecificYear(null); setSpecificMonth(null); setForecastRange(null);
+                    }
+                  }}
+                  className="w-auto"
+                >
                   <TabsList>
                     <TabsTrigger value="quarter">3M</TabsTrigger>
                     <TabsTrigger value="year">1Y</TabsTrigger>
                     <TabsTrigger value="all">ALL</TabsTrigger>
+                    {chartView === "overview" && <>
+                      <TabsTrigger value="forecast-3m" data-testid="button-forecast-3m">+3M</TabsTrigger>
+                      <TabsTrigger value="forecast-1y" data-testid="button-forecast-1y">+1Y</TabsTrigger>
+                    </>}
                   </TabsList>
                 </Tabs>
-                {chartView === "overview" && (
-                  <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
-                    <button
-                      onClick={() => { setForecastRange("3m"); setRange("all"); setSpecificYear(null); setSpecificMonth(null); setChartType("line"); }}
-                      className={cn("px-2.5 py-1.5 transition-colors", forecastRange === "3m" ? "bg-amber-500 text-white" : "hover:bg-muted text-muted-foreground")}
-                      data-testid="button-forecast-3m"
-                    >+3M</button>
-                    <button
-                      onClick={() => { setForecastRange("1y"); setRange("all"); setSpecificYear(null); setSpecificMonth(null); setChartType("line"); }}
-                      className={cn("px-2.5 py-1.5 transition-colors", forecastRange === "1y" ? "bg-amber-500 text-white" : "hover:bg-muted text-muted-foreground")}
-                      data-testid="button-forecast-1y"
-                    >+1Y</button>
-                  </div>
-                )}
                 <div className="flex items-center border rounded-md overflow-hidden">
                   <button
                     onClick={() => setChartType("line")}
