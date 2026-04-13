@@ -3243,6 +3243,222 @@ export async function registerRoutes(
     }
   });
 
+  // --- Forecast: 12-month portfolio projection ---
+  app.get('/api/forecast', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const userPlatforms = await storage.getPlatforms(userId);
+      const userValuations = await storage.getAllValuationsForUser(userId);
+
+      // Build month labels for the next 12 months starting from next month
+      const now = new Date();
+      const monthLabels: { label: string; year: number; month: number }[] = [];
+      for (let i = 1; i <= 12; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+        const label = d.toLocaleString('default', { month: 'short', year: 'numeric' });
+        monthLabels.push({ label, year: d.getFullYear(), month: d.getMonth() });
+      }
+
+      // Per-platform projection
+      const platformProjections: {
+        platformId: number;
+        name: string;
+        category: string;
+        endValue: number;
+        totalIncome: number;
+        method: string;
+        monthlyValues: number[];
+        monthlyIncome: number[];
+      }[] = [];
+
+      for (const platform of userPlatforms) {
+        const mode = platform.platformMode;
+
+        if (mode === 'asset_returns') {
+          // Spec: monthly income = investedAmount × annualYield / 12 per active asset.
+          // Stop yield contributions at expectedExitDate. After exit the principal is
+          // still part of the portfolio (it was returned, not lost), so its value is
+          // preserved in the projection; only future income accrual stops.
+          const platformAssets = await db.select().from(assets)
+            .where(and(eq(assets.platformId, platform.id), eq(assets.status, 'active')));
+
+          const monthlyValues: number[] = [];
+          const monthlyIncome: number[] = [];
+
+          for (let i = 0; i < 12; i++) {
+            const { year, month } = monthLabels[i];
+            const monthEnd = new Date(year, month + 1, 0);
+
+            let monthlyIncomeSum = 0;
+            let totalValue = 0;
+
+            for (const asset of platformAssets) {
+              const investedAmount = Number(asset.investedAmount);
+              const annualYield = Number(asset.annualYield || 0) / 100;
+              const monthlyYieldIncome = investedAmount * annualYield / 12;
+              const exitDate = asset.expectedExitDate ? new Date(asset.expectedExitDate) : null;
+
+              if (!exitDate || exitDate > monthEnd) {
+                // Asset is still yielding this month
+                monthlyIncomeSum += monthlyYieldIncome;
+                // Count months this asset has been active up to and including month i
+                totalValue += investedAmount + monthlyYieldIncome * (i + 1);
+              } else {
+                // Asset has exited: stop income but preserve principal in portfolio value.
+                // Count how many months it yielded before exit.
+                const monthsYielded = monthLabels
+                  .slice(0, i + 1)
+                  .filter(({ year: y, month: m }) => {
+                    const mEnd = new Date(y, m + 1, 0);
+                    return !exitDate || exitDate > mEnd;
+                  }).length;
+                totalValue += investedAmount + monthlyYieldIncome * monthsYielded;
+              }
+            }
+
+            monthlyValues.push(totalValue);
+            monthlyIncome.push(monthlyIncomeSum);
+          }
+
+          platformProjections.push({
+            platformId: platform.id,
+            name: platform.name,
+            category: platform.category,
+            endValue: monthlyValues[11] ?? 0,
+            totalIncome: monthlyIncome.reduce((a, b) => a + b, 0),
+            method: 'Asset Yields',
+            monthlyValues,
+            monthlyIncome,
+          });
+
+        } else if (mode === 'standard') {
+          // Derive the platform's average monthly growth rate from its most recent 6 months
+          // of valuations. Compound that rate forward from the latest valuation's value.
+          const sixMonthsAgo = new Date(now);
+          sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+          const platformVals = userValuations
+            .filter(v => v.platformId === platform.id)
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+          // Seed value is the explicit latest valuation record (not the cached currentValue)
+          const latestValRecord = platformVals[0];
+          const latestValue = latestValRecord ? Number(latestValRecord.value) : 0;
+
+          // Use valuations within the last 6 months, up to 6 records, for rate derivation
+          const recentVals = platformVals.filter(v => new Date(v.date) >= sixMonthsAgo).slice(0, 6);
+
+          if (recentVals.length < 2) {
+            platformProjections.push({
+              platformId: platform.id,
+              name: platform.name,
+              category: platform.category,
+              endValue: latestValue,
+              totalIncome: 0,
+              method: 'Held Flat (insufficient history)',
+              monthlyValues: Array(12).fill(latestValue),
+              monthlyIncome: Array(12).fill(0),
+            });
+            continue;
+          }
+
+          const growthRates: number[] = [];
+          for (let j = 0; j < recentVals.length - 1; j++) {
+            const newer = Number(recentVals[j].value);
+            const older = Number(recentVals[j + 1].value);
+            const daysDiff = (new Date(recentVals[j].date).getTime() - new Date(recentVals[j + 1].date).getTime()) / (1000 * 60 * 60 * 24);
+            if (older > 0 && daysDiff > 0) {
+              growthRates.push((newer / older) ** (30 / daysDiff) - 1);
+            }
+          }
+
+          const avgMonthlyRate = growthRates.length > 0
+            ? growthRates.reduce((a, b) => a + b, 0) / growthRates.length
+            : 0;
+
+          const monthlyValues: number[] = [];
+          for (let i = 0; i < 12; i++) {
+            monthlyValues.push(latestValue * (1 + avgMonthlyRate) ** (i + 1));
+          }
+
+          platformProjections.push({
+            platformId: platform.id,
+            name: platform.name,
+            category: platform.category,
+            endValue: monthlyValues[11] ?? latestValue,
+            totalIncome: 0,
+            method: 'Historical Growth Rate',
+            monthlyValues,
+            monthlyIncome: Array(12).fill(0),
+          });
+
+        } else if (mode === 'item_valuations') {
+          // Spec: hold flat at quantity × latest pricePerUnit per asset.
+          const platformAssets = await db.select().from(assets)
+            .where(eq(assets.platformId, platform.id));
+
+          let currentItemValue = 0;
+          for (const asset of platformAssets) {
+            const qty = Number(asset.quantity || 0);
+            const price = Number(asset.pricePerUnit || 0);
+            currentItemValue += qty * price;
+          }
+
+          platformProjections.push({
+            platformId: platform.id,
+            name: platform.name,
+            category: platform.category,
+            endValue: currentItemValue,
+            totalIncome: 0,
+            method: 'Held Flat (item valuations)',
+            monthlyValues: Array(12).fill(currentItemValue),
+            monthlyIncome: Array(12).fill(0),
+          });
+        }
+      }
+
+      // Compute the current total portfolio value as the sum of each platform's current value
+      // using the same mode-aware logic so ROI baseline is consistent with projections.
+      let currentTotalValue = 0;
+      for (const platform of userPlatforms) {
+        const mode = platform.platformMode;
+        if (mode === 'standard') {
+          currentTotalValue += Number(platform.currentValue || 0);
+        } else if (mode === 'asset_returns') {
+          // Sum invested principals for active assets as current value
+          const platformAssets = await db.select().from(assets)
+            .where(and(eq(assets.platformId, platform.id), eq(assets.status, 'active')));
+          for (const asset of platformAssets) {
+            currentTotalValue += Number(asset.investedAmount);
+          }
+        } else if (mode === 'item_valuations') {
+          const proj = platformProjections.find(p => p.platformId === platform.id);
+          currentTotalValue += proj?.endValue ?? 0;
+        }
+      }
+
+      const months = monthLabels.map(({ label }, i) => ({
+        label,
+        totalValue: platformProjections.reduce((sum, p) => sum + (p.monthlyValues[i] ?? 0), 0),
+        income: platformProjections.reduce((sum, p) => sum + (p.monthlyIncome[i] ?? 0), 0),
+      }));
+
+      const platforms_result = platformProjections.map(p => ({
+        platformId: p.platformId,
+        name: p.name,
+        category: p.category,
+        endValue: p.endValue,
+        totalIncome: p.totalIncome,
+        method: p.method,
+      }));
+
+      res.json({ months, platforms: platforms_result, currentTotalValue });
+    } catch (error) {
+      console.error("Error generating forecast:", error);
+      res.status(500).json({ message: "Failed to generate forecast" });
+    }
+  });
+
   await seedDatabase();
   // removed importInvestmentData() call to prevent duplicates on restart
 
