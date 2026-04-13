@@ -1123,7 +1123,7 @@ export default function PlatformDetails() {
               <TabsTrigger value="holdings" className="gap-2" data-testid="tab-holdings"><BarChart3 className="h-4 w-4" /> Holdings</TabsTrigger>
             )}
             {isTrading212 && (
-              <TabsTrigger value="dividend-calendar" className="gap-2" data-testid="tab-dividend-calendar"><CalendarDays className="h-4 w-4" /> Dividends</TabsTrigger>
+              <TabsTrigger value="dividend-calendar" className="gap-2" data-testid="tab-dividend-calendar"><CalendarDays className="h-4 w-4" /> Dividend Calendar</TabsTrigger>
             )}
             <TabsTrigger value="analytics" className="gap-2" data-testid="tab-platform-analytics"><TrendingUp className="h-4 w-4" /> Analytics</TabsTrigger>
           </TabsList>

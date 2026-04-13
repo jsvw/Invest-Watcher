@@ -41,6 +41,7 @@ function computeProjections(payments: Payment[], heldSet: Set<string>, today: Da
     if (!heldSet.has(ticker)) continue;
     const sorted = [...history].sort((a, b) => a.paidOn.slice(0, 10).localeCompare(b.paidOn.slice(0, 10)));
     const dates = sorted.map(h => h.paidOn.slice(0, 10));
+    if (dates.length < 2) continue;
     const { label, days } = detectFrequency(dates);
     const lastDate = parseISO(dates[dates.length - 1]);
     const avgAmount = history.reduce((s, h) => s + h.amount, 0) / history.length;
@@ -277,14 +278,19 @@ export function DividendCalendar({ payments, heldTickers, currency }: Props) {
                       <p className="text-xs font-semibold mb-2">{format(cell.date, "d MMMM yyyy")}</p>
                       <div className="space-y-1.5">
                         {entries.map((e, j) => (
-                          <div key={j} className="flex items-center justify-between text-xs gap-2">
-                            <span className="font-mono font-medium truncate">{e.ticker}</span>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span>{fmt(e.amount)}</span>
-                              {e.isProjected && (
-                                <Badge variant="outline" className="text-[9px] py-0 px-1 h-4 leading-none">~est</Badge>
-                              )}
+                          <div key={j} className="text-xs space-y-0.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-mono font-medium truncate">{e.ticker}</span>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span>{fmt(e.amount)}</span>
+                                {e.isProjected && (
+                                  <Badge variant="outline" className="text-[9px] py-0 px-1 h-4 leading-none">~est</Badge>
+                                )}
+                              </div>
                             </div>
+                            {e.isProjected && e.frequency && (
+                              <p className="text-[10px] text-muted-foreground capitalize pl-0">{e.frequency}</p>
+                            )}
                           </div>
                         ))}
                       </div>
