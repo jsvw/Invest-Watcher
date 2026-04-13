@@ -126,13 +126,16 @@ export default function Forecast() {
     return `/api/forecast?overrides=${encodeURIComponent(param)}`;
   }, [growthOverrides]);
 
+  const forecastUrlRef = useRef(forecastUrl);
+  forecastUrlRef.current = forecastUrl;
+
   const { data, isLoading, refetch } = useQuery<ForecastResponse>({
     queryKey: ["/api/forecast"],
-    queryFn: async () => {
-      const res = await fetch(forecastUrl, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch forecast");
-      return res.json();
-    },
+    queryFn: () =>
+      fetch(forecastUrlRef.current, { credentials: "include" }).then((r) => {
+        if (!r.ok) throw new Error("Failed to fetch forecast");
+        return r.json();
+      }),
     staleTime: 0,
   });
 
