@@ -135,6 +135,7 @@ export default function Forecast() {
   const projectedYearEndValue = data?.months[11]?.totalValue ?? 0;
   const projectedIncome = data?.months.reduce((sum, m) => sum + m.income, 0) ?? 0;
   const currentTotalValue = data?.currentTotalValue ?? 0;
+  const adjustedIncome = projectedYearEndValue - currentTotalValue;
   const projectedRoi = currentTotalValue > 0
     ? ((projectedYearEndValue - currentTotalValue) / currentTotalValue) * 100
     : 0;
@@ -212,11 +213,11 @@ export default function Forecast() {
                 highlight="positive"
               />
               <StatCard
-                label="Projected ROI"
-                value={`${projectedRoi >= 0 ? "+" : ""}${projectedRoi.toFixed(2)}%`}
-                sub="vs. current portfolio value"
+                label="Adjusted Income"
+                value={`${adjustedIncome >= 0 ? "+" : ""}${formatCurrency(adjustedIncome, currency)}`}
+                sub={`${projectedRoi >= 0 ? "+" : ""}${projectedRoi.toFixed(2)}% projected ROI`}
                 icon={<Percent className="h-4 w-4 text-primary" />}
-                highlight={projectedRoi >= 0 ? "positive" : undefined}
+                highlight={adjustedIncome >= 0 ? "positive" : undefined}
               />
             </>
           )}
