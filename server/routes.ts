@@ -2615,6 +2615,49 @@ export async function registerRoutes(
     }
   });
 
+  const tickerNamesCache = new Map<string, string>();
+
+  app.get('/api/tickers/names', requireAuth, async (req, res) => {
+    try {
+      const rawTickers = (req.query.tickers as string || '').split(',').map(t => t.trim()).filter(Boolean);
+      if (rawTickers.length === 0) return res.json({});
+
+      const result: Record<string, string> = {};
+      const toFetch: string[] = [];
+
+      for (const ticker of rawTickers) {
+        if (tickerNamesCache.has(ticker)) {
+          result[ticker] = tickerNamesCache.get(ticker)!;
+        } else {
+          toFetch.push(ticker);
+        }
+      }
+
+      await Promise.all(toFetch.map(async (ticker) => {
+        try {
+          const yahooSymbol = mapT212TickerToYahoo(ticker);
+          const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=1d&range=1d`;
+          const response = await fetch(yfUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+          });
+          if (!response.ok) return;
+          const data = await response.json() as any;
+          const meta = data?.chart?.result?.[0]?.meta;
+          const name = meta?.longName || meta?.shortName;
+          if (name) {
+            tickerNamesCache.set(ticker, name);
+            result[ticker] = name;
+          }
+        } catch (_) {}
+      }));
+
+      res.json(result);
+    } catch (err: any) {
+      console.error("Ticker names error:", err.message);
+      res.json({});
+    }
+  });
+
   const holdingsCache = new Map<string, { data: any; timestamp: number }>();
   const HOLDINGS_CACHE_TTL = 5 * 60 * 1000;
 

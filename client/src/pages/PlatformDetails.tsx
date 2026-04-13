@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search, ArrowUp, ArrowDown, ChevronsUpDown, Trash2, RotateCcw, BarChart3, RefreshCw, Loader2, CalendarDays } from "lucide-react";
+import { TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search, ArrowUp, ArrowDown, ChevronsUpDown, Trash2, RotateCcw, BarChart3, RefreshCw, Loader2, CalendarDays, ChevronUp, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -362,6 +362,26 @@ export default function PlatformDetails() {
     enabled: isTrading212,
     staleTime: 5 * 60 * 1000,
     retry: false,
+  });
+
+  const [holdingsSortColumn, setHoldingsSortColumn] = useState<string>('currentShare');
+  const [holdingsSortDirection, setHoldingsSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const holdingsTickers = useMemo(() => {
+    if (!holdingsData?.instruments) return [];
+    return holdingsData.instruments.map((inst: any) => inst.ticker).filter(Boolean);
+  }, [holdingsData]);
+
+  const { data: tickerNamesMap } = useQuery<Record<string, string>>({
+    queryKey: ['/api/tickers/names', holdingsTickers.join(',')],
+    queryFn: async () => {
+      if (holdingsTickers.length === 0) return {};
+      const res = await fetch(`/api/tickers/names?tickers=${encodeURIComponent(holdingsTickers.join(','))}`, { credentials: 'include' });
+      if (!res.ok) return {};
+      return res.json();
+    },
+    enabled: holdingsTickers.length > 0,
+    staleTime: Infinity,
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -1983,19 +2003,67 @@ export default function PlatformDetails() {
                         <table className="w-full text-sm" data-testid="table-holdings">
                           <thead>
                             <tr className="border-b bg-muted/50">
-                              <th className="text-left p-3 font-medium">Ticker</th>
-                              <th className="text-right p-3 font-medium">Shares</th>
-                              <th className="text-right p-3 font-medium">Avg Price</th>
-                              <th className="text-right p-3 font-medium">Price</th>
-                              <th className="text-right p-3 font-medium">Value</th>
-                              <th className="text-right p-3 font-medium">P/L</th>
-                              <th className="text-right p-3 font-medium">Dividends</th>
-                              <th className="text-right p-3 font-medium">Allocation</th>
+                              {([
+                                { key: 'ticker', label: 'Ticker', align: 'left' },
+                                { key: 'quantity', label: 'Shares', align: 'right' },
+                                { key: 'averagePrice', label: 'Avg Price', align: 'right' },
+                                { key: 'currentPrice', label: 'Price', align: 'right' },
+                                { key: 'value', label: 'Value', align: 'right' },
+                                { key: 'ppl', label: 'P/L', align: 'right' },
+                                { key: 'dividendsReceived', label: 'Dividends', align: 'right' },
+                                { key: 'currentShare', label: 'Allocation', align: 'right' },
+                              ] as { key: string; label: string; align: 'left' | 'right' }[]).map(col => (
+                                <th
+                                  key={col.key}
+                                  className={`${col.align === 'right' ? 'text-right' : 'text-left'} p-3 font-medium cursor-pointer select-none hover:text-foreground`}
+                                  onClick={() => {
+                                    if (holdingsSortColumn === col.key) {
+                                      setHoldingsSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+                                    } else {
+                                      setHoldingsSortColumn(col.key);
+                                      setHoldingsSortDirection('asc');
+                                    }
+                                  }}
+                                  data-testid={`th-holdings-${col.key}`}
+                                >
+                                  <span className="inline-flex items-center gap-1">
+                                    {col.label}
+                                    {holdingsSortColumn === col.key ? (
+                                      holdingsSortDirection === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
+                                    ) : null}
+                                  </span>
+                                </th>
+                              ))}
                             </tr>
                           </thead>
                           <tbody>
                             {holdingsData.instruments
-                              ?.sort((a: any, b: any) => (b.currentShare || 0) - (a.currentShare || 0))
+                              ?.slice()
+                              .sort((a: any, b: any) => {
+                                let aVal: any, bVal: any;
+                                if (holdingsSortColumn === 'value') {
+                                  const aQty = a.quantity ?? a.shares;
+                                  const bQty = b.quantity ?? b.shares;
+                                  aVal = aQty != null && a.currentPrice != null ? aQty * a.currentPrice : -Infinity;
+                                  bVal = bQty != null && b.currentPrice != null ? bQty * b.currentPrice : -Infinity;
+                                } else if (holdingsSortColumn === 'ppl') {
+                                  aVal = a.ppl ?? a.result ?? -Infinity;
+                                  bVal = b.ppl ?? b.result ?? -Infinity;
+                                } else if (holdingsSortColumn === 'quantity') {
+                                  aVal = a.quantity ?? a.shares ?? -Infinity;
+                                  bVal = b.quantity ?? b.shares ?? -Infinity;
+                                } else if (holdingsSortColumn === 'ticker') {
+                                  aVal = a.ticker ?? '';
+                                  bVal = b.ticker ?? '';
+                                  return holdingsSortDirection === 'asc'
+                                    ? aVal.localeCompare(bVal)
+                                    : bVal.localeCompare(aVal);
+                                } else {
+                                  aVal = a[holdingsSortColumn] ?? -Infinity;
+                                  bVal = b[holdingsSortColumn] ?? -Infinity;
+                                }
+                                return holdingsSortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+                              })
                               .map((inst: any, idx: number) => {
                                 const qty = inst.quantity ?? inst.shares;
                                 const value = qty && inst.currentPrice ? qty * inst.currentPrice : null;
@@ -2005,6 +2073,9 @@ export default function PlatformDetails() {
                                       <TickerPriceHover ticker={inst.ticker} currency={currency}>
                                         <span className="cursor-pointer underline decoration-dotted underline-offset-2">{inst.ticker}</span>
                                       </TickerPriceHover>
+                                      {tickerNamesMap?.[inst.ticker] && (
+                                        <span className="block text-xs text-muted-foreground font-normal mt-0.5">{tickerNamesMap[inst.ticker]}</span>
+                                      )}
                                     </td>
                                     <td className="text-right p-3 tabular-nums">{qty?.toFixed(qty < 1 ? 6 : 4) ?? '-'}</td>
                                     <td className="text-right p-3 tabular-nums">
