@@ -201,6 +201,7 @@ export default function Dashboard() {
   const [displayedChartValueMode, setDisplayedChartValueMode] = useState<"value" | "pct">("value");
   const [displayedChartAggregation, setDisplayedChartAggregation] = useState<"month" | "quarter" | "year">("month");
   const [chartFading, setChartFading] = useState(false);
+  const [forecastRange, setForecastRange] = useState<null | "3m" | "1y">(null);
 
   // ── Allocation targets state ─────────────────────────────────────────────
   const [localTargets, setLocalTargets] = useState<Record<number, string>>({});
@@ -533,6 +534,41 @@ export default function Dashboard() {
       invested: data.invested,
     }));
   }, [history]);
+
+  // ── Computed: forecast extension from historical avg monthly return ───────
+  const forecastCombined = useMemo(() => {
+    if (!forecastRange || chartData.length < 2) return null;
+    const months = forecastRange === "3m" ? 3 : 12;
+
+    // Geometric mean over last 12 months (or all available)
+    const lookback = Math.min(12, chartData.length - 1);
+    const recent = chartData.slice(chartData.length - 1 - lookback);
+    let product = 1, count = 0;
+    for (let i = 1; i < recent.length; i++) {
+      const prev = recent[i - 1].value, curr = recent[i].value;
+      if (prev > 0 && curr > 0) { product *= curr / prev; count++; }
+    }
+    const avgMonthlyRate = count > 0 ? Math.pow(product, 1 / count) - 1 : 0;
+
+    const last = chartData[chartData.length - 1];
+    const lastDate = new Date(last.date);
+
+    const actual = chartData.map(p => ({ ...p, forecast: null as number | null }));
+    const projected = Array.from({ length: months }, (_, i) => {
+      const d = new Date(lastDate.getFullYear(), lastDate.getMonth() + i + 1, lastDate.getDate());
+      return {
+        date: format(d, 'yyyy-MM-dd'),
+        value: null as number | null,
+        invested: last.invested,
+        forecast: last.value * Math.pow(1 + avgMonthlyRate, i + 1),
+      };
+    });
+
+    // Transition point: last actual also seeds the forecast line
+    actual[actual.length - 1] = { ...actual[actual.length - 1], forecast: last.value };
+
+    return { points: [...actual, ...projected], avgMonthlyRate };
+  }, [forecastRange, chartData]);
 
   // ── Computed: monthly growth series (heatmap-aligned, 10th-to-10th) ─────
   // Uses the same platformBreakdownByMonth data as the heatmap so the
@@ -1236,10 +1272,11 @@ export default function Dashboard() {
                     </Select>
                   </div>
                 )}
-                <Tabs value={range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range} onValueChange={val => {
+                <Tabs value={forecastRange ? "__forecast__" : (range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range)} onValueChange={val => {
                   setRange(val);
                   setSpecificYear(null);
                   setSpecificMonth(null);
+                  setForecastRange(null);
                 }} className="w-auto">
                   <TabsList>
                     <TabsTrigger value="quarter">3M</TabsTrigger>
@@ -1247,6 +1284,18 @@ export default function Dashboard() {
                     <TabsTrigger value="all">ALL</TabsTrigger>
                   </TabsList>
                 </Tabs>
+                <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
+                  <button
+                    onClick={() => { setForecastRange("3m"); setRange("all"); setSpecificYear(null); setSpecificMonth(null); setChartView("overview"); setChartType("line"); }}
+                    className={cn("px-2.5 py-1.5 transition-colors", forecastRange === "3m" ? "bg-amber-500 text-white" : "hover:bg-muted text-muted-foreground")}
+                    data-testid="button-forecast-3m"
+                  >+3M</button>
+                  <button
+                    onClick={() => { setForecastRange("1y"); setRange("all"); setSpecificYear(null); setSpecificMonth(null); setChartView("overview"); setChartType("line"); }}
+                    className={cn("px-2.5 py-1.5 transition-colors", forecastRange === "1y" ? "bg-amber-500 text-white" : "hover:bg-muted text-muted-foreground")}
+                    data-testid="button-forecast-1y"
+                  >+1Y</button>
+                </div>
                 <div className="flex items-center border rounded-md overflow-hidden">
                   <button
                     onClick={() => setChartType("line")}
@@ -1492,6 +1541,43 @@ export default function Dashboard() {
                           <Tooltip content={<ChartTooltip />} />
                           <Legend verticalAlign="top" height={36} />
                           <Line type="monotone" dataKey={monthlyKey} name={aggSeriesName} yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{ r: 7 }} animationDuration={350} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    );
+                  }
+
+                  // ── Forecast overlay (overview + line only) ──────────────────────────
+                  if (forecastCombined && displayedChartView === "overview" && displayedChartType === "line") {
+                    const fcData = forecastCombined.points.map(p => ({
+                      ...p,
+                      timestamp: new Date(p.date).getTime(),
+                    }));
+                    const ratePct = (forecastCombined.avgMonthlyRate * 100).toFixed(2);
+                    return (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={fcData}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                          <XAxis
+                            dataKey="timestamp"
+                            type="number"
+                            scale="time"
+                            domain={['dataMin', 'dataMax']}
+                            stroke="hsl(var(--muted-foreground))"
+                            fontSize={12}
+                            tickLine={false}
+                            axisLine={false}
+                            tickFormatter={ts => format(new Date(ts), 'MMM yy')}
+                            ticks={fcData.filter((_, i, a) => {
+                              const key = format(new Date(a[i].date), 'yyyy-MM');
+                              return i === 0 || format(new Date(a[i-1].date), 'yyyy-MM') !== key;
+                            }).map(p => p.timestamp)}
+                          />
+                          <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={v => formatAxisValue(v)} domain={['auto', 'auto']} />
+                          <Tooltip content={<ChartTooltip />} />
+                          <Legend verticalAlign="top" height={36} />
+                          <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke="hsl(var(--primary))" strokeWidth={4} dot={false} activeDot={{ r: 6 }} connectNulls={false} animationDuration={350} />
+                          <Line type="monotone" dataKey="invested" name="Invested" yAxisId="left" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls={false} animationDuration={350} />
+                          <Line type="monotone" dataKey="forecast" name={`Forecast (${ratePct}%/mo avg)`} yAxisId="left" stroke="#f59e0b" strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 5 }} connectNulls={false} animationDuration={350} />
                         </LineChart>
                       </ResponsiveContainer>
                     );
