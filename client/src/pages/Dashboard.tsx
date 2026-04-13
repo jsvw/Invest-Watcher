@@ -201,7 +201,7 @@ export default function Dashboard() {
   const [displayedChartValueMode, setDisplayedChartValueMode] = useState<"value" | "pct">("value");
   const [displayedChartAggregation, setDisplayedChartAggregation] = useState<"month" | "quarter" | "year">("month");
   const [chartFading, setChartFading] = useState(false);
-  const [forecastRange, setForecastRange] = useState<null | "3m" | "1y" | "3q" | "3y">(null);
+  const [forecastRange, setForecastRange] = useState<null | "3m" | "1y" | "3q" | "2y" | "5y">(null);
 
   // ── Allocation targets state ─────────────────────────────────────────────
   const [localTargets, setLocalTargets] = useState<Record<number, string>>({});
@@ -538,7 +538,7 @@ export default function Dashboard() {
   // ── Computed: forecast extension from historical avg monthly return ───────
   const forecastCombined = useMemo(() => {
     if (!forecastRange || chartData.length < 2) return null;
-    const FORECAST_MONTHS: Record<string, number> = { "3m": 3, "3q": 9, "1y": 12, "3y": 36 };
+    const FORECAST_MONTHS: Record<string, number> = { "3m": 3, "3q": 9, "1y": 12, "2y": 24, "5y": 60 };
     const months = FORECAST_MONTHS[forecastRange] ?? 3;
 
     // Average net profit rate over last 12 months (strip out new capital flows)
@@ -1280,8 +1280,8 @@ export default function Dashboard() {
                 <Tabs
                   value={forecastRange ? `forecast-${forecastRange}` : (range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range)}
                   onValueChange={val => {
-                    const FORECAST_MAP: Record<string, "3m" | "3q" | "1y" | "3y"> = {
-                      "forecast-3m": "3m", "forecast-3q": "3q", "forecast-1y": "1y", "forecast-3y": "3y",
+                    const FORECAST_MAP: Record<string, "3m" | "3q" | "1y" | "2y" | "5y"> = {
+                      "forecast-3m": "3m", "forecast-3q": "3q", "forecast-1y": "1y", "forecast-2y": "2y", "forecast-5y": "5y",
                     };
                     if (val in FORECAST_MAP) {
                       setForecastRange(FORECAST_MAP[val]); setRange("all"); setSpecificYear(null); setSpecificMonth(null); setChartType("line");
@@ -1297,9 +1297,9 @@ export default function Dashboard() {
                     <TabsTrigger value="all">ALL</TabsTrigger>
                     {chartView === "overview" && (() => {
                       const opts = chartAggregation === "quarter"
-                        ? [{ value: "forecast-3q", label: "+3Q" }, { value: "forecast-1y", label: "+1Y" }]
+                        ? [{ value: "forecast-3q", label: "+3Q" }, { value: "forecast-2y", label: "+2Y" }]
                         : chartAggregation === "year"
-                          ? [{ value: "forecast-1y", label: "+1Y" }, { value: "forecast-3y", label: "+3Y" }]
+                          ? [{ value: "forecast-1y", label: "+1Y" }, { value: "forecast-5y", label: "+5Y" }]
                           : [{ value: "forecast-3m", label: "+3M" }, { value: "forecast-1y", label: "+1Y" }];
                       return opts.map(o => (
                         <TabsTrigger key={o.value} value={o.value} data-testid={`button-${o.value}`}>{o.label}</TabsTrigger>
