@@ -1288,18 +1288,20 @@ export default function Dashboard() {
                     <TabsTrigger value="all">ALL</TabsTrigger>
                   </TabsList>
                 </Tabs>
-                <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
-                  <button
-                    onClick={() => { setForecastRange("3m"); setRange("all"); setSpecificYear(null); setSpecificMonth(null); setChartView("overview"); setChartType("line"); }}
-                    className={cn("px-2.5 py-1.5 transition-colors", forecastRange === "3m" ? "bg-amber-500 text-white" : "hover:bg-muted text-muted-foreground")}
-                    data-testid="button-forecast-3m"
-                  >+3M</button>
-                  <button
-                    onClick={() => { setForecastRange("1y"); setRange("all"); setSpecificYear(null); setSpecificMonth(null); setChartView("overview"); setChartType("line"); }}
-                    className={cn("px-2.5 py-1.5 transition-colors", forecastRange === "1y" ? "bg-amber-500 text-white" : "hover:bg-muted text-muted-foreground")}
-                    data-testid="button-forecast-1y"
-                  >+1Y</button>
-                </div>
+                {chartView === "overview" && (
+                  <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
+                    <button
+                      onClick={() => { setForecastRange("3m"); setRange("all"); setSpecificYear(null); setSpecificMonth(null); setChartType("line"); }}
+                      className={cn("px-2.5 py-1.5 transition-colors", forecastRange === "3m" ? "bg-amber-500 text-white" : "hover:bg-muted text-muted-foreground")}
+                      data-testid="button-forecast-3m"
+                    >+3M</button>
+                    <button
+                      onClick={() => { setForecastRange("1y"); setRange("all"); setSpecificYear(null); setSpecificMonth(null); setChartType("line"); }}
+                      className={cn("px-2.5 py-1.5 transition-colors", forecastRange === "1y" ? "bg-amber-500 text-white" : "hover:bg-muted text-muted-foreground")}
+                      data-testid="button-forecast-1y"
+                    >+1Y</button>
+                  </div>
+                )}
                 <div className="flex items-center border rounded-md overflow-hidden">
                   <button
                     onClick={() => setChartType("line")}
@@ -1335,6 +1337,7 @@ export default function Dashboard() {
                   const next = v as typeof chartView;
                   if (next === "all" && chartType === "bar") setChartType("line");
                   if (next !== "overview" && chartType === "waterfall") setChartType("line");
+                  if (next !== "overview") setForecastRange(null);
                   setChartView(next);
                 }}>
                   <TabsList>
