@@ -2943,7 +2943,8 @@ export async function registerRoutes(
           const totalResult = instruments.reduce((sum, i) => sum + (i.ppl ?? 0), 0);
 
           const creds = JSON.parse(decrypt(config.credentials));
-          const totalDividendsGained = instruments.reduce((sum, i) => sum + (i.dividendsReceived ?? 0), 0);
+          let totalDividendsGained = 0;
+          for (const [, div] of divMap) totalDividendsGained += div.total;
           const responseData = {
             pieName: creds.pieName || platform.name,
             currentValue: totalValue,
