@@ -543,59 +543,35 @@ export default function Dashboard() {
     // Average net profit rate over last 12 months (strip out new capital flows)
     const lookback = Math.min(12, chartData.length - 1);
     const recent = chartData.slice(chartData.length - 1 - lookback);
-    let rateSum = 0, gainSum = 0, count = 0;
+    let rateSum = 0, count = 0;
     for (let i = 1; i < recent.length; i++) {
       const prev = recent[i - 1], curr = recent[i];
       if (prev.value > 0) {
         const netGain = (curr.value - prev.value) - (curr.invested - prev.invested);
         rateSum += netGain / prev.value;
-        gainSum += netGain;
         count++;
       }
     }
     const avgMonthlyRate = count > 0 ? rateSum / count : 0;
-    const avgNetGainAbs = count > 0 ? gainSum / count : 0;
 
     const last = chartData[chartData.length - 1];
     const lastDate = new Date(last.date);
-    const lastGain = last.value - last.invested;
 
-    const actual = chartData.map(p => ({
-      ...p,
-      forecast: null as number | null,
-      forecastGain: null as number | null,
-      forecastGainPct: null as number | null,
-      forecastMonthly: null as number | null,
-      forecastMonthlyPct: null as number | null,
-    }));
-
+    const actual = chartData.map(p => ({ ...p, forecast: null as number | null }));
     const projected = Array.from({ length: months }, (_, i) => {
       const d = new Date(lastDate.getFullYear(), lastDate.getMonth() + i + 1, lastDate.getDate());
-      const fcValue = last.value * Math.pow(1 + avgMonthlyRate, i + 1);
-      const fcGain = fcValue - last.invested;
       return {
         date: format(d, 'yyyy-MM-dd'),
         value: null as number | null,
         invested: last.invested,
-        forecast: fcValue,
-        forecastGain: fcGain,
-        forecastGainPct: last.invested > 0 ? (fcGain / last.invested) * 100 : 0,
-        forecastMonthly: avgNetGainAbs,
-        forecastMonthlyPct: avgMonthlyRate * 100,
+        forecast: last.value * Math.pow(1 + avgMonthlyRate, i + 1),
       };
     });
 
-    // Transition point: seed all forecast fields from last actual
-    actual[actual.length - 1] = {
-      ...actual[actual.length - 1],
-      forecast: last.value,
-      forecastGain: lastGain,
-      forecastGainPct: last.invested > 0 ? (lastGain / last.invested) * 100 : 0,
-      forecastMonthly: avgNetGainAbs,
-      forecastMonthlyPct: avgMonthlyRate * 100,
-    };
+    // Transition point: last actual also seeds the forecast line
+    actual[actual.length - 1] = { ...actual[actual.length - 1], forecast: last.value };
 
-    return { points: [...actual, ...projected], avgMonthlyRate, avgNetGainAbs };
+    return { points: [...actual, ...projected], avgMonthlyRate };
   }, [forecastRange, chartData]);
 
   // ── Computed: monthly growth series (heatmap-aligned, 10th-to-10th) ─────
@@ -1522,155 +1498,6 @@ export default function Dashboard() {
                     );
                   }
 
-                  // ── Forecast overlay: all views, all aggregations ─────────────────────
-                  if (forecastCombined) {
-                    const { points: fcPoints, avgMonthlyRate, avgNetGainAbs } = forecastCombined;
-                    const ratePct = (avgMonthlyRate * 100).toFixed(2);
-                    const fcLabel = `Forecast (${ratePct}%/mo avg)`;
-                    const fcGainKey = displayedChartValueMode === "pct" ? "forecastGainPct" : "forecastGain";
-                    const fcMonthlyKey = displayedChartValueMode === "pct" ? "forecastMonthlyPct" : "forecastMonthly";
-                    const actualGainKey = displayedChartValueMode === "pct" ? "gainPct" : "gain";
-                    const periodsToProject = forecastRange === "3m" ? 3 : 12;
-
-                    // ── Monthly aggregation: use timestamp-based axis ─────────────────
-                    if (displayedChartAggregation === "month") {
-                      const fcData = fcPoints.map(p => ({ ...p, timestamp: new Date(p.date).getTime() }));
-                      const fcXAxis = (
-                        <XAxis dataKey="timestamp" type="number" scale="time" domain={['dataMin', 'dataMax']}
-                          stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false}
-                          tickFormatter={ts => format(new Date(ts), 'MMM yy')}
-                          ticks={fcData.filter((_, i, a) => i === 0 || format(new Date(a[i].date), 'yyyy-MM') !== format(new Date(a[i-1].date), 'yyyy-MM')).map(p => p.timestamp)}
-                        />
-                      );
-
-                      if (displayedChartView === "monthly") {
-                        // Monthly growth view: extend aggregatedSeriesData with forecast months
-                        const lastS = aggregatedSeriesData[aggregatedSeriesData.length - 1];
-                        const lastSDate = lastS ? new Date(lastS.date) : new Date();
-                        const projM = Array.from({ length: periodsToProject }, (_, i) => {
-                          const d = new Date(lastSDate.getFullYear(), lastSDate.getMonth() + i + 1, 10);
-                          return { date: format(d, 'yyyy-MM-dd'), timestamp: d.getTime(), monthlyChange: null as number | null, monthlyChangePct: null as number | null, forecastMonthly: avgNetGainAbs, forecastMonthlyPct: avgMonthlyRate * 100, platformBreakdown: [] };
-                        });
-                        const seedLast = { ...lastS, timestamp: lastS ? new Date(lastS.date).getTime() : 0, forecastMonthly: avgNetGainAbs, forecastMonthlyPct: avgMonthlyRate * 100 };
-                        const monthlyFcData = [...aggregatedSeriesData.slice(0, -1).map(p => ({ ...p, timestamp: new Date(p.date).getTime(), forecastMonthly: null as number | null, forecastMonthlyPct: null as number | null })), seedLast, ...projM];
-                        return (
-                          <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={monthlyFcData}>
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                              {fcXAxis}
-                              <YAxis yAxisId="monthly" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={monthlyAxisFmt} domain={['auto', 'auto']} />
-                              <Tooltip content={<ChartTooltip />} />
-                              <Legend verticalAlign="top" height={36} />
-                              <Line type="monotone" dataKey={monthlyKey} name="Net Profit/Period" yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{ r: 5 }} connectNulls={false} animationDuration={350} />
-                              <Line type="monotone" dataKey={fcMonthlyKey} name={fcLabel} yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 5 }} connectNulls={false} animationDuration={350} />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        );
-                      }
-
-                      return (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={fcData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                            {fcXAxis}
-                            {(displayedChartView === "overview" || displayedChartView === "all") && <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={v => formatAxisValue(v)} domain={['auto', 'auto']} />}
-                            {(displayedChartView === "profit" || displayedChartView === "all") && <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={profitAxisFmt} domain={['auto', 'auto']} />}
-                            <Tooltip content={<ChartTooltip />} />
-                            <Legend verticalAlign="top" height={36} />
-                            {(displayedChartView === "overview" || displayedChartView === "all") && <>
-                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke="hsl(var(--primary))" strokeWidth={4} dot={false} activeDot={{ r: 6 }} connectNulls={false} animationDuration={350} />
-                              <Line type="monotone" dataKey="invested" name="Invested" yAxisId="left" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls={false} animationDuration={350} />
-                              <Line type="monotone" dataKey="forecast" name={fcLabel} yAxisId="left" stroke="#f59e0b" strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 5 }} connectNulls={false} animationDuration={350} />
-                            </>}
-                            {(displayedChartView === "profit" || displayedChartView === "all") && <>
-                              <Line type="monotone" dataKey={actualGainKey} name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 5 }} connectNulls={false} animationDuration={350} />
-                              <Line type="monotone" dataKey={fcGainKey} name={fcLabel} yAxisId="right" stroke="#10b981" strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 5 }} connectNulls={false} animationDuration={350} />
-                            </>}
-                          </LineChart>
-                        </ResponsiveContainer>
-                      );
-                    }
-
-                    // ── Quarter / Year aggregation: category axis ────────────────────
-                    const isQtr = displayedChartAggregation === "quarter";
-                    const monthsPerPeriod = isQtr ? 3 : 12;
-                    const aggXFmtFc = (d: string) => isQtr ? (() => { const [y, q] = d.split("-"); return `${q} '${y.slice(2)}`; })() : d;
-
-                    // Aggregate fcPoints into periods
-                    const groups = new Map<string, typeof fcPoints>();
-                    for (const p of fcPoints) {
-                      const [y, m] = p.date.split("-").map(Number);
-                      const key = isQtr ? `${y}-Q${Math.ceil(m / 3)}` : `${y}`;
-                      if (!groups.has(key)) groups.set(key, []);
-                      groups.get(key)!.push(p);
-                    }
-                    const aggFcData = Array.from(groups.entries())
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([key, pts]) => {
-                        const lastPt = pts[pts.length - 1];
-                        const fcMonthlySum = pts.reduce((s, p) => s + (p.forecastMonthly ?? 0), 0);
-                        const fcMonthlyPctSum = pts.reduce((s, p) => s + (p.forecastMonthlyPct ?? 0), 0);
-                        const gain = lastPt.value != null ? lastPt.value - lastPt.invested : null;
-                        const gainPct = lastPt.value != null && lastPt.invested > 0 ? (gain! / lastPt.invested) * 100 : null;
-                        return { date: key, value: lastPt.value, invested: lastPt.invested, forecast: lastPt.forecast, forecastGain: lastPt.forecastGain, forecastGainPct: lastPt.forecastGainPct, gain, gainPct, forecastMonthly: fcMonthlySum || null, forecastMonthlyPct: fcMonthlyPctSum || null };
-                      });
-
-                    if (displayedChartView === "monthly") {
-                      // Monthly growth aggregated: extend aggregatedSeriesData with forecast periods
-                      const lastS = aggregatedSeriesData[aggregatedSeriesData.length - 1];
-                      const lastSDate = lastS ? new Date(lastS.date) : new Date();
-                      const actualPeriods = Math.ceil(periodsToProject / monthsPerPeriod);
-                      const projPeriods = Array.from({ length: actualPeriods }, (_, i) => {
-                        let dateStr: string;
-                        if (isQtr) {
-                          const d = new Date(lastSDate.getFullYear(), lastSDate.getMonth() + (i + 1) * 3, 1);
-                          dateStr = `${d.getFullYear()}-Q${Math.ceil((d.getMonth() + 1) / 3)}`;
-                        } else {
-                          dateStr = `${lastSDate.getFullYear() + i + 1}`;
-                        }
-                        return { date: dateStr, timestamp: 0, monthlyChange: null as number | null, monthlyChangePct: null as number | null, forecastMonthly: avgNetGainAbs * monthsPerPeriod, forecastMonthlyPct: avgMonthlyRate * 100 * monthsPerPeriod, platformBreakdown: [] };
-                      });
-                      const seedLast = { ...lastS, forecastMonthly: avgNetGainAbs * monthsPerPeriod, forecastMonthlyPct: avgMonthlyRate * 100 * monthsPerPeriod };
-                      const aggMonthlyFcData = [...aggregatedSeriesData.slice(0, -1).map(p => ({ ...p, forecastMonthly: null as number | null, forecastMonthlyPct: null as number | null })), seedLast, ...projPeriods];
-                      const aggSeriesName = isQtr ? "Quarterly Growth" : "Yearly Growth";
-                      return (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={aggMonthlyFcData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                            <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={aggXFmtFc} interval="preserveStartEnd" />
-                            <YAxis yAxisId="monthly" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={monthlyAxisFmt} domain={['auto', 'auto']} />
-                            <Tooltip content={<ChartTooltip />} />
-                            <Legend verticalAlign="top" height={36} />
-                            <Line type="monotone" dataKey={monthlyKey} name={aggSeriesName} yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{ r: 5 }} connectNulls={false} animationDuration={350} />
-                            <Line type="monotone" dataKey={fcMonthlyKey} name={fcLabel} yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 5 }} connectNulls={false} animationDuration={350} />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      );
-                    }
-
-                    return (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={aggFcData}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                          <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={aggXFmtFc} interval="preserveStartEnd" />
-                          {(displayedChartView === "overview" || displayedChartView === "all") && <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={v => formatAxisValue(v)} domain={['auto', 'auto']} />}
-                          {(displayedChartView === "profit" || displayedChartView === "all") && <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={profitAxisFmt} domain={['auto', 'auto']} />}
-                          <Tooltip content={<ChartTooltip />} />
-                          <Legend verticalAlign="top" height={36} />
-                          {(displayedChartView === "overview" || displayedChartView === "all") && <>
-                            <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke="hsl(var(--primary))" strokeWidth={4} dot={false} activeDot={{ r: 6 }} connectNulls={false} animationDuration={350} />
-                            <Line type="monotone" dataKey="invested" name="Invested" yAxisId="left" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls={false} animationDuration={350} />
-                            <Line type="monotone" dataKey="forecast" name={fcLabel} yAxisId="left" stroke="#f59e0b" strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 5 }} connectNulls={false} animationDuration={350} />
-                          </>}
-                          {(displayedChartView === "profit" || displayedChartView === "all") && <>
-                            <Line type="monotone" dataKey={actualGainKey} name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 5 }} connectNulls={false} animationDuration={350} />
-                            <Line type="monotone" dataKey={fcGainKey} name={fcLabel} yAxisId="right" stroke="#10b981" strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 5 }} connectNulls={false} animationDuration={350} />
-                          </>}
-                        </LineChart>
-                      </ResponsiveContainer>
-                    );
-                  }
-
                   // ── Monthly Growth: use heatmap-aligned series, with optional aggregation ─
                   if (displayedChartView === "monthly") {
                     if (aggregatedSeriesData.length === 0) {
@@ -1718,6 +1545,43 @@ export default function Dashboard() {
                           <Tooltip content={<ChartTooltip />} />
                           <Legend verticalAlign="top" height={36} />
                           <Line type="monotone" dataKey={monthlyKey} name={aggSeriesName} yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{ r: 7 }} animationDuration={350} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    );
+                  }
+
+                  // ── Forecast overlay (overview + line only) ──────────────────────────
+                  if (forecastCombined && displayedChartView === "overview" && displayedChartType === "line") {
+                    const fcData = forecastCombined.points.map(p => ({
+                      ...p,
+                      timestamp: new Date(p.date).getTime(),
+                    }));
+                    const ratePct = (forecastCombined.avgMonthlyRate * 100).toFixed(2);
+                    return (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={fcData}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                          <XAxis
+                            dataKey="timestamp"
+                            type="number"
+                            scale="time"
+                            domain={['dataMin', 'dataMax']}
+                            stroke="hsl(var(--muted-foreground))"
+                            fontSize={12}
+                            tickLine={false}
+                            axisLine={false}
+                            tickFormatter={ts => format(new Date(ts), 'MMM yy')}
+                            ticks={fcData.filter((_, i, a) => {
+                              const key = format(new Date(a[i].date), 'yyyy-MM');
+                              return i === 0 || format(new Date(a[i-1].date), 'yyyy-MM') !== key;
+                            }).map(p => p.timestamp)}
+                          />
+                          <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={v => formatAxisValue(v)} domain={['auto', 'auto']} />
+                          <Tooltip content={<ChartTooltip />} />
+                          <Legend verticalAlign="top" height={36} />
+                          <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke="hsl(var(--primary))" strokeWidth={4} dot={false} activeDot={{ r: 6 }} connectNulls={false} animationDuration={350} />
+                          <Line type="monotone" dataKey="invested" name="Invested" yAxisId="left" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls={false} animationDuration={350} />
+                          <Line type="monotone" dataKey="forecast" name={`Forecast (${ratePct}%/mo avg)`} yAxisId="left" stroke="#f59e0b" strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 5 }} connectNulls={false} animationDuration={350} />
                         </LineChart>
                       </ResponsiveContainer>
                     );
