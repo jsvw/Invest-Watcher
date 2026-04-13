@@ -3001,6 +3001,42 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/platforms/:platformId/dividend-calendar', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.platformId);
+
+      const config = await storage.getScraperConfig(platformId, userId);
+      if (!config || config.scraperType !== "trading212") {
+        return res.status(404).json({ message: "No Trading 212 configuration found for this platform" });
+      }
+
+      const allDividends = await storage.getTrading212Dividends(platformId, userId);
+      const payments = allDividends
+        .filter(d => d.paidOn >= DIVIDEND_START)
+        .map(d => ({
+          ticker: d.ticker,
+          amount: Number(d.amount),
+          paidOn: d.paidOn,
+          quantity: d.quantity ? Number(d.quantity) : null,
+        }));
+
+      const latestHoldings = await storage.getTrading212Holdings(platformId, userId);
+      const heldTickers: string[] = [];
+      if (latestHoldings.length > 0) {
+        const latestDate = latestHoldings[0].date;
+        const snapshotHoldings = latestHoldings.filter(h =>
+          new Date(h.date).getTime() === new Date(latestDate).getTime()
+        );
+        snapshotHoldings.forEach(h => heldTickers.push(h.ticker));
+      }
+
+      res.json({ payments, heldTickers });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get('/api/platforms/:platformId/trading212-holdings-history', requireAuth, async (req, res) => {
     try {
       const userId = getAuthenticatedUserId(req)!;

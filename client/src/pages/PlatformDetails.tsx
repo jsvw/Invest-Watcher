@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search, ArrowUp, ArrowDown, ChevronsUpDown, Trash2, RotateCcw, BarChart3, RefreshCw, Loader2 } from "lucide-react";
+import { TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search, ArrowUp, ArrowDown, ChevronsUpDown, Trash2, RotateCcw, BarChart3, RefreshCw, Loader2, CalendarDays } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,7 @@ import { AssetValuationHoverCard } from "@/components/AssetValuationHoverCard";
 import { AssetValuationManageDialog } from "@/components/AssetValuationManageDialog";
 import { AssetInsightTabs } from "@/components/AssetInsightTabs";
 import { AssetRepaymentDialog } from "@/components/AssetRepaymentDialog";
+import { DividendCalendar } from "@/components/DividendCalendar";
 import type { Asset, PlatformResponse } from "@shared/schema";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { ScraperConfigDialog } from "@/components/ScraperConfigDialog";
@@ -473,7 +474,18 @@ export default function PlatformDetails() {
     enabled: isTrading212,
     staleTime: 60 * 1000,
   });
-  
+
+  const { data: dividendCalendarData } = useQuery<{ payments: { ticker: string; amount: number; paidOn: string; quantity?: number | null }[]; heldTickers: string[] }>({
+    queryKey: ['/api/platforms', id, 'dividend-calendar'],
+    queryFn: async () => {
+      const res = await fetch(`/api/platforms/${id}/dividend-calendar`, { credentials: 'include' });
+      if (!res.ok) return { payments: [], heldTickers: [] };
+      return res.json();
+    },
+    enabled: isTrading212,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const [assetNameFilter, setAssetNameFilter] = useState("");
   const [assetSort, setAssetSort] = useState<"name" | "name-desc" | "date" | "date-asc" | "invested" | "invested-asc" | "value" | "value-asc" | "return" | "return-asc" | "exit" | "exit-desc" | "change" | "change-asc" | "duration" | "duration-asc" | "rpm" | "rpm-asc">("date");
   const [assetStatusFilter, setAssetStatusFilter] = useState<"all" | "active" | "exited">("active");
@@ -1109,6 +1121,9 @@ export default function PlatformDetails() {
             <TabsTrigger value="valuations" className="gap-2"><History className="h-4 w-4" /> Valuations</TabsTrigger>
             {isTrading212 && (
               <TabsTrigger value="holdings" className="gap-2" data-testid="tab-holdings"><BarChart3 className="h-4 w-4" /> Holdings</TabsTrigger>
+            )}
+            {isTrading212 && (
+              <TabsTrigger value="dividend-calendar" className="gap-2" data-testid="tab-dividend-calendar"><CalendarDays className="h-4 w-4" /> Dividends</TabsTrigger>
             )}
             <TabsTrigger value="analytics" className="gap-2" data-testid="tab-platform-analytics"><TrendingUp className="h-4 w-4" /> Analytics</TabsTrigger>
           </TabsList>
@@ -2239,6 +2254,28 @@ export default function PlatformDetails() {
                     ) : (
                       <p className="text-center py-4 text-muted-foreground">Select a date to view the holdings snapshot</p>
                     )}
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+          )}
+
+          {/* Dividend Calendar Tab */}
+          {isTrading212 && (
+            <TabsContent value="dividend-calendar" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              {dividendCalendarData ? (
+                <DividendCalendar
+                  payments={dividendCalendarData.payments}
+                  heldTickers={dividendCalendarData.heldTickers}
+                  currency={currency}
+                />
+              ) : (
+                <Card>
+                  <CardContent className="py-12">
+                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm">Loading dividend calendar…</span>
+                    </div>
                   </CardContent>
                 </Card>
               )}
