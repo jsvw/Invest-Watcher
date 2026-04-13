@@ -26,6 +26,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
@@ -95,6 +96,14 @@ interface InvestmentFlowResponse {
   platforms: { name: string; color: string }[];
 }
 
+interface KpiPlatformBreakdown {
+  name: string;
+  annualized: number;
+  avgMonthly: number;
+  color?: string;
+  iconUrl?: string | null;
+}
+
 interface KpiCardProps {
   label: string;
   value: string;
@@ -102,10 +111,12 @@ interface KpiCardProps {
   icon: React.ReactNode;
   positive?: boolean;
   neutral?: boolean;
+  platformBreakdown?: KpiPlatformBreakdown[];
 }
 
-function KpiCard({ label, value, sub, icon, positive, neutral }: KpiCardProps) {
+function KpiCard({ label, value, sub, icon, positive, neutral, platformBreakdown }: KpiCardProps) {
   const valueColor = neutral ? "text-foreground" : positive ? "text-emerald-500" : "text-red-500";
+  const iconEl = <div className="p-2 rounded-lg bg-muted/50">{icon}</div>;
   return (
     <Card data-testid={`kpi-card-${label.toLowerCase().replace(/\s+/g, "-")}`}>
       <CardContent className="pt-6">
@@ -115,7 +126,36 @@ function KpiCard({ label, value, sub, icon, positive, neutral }: KpiCardProps) {
             <p className={cn("text-2xl font-bold mt-1", valueColor)}>{value}</p>
             {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
           </div>
-          <div className="p-2 rounded-lg bg-muted/50">{icon}</div>
+          {platformBreakdown && platformBreakdown.length > 0 ? (
+            <HoverCard openDelay={100} closeDelay={100}>
+              <HoverCardTrigger asChild>
+                <div className="cursor-pointer">{iconEl}</div>
+              </HoverCardTrigger>
+              <HoverCardContent className="w-72 p-3" side="bottom" align="end">
+                <p className="text-xs font-semibold mb-2 text-foreground">12M return by platform</p>
+                <div className="space-y-1 max-h-56 overflow-y-auto">
+                  {[...platformBreakdown].sort((a, b) => b.annualized - a.annualized).map((p, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {p.color
+                          ? <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: p.color }} />
+                          : <div className="w-2 h-2 rounded-full bg-muted flex-shrink-0" />}
+                        <span className="truncate text-muted-foreground">{p.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 tabular-nums font-medium">
+                        <span className="text-xs text-muted-foreground bg-muted px-1 py-0.5 rounded">
+                          {fmtPct(p.avgMonthly)}/mo
+                        </span>
+                        <span className={p.annualized >= 0 ? "text-emerald-500" : "text-red-500"}>
+                          {fmtPct(p.annualized)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+          ) : iconEl}
         </div>
       </CardContent>
     </Card>
@@ -792,6 +832,60 @@ export default function Dashboard() {
     return sum / monthlySeriesData.length;
   }, [monthlySeriesData]);
 
+  // ── Computed: 12-month annualized return + per-platform breakdown ─────────
+  const annReturn12M = useMemo(() => {
+    if (!platformBreakdownByMonth) return null;
+    const allKeys = Object.keys(platformBreakdownByMonth).sort();
+    const keys = allKeys.slice(-12);
+    if (keys.length === 0) return null;
+
+    // Portfolio-level TWR over last 12 months
+    let portfolioTwr = 1;
+    let portfolioRateSum = 0;
+    let portfolioCount = 0;
+    for (const key of keys) {
+      const entries = platformBreakdownByMonth[key].filter(p => !excludedPlatforms.has(p.platformId));
+      const gain = entries.reduce((s, p) => s + p.gain, 0);
+      const prevVal = entries.reduce((s, p) => s + p.prevVal, 0);
+      if (prevVal > 0) {
+        const r = gain / prevVal;
+        portfolioTwr *= (1 + r);
+        portfolioRateSum += r * 100;
+        portfolioCount++;
+      }
+    }
+    const annualized = portfolioCount > 0 ? (portfolioTwr - 1) * 100 : null;
+    const avgMonthly = portfolioCount > 0 ? portfolioRateSum / portfolioCount : null;
+
+    // Per-platform TWR
+    const platformMap = new Map<number, { name: string; color: string; twr: number; rateSum: number; count: number }>();
+    for (const key of keys) {
+      for (const p of platformBreakdownByMonth[key]) {
+        if (excludedPlatforms.has(p.platformId)) continue;
+        if (!platformMap.has(p.platformId)) {
+          platformMap.set(p.platformId, { name: p.name, color: p.color, twr: 1, rateSum: 0, count: 0 });
+        }
+        const entry = platformMap.get(p.platformId)!;
+        if (p.prevVal > 0) {
+          const r = p.gain / p.prevVal;
+          entry.twr *= (1 + r);
+          entry.rateSum += r * 100;
+          entry.count++;
+        }
+      }
+    }
+    const platforms: KpiPlatformBreakdown[] = Array.from(platformMap.values())
+      .filter(p => p.count > 0)
+      .map(p => ({
+        name: p.name,
+        color: p.color,
+        annualized: (p.twr - 1) * 100,
+        avgMonthly: p.rateSum / p.count,
+      }));
+
+    return { annualized, avgMonthly, platforms };
+  }, [platformBreakdownByMonth, excludedPlatforms]);
+
   const activeHeatmapData = useMemo(() => {
     if (!platformBreakdownByMonth) return null;
 
@@ -1167,10 +1261,11 @@ export default function Dashboard() {
             />
             <KpiCard
               label="Ann. Return"
-              value={kpis?.cagr != null ? fmtPct(kpis.cagr) : "—"}
-              sub={avgMomPct != null ? `avg ${fmtPct(avgMomPct)} / month` : undefined}
+              value={annReturn12M?.annualized != null ? fmtPct(annReturn12M.annualized) : "—"}
+              sub={annReturn12M?.avgMonthly != null ? `avg ${fmtPct(annReturn12M.avgMonthly)} / month` : undefined}
               icon={<TrendingUp className="w-5 h-5 text-muted-foreground" />}
-              positive={kpis?.cagr != null ? kpis.cagr >= 0 : undefined}
+              positive={annReturn12M?.annualized != null ? annReturn12M.annualized >= 0 : undefined}
+              platformBreakdown={annReturn12M?.platforms}
             />
             <Card className={cn("hover:shadow-lg transition-all duration-300 border-l-4", rollingReturns ? (rollingReturns.d30.change >= 0 ? "border-l-emerald-500" : "border-l-rose-500") : "border-l-muted")} data-testid="stat-rolling-returns">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
