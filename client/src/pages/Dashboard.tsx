@@ -112,9 +112,10 @@ interface KpiCardProps {
   positive?: boolean;
   neutral?: boolean;
   platformBreakdown?: KpiPlatformBreakdown[];
+  hoverTitle?: string;
 }
 
-function KpiCard({ label, value, sub, icon, positive, neutral, platformBreakdown }: KpiCardProps) {
+function KpiCard({ label, value, sub, icon, positive, neutral, platformBreakdown, hoverTitle }: KpiCardProps) {
   const valueColor = neutral ? "text-foreground" : positive ? "text-emerald-500" : "text-red-500";
   const iconEl = <div className="p-2 rounded-lg bg-muted/50">{icon}</div>;
   return (
@@ -132,7 +133,7 @@ function KpiCard({ label, value, sub, icon, positive, neutral, platformBreakdown
                 <div className="cursor-pointer">{iconEl}</div>
               </HoverCardTrigger>
               <HoverCardContent className="w-72 p-3" side="bottom" align="end">
-                <p className="text-xs font-semibold mb-2 text-foreground">12M return by platform</p>
+                <p className="text-xs font-semibold mb-2 text-foreground">{hoverTitle ?? "Platform breakdown"}</p>
                 <div className="space-y-1 max-h-56 overflow-y-auto">
                   {[...platformBreakdown].sort((a, b) => b.annualized - a.annualized).map((p, i) => (
                     <div key={i} className="flex items-center justify-between gap-2 text-xs">
@@ -883,7 +884,7 @@ export default function Dashboard() {
         avgMonthly: p.rateSum / p.count,
       }));
 
-    return { annualized, avgMonthly, platforms };
+    return { annualized, avgMonthly, platforms, months: keys.length };
   }, [platformBreakdownByMonth, excludedPlatforms]);
 
   const activeHeatmapData = useMemo(() => {
@@ -1266,6 +1267,7 @@ export default function Dashboard() {
               icon={<TrendingUp className="w-5 h-5 text-muted-foreground" />}
               positive={annReturn12M?.annualized != null ? annReturn12M.annualized >= 0 : undefined}
               platformBreakdown={annReturn12M?.platforms}
+              hoverTitle={`Return by platform (last ${annReturn12M?.months ?? 12}mo)`}
             />
             <Card className={cn("hover:shadow-lg transition-all duration-300 border-l-4", rollingReturns ? (rollingReturns.d30.change >= 0 ? "border-l-emerald-500" : "border-l-rose-500") : "border-l-muted")} data-testid="stat-rolling-returns">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
