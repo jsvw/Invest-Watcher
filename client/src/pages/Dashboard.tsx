@@ -1428,7 +1428,7 @@ export default function Dashboard() {
                   }
 
                   // ── Aggregated overview/profit/all: use end-of-period snapshots ─────
-                  if (displayedChartAggregation !== "month" && aggregatedChartData && displayedChartView !== "monthly") {
+                  if (displayedChartAggregation !== "month" && aggregatedChartData && displayedChartView !== "monthly" && !forecastCombined) {
                     const aggXFmt2 = (d: string) => {
                       if (displayedChartAggregation === "quarter") {
                         const [y, q] = d.split("-");
