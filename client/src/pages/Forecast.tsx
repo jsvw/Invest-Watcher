@@ -104,7 +104,7 @@ function ForecastTooltip({
           <span className="font-medium">{formatCurrency(totalValue, currency)}</span>
         </div>
         <div className="flex justify-between gap-4">
-          <span className="text-muted-foreground">Monthly Income</span>
+          <span className="text-muted-foreground">Cumulative Growth</span>
           <span className="font-medium text-emerald-600">{formatCurrency(income, currency)}</span>
         </div>
       </div>
@@ -134,14 +134,17 @@ export default function Forecast() {
   });
 
   const projectedYearEndValue = data?.months[11]?.totalValue ?? 0;
-  const projectedIncome = data?.months.reduce((sum, m) => sum + m.income, 0) ?? 0;
   const currentTotalValue = data?.currentTotalValue ?? 0;
   const adjustedIncome = projectedYearEndValue - currentTotalValue;
+  const projectedIncome = data?.platforms.reduce((sum, p) => sum + (p.endValue - p.currentValue), 0) ?? 0;
   const projectedRoi = currentTotalValue > 0
     ? ((projectedYearEndValue - currentTotalValue) / currentTotalValue) * 100
     : 0;
 
-  const chartData = data?.months ?? [];
+  const chartData = (data?.months ?? []).map(m => ({
+    ...m,
+    income: m.totalValue - currentTotalValue,
+  }));
 
   function startEdit(platform: ForecastPlatform) {
     setEditValue(platform.expectedGrowthPct != null ? String(platform.expectedGrowthPct) : "");
@@ -279,7 +282,7 @@ export default function Forecast() {
                     stroke="#10b981"
                     strokeWidth={1.5}
                     fill="url(#incomeGradient)"
-                    name="Monthly Income"
+                    name="Cumulative Growth"
                     dot={false}
                     data-testid="chart-area-income"
                   />
