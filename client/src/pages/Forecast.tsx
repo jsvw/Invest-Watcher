@@ -142,7 +142,7 @@ export default function Forecast() {
   const chartData = data?.months ?? [];
 
   function startEdit(platform: ForecastPlatform) {
-    setEditValue(platform.expectedGrowthPct !== null ? String(platform.expectedGrowthPct) : "");
+    setEditValue(platform.expectedGrowthPct != null ? String(platform.expectedGrowthPct) : "");
     setEditingPlatformId(platform.platformId);
   }
 
@@ -405,7 +405,7 @@ export default function Forecast() {
                                     >
                                       <Pencil className="h-3 w-3" />
                                     </button>
-                                    {platform.expectedGrowthPct !== null && (
+                                    {platform.expectedGrowthPct != null && (
                                       <button
                                         onClick={() => clearGrowthRate(platform.platformId)}
                                         className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-muted/60 transition-colors"

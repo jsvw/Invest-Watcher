@@ -3506,6 +3506,7 @@ export async function registerRoutes(
         endValue: p.endValue,
         totalIncome: p.totalIncome,
         method: p.method,
+        expectedGrowthPct: p.expectedGrowthPct,
       }));
 
       res.json({ months, platforms: platforms_result, currentTotalValue });
