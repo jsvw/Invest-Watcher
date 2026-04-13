@@ -3250,6 +3250,18 @@ export async function registerRoutes(
       const userPlatforms = await storage.getPlatforms(userId);
       const userValuations = await storage.getAllValuationsForUser(userId);
 
+      // Parse optional per-platform growth rate overrides: ?overrides=1:8,2:5 (annual % per platform ID)
+      const overridesRaw = typeof req.query.overrides === 'string' ? req.query.overrides : '';
+      const growthOverrides = new Map<number, number>();
+      if (overridesRaw) {
+        for (const pair of overridesRaw.split(',')) {
+          const [idStr, rateStr] = pair.split(':');
+          const id = parseInt(idStr, 10);
+          const rate = parseFloat(rateStr);
+          if (!isNaN(id) && !isNaN(rate)) growthOverrides.set(id, rate);
+        }
+      }
+
       // Build month labels for the next 12 months starting from next month
       const now = new Date();
       const monthLabels: { label: string; year: number; month: number }[] = [];
@@ -3372,9 +3384,18 @@ export async function registerRoutes(
             }
           }
 
-          const avgMonthlyRate = growthRates.length > 0
+          const historicalMonthlyRate = growthRates.length > 0
             ? growthRates.reduce((a, b) => a + b, 0) / growthRates.length
             : 0;
+
+          const customAnnualPct = growthOverrides.get(platform.id);
+          const avgMonthlyRate = customAnnualPct !== undefined
+            ? (customAnnualPct / 100) / 12
+            : historicalMonthlyRate;
+
+          const methodLabel = customAnnualPct !== undefined
+            ? `Custom: ${customAnnualPct}%/yr`
+            : 'Historical Growth Rate';
 
           const monthlyValues: number[] = [];
           for (let i = 0; i < 12; i++) {
@@ -3387,7 +3408,7 @@ export async function registerRoutes(
             category: platform.category,
             endValue: monthlyValues[11] ?? latestValue,
             totalIncome: 0,
-            method: 'Historical Growth Rate',
+            method: methodLabel,
             monthlyValues,
             monthlyIncome: Array(12).fill(0),
           });

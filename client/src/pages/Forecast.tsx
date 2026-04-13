@@ -9,8 +9,9 @@ import {
 import { type ValueType, type NameType } from "recharts/types/component/DefaultTooltipContent";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, DollarSign, Percent, Info } from "lucide-react";
+import { TrendingUp, DollarSign, Percent, Info, Pencil, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useState, useMemo } from "react";
 
 interface ForecastMonth {
   label: string;
@@ -39,6 +40,9 @@ const METHOD_COLORS: Record<string, string> = {
 };
 
 function methodBadgeClass(method: string): string {
+  if (method.startsWith("Custom:")) {
+    return "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400";
+  }
   if (method.startsWith("Held Flat")) {
     return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400";
   }
@@ -111,10 +115,23 @@ export default function Forecast() {
   const { user } = useAuth();
   const currency = user?.currency ?? "EUR";
 
+  const [growthOverrides, setGrowthOverrides] = useState<Record<number, number>>({});
+  const [editingPlatformId, setEditingPlatformId] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState("");
+
+  const overrideParam = useMemo(() => {
+    const entries = Object.entries(growthOverrides);
+    if (entries.length === 0) return "";
+    return entries.map(([id, rate]) => `${id}:${rate}`).join(",");
+  }, [growthOverrides]);
+
   const { data, isLoading } = useQuery<ForecastResponse>({
-    queryKey: ["/api/forecast"],
+    queryKey: ["/api/forecast", overrideParam],
     queryFn: async () => {
-      const res = await fetch("/api/forecast", { credentials: "include" });
+      const url = overrideParam
+        ? `/api/forecast?overrides=${encodeURIComponent(overrideParam)}`
+        : "/api/forecast";
+      const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch forecast");
       return res.json();
     },
@@ -128,6 +145,34 @@ export default function Forecast() {
     : 0;
 
   const chartData = data?.months ?? [];
+
+  function startEdit(platformId: number, currentMethod: string) {
+    const existing = growthOverrides[platformId];
+    setEditValue(existing !== undefined ? String(existing) : "");
+    setEditingPlatformId(platformId);
+  }
+
+  function commitEdit(platformId: number) {
+    const parsed = parseFloat(editValue);
+    if (!isNaN(parsed)) {
+      setGrowthOverrides(prev => ({ ...prev, [platformId]: parsed }));
+    }
+    setEditingPlatformId(null);
+    setEditValue("");
+  }
+
+  function cancelEdit() {
+    setEditingPlatformId(null);
+    setEditValue("");
+  }
+
+  function clearOverride(platformId: number) {
+    setGrowthOverrides(prev => {
+      const next = { ...prev };
+      delete next[platformId];
+      return next;
+    });
+  }
 
   return (
     <Layout>
@@ -266,40 +311,104 @@ export default function Forecast() {
                   <tbody>
                     {[...data.platforms]
                       .sort((a, b) => b.endValue - a.endValue)
-                      .map((platform) => (
-                        <tr
-                          key={platform.platformId}
-                          className="border-b last:border-0 hover:bg-muted/30 transition-colors"
-                          data-testid={`forecast-row-${platform.platformId}`}
-                        >
-                          <td className="py-3 pr-4 font-medium" data-testid={`forecast-name-${platform.platformId}`}>
-                            {platform.name}
-                          </td>
-                          <td className="py-3 pr-4 text-muted-foreground" data-testid={`forecast-category-${platform.platformId}`}>
-                            {platform.category}
-                          </td>
-                          <td className="py-3 pr-4 text-right font-medium" data-testid={`forecast-end-value-${platform.platformId}`}>
-                            {formatCurrency(platform.endValue, currency)}
-                          </td>
-                          <td className="py-3 pr-4 text-right" data-testid={`forecast-income-${platform.platformId}`}>
-                            {platform.totalIncome > 0 ? (
-                              <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                                {formatCurrency(platform.totalIncome, currency)}
-                              </span>
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </td>
-                          <td className="py-3" data-testid={`forecast-method-${platform.platformId}`}>
-                            <span className={cn(
-                              "text-xs px-2 py-0.5 rounded-full font-medium",
-                              methodBadgeClass(platform.method)
-                            )}>
-                              {platform.method}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                      .map((platform) => {
+                        const isEditing = editingPlatformId === platform.platformId;
+                        const hasOverride = growthOverrides[platform.platformId] !== undefined;
+                        const canEdit = platform.method === "Historical Growth Rate" || hasOverride;
+
+                        return (
+                          <tr
+                            key={platform.platformId}
+                            className="border-b last:border-0 hover:bg-muted/30 transition-colors"
+                            data-testid={`forecast-row-${platform.platformId}`}
+                          >
+                            <td className="py-3 pr-4 font-medium" data-testid={`forecast-name-${platform.platformId}`}>
+                              {platform.name}
+                            </td>
+                            <td className="py-3 pr-4 text-muted-foreground" data-testid={`forecast-category-${platform.platformId}`}>
+                              {platform.category}
+                            </td>
+                            <td className="py-3 pr-4 text-right font-medium" data-testid={`forecast-end-value-${platform.platformId}`}>
+                              {formatCurrency(platform.endValue, currency)}
+                            </td>
+                            <td className="py-3 pr-4 text-right" data-testid={`forecast-income-${platform.platformId}`}>
+                              {platform.totalIncome > 0 ? (
+                                <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                                  {formatCurrency(platform.totalIncome, currency)}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </td>
+                            <td className="py-3" data-testid={`forecast-method-${platform.platformId}`}>
+                              {isEditing ? (
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    placeholder="e.g. 8"
+                                    value={editValue}
+                                    onChange={e => setEditValue(e.target.value)}
+                                    onKeyDown={e => {
+                                      if (e.key === "Enter") commitEdit(platform.platformId);
+                                      if (e.key === "Escape") cancelEdit();
+                                    }}
+                                    autoFocus
+                                    className="w-20 h-7 rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                                    data-testid={`forecast-growth-input-${platform.platformId}`}
+                                  />
+                                  <span className="text-xs text-muted-foreground">%/yr</span>
+                                  <button
+                                    onClick={() => commitEdit(platform.platformId)}
+                                    className="h-6 w-6 rounded flex items-center justify-center text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+                                    data-testid={`forecast-growth-confirm-${platform.platformId}`}
+                                    aria-label="Confirm"
+                                  >
+                                    <Check className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={cancelEdit}
+                                    className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-muted/60 transition-colors"
+                                    data-testid={`forecast-growth-cancel-${platform.platformId}`}
+                                    aria-label="Cancel"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5">
+                                  <span className={cn(
+                                    "text-xs px-2 py-0.5 rounded-full font-medium",
+                                    methodBadgeClass(platform.method)
+                                  )}>
+                                    {platform.method}
+                                  </span>
+                                  {canEdit && (
+                                    <button
+                                      onClick={() => startEdit(platform.platformId, platform.method)}
+                                      className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                                      data-testid={`forecast-edit-${platform.platformId}`}
+                                      aria-label="Set expected growth rate"
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </button>
+                                  )}
+                                  {hasOverride && (
+                                    <button
+                                      onClick={() => clearOverride(platform.platformId)}
+                                      className="h-5 w-5 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-muted/60 transition-colors"
+                                      data-testid={`forecast-clear-override-${platform.platformId}`}
+                                      aria-label="Reset to historical rate"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
               </div>
@@ -316,8 +425,8 @@ export default function Forecast() {
             <p className="font-semibold mb-1">Projections are estimates, not financial advice.</p>
             <p className="text-amber-700 dark:text-amber-400">
               Forecasts are calculated using historical growth rates (standard platforms), declared annual yields
-              (asset-return platforms), or held flat at current value (item-valuation platforms). Actual results
-              may differ due to market conditions, reinvestment decisions, early exits, or other factors.
+              (asset-return platforms), or held flat at current value (item-valuation platforms). Use the pencil
+              icon to override the growth rate for any platform with a custom expected annual rate.
             </p>
           </div>
         </div>
