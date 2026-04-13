@@ -475,11 +475,15 @@ export default function PlatformDetails() {
     staleTime: 60 * 1000,
   });
 
-  const { data: dividendCalendarData } = useQuery<{ payments: { ticker: string; amount: number; paidOn: string; quantity?: number | null }[]; heldTickers: string[] }>({
+  const { data: dividendCalendarData } = useQuery<{
+    payments: { ticker: string; amount: number; paidOn: string; quantity?: number | null }[];
+    projections: { ticker: string; amount: number; date: string; frequency: string; source: "declared" | "estimated" }[];
+    hasFmpKey: boolean;
+  }>({
     queryKey: ['/api/platforms', id, 'dividend-calendar'],
     queryFn: async () => {
       const res = await fetch(`/api/platforms/${id}/dividend-calendar`, { credentials: 'include' });
-      if (!res.ok) return { payments: [], heldTickers: [] };
+      if (!res.ok) return { payments: [], projections: [], hasFmpKey: false };
       return res.json();
     },
     enabled: isTrading212,

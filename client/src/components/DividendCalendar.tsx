@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { format, addMonths, subMonths, startOfMonth, getDaysInMonth, parseISO, isBefore } from "date-fns";
-import { ChevronLeft, ChevronRight, CalendarDays, List, Info } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, List, Info, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -31,6 +31,7 @@ export function DividendCalendar({ payments, projections, hasFmpKey, currency }:
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(today));
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
   const [openDay, setOpenDay] = useState<string | null>(null);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   const dayEntries = useMemo(() => {
     const map = new Map<string, DayEntry[]>();
@@ -92,10 +93,10 @@ export function DividendCalendar({ payments, projections, hasFmpKey, currency }:
 
   return (
     <div className="space-y-4">
-      {!hasFmpKey && (
+      {!hasFmpKey && !bannerDismissed && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 px-4 py-3 text-xs text-amber-800 dark:text-amber-300">
           <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-          <span>
+          <span className="flex-1">
             Using pattern-based estimates. For real declared dividend dates, add a free{" "}
             <a
               href="https://financialmodelingprep.com/developer/docs"
@@ -107,6 +108,14 @@ export function DividendCalendar({ payments, projections, hasFmpKey, currency }:
             </a>{" "}
             as <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-0.5 rounded">FMP_API_KEY</code> in your secrets.
           </span>
+          <button
+            onClick={() => setBannerDismissed(true)}
+            className="shrink-0 opacity-60 hover:opacity-100 transition-opacity"
+            data-testid="fmp-banner-dismiss"
+            aria-label="Dismiss"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
       )}
 
