@@ -2171,43 +2171,39 @@ export default function PlatformDetails() {
                   "hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))",
                   "#f97316", "#06b6d4", "#8b5cf6", "#ec4899", "#14b8a6",
                 ];
-                const stackedData = holdingsChartData.chartData.map((d: any) => {
-                  const row: Record<string, any> = { date: d.date };
-                  let totalPpl = 0;
-                  for (const t of tickerList) {
-                    row[t] = d.instruments?.[t]?.value || 0;
-                    totalPpl += d.instruments?.[t]?.ppl || 0;
-                  }
-                  row.totalPpl = totalPpl;
-                  return row;
+                const monthlyMap = new Map<string, any>();
+                holdingsChartData.chartData.forEach((d: any) => {
+                  const key = format(new Date(d.date), 'yyyy-MM');
+                  monthlyMap.set(key, d);
                 });
+                const stackedData = Array.from(monthlyMap.entries())
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([monthKey, d]) => {
+                    const row: Record<string, any> = { date: d.date, monthKey };
+                    let totalPpl = 0;
+                    for (const t of tickerList) {
+                      row[t] = d.instruments?.[t]?.value || 0;
+                      totalPpl += d.instruments?.[t]?.ppl || 0;
+                    }
+                    row.totalPpl = totalPpl;
+                    row.monthLabel = format(new Date(d.date), 'MMM yy');
+                    return row;
+                  });
                 return (
                   <Card>
                     <CardHeader>
                       <CardTitle>Holdings Value Over Time</CardTitle>
-                      <CardDescription>Daily breakdown by instrument</CardDescription>
+                      <CardDescription>Monthly breakdown by instrument</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={stackedData.map((d: any) => ({ ...d, timestamp: new Date(d.date).getTime() }))} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+                          <AreaChart data={stackedData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                             <XAxis 
-                              dataKey="timestamp" 
-                              type="number"
-                              scale="time"
-                              domain={['dataMin', 'dataMax']}
+                              dataKey="monthLabel"
+                              type="category"
                               tick={{ fontSize: 11 }} 
-                              tickFormatter={(ts) => format(new Date(ts), 'MMM d')}
-                              ticks={(() => {
-                                const seen = new Set<string>();
-                                return stackedData.filter((entry: any) => {
-                                  const key = format(new Date(entry.date), 'yyyy-MM');
-                                  if (seen.has(key)) return false;
-                                  seen.add(key);
-                                  return true;
-                                }).map((entry: any) => new Date(entry.date).getTime());
-                              })()}
                             />
                             <YAxis tick={{ fontSize: 11 }} tickFormatter={(val) => `${getCurrencySymbol(currency)}${val.toFixed(0)}`} width={60} />
                             <Tooltip
@@ -2216,7 +2212,7 @@ export default function PlatformDetails() {
                                 const total = props.payload.reduce((s: number, e: any) => s + (e.value || 0), 0);
                                 return (
                                   <div className="rounded-xl border border-border bg-card shadow-lg px-3 py-2 text-xs min-w-[180px]">
-                                    <p className="font-semibold text-foreground mb-2">{props.label ? format(new Date(props.label), 'MMM d, yyyy') : ''}</p>
+                                    <p className="font-semibold text-foreground mb-2">{props.payload?.[0]?.payload?.monthKey ? format(new Date(props.payload[0].payload.monthKey + '-01'), 'MMM yyyy') : props.label}</p>
                                     {[...props.payload].reverse().map((entry: any) => (
                                       <div key={entry.dataKey} className="flex items-center justify-between gap-4 py-0.5">
                                         <div className="flex items-center gap-1.5">
