@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { format, addMonths, subMonths, startOfMonth, getDaysInMonth, parseISO, isBefore } from "date-fns";
-import { ChevronLeft, ChevronRight, CalendarDays, List } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, List, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -9,74 +9,19 @@ import { formatCurrency, formatCompactCurrency } from "@/lib/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Payment = { ticker: string; amount: number; paidOn: string; quantity?: number | null };
-type Projection = { ticker: string; amount: number; date: string; frequency: string };
-type DayEntry = { ticker: string; amount: number; isProjected: boolean; frequency?: string };
-
-function detectFrequency(sortedDates: string[]): { label: string; days: number } {
-  if (sortedDates.length < 2) return { label: "annual", days: 365 };
-  const gaps: number[] = [];
-  for (let i = 1; i < sortedDates.length; i++) {
-    const d1 = parseISO(sortedDates[i - 1]).getTime();
-    const d2 = parseISO(sortedDates[i]).getTime();
-    gaps.push((d2 - d1) / 86400000);
-  }
-  gaps.sort((a, b) => a - b);
-  const median = gaps[Math.floor(gaps.length / 2)];
-  if (median >= 25 && median <= 35) return { label: "monthly", days: 30 };
-  if (median >= 80 && median <= 100) return { label: "quarterly", days: 91 };
-  if (median >= 170 && median <= 200) return { label: "semi-annual", days: 182 };
-  return { label: "annual", days: 365 };
-}
-
-function computeProjections(payments: Payment[], heldSet: Set<string>, today: Date): Projection[] {
-  const byTicker = new Map<string, Payment[]>();
-  for (const p of payments) {
-    if (!byTicker.has(p.ticker)) byTicker.set(p.ticker, []);
-    byTicker.get(p.ticker)!.push(p);
-  }
-  const maxDate = addMonths(today, 6);
-  const results: Projection[] = [];
-
-  for (const [ticker, history] of byTicker.entries()) {
-    if (!heldSet.has(ticker)) continue;
-    const sorted = [...history].sort((a, b) => a.paidOn.slice(0, 10).localeCompare(b.paidOn.slice(0, 10)));
-    const dates = sorted.map(h => h.paidOn.slice(0, 10));
-    if (dates.length < 2) continue;
-    const { label, days } = detectFrequency(dates);
-    const lastDate = parseISO(dates[dates.length - 1]);
-    const recentHistory = sorted.slice(-4);
-    const avgAmount = recentHistory.reduce((s, h) => s + h.amount, 0) / recentHistory.length;
-
-    let next = new Date(lastDate);
-    next.setDate(next.getDate() + days);
-    let count = 0;
-    while (count < 3 && next <= maxDate) {
-      if (next > today) {
-        results.push({
-          ticker,
-          amount: avgAmount,
-          date: format(next, "yyyy-MM-dd"),
-          frequency: label,
-        });
-        count++;
-      }
-      const n2 = new Date(next);
-      n2.setDate(n2.getDate() + days);
-      next = n2;
-    }
-  }
-  return results;
-}
+type Projection = { ticker: string; amount: number; date: string; frequency: string; source: "declared" | "estimated" };
+type DayEntry = { ticker: string; amount: number; isProjected: boolean; source?: "declared" | "estimated"; frequency?: string };
 
 const DAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 interface Props {
   payments: Payment[];
-  heldTickers: string[];
+  projections: Projection[];
+  hasFmpKey: boolean;
   currency: string;
 }
 
-export function DividendCalendar({ payments, heldTickers, currency }: Props) {
+export function DividendCalendar({ payments, projections, hasFmpKey, currency }: Props) {
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -86,9 +31,6 @@ export function DividendCalendar({ payments, heldTickers, currency }: Props) {
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(today));
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
   const [openDay, setOpenDay] = useState<string | null>(null);
-
-  const heldSet = useMemo(() => new Set(heldTickers), [heldTickers]);
-  const projections = useMemo(() => computeProjections(payments, heldSet, today), [payments, heldSet, today]);
 
   const dayEntries = useMemo(() => {
     const map = new Map<string, DayEntry[]>();
@@ -100,7 +42,7 @@ export function DividendCalendar({ payments, heldTickers, currency }: Props) {
       add(p.paidOn.slice(0, 10), { ticker: p.ticker, amount: p.amount, isProjected: false });
     }
     for (const proj of projections) {
-      add(proj.date, { ticker: proj.ticker, amount: proj.amount, isProjected: true, frequency: proj.frequency });
+      add(proj.date, { ticker: proj.ticker, amount: proj.amount, isProjected: true, source: proj.source, frequency: proj.frequency });
     }
     return map;
   }, [payments, projections]);
@@ -150,6 +92,24 @@ export function DividendCalendar({ payments, heldTickers, currency }: Props) {
 
   return (
     <div className="space-y-4">
+      {!hasFmpKey && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 px-4 py-3 text-xs text-amber-800 dark:text-amber-300">
+          <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+          <span>
+            Using pattern-based estimates. For real declared dividend dates, add a free{" "}
+            <a
+              href="https://financialmodelingprep.com/developer/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline font-medium"
+            >
+              Financial Modeling Prep API key
+            </a>{" "}
+            as <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-0.5 rounded">FMP_API_KEY</code> in your secrets.
+          </span>
+        </div>
+      )}
+
       <Card>
         <CardHeader className="pb-2 pt-4">
           <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Monthly Dividend Income</CardTitle>
@@ -229,6 +189,7 @@ export function DividendCalendar({ payments, heldTickers, currency }: Props) {
                 const entries = dayEntries.get(cell.dateStr) || [];
                 const hasPast = entries.some(e => !e.isProjected);
                 const hasFuture = entries.some(e => e.isProjected);
+                const isDeclared = entries.some(e => e.source === "declared");
                 const isPastDay = isBefore(cell.date, today);
                 const isToday = cell.dateStr === todayStr;
                 const total = entries.reduce((s, e) => s + e.amount, 0);
@@ -236,7 +197,8 @@ export function DividendCalendar({ payments, heldTickers, currency }: Props) {
                 const cellCls = [
                   "h-14 rounded-md p-1 flex flex-col text-left transition-colors",
                   isToday ? "ring-2 ring-primary ring-offset-1" : "",
-                  hasFuture ? "bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 cursor-pointer hover:bg-emerald-500/20" : "",
+                  hasFuture && isDeclared ? "bg-emerald-500/15 dark:bg-emerald-500/20 border border-emerald-500/40 cursor-pointer hover:bg-emerald-500/25" : "",
+                  hasFuture && !isDeclared ? "bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/30 cursor-pointer hover:bg-emerald-500/20" : "",
                   hasPast && !hasFuture ? "bg-muted/40 border border-transparent cursor-pointer hover:bg-muted/60" : "",
                   !hasPast && !hasFuture && !isToday ? "opacity-40" : "",
                   isPastDay && !hasPast ? "opacity-30" : "",
@@ -264,7 +226,7 @@ export function DividendCalendar({ payments, heldTickers, currency }: Props) {
                         <div className="mt-auto overflow-hidden">
                           {hasFuture && (
                             <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 leading-none block truncate">
-                              ~{fmt(total)}
+                              {isDeclared ? "" : "~"}{fmt(total)}
                             </span>
                           )}
                           {hasPast && !hasFuture && (
@@ -284,13 +246,16 @@ export function DividendCalendar({ payments, heldTickers, currency }: Props) {
                               <span className="font-mono font-medium truncate">{e.ticker}</span>
                               <div className="flex items-center gap-1 shrink-0">
                                 <span>{fmt(e.amount)}</span>
-                                {e.isProjected && (
+                                {e.isProjected && e.source === "declared" && (
+                                  <Badge variant="outline" className="text-[9px] py-0 px-1 h-4 leading-none text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700">Declared</Badge>
+                                )}
+                                {e.isProjected && e.source === "estimated" && (
                                   <Badge variant="outline" className="text-[9px] py-0 px-1 h-4 leading-none">~est</Badge>
                                 )}
                               </div>
                             </div>
-                            {e.isProjected && e.frequency && (
-                              <p className="text-[10px] text-muted-foreground capitalize pl-0">{e.frequency}</p>
+                            {e.isProjected && e.source === "estimated" && e.frequency && (
+                              <p className="text-[10px] text-muted-foreground capitalize">{e.frequency}</p>
                             )}
                           </div>
                         ))}
@@ -299,7 +264,12 @@ export function DividendCalendar({ payments, heldTickers, currency }: Props) {
                         <span>Total</span>
                         <div className="flex items-center gap-1">
                           <span>{fmt(total)}</span>
-                          {hasFuture && <Badge variant="outline" className="text-[9px] py-0 px-1 h-4 leading-none text-muted-foreground">estimated</Badge>}
+                          {hasFuture && isDeclared && (
+                            <Badge variant="outline" className="text-[9px] py-0 px-1 h-4 leading-none text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700">Declared</Badge>
+                          )}
+                          {hasFuture && !isDeclared && (
+                            <Badge variant="outline" className="text-[9px] py-0 px-1 h-4 leading-none text-muted-foreground">estimated</Badge>
+                          )}
                         </div>
                       </div>
                     </PopoverContent>
@@ -325,7 +295,7 @@ export function DividendCalendar({ payments, heldTickers, currency }: Props) {
                       <th className="text-left py-2.5 px-4 font-medium text-muted-foreground">Date</th>
                       <th className="text-left py-2.5 px-2 font-medium text-muted-foreground">Ticker</th>
                       <th className="text-right py-2.5 px-2 font-medium text-muted-foreground">Est. Amount</th>
-                      <th className="text-right py-2.5 px-4 font-medium text-muted-foreground">Frequency</th>
+                      <th className="text-right py-2.5 px-4 font-medium text-muted-foreground">Source</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -333,8 +303,16 @@ export function DividendCalendar({ payments, heldTickers, currency }: Props) {
                       <tr key={i} className="border-b last:border-0 hover:bg-muted/30 transition-colors" data-testid={`list-row-${i}`}>
                         <td className="py-2.5 px-4 text-muted-foreground">{format(parseISO(p.date), "d MMM yyyy")}</td>
                         <td className="py-2.5 px-2 font-mono font-medium">{p.ticker}</td>
-                        <td className="py-2.5 px-2 text-right text-emerald-600 dark:text-emerald-400 font-medium">~{fmt(p.amount)}</td>
-                        <td className="py-2.5 px-4 text-right text-muted-foreground capitalize">{p.frequency}</td>
+                        <td className="py-2.5 px-2 text-right text-emerald-600 dark:text-emerald-400 font-medium">
+                          {p.source === "estimated" ? "~" : ""}{fmt(p.amount)}
+                        </td>
+                        <td className="py-2.5 px-4 text-right">
+                          {p.source === "declared" ? (
+                            <Badge variant="outline" className="text-[9px] py-0 px-1 h-4 leading-none text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700">Declared</Badge>
+                          ) : (
+                            <span className="text-muted-foreground capitalize">{p.frequency}</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

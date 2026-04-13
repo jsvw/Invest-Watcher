@@ -2266,7 +2266,8 @@ export default function PlatformDetails() {
               {dividendCalendarData ? (
                 <DividendCalendar
                   payments={dividendCalendarData.payments}
-                  heldTickers={dividendCalendarData.heldTickers}
+                  projections={dividendCalendarData.projections ?? []}
+                  hasFmpKey={dividendCalendarData.hasFmpKey ?? false}
                   currency={currency}
                 />
               ) : (

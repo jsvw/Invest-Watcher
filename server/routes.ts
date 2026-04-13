@@ -19,6 +19,69 @@ import { encrypt, decrypt } from "./encryption";
 
 const DIVIDEND_START = '2024-07-01';
 
+// --- FMP dividend calendar helpers ---
+
+function normalizeTicker(t212Ticker: string): string {
+  // Strip exchange suffix patterns: _US_EQ, _GB_EQ, _DE_EQ, _EQ etc.
+  let sym = t212Ticker.replace(/_[A-Z]{1,3}_EQ$/, '').replace(/_EQ$/, '');
+  // Convert remaining underscores to dots (e.g. BRK_B → BRK.B for share classes)
+  sym = sym.replace(/_/g, '.');
+  return sym.toUpperCase();
+}
+
+function detectFrequencyFmp(sortedDates: string[]): { label: string; days: number } {
+  if (sortedDates.length < 2) return { label: "annual", days: 365 };
+  const gaps: number[] = [];
+  for (let i = 1; i < sortedDates.length; i++) {
+    const d1 = new Date(sortedDates[i - 1]).getTime();
+    const d2 = new Date(sortedDates[i]).getTime();
+    gaps.push((d2 - d1) / 86400000);
+  }
+  gaps.sort((a, b) => a - b);
+  const median = gaps[Math.floor(gaps.length / 2)];
+  if (median >= 25 && median <= 35) return { label: "monthly", days: 30 };
+  if (median >= 80 && median <= 100) return { label: "quarterly", days: 91 };
+  if (median >= 170 && median <= 200) return { label: "semi-annual", days: 182 };
+  return { label: "annual", days: 365 };
+}
+
+let _fmpDivCache: { data: Map<string, string[]>; timestamp: number } | null = null;
+
+async function getFmpDividendCalendar(): Promise<Map<string, string[]>> {
+  const apiKey = process.env.FMP_API_KEY;
+  if (!apiKey) return new Map();
+  const now = Date.now();
+  if (_fmpDivCache && now - _fmpDivCache.timestamp < 24 * 60 * 60 * 1000) {
+    return _fmpDivCache.data;
+  }
+  try {
+    const from = new Date().toISOString().slice(0, 10);
+    const toDate = new Date();
+    toDate.setMonth(toDate.getMonth() + 6);
+    const to = toDate.toISOString().slice(0, 10);
+    const url = `https://financialmodelingprep.com/stable/dividends-calendar?from=${from}&to=${to}&apikey=${apiKey}`;
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      console.error(`[FMP] API error: ${resp.status} ${resp.statusText}`);
+      return new Map();
+    }
+    const items: { symbol?: string; paymentDate?: string }[] = await resp.json();
+    const map = new Map<string, string[]>();
+    for (const item of items) {
+      if (!item.symbol || !item.paymentDate) continue;
+      const sym = item.symbol.toUpperCase();
+      if (!map.has(sym)) map.set(sym, []);
+      map.get(sym)!.push(item.paymentDate);
+    }
+    _fmpDivCache = { data: map, timestamp: now };
+    console.log(`[FMP] Loaded ${items.length} dividend calendar entries for ${map.size} symbols`);
+    return map;
+  } catch (err: any) {
+    console.error('[FMP] Fetch error:', err.message);
+    return new Map();
+  }
+}
+
 // Configure multer for file uploads
 const upload = multer({ dest: "/tmp/uploads/" });
 
@@ -3011,7 +3074,12 @@ export async function registerRoutes(
         return res.status(404).json({ message: "No Trading 212 configuration found for this platform" });
       }
 
-      const allDividends = await storage.getTrading212Dividends(platformId, userId);
+      const [allDividends, latestHoldings, fmpData] = await Promise.all([
+        storage.getTrading212Dividends(platformId, userId),
+        storage.getTrading212Holdings(platformId, userId),
+        getFmpDividendCalendar(),
+      ]);
+
       const payments = allDividends
         .filter(d => d.paidOn >= DIVIDEND_START)
         .map(d => ({
@@ -3021,17 +3089,65 @@ export async function registerRoutes(
           quantity: d.quantity ? Number(d.quantity) : null,
         }));
 
-      const latestHoldings = await storage.getTrading212Holdings(platformId, userId);
       const heldTickers: string[] = [];
       if (latestHoldings.length > 0) {
         const latestDate = latestHoldings[0].date;
-        const snapshotHoldings = latestHoldings.filter(h =>
-          new Date(h.date).getTime() === new Date(latestDate).getTime()
-        );
-        snapshotHoldings.forEach(h => heldTickers.push(h.ticker));
+        latestHoldings
+          .filter(h => new Date(h.date).getTime() === new Date(latestDate).getTime())
+          .forEach(h => heldTickers.push(h.ticker));
       }
 
-      res.json({ payments, heldTickers });
+      // Build projections: FMP declared dates take priority; pattern fallback for the rest
+      const hasFmpKey = !!process.env.FMP_API_KEY;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const maxDate = new Date(today);
+      maxDate.setMonth(maxDate.getMonth() + 6);
+
+      const byTicker = new Map<string, typeof payments>();
+      for (const p of payments) {
+        if (!byTicker.has(p.ticker)) byTicker.set(p.ticker, []);
+        byTicker.get(p.ticker)!.push(p);
+      }
+
+      const projections: { ticker: string; amount: number; date: string; frequency: string; source: "declared" | "estimated" }[] = [];
+
+      for (const ticker of heldTickers) {
+        const history = byTicker.get(ticker) || [];
+        const sorted = [...history].sort((a, b) => a.paidOn.slice(0, 10).localeCompare(b.paidOn.slice(0, 10)));
+        const recent = sorted.slice(-4);
+        const avgAmount = recent.length > 0 ? recent.reduce((s, h) => s + h.amount, 0) / recent.length : 0;
+
+        const normalizedSym = normalizeTicker(ticker);
+        const fmpDates = fmpData.get(normalizedSym);
+
+        if (fmpDates && fmpDates.length > 0) {
+          for (const payDate of fmpDates) {
+            const d = new Date(payDate);
+            if (d > today && d <= maxDate) {
+              projections.push({ ticker, amount: avgAmount, date: payDate, frequency: "declared", source: "declared" });
+            }
+          }
+        } else if (sorted.length >= 2) {
+          const dates = sorted.map(h => h.paidOn.slice(0, 10));
+          const { label, days } = detectFrequencyFmp(dates);
+          const lastDate = new Date(dates[dates.length - 1]);
+          let next = new Date(lastDate);
+          next.setDate(next.getDate() + days);
+          let count = 0;
+          while (count < 3 && next <= maxDate) {
+            if (next > today) {
+              projections.push({ ticker, amount: avgAmount, date: next.toISOString().slice(0, 10), frequency: label, source: "estimated" });
+              count++;
+            }
+            const n2 = new Date(next);
+            n2.setDate(n2.getDate() + days);
+            next = n2;
+          }
+        }
+      }
+
+      res.json({ payments, projections, hasFmpKey });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
