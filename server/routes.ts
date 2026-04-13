@@ -193,6 +193,22 @@ export async function registerRoutes(
     }
   });
 
+  app.patch('/api/platforms/:id/growth-pct', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.id);
+      const { pct } = req.body;
+      const parsed = pct === null || pct === undefined ? null : Number(pct);
+      if (parsed !== null && isNaN(parsed)) {
+        return res.status(400).json({ message: "pct must be a number or null" });
+      }
+      await storage.updatePlatformGrowthPct(platformId, userId, parsed);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(404).json({ message: err.message ?? "Platform not found" });
+    }
+  });
+
   app.delete('/api/platforms/:id', requireAuth, async (req, res) => {
     try {
       const userId = getAuthenticatedUserId(req)!;
@@ -3293,18 +3309,6 @@ export async function registerRoutes(
       const userPlatforms = await storage.getPlatforms(userId);
       const userValuations = await storage.getAllValuationsForUser(userId);
 
-      // Parse optional per-platform growth rate overrides: ?overrides=1:8,2:5 (annual % per platform ID)
-      const overridesRaw = typeof req.query.overrides === 'string' ? req.query.overrides : '';
-      const growthOverrides = new Map<number, number>();
-      if (overridesRaw) {
-        for (const pair of overridesRaw.split(',')) {
-          const [idStr, rateStr] = pair.split(':');
-          const id = parseInt(idStr, 10);
-          const rate = parseFloat(rateStr);
-          if (!isNaN(id) && !isNaN(rate)) growthOverrides.set(id, rate);
-        }
-      }
-
       // Build month labels for the next 12 months starting from next month
       const now = new Date();
       const monthLabels: { label: string; year: number; month: number }[] = [];
@@ -3322,6 +3326,7 @@ export async function registerRoutes(
         endValue: number;
         totalIncome: number;
         method: string;
+        expectedGrowthPct: number | null;
         monthlyValues: number[];
         monthlyIncome: number[];
       }[] = [];
@@ -3382,6 +3387,7 @@ export async function registerRoutes(
             endValue: monthlyValues[11] ?? 0,
             totalIncome: monthlyIncome.reduce((a, b) => a + b, 0),
             method: 'Asset Yields',
+            expectedGrowthPct: null,
             monthlyValues,
             monthlyIncome,
           });
@@ -3403,43 +3409,27 @@ export async function registerRoutes(
           // Use valuations within the last 6 months, up to 6 records, for rate derivation
           const recentVals = platformVals.filter(v => new Date(v.date) >= sixMonthsAgo).slice(0, 6);
 
-          if (recentVals.length < 2) {
+          const storedPct = platform.expectedGrowthPct !== null && platform.expectedGrowthPct !== undefined
+            ? Number(platform.expectedGrowthPct)
+            : null;
+
+          if (storedPct === null) {
+            // No growth rate set — hold flat and prompt the user to set one
             platformProjections.push({
               platformId: platform.id,
               name: platform.name,
               category: platform.category,
               endValue: latestValue,
               totalIncome: 0,
-              method: 'Held Flat (insufficient history)',
+              method: 'Rate Not Set',
+              expectedGrowthPct: null,
               monthlyValues: Array(12).fill(latestValue),
               monthlyIncome: Array(12).fill(0),
             });
             continue;
           }
 
-          const growthRates: number[] = [];
-          for (let j = 0; j < recentVals.length - 1; j++) {
-            const newer = Number(recentVals[j].value);
-            const older = Number(recentVals[j + 1].value);
-            const daysDiff = (new Date(recentVals[j].date).getTime() - new Date(recentVals[j + 1].date).getTime()) / (1000 * 60 * 60 * 24);
-            if (older > 0 && daysDiff > 0) {
-              growthRates.push((newer / older) ** (30 / daysDiff) - 1);
-            }
-          }
-
-          const historicalMonthlyRate = growthRates.length > 0
-            ? growthRates.reduce((a, b) => a + b, 0) / growthRates.length
-            : 0;
-
-          const customAnnualPct = growthOverrides.get(platform.id);
-          const avgMonthlyRate = customAnnualPct !== undefined
-            ? (customAnnualPct / 100) / 12
-            : historicalMonthlyRate;
-
-          const methodLabel = customAnnualPct !== undefined
-            ? `Custom: ${customAnnualPct}%/yr`
-            : 'Historical Growth Rate';
-
+          const avgMonthlyRate = (storedPct / 100) / 12;
           const monthlyValues: number[] = [];
           for (let i = 0; i < 12; i++) {
             monthlyValues.push(latestValue * (1 + avgMonthlyRate) ** (i + 1));
@@ -3451,7 +3441,8 @@ export async function registerRoutes(
             category: platform.category,
             endValue: monthlyValues[11] ?? latestValue,
             totalIncome: 0,
-            method: methodLabel,
+            method: `${storedPct}%/yr`,
+            expectedGrowthPct: storedPct,
             monthlyValues,
             monthlyIncome: Array(12).fill(0),
           });
@@ -3475,6 +3466,7 @@ export async function registerRoutes(
             endValue: currentItemValue,
             totalIncome: 0,
             method: 'Held Flat (item valuations)',
+            expectedGrowthPct: null,
             monthlyValues: Array(12).fill(currentItemValue),
             monthlyIncome: Array(12).fill(0),
           });

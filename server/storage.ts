@@ -54,6 +54,7 @@ export interface IStorage {
   getPlatform(id: number, userId: number): Promise<PlatformResponse | undefined>;
   createPlatform(platform: InsertPlatform, userId: number): Promise<Platform>;
   updatePlatform(id: number, platform: Partial<InsertPlatform>, userId: number): Promise<Platform>;
+  updatePlatformGrowthPct(platformId: number, userId: number, pct: number | null): Promise<void>;
   deletePlatform(id: number, userId: number): Promise<void>;
 
   // Investments (require platform ownership verification in routes)
@@ -318,6 +319,14 @@ export class DatabaseStorage implements IStorage {
       .returning();
     if (!updated) throw new Error("Platform not found");
     return updated;
+  }
+
+  async updatePlatformGrowthPct(platformId: number, userId: number, pct: number | null): Promise<void> {
+    const [updated] = await db.update(platforms)
+      .set({ expectedGrowthPct: pct !== null ? String(pct) : null })
+      .where(and(eq(platforms.id, platformId), eq(platforms.userId, userId)))
+      .returning();
+    if (!updated) throw new Error("Platform not found");
   }
 
   async deletePlatform(id: number, userId: number): Promise<void> {
