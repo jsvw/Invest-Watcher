@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingUp, DollarSign, Percent, Info, Pencil, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 
 interface ForecastMonth {
   label: string;
@@ -136,7 +136,12 @@ export default function Forecast() {
     staleTime: 0,
   });
 
+  const isMounted = useRef(false);
   useEffect(() => {
+    if (!isMounted.current) {
+      isMounted.current = true;
+      return;
+    }
     refetch();
   }, [forecastUrl]);
 
