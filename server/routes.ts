@@ -45,17 +45,17 @@ function detectFrequencyFmp(sortedDates: string[]): { label: string; days: numbe
   return { label: "annual", days: 365 };
 }
 
-let _fmpDivCache: { data: Map<string, string[]>; timestamp: number } | null = null;
+let _fmpDivCache: { data: Map<string, string[]>; fromKey: string; timestamp: number } | null = null;
 
 async function getFmpDividendCalendar(): Promise<Map<string, string[]>> {
   const apiKey = process.env.FMP_API_KEY;
   if (!apiKey) return new Map();
   const now = Date.now();
-  if (_fmpDivCache && now - _fmpDivCache.timestamp < 24 * 60 * 60 * 1000) {
+  const from = new Date().toISOString().slice(0, 10);
+  if (_fmpDivCache && _fmpDivCache.fromKey === from && now - _fmpDivCache.timestamp < 24 * 60 * 60 * 1000) {
     return _fmpDivCache.data;
   }
   try {
-    const from = new Date().toISOString().slice(0, 10);
     const toDate = new Date();
     toDate.setMonth(toDate.getMonth() + 6);
     const to = toDate.toISOString().slice(0, 10);
@@ -73,7 +73,7 @@ async function getFmpDividendCalendar(): Promise<Map<string, string[]>> {
       if (!map.has(sym)) map.set(sym, []);
       map.get(sym)!.push(item.paymentDate);
     }
-    _fmpDivCache = { data: map, timestamp: now };
+    _fmpDivCache = { data: map, fromKey: from, timestamp: now };
     console.log(`[FMP] Loaded ${items.length} dividend calendar entries for ${map.size} symbols`);
     return map;
   } catch (err: any) {
