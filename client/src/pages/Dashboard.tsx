@@ -618,6 +618,7 @@ export default function Dashboard() {
         forecastProfit: fp,
         forecastProfitIncrease: fp - (last.value - last.invested),
         forecastPctChange: last.value > 0 ? ((forecastValue - last.value) / last.value) * 100 : 0,
+        forecastValueIncrease: forecastValue - last.value,
         investedPerMonth: forecastMonthlyInvest,
         investedIncrease: forecastMonthlyInvest * period,
       };
@@ -1104,6 +1105,11 @@ export default function Dashboard() {
           const forecastRatePct = isForecastLine && forecastCombined
             ? (forecastCombined.avgMonthlyRate * 100)
             : null;
+          const rowIncrease = isForecastLine
+            ? (d?.forecastValueIncrease != null && d.forecastValueIncrease !== 0 ? d.forecastValueIncrease as number : null)
+            : isForecastInvested
+              ? (d?.investedIncrease != null && d.investedIncrease !== 0 ? d.investedIncrease as number : null)
+              : null;
           return (
             <div key={entry.dataKey} className="flex items-center justify-between gap-6 py-0.5">
               <div className="flex items-center gap-2">
@@ -1133,6 +1139,11 @@ export default function Dashboard() {
                     {delta >= 0 ? '+' : ''}{formatCurrency(delta, currency)}{deltaIsMonthly ? '/mo' : ''}
                   </span>
                 )}
+                {rowIncrease != null && (
+                  <span className={cn("ml-2 text-[10px] font-medium", rowIncrease >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                    ({rowIncrease >= 0 ? '+' : ''}{formatCurrency(rowIncrease, currency)})
+                  </span>
+                )}
               </div>
             </div>
           );
@@ -1141,9 +1152,16 @@ export default function Dashboard() {
           <div className="border-t border-border mt-2 pt-2">
             <div className="flex items-center justify-between gap-6 py-0.5">
               <span className="text-muted-foreground text-xs">Net P&amp;L</span>
-              <span className={cn("text-xs font-semibold", d.forecastProfit >= 0 ? "text-emerald-500" : "text-rose-500")}>
-                {d.forecastProfit >= 0 ? '+' : ''}{formatCurrency(d.forecastProfit, currency)}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className={cn("text-xs font-semibold", d.forecastProfit >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                  {d.forecastProfit >= 0 ? '+' : ''}{formatCurrency(d.forecastProfit, currency)}
+                </span>
+                {d.forecastProfitIncrease != null && d.forecastProfitIncrease !== 0 && (
+                  <span className={cn("text-[10px] font-medium", d.forecastProfitIncrease >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                    ({d.forecastProfitIncrease >= 0 ? '+' : ''}{formatCurrency(d.forecastProfitIncrease, currency)})
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         )}
