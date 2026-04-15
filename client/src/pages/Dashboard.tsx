@@ -242,7 +242,7 @@ export default function Dashboard() {
   const [displayedChartValueMode, setDisplayedChartValueMode] = useState<"value" | "pct">("value");
   const [displayedChartAggregation, setDisplayedChartAggregation] = useState<"month" | "quarter" | "year">("month");
   const [chartFading, setChartFading] = useState(false);
-  const [forecastRange, setForecastRange] = useState<null | "3m" | "1y" | "3q" | "2y" | "5y">(null);
+  const [forecastRange, setForecastRange] = useState<null | "3m" | "1y" | "3q" | "2y" | "5y" | "10y" | "20y" | "30y" | "40y">(null);
   const [forecastMonthlyInvest, setForecastMonthlyInvest] = useState<number>(0);
 
   // ── Allocation targets state ─────────────────────────────────────────────
@@ -580,7 +580,7 @@ export default function Dashboard() {
   // ── Computed: forecast extension from historical avg monthly return ───────
   const forecastCombined = useMemo(() => {
     if (!forecastRange || chartData.length < 2) return null;
-    const FORECAST_MONTHS: Record<string, number> = { "3m": 3, "3q": 9, "1y": 12, "2y": 24, "5y": 60 };
+    const FORECAST_MONTHS: Record<string, number> = { "3m": 3, "3q": 9, "1y": 12, "2y": 24, "5y": 60, "10y": 120, "20y": 240, "30y": 360, "40y": 480 };
     const months = FORECAST_MONTHS[forecastRange] ?? 3;
 
     // Average net profit rate over last 12 months (strip out new capital flows)
@@ -1443,9 +1443,9 @@ export default function Dashboard() {
                   </div>
                 )}
                 <Tabs
-                  value={forecastRange ? `forecast-${forecastRange}` : (range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range)}
+                  value={forecastRange ? (["10y","20y","30y","40y"].includes(forecastRange) ? "forecast-5y" : `forecast-${forecastRange}`) : (range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range)}
                   onValueChange={val => {
-                    const FORECAST_MAP: Record<string, "3m" | "3q" | "1y" | "2y" | "5y"> = {
+                    const FORECAST_MAP: Record<string, "3m" | "3q" | "1y" | "2y" | "5y" | "10y" | "20y" | "30y" | "40y"> = {
                       "forecast-3m": "3m", "forecast-3q": "3q", "forecast-1y": "1y", "forecast-2y": "2y", "forecast-5y": "5y",
                     };
                     if (val in FORECAST_MAP) {
@@ -1466,9 +1466,31 @@ export default function Dashboard() {
                         : chartAggregation === "year"
                           ? [{ value: "forecast-1y", label: "+1Y" }, { value: "forecast-5y", label: "+5Y" }]
                           : [{ value: "forecast-3m", label: "+3M" }, { value: "forecast-1y", label: "+1Y" }];
-                      return opts.map(o => (
-                        <TabsTrigger key={o.value} value={o.value} data-testid={`button-${o.value}`}>{o.label}</TabsTrigger>
-                      ));
+                      return opts.map(o => {
+                        if (o.value === "forecast-5y") {
+                          return (
+                            <div key={o.value} className="relative group/longrange">
+                              <TabsTrigger value={o.value} data-testid="button-forecast-5y">{o.label}</TabsTrigger>
+                              <div className="absolute top-full right-0 z-50 pt-1 hidden group-hover/longrange:flex flex-col min-w-[4rem] bg-popover border border-border rounded-md shadow-md overflow-hidden">
+                                {(["10y","20y","30y","40y"] as const).map(yr => (
+                                  <button
+                                    key={yr}
+                                    data-testid={`button-forecast-${yr}`}
+                                    onClick={() => { setForecastRange(yr); setRange("all"); setSpecificYear(null); setSpecificMonth(null); setChartType("line"); }}
+                                    className={cn(
+                                      "px-3 py-1.5 text-xs font-medium text-left hover:bg-muted transition-colors",
+                                      forecastRange === yr ? "text-foreground bg-muted" : "text-muted-foreground"
+                                    )}
+                                  >
+                                    +{yr.toUpperCase()}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return <TabsTrigger key={o.value} value={o.value} data-testid={`button-${o.value}`}>{o.label}</TabsTrigger>;
+                      });
                     })()}
                   </TabsList>
                 </Tabs>
