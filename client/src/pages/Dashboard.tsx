@@ -1137,12 +1137,12 @@ export default function Dashboard() {
             </div>
           );
         })}
-        {d?.forecastProfitIncrease != null && d?.forecastProfitIncrease !== 0 && d?.value === null && (
+        {d?.forecastProfit != null && d?.value === null && (
           <div className="border-t border-border mt-2 pt-2">
             <div className="flex items-center justify-between gap-6 py-0.5">
               <span className="text-muted-foreground text-xs">Net P&amp;L</span>
-              <span className={cn("text-xs font-semibold", d.forecastProfitIncrease >= 0 ? "text-emerald-500" : "text-rose-500")}>
-                {d.forecastProfitIncrease >= 0 ? '+' : ''}{formatCurrency(d.forecastProfitIncrease, currency)}
+              <span className={cn("text-xs font-semibold", d.forecastProfit >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                {d.forecastProfit >= 0 ? '+' : ''}{formatCurrency(d.forecastProfit, currency)}
               </span>
             </div>
           </div>
