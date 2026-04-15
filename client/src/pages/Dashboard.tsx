@@ -1101,8 +1101,8 @@ export default function Dashboard() {
           const investedIncrease = isForecastInvested && d?.investedIncrease != null && d.investedIncrease !== 0
             ? d.investedIncrease as number
             : null;
-          const forecastPctChange = isForecastLine && d?.forecastPctChange != null && d.forecastPctChange !== 0
-            ? d.forecastPctChange as number
+          const forecastRatePct = isForecastLine && forecastCombined
+            ? (forecastCombined.avgMonthlyRate * 100)
             : null;
           return (
             <div key={entry.dataKey} className="flex items-center justify-between gap-6 py-0.5">
@@ -1114,9 +1114,9 @@ export default function Dashboard() {
                     (+{formatCurrency(investedIncrease, currency)})
                   </span>
                 )}
-                {forecastPctChange != null && (
-                  <span className={cn("text-[10px] font-medium", forecastPctChange >= 0 ? "text-emerald-500" : "text-rose-500")}>
-                    ({forecastPctChange >= 0 ? '+' : ''}{forecastPctChange.toFixed(1)}%)
+                {forecastRatePct != null && (
+                  <span className="text-[10px] font-medium text-muted-foreground">
+                    ({forecastRatePct >= 0 ? '+' : ''}{forecastRatePct.toFixed(2)}%/mo)
                   </span>
                 )}
               </div>
