@@ -1727,10 +1727,7 @@ export default function Dashboard() {
                       ...p,
                       timestamp: new Date(p.date).getTime(),
                     }));
-                    const ratePct = (forecastCombined.avgMonthlyRate * 100).toFixed(2);
-                    const forecastLabel = forecastMonthlyInvest > 0
-                      ? `Forecast (${ratePct}%/mo · +${getCurrencySymbol(currency)}${forecastMonthlyInvest.toLocaleString()}/mo)`
-                      : `Forecast (${ratePct}%/mo avg)`;
+                    const forecastLabel = 'Forecast';
                     return (
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={fcData}>
