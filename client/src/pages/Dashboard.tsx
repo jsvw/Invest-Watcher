@@ -617,6 +617,7 @@ export default function Dashboard() {
         forecast: forecastValue,
         forecastProfit: fp,
         forecastProfitIncrease: fp - (last.value - last.invested),
+        forecastPctChange: last.value > 0 ? ((forecastValue - last.value) / last.value) * 100 : 0,
         investedPerMonth: forecastMonthlyInvest,
         investedIncrease: forecastMonthlyInvest * period,
       };
@@ -1100,8 +1101,8 @@ export default function Dashboard() {
           const investedIncrease = isForecastInvested && d?.investedIncrease != null && d.investedIncrease !== 0
             ? d.investedIncrease as number
             : null;
-          const forecastProfit = isForecastLine && d?.forecastProfit != null && d.forecastProfit !== 0
-            ? d.forecastProfit as number
+          const forecastPctChange = isForecastLine && d?.forecastPctChange != null && d.forecastPctChange !== 0
+            ? d.forecastPctChange as number
             : null;
           return (
             <div key={entry.dataKey} className="flex items-center justify-between gap-6 py-0.5">
@@ -1113,9 +1114,9 @@ export default function Dashboard() {
                     (+{formatCurrency(investedIncrease, currency)})
                   </span>
                 )}
-                {forecastProfit != null && (
-                  <span className={cn("text-[10px] font-medium", forecastProfit >= 0 ? "text-emerald-500" : "text-rose-500")}>
-                    ({forecastProfit >= 0 ? '+' : ''}{formatCurrency(forecastProfit, currency)})
+                {forecastPctChange != null && (
+                  <span className={cn("text-[10px] font-medium", forecastPctChange >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                    ({forecastPctChange >= 0 ? '+' : ''}{forecastPctChange.toFixed(1)}%)
                   </span>
                 )}
               </div>
