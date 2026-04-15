@@ -618,6 +618,7 @@ export default function Dashboard() {
         forecastProfit: fp,
         forecastProfitIncrease: fp - (last.value - last.invested),
         investedPerMonth: forecastMonthlyInvest,
+        investedIncrease: forecastMonthlyInvest * period,
       };
     });
 
@@ -628,6 +629,7 @@ export default function Dashboard() {
       forecastProfit: last.value - last.invested,
       forecastProfitIncrease: 0,
       investedPerMonth: forecastMonthlyInvest,
+      investedIncrease: 0,
     };
 
     return { points: [...actual, ...projected], avgMonthlyRate };
@@ -1091,17 +1093,26 @@ export default function Dashboard() {
             : entry.dataKey === 'gain' ? 'gainChange'
             : null;
           const isForecastPoint = d?.forecastProfit != null && d?.value === null;
+          const isForecastInvested = entry.dataKey === 'invested' && isForecastPoint;
           const delta = entry.dataKey === 'forecast' && d?.forecastProfit != null
             ? d.forecastProfit
-            : entry.dataKey === 'invested' && isForecastPoint && d?.investedPerMonth != null
-              ? d.investedPerMonth
-              : deltaKey ? d?.[deltaKey] : null;
-          const deltaIsMonthly = entry.dataKey === 'invested' && isForecastPoint && d?.investedPerMonth != null;
+            : !isForecastInvested && deltaKey
+              ? d?.[deltaKey]
+              : null;
+          const deltaIsMonthly = false;
+          const investedIncrease = isForecastInvested && d?.investedIncrease != null && d.investedIncrease !== 0
+            ? d.investedIncrease as number
+            : null;
           return (
             <div key={entry.dataKey} className="flex items-center justify-between gap-6 py-0.5">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
                 <span className="text-muted-foreground">{entry.name}</span>
+                {investedIncrease != null && (
+                  <span className="text-[10px] font-medium text-emerald-500">
+                    (+{formatCurrency(investedIncrease, currency)})
+                  </span>
+                )}
               </div>
               <div className="text-right">
                 <span className="font-semibold text-foreground">
