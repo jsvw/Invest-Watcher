@@ -609,12 +609,14 @@ export default function Dashboard() {
         ? last.value + forecastMonthlyInvest * period
         : last.value * growth + forecastMonthlyInvest * (growth - 1) / avgMonthlyRate;
       const projectedInvested = last.invested + forecastMonthlyInvest * period;
+      const fp = forecastValue - projectedInvested;
       return {
         date: format(d, 'yyyy-MM-dd'),
         value: null as number | null,
         invested: projectedInvested,
         forecast: forecastValue,
-        forecastProfit: forecastValue - projectedInvested,
+        forecastProfit: fp,
+        forecastProfitIncrease: fp - (last.value - last.invested),
         investedPerMonth: forecastMonthlyInvest,
       };
     });
@@ -624,6 +626,7 @@ export default function Dashboard() {
       ...actual[actual.length - 1],
       forecast: last.value,
       forecastProfit: last.value - last.invested,
+      forecastProfitIncrease: 0,
       investedPerMonth: forecastMonthlyInvest,
     };
 
@@ -1121,9 +1124,16 @@ export default function Dashboard() {
           <div className="border-t border-border mt-2 pt-2">
             <div className="flex items-center justify-between gap-6 py-0.5">
               <span className="text-muted-foreground text-xs">Net P&amp;L</span>
-              <span className={cn("text-xs font-semibold", d.forecastProfit >= 0 ? "text-emerald-500" : "text-rose-500")}>
-                {d.forecastProfit >= 0 ? '+' : ''}{formatCurrency(d.forecastProfit, currency)}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className={cn("text-xs font-semibold", d.forecastProfit >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                  {d.forecastProfit >= 0 ? '+' : ''}{formatCurrency(d.forecastProfit, currency)}
+                </span>
+                {d.forecastProfitIncrease != null && d.forecastProfitIncrease !== 0 && (
+                  <span className={cn("text-[10px] font-medium", d.forecastProfitIncrease >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                    ({d.forecastProfitIncrease >= 0 ? '+' : ''}{formatCurrency(d.forecastProfitIncrease, currency)})
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         )}
