@@ -608,18 +608,24 @@ export default function Dashboard() {
       const forecastValue = Math.abs(avgMonthlyRate) < 1e-10
         ? last.value + forecastMonthlyInvest * period
         : last.value * growth + forecastMonthlyInvest * (growth - 1) / avgMonthlyRate;
+      const projectedInvested = last.invested + forecastMonthlyInvest * period;
       return {
         date: format(d, 'yyyy-MM-dd'),
         value: null as number | null,
-        invested: last.invested + forecastMonthlyInvest * period,
+        invested: projectedInvested,
         forecast: forecastValue,
-        forecastVsToday: forecastValue - last.value,
-        investedVsToday: forecastMonthlyInvest * period,
+        forecastProfit: forecastValue - projectedInvested,
+        investedPerMonth: forecastMonthlyInvest,
       };
     });
 
-    // Transition point: last actual also seeds the forecast line (vsToday = 0)
-    actual[actual.length - 1] = { ...actual[actual.length - 1], forecast: last.value, forecastVsToday: 0, investedVsToday: 0 };
+    // Transition point: last actual also seeds the forecast line
+    actual[actual.length - 1] = {
+      ...actual[actual.length - 1],
+      forecast: last.value,
+      forecastProfit: last.value - last.invested,
+      investedPerMonth: forecastMonthlyInvest,
+    };
 
     return { points: [...actual, ...projected], avgMonthlyRate };
   }, [forecastRange, forecastMonthlyInvest, chartData]);
@@ -1074,9 +1080,6 @@ export default function Dashboard() {
     return (
       <div className="rounded-xl border border-border bg-card shadow-lg px-4 py-3 text-sm min-w-[220px]">
         <p className="font-semibold text-foreground mb-2">{fmtTooltipLabel(label)}</p>
-        {d?.forecastVsToday != null && d?.value === null && (
-          <p className="text-[10px] text-amber-500 font-medium uppercase tracking-wide mb-1.5">Δ vs today</p>
-        )}
         {payload.map((entry: any) => {
           const isPct = entry.dataKey === 'gainPct' || entry.dataKey === 'monthlyChangePct';
           const isSigned = entry.dataKey === 'monthlyChange' || entry.dataKey === 'gain' || isPct;
@@ -1084,12 +1087,13 @@ export default function Dashboard() {
             : entry.dataKey === 'invested' ? 'investedChange'
             : entry.dataKey === 'gain' ? 'gainChange'
             : null;
-          // In forecast mode, prefer vsToday deltas over month-over-month
-          const delta = entry.dataKey === 'forecast' && d?.forecastVsToday != null
-            ? d.forecastVsToday
-            : entry.dataKey === 'invested' && d?.investedVsToday != null
-              ? d.investedVsToday
+          const isForecastPoint = d?.forecastProfit != null && d?.value === null;
+          const delta = entry.dataKey === 'forecast' && d?.forecastProfit != null
+            ? d.forecastProfit
+            : entry.dataKey === 'invested' && isForecastPoint && d?.investedPerMonth != null
+              ? d.investedPerMonth
               : deltaKey ? d?.[deltaKey] : null;
+          const deltaIsMonthly = entry.dataKey === 'invested' && isForecastPoint && d?.investedPerMonth != null;
           return (
             <div key={entry.dataKey} className="flex items-center justify-between gap-6 py-0.5">
               <div className="flex items-center gap-2">
@@ -1106,7 +1110,7 @@ export default function Dashboard() {
                 </span>
                 {delta != null && delta !== 0 && (
                   <span className={cn("ml-2 text-xs font-medium", delta >= 0 ? "text-emerald-500" : "text-rose-500")}>
-                    {delta >= 0 ? '+' : ''}{formatCurrency(delta, currency)}
+                    {delta >= 0 ? '+' : ''}{formatCurrency(delta, currency)}{deltaIsMonthly ? '/mo' : ''}
                   </span>
                 )}
               </div>
