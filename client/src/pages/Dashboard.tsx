@@ -1098,8 +1098,8 @@ export default function Dashboard() {
           const isForecastLine = entry.dataKey === 'forecast' && isForecastPoint;
           const delta = !isForecastInvested && !isForecastLine && deltaKey ? d?.[deltaKey] : null;
           const deltaIsMonthly = false;
-          const investedIncrease = isForecastInvested && d?.investedIncrease != null && d.investedIncrease !== 0
-            ? d.investedIncrease as number
+          const investedPerMonth = isForecastInvested && d?.investedPerMonth != null && d.investedPerMonth !== 0
+            ? d.investedPerMonth as number
             : null;
           const forecastRatePct = isForecastLine && forecastCombined
             ? (forecastCombined.avgMonthlyRate * 100)
@@ -1109,9 +1109,9 @@ export default function Dashboard() {
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
                 <span className="text-muted-foreground">{entry.name}</span>
-                {investedIncrease != null && (
+                {investedPerMonth != null && (
                   <span className="text-[10px] font-medium text-emerald-500">
-                    (+{formatCurrency(investedIncrease, currency)})
+                    (+{formatCurrency(investedPerMonth, currency)}/mo)
                   </span>
                 )}
                 {forecastRatePct != null && (
