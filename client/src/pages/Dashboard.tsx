@@ -1559,9 +1559,9 @@ export default function Dashboard() {
                 </Tabs>
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
-                    <button onClick={() => { setChartAggregation("month"); setForecastRange(null); setForecastMonthlyInvest(0); }} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "month" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-month">Mo</button>
-                    <button onClick={() => { setChartAggregation("quarter"); setForecastRange(null); setForecastMonthlyInvest(0); }} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "quarter" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-quarter">Qtr</button>
-                    <button onClick={() => { setChartAggregation("year"); setForecastRange(null); setForecastMonthlyInvest(0); }} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "year" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-year">Yr</button>
+                    <button onClick={() => setChartAggregation("month")} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "month" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-month">Mo</button>
+                    <button onClick={() => setChartAggregation("quarter")} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "quarter" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-quarter">Qtr</button>
+                    <button onClick={() => setChartAggregation("year")} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "year" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-year">Yr</button>
                   </div>
                   {chartView !== "overview" && (
                     <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
