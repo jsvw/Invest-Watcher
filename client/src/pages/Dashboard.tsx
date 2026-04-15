@@ -613,11 +613,13 @@ export default function Dashboard() {
         value: null as number | null,
         invested: last.invested + forecastMonthlyInvest * period,
         forecast: forecastValue,
+        forecastVsToday: forecastValue - last.value,
+        investedVsToday: forecastMonthlyInvest * period,
       };
     });
 
-    // Transition point: last actual also seeds the forecast line
-    actual[actual.length - 1] = { ...actual[actual.length - 1], forecast: last.value };
+    // Transition point: last actual also seeds the forecast line (vsToday = 0)
+    actual[actual.length - 1] = { ...actual[actual.length - 1], forecast: last.value, forecastVsToday: 0, investedVsToday: 0 };
 
     return { points: [...actual, ...projected], avgMonthlyRate };
   }, [forecastRange, forecastMonthlyInvest, chartData]);
@@ -1072,6 +1074,9 @@ export default function Dashboard() {
     return (
       <div className="rounded-xl border border-border bg-card shadow-lg px-4 py-3 text-sm min-w-[220px]">
         <p className="font-semibold text-foreground mb-2">{fmtTooltipLabel(label)}</p>
+        {d?.forecastVsToday != null && d?.value === null && (
+          <p className="text-[10px] text-amber-500 font-medium uppercase tracking-wide mb-1.5">Δ vs today</p>
+        )}
         {payload.map((entry: any) => {
           const isPct = entry.dataKey === 'gainPct' || entry.dataKey === 'monthlyChangePct';
           const isSigned = entry.dataKey === 'monthlyChange' || entry.dataKey === 'gain' || isPct;
@@ -1079,7 +1084,12 @@ export default function Dashboard() {
             : entry.dataKey === 'invested' ? 'investedChange'
             : entry.dataKey === 'gain' ? 'gainChange'
             : null;
-          const delta = deltaKey ? d?.[deltaKey] : null;
+          // In forecast mode, prefer vsToday deltas over month-over-month
+          const delta = entry.dataKey === 'forecast' && d?.forecastVsToday != null
+            ? d.forecastVsToday
+            : entry.dataKey === 'invested' && d?.investedVsToday != null
+              ? d.investedVsToday
+              : deltaKey ? d?.[deltaKey] : null;
           return (
             <div key={entry.dataKey} className="flex items-center justify-between gap-6 py-0.5">
               <div className="flex items-center gap-2">
