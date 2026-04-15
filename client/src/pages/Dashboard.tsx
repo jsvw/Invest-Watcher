@@ -1121,7 +1121,7 @@ export default function Dashboard() {
                   </span>
                 )}
                 {forecastRatePct != null && (
-                  <span className="text-[10px] font-medium text-muted-foreground">
+                  <span className={cn("text-[10px] font-medium", forecastRatePct >= 0 ? "text-emerald-500" : "text-rose-500")}>
                     ({forecastRatePct >= 0 ? '+' : ''}{forecastRatePct.toFixed(2)}%/mo)
                   </span>
                 )}
