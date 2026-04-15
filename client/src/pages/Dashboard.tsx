@@ -1094,14 +1094,14 @@ export default function Dashboard() {
             : null;
           const isForecastPoint = d?.forecastProfit != null && d?.value === null;
           const isForecastInvested = entry.dataKey === 'invested' && isForecastPoint;
-          const delta = entry.dataKey === 'forecast' && d?.forecastProfit != null
-            ? d.forecastProfit
-            : !isForecastInvested && deltaKey
-              ? d?.[deltaKey]
-              : null;
+          const isForecastLine = entry.dataKey === 'forecast' && isForecastPoint;
+          const delta = !isForecastInvested && !isForecastLine && deltaKey ? d?.[deltaKey] : null;
           const deltaIsMonthly = false;
           const investedIncrease = isForecastInvested && d?.investedIncrease != null && d.investedIncrease !== 0
             ? d.investedIncrease as number
+            : null;
+          const forecastProfit = isForecastLine && d?.forecastProfit != null && d.forecastProfit !== 0
+            ? d.forecastProfit as number
             : null;
           return (
             <div key={entry.dataKey} className="flex items-center justify-between gap-6 py-0.5">
@@ -1111,6 +1111,11 @@ export default function Dashboard() {
                 {investedIncrease != null && (
                   <span className="text-[10px] font-medium text-emerald-500">
                     (+{formatCurrency(investedIncrease, currency)})
+                  </span>
+                )}
+                {forecastProfit != null && (
+                  <span className={cn("text-[10px] font-medium", forecastProfit >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                    ({forecastProfit >= 0 ? '+' : ''}{formatCurrency(forecastProfit, currency)})
                   </span>
                 )}
               </div>
@@ -1131,20 +1136,13 @@ export default function Dashboard() {
             </div>
           );
         })}
-        {d?.forecastProfit != null && d?.value === null && (
+        {d?.forecastProfitIncrease != null && d?.forecastProfitIncrease !== 0 && d?.value === null && (
           <div className="border-t border-border mt-2 pt-2">
             <div className="flex items-center justify-between gap-6 py-0.5">
               <span className="text-muted-foreground text-xs">Net P&amp;L</span>
-              <div className="flex items-center gap-1.5">
-                <span className={cn("text-xs font-semibold", d.forecastProfit >= 0 ? "text-emerald-500" : "text-rose-500")}>
-                  {d.forecastProfit >= 0 ? '+' : ''}{formatCurrency(d.forecastProfit, currency)}
-                </span>
-                {d.forecastProfitIncrease != null && d.forecastProfitIncrease !== 0 && (
-                  <span className={cn("text-[10px] font-medium", d.forecastProfitIncrease >= 0 ? "text-emerald-500" : "text-rose-500")}>
-                    ({d.forecastProfitIncrease >= 0 ? '+' : ''}{formatCurrency(d.forecastProfitIncrease, currency)})
-                  </span>
-                )}
-              </div>
+              <span className={cn("text-xs font-semibold", d.forecastProfitIncrease >= 0 ? "text-emerald-500" : "text-rose-500")}>
+                {d.forecastProfitIncrease >= 0 ? '+' : ''}{formatCurrency(d.forecastProfitIncrease, currency)}
+              </span>
             </div>
           </div>
         )}
