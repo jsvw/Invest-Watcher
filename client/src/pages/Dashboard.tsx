@@ -243,6 +243,7 @@ export default function Dashboard() {
   const [displayedChartAggregation, setDisplayedChartAggregation] = useState<"month" | "quarter" | "year">("month");
   const [chartFading, setChartFading] = useState(false);
   const [forecastRange, setForecastRange] = useState<null | "3m" | "1y" | "3q" | "2y" | "5y">(null);
+  const [forecastMonthlyInvest, setForecastMonthlyInvest] = useState<number>(0);
 
   // ── Allocation targets state ─────────────────────────────────────────────
   const [localTargets, setLocalTargets] = useState<Record<number, string>>({});
@@ -601,12 +602,17 @@ export default function Dashboard() {
 
     const actual = chartData.map(p => ({ ...p, forecast: null as number | null }));
     const projected = Array.from({ length: months }, (_, i) => {
-      const d = new Date(lastDate.getFullYear(), lastDate.getMonth() + i + 1, lastDate.getDate());
+      const period = i + 1;
+      const d = new Date(lastDate.getFullYear(), lastDate.getMonth() + period, lastDate.getDate());
+      const growth = Math.pow(1 + avgMonthlyRate, period);
+      const forecastValue = Math.abs(avgMonthlyRate) < 1e-10
+        ? last.value + forecastMonthlyInvest * period
+        : last.value * growth + forecastMonthlyInvest * (growth - 1) / avgMonthlyRate;
       return {
         date: format(d, 'yyyy-MM-dd'),
         value: null as number | null,
-        invested: last.invested,
-        forecast: last.value * Math.pow(1 + avgMonthlyRate, i + 1),
+        invested: last.invested + forecastMonthlyInvest * period,
+        forecast: forecastValue,
       };
     });
 
@@ -614,7 +620,7 @@ export default function Dashboard() {
     actual[actual.length - 1] = { ...actual[actual.length - 1], forecast: last.value };
 
     return { points: [...actual, ...projected], avgMonthlyRate };
-  }, [forecastRange, chartData]);
+  }, [forecastRange, forecastMonthlyInvest, chartData]);
 
   // ── Computed: monthly growth series (heatmap-aligned, 10th-to-10th) ─────
   // Uses the same platformBreakdownByMonth data as the heatmap so the
@@ -1383,7 +1389,7 @@ export default function Dashboard() {
                     if (val in FORECAST_MAP) {
                       setForecastRange(FORECAST_MAP[val]); setRange("all"); setSpecificYear(null); setSpecificMonth(null); setChartType("line");
                     } else {
-                      setRange(val); setSpecificYear(null); setSpecificMonth(null); setForecastRange(null);
+                      setRange(val); setSpecificYear(null); setSpecificMonth(null); setForecastRange(null); setForecastMonthlyInvest(0);
                     }
                   }}
                   className="w-auto"
@@ -1404,6 +1410,22 @@ export default function Dashboard() {
                     })()}
                   </TabsList>
                 </Tabs>
+                {forecastRange && (
+                  <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium h-10">
+                    <span className="px-2 text-muted-foreground border-r bg-muted/40 h-full flex items-center select-none">
+                      {getCurrencySymbol(currency)}/mo
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={forecastMonthlyInvest || ""}
+                      onChange={e => setForecastMonthlyInvest(Math.max(0, parseFloat(e.target.value) || 0))}
+                      placeholder="0"
+                      className="w-24 px-2 py-1.5 bg-background outline-none text-foreground placeholder:text-muted-foreground"
+                      data-testid="input-forecast-monthly-invest"
+                    />
+                  </div>
+                )}
                 <div className="flex items-center border rounded-md overflow-hidden">
                   <button
                     onClick={() => setChartType("line")}
@@ -1439,7 +1461,7 @@ export default function Dashboard() {
                   const next = v as typeof chartView;
                   if (next === "all" && chartType === "bar") setChartType("line");
                   if (next !== "overview" && chartType === "waterfall") setChartType("line");
-                  if (next !== "overview") setForecastRange(null);
+                  if (next !== "overview") { setForecastRange(null); setForecastMonthlyInvest(0); }
                   setChartView(next);
                 }}>
                   <TabsList>
@@ -1453,9 +1475,9 @@ export default function Dashboard() {
                 </Tabs>
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
-                    <button onClick={() => { setChartAggregation("month"); setForecastRange(null); }} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "month" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-month">Mo</button>
-                    <button onClick={() => { setChartAggregation("quarter"); setForecastRange(null); }} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "quarter" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-quarter">Qtr</button>
-                    <button onClick={() => { setChartAggregation("year"); setForecastRange(null); }} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "year" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-year">Yr</button>
+                    <button onClick={() => { setChartAggregation("month"); setForecastRange(null); setForecastMonthlyInvest(0); }} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "month" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-month">Mo</button>
+                    <button onClick={() => { setChartAggregation("quarter"); setForecastRange(null); setForecastMonthlyInvest(0); }} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "quarter" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-quarter">Qtr</button>
+                    <button onClick={() => { setChartAggregation("year"); setForecastRange(null); setForecastMonthlyInvest(0); }} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "year" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-year">Yr</button>
                   </div>
                   {chartView !== "overview" && (
                     <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
@@ -1662,6 +1684,9 @@ export default function Dashboard() {
                       timestamp: new Date(p.date).getTime(),
                     }));
                     const ratePct = (forecastCombined.avgMonthlyRate * 100).toFixed(2);
+                    const forecastLabel = forecastMonthlyInvest > 0
+                      ? `Forecast (${ratePct}%/mo · +${getCurrencySymbol(currency)}${forecastMonthlyInvest.toLocaleString()}/mo)`
+                      : `Forecast (${ratePct}%/mo avg)`;
                     return (
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={fcData}>
@@ -1686,7 +1711,7 @@ export default function Dashboard() {
                           <Legend verticalAlign="top" height={36} />
                           <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke="hsl(var(--primary))" strokeWidth={4} dot={false} activeDot={{ r: 6 }} connectNulls={false} animationDuration={350} />
                           <Line type="monotone" dataKey="invested" name="Invested" yAxisId="left" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={false} connectNulls={false} animationDuration={350} />
-                          <Line type="monotone" dataKey="forecast" name={`Forecast (${ratePct}%/mo avg)`} yAxisId="left" stroke="#f59e0b" strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 5 }} connectNulls={false} animationDuration={350} />
+                          <Line type="monotone" dataKey="forecast" name={forecastLabel} yAxisId="left" stroke="#f59e0b" strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 5 }} connectNulls={false} animationDuration={350} />
                         </LineChart>
                       </ResponsiveContainer>
                     );
