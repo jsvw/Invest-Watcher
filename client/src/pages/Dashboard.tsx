@@ -567,7 +567,7 @@ export default function Dashboard() {
     const tenthEndOfDay = new Date(latestY, latestM - 1, 10, 23, 59, 59, 999);
     const pastTenthOfLatestMonth = now > tenthEndOfDay;
 
-    const monthMap = new Map<string, { value: number; invested: number; date: string; dist: number }>();
+    const monthMap = new Map<string, { value: number; invested: number; date: string; dist: number; isLive?: boolean }>();
 
     // Track the best pre-10th and nearest-overall entries for the latest month separately
     let latestMonthPreTenth: { value: number; invested: number; date: string; dist: number } | null = null;
@@ -623,6 +623,7 @@ export default function Dashboard() {
             invested: latestEntry.invested,
             date: `${nextKey}-01`,
             dist: 0,
+            isLive: true,
           });
         }
       }
@@ -634,6 +635,7 @@ export default function Dashboard() {
         date: data.date,
         value: data.value,
         invested: data.invested,
+        isLive: data.isLive,
       }));
   }, [history]);
 

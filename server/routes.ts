@@ -1659,8 +1659,18 @@ export async function registerRoutes(
         return inv - wd;
       };
 
+      interface WaterfallResultItem {
+        period: string;
+        openValue: number;
+        netInvested: number;
+        valueChange: number;
+        closeValue: number;
+        platformBreakdown: { platformId: number; name: string; color: string; netInvested: number; valueChange: number }[];
+        isLive?: boolean;
+      }
+
       const epoch = new Date(0);
-      const result = [];
+      const result: WaterfallResultItem[] = [];
 
       for (let i = 0; i < sortedPeriods.length; i++) {
         const period = sortedPeriods[i];
@@ -1695,26 +1705,26 @@ export async function registerRoutes(
         result.push({ period, openValue, netInvested, valueChange, closeValue, platformBreakdown });
       }
 
-      // Post-10th live-period fix (monthly granularity only): when today is past the
-      // 10th of the current month and the last period is the current month, re-cap that
-      // period's close at the pre-10th anchor and append a synthetic "next month" bar
-      // showing the post-10th gain.
-      if (granularity === 'month' && result.length > 0) {
+      // Post-10th live-period fix: when today is past the 10th of the current calendar
+      // month and the last known period is the current period, re-cap that period's close
+      // at the pre-10th anchor and append a synthetic "next period" bar for post-10th gains.
+      // Applies to all granularities (month, quarter, year).
+      if (result.length > 0) {
         const now = new Date();
         const todayY = now.getFullYear();
         const todayM = now.getMonth() + 1;
-        const todayPeriodKey = `${todayY}-${String(todayM).padStart(2, '0')}`;
+        const todayPeriodKey = toPeriodKey(now);
         const lastPeriod = sortedPeriods[sortedPeriods.length - 1];
 
         if (lastPeriod === todayPeriodKey) {
-          const [py, pm] = lastPeriod.split('-').map(Number);
-          const tenthEndOfDay = new Date(py, pm - 1, 10, 23, 59, 59, 999);
+          // Anchor is always the 10th of the current calendar month
+          const tenthEndOfDay = new Date(todayY, todayM - 1, 10, 23, 59, 59, 999);
 
           if (now > tenthEndOfDay) {
             const hasPostTenth = filteredValuations.some(v => new Date(v.date) > tenthEndOfDay);
 
             if (hasPostTenth) {
-              // Pop the current-month entry and recompute it using tenthEndOfDay as close
+              // Pop the current-period entry and recompute it capped at tenthEndOfDay
               result.pop();
               const li = sortedPeriods.length - 1;
               const prevEndDate = li === 0 ? epoch : getPeriodEndDate(sortedPeriods[li - 1]);
@@ -1741,15 +1751,29 @@ export async function registerRoutes(
                 platformBreakdown: tenthPlatformBreakdown,
               });
 
+              // Derive the next-period key based on granularity
+              let nextPeriodKey: string;
+              if (granularity === 'year') {
+                nextPeriodKey = `${todayY + 1}`;
+              } else if (granularity === 'quarter') {
+                const q = Math.ceil(todayM / 3);
+                if (q === 4) {
+                  nextPeriodKey = `${todayY + 1}-Q1`;
+                } else {
+                  nextPeriodKey = `${todayY}-Q${q + 1}`;
+                }
+              } else {
+                const nextMonth = todayM === 12 ? 1 : todayM + 1;
+                const nextYear = todayM === 12 ? todayY + 1 : todayY;
+                nextPeriodKey = `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
+              }
+
               // Compute the live next-period entry
               const latestValDate = filteredValuations.reduce((latest, v) => {
                 const d = new Date(v.date);
                 return d > latest ? d : latest;
               }, new Date(0));
               const latestCloseValue = getPortfolioValueAtDate(latestValDate);
-              const nextMonth = pm === 12 ? 1 : pm + 1;
-              const nextYear = pm === 12 ? py + 1 : py;
-              const nextPeriodKey = `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
               const liveNetInvested = getNetInvested(tenthEndOfDay, latestValDate);
               const liveValueChange = latestCloseValue - tenthCloseValue - liveNetInvested;
 
@@ -1769,7 +1793,7 @@ export async function registerRoutes(
                 closeValue: latestCloseValue,
                 platformBreakdown: livePlatformBreakdown,
                 isLive: true,
-              } as any);
+              });
             }
           }
         }
