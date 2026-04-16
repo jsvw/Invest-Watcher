@@ -1695,6 +1695,86 @@ export async function registerRoutes(
         result.push({ period, openValue, netInvested, valueChange, closeValue, platformBreakdown });
       }
 
+      // Post-10th live-period fix (monthly granularity only): when today is past the
+      // 10th of the current month and the last period is the current month, re-cap that
+      // period's close at the pre-10th anchor and append a synthetic "next month" bar
+      // showing the post-10th gain.
+      if (granularity === 'month' && result.length > 0) {
+        const now = new Date();
+        const todayY = now.getFullYear();
+        const todayM = now.getMonth() + 1;
+        const todayPeriodKey = `${todayY}-${String(todayM).padStart(2, '0')}`;
+        const lastPeriod = sortedPeriods[sortedPeriods.length - 1];
+
+        if (lastPeriod === todayPeriodKey) {
+          const [py, pm] = lastPeriod.split('-').map(Number);
+          const tenthEndOfDay = new Date(py, pm - 1, 10, 23, 59, 59, 999);
+
+          if (now > tenthEndOfDay) {
+            const hasPostTenth = filteredValuations.some(v => new Date(v.date) > tenthEndOfDay);
+
+            if (hasPostTenth) {
+              // Pop the current-month entry and recompute it using tenthEndOfDay as close
+              result.pop();
+              const li = sortedPeriods.length - 1;
+              const prevEndDate = li === 0 ? epoch : getPeriodEndDate(sortedPeriods[li - 1]);
+
+              const tenthCloseValue = getPortfolioValueAtDate(tenthEndOfDay);
+              const tenthOpenValue = li === 0 ? 0 : getPortfolioValueAtDate(prevEndDate);
+              const tenthNetInvested = getNetInvested(prevEndDate, tenthEndOfDay);
+              const tenthValueChange = tenthCloseValue - tenthOpenValue - tenthNetInvested;
+
+              const tenthPlatformBreakdown = filteredPlatforms.map(p => {
+                const pNetInvested = getPlatformNetInvested(p.id, prevEndDate, tenthEndOfDay);
+                const pOpenValue = li === 0 ? 0 : getPlatformValueAtDate(p.id, prevEndDate);
+                const pCloseValue = getPlatformValueAtDate(p.id, tenthEndOfDay);
+                const pValueChange = pCloseValue - pOpenValue - pNetInvested;
+                return { platformId: p.id, name: p.name, color: p.color, netInvested: pNetInvested, valueChange: pValueChange };
+              }).filter(pb => Math.abs(pb.netInvested) > 0.001 || Math.abs(pb.valueChange) > 0.001);
+
+              result.push({
+                period: lastPeriod,
+                openValue: tenthOpenValue,
+                netInvested: tenthNetInvested,
+                valueChange: tenthValueChange,
+                closeValue: tenthCloseValue,
+                platformBreakdown: tenthPlatformBreakdown,
+              });
+
+              // Compute the live next-period entry
+              const latestValDate = filteredValuations.reduce((latest, v) => {
+                const d = new Date(v.date);
+                return d > latest ? d : latest;
+              }, new Date(0));
+              const latestCloseValue = getPortfolioValueAtDate(latestValDate);
+              const nextMonth = pm === 12 ? 1 : pm + 1;
+              const nextYear = pm === 12 ? py + 1 : py;
+              const nextPeriodKey = `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
+              const liveNetInvested = getNetInvested(tenthEndOfDay, latestValDate);
+              const liveValueChange = latestCloseValue - tenthCloseValue - liveNetInvested;
+
+              const livePlatformBreakdown = filteredPlatforms.map(p => {
+                const pNetInvested = getPlatformNetInvested(p.id, tenthEndOfDay, latestValDate);
+                const pOpenValue = getPlatformValueAtDate(p.id, tenthEndOfDay);
+                const pCloseValue = getPlatformValueAtDate(p.id, latestValDate);
+                const pValueChange = pCloseValue - pOpenValue - pNetInvested;
+                return { platformId: p.id, name: p.name, color: p.color, netInvested: pNetInvested, valueChange: pValueChange };
+              }).filter(pb => Math.abs(pb.netInvested) > 0.001 || Math.abs(pb.valueChange) > 0.001);
+
+              result.push({
+                period: nextPeriodKey,
+                openValue: tenthCloseValue,
+                netInvested: liveNetInvested,
+                valueChange: liveValueChange,
+                closeValue: latestCloseValue,
+                platformBreakdown: livePlatformBreakdown,
+                isLive: true,
+              } as any);
+            }
+          }
+        }
+      }
+
       res.json(result);
     } catch (error) {
       console.error("Error fetching waterfall data:", error);

@@ -31,6 +31,7 @@ interface WaterfallPeriod {
   valueChange: number;
   closeValue: number;
   platformBreakdown: PlatformBreakdown[];
+  isLive?: boolean;
 }
 
 export interface WaterfallChartProps {
@@ -70,6 +71,7 @@ interface ChartRow {
   connector: number;
   bar_pos: number;
   bar_neg: number;
+  isLive?: boolean;
 }
 
 const CustomXAxisTick = ({ x, y, payload }: any) => {
@@ -143,7 +145,15 @@ function WaterfallTooltip({ active, payload, label, currency, chartRows, rawData
 
   return (
     <div className="bg-popover border rounded-lg shadow-lg p-3 text-xs min-w-[190px]">
-      <p className="font-semibold mb-0.5 text-sm">{row.periodLabel}</p>
+      <div className="flex items-center gap-2 mb-0.5">
+        <p className="font-semibold text-sm">{row.periodLabel}</p>
+        {row.isLive && (
+          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 text-[10px] font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            Live
+          </span>
+        )}
+      </div>
       <p className="text-muted-foreground mb-2">{subLabel[row.subType]}</p>
       <p className="font-bold text-sm mb-2" style={{ color: subColor[row.subType] }}>
         {(row.subType === "invest" || row.subType === "value") && subValue[row.subType] >= 0 ? "+" : ""}
@@ -235,6 +245,7 @@ export function WaterfallChart({ currency, excludedPlatforms, granularity }: Wat
         netInvested,
         valueChange,
         closeValue,
+        isLive: period.isLive,
       };
 
       rows.push({

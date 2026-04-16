@@ -559,32 +559,82 @@ export default function Dashboard() {
   const chartData = useMemo(() => {
     if (!history || history.length === 0) return [];
 
-    const latestKey = format(new Date(history[history.length - 1].date), 'yyyy-MM');
+    const now = new Date();
+    const latestEntry = history[history.length - 1];
+    const latestKey = format(new Date(latestEntry.date), 'yyyy-MM');
+    const [latestY, latestM] = latestKey.split('-').map(Number);
+    const tenthStart = new Date(latestY, latestM - 1, 10).getTime();
+    const tenthEndOfDay = new Date(latestY, latestM - 1, 10, 23, 59, 59, 999);
+    const pastTenthOfLatestMonth = now > tenthEndOfDay;
 
     const monthMap = new Map<string, { value: number; invested: number; date: string; dist: number }>();
+
+    // Track the best pre-10th and nearest-overall entries for the latest month separately
+    let latestMonthPreTenth: { value: number; invested: number; date: string; dist: number } | null = null;
+    let latestMonthFallback: { value: number; invested: number; date: string; dist: number } | null = null;
+
     for (const h of history) {
       const d = new Date(h.date);
       const key = format(d, 'yyyy-MM');
       const isLatestMonth = key === latestKey;
-      const existing = monthMap.get(key);
-      if (isLatestMonth) {
+
+      if (isLatestMonth && pastTenthOfLatestMonth) {
+        // Collect candidates — don't insert into monthMap yet; we resolve below
+        const dist = Math.abs(d.getTime() - tenthStart);
+        if (d <= tenthEndOfDay) {
+          if (!latestMonthPreTenth || dist < latestMonthPreTenth.dist) {
+            latestMonthPreTenth = { value: h.value, invested: h.invested, date: h.date, dist };
+          }
+        }
+        if (!latestMonthFallback || dist < latestMonthFallback.dist) {
+          latestMonthFallback = { value: h.value, invested: h.invested, date: h.date, dist };
+        }
+      } else if (isLatestMonth) {
+        // Before the 10th of the latest month: use most-recent entry
+        const existing = monthMap.get(key);
         if (!existing || d.getTime() > new Date(existing.date).getTime()) {
           monthMap.set(key, { value: h.value, invested: h.invested, date: h.date, dist: 0 });
         }
       } else {
+        // Historical months: nearest to the 10th
         const target = new Date(d.getFullYear(), d.getMonth(), 10);
         const dist = Math.abs(d.getTime() - target.getTime());
+        const existing = monthMap.get(key);
         if (!existing || dist < existing.dist) {
           monthMap.set(key, { value: h.value, invested: h.invested, date: h.date, dist });
         }
       }
     }
 
-    return Array.from(monthMap.values()).map(data => ({
-      date: data.date,
-      value: data.value,
-      invested: data.invested,
-    }));
+    if (pastTenthOfLatestMonth) {
+      // Lock the latest month's data point to the nearest pre-10th entry (fallback to nearest overall)
+      const anchor = latestMonthPreTenth ?? latestMonthFallback;
+      if (anchor) monthMap.set(latestKey, anchor);
+
+      // Append a synthetic live "next month" point when the absolute latest entry is post-10th
+      const latestDate = new Date(latestEntry.date);
+      if (latestDate > tenthEndOfDay) {
+        const nextMonth = latestM === 12 ? 1 : latestM + 1;
+        const nextYear = latestM === 12 ? latestY + 1 : latestY;
+        const nextKey = `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
+        if (!monthMap.has(nextKey)) {
+          monthMap.set(nextKey, {
+            value: latestEntry.value,
+            invested: latestEntry.invested,
+            date: `${nextKey}-01`,
+            dist: 0,
+          });
+        }
+      }
+    }
+
+    return Array.from(monthMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, data]) => ({
+        date: data.date,
+        value: data.value,
+        invested: data.invested,
+      }));
   }, [history]);
 
   // ── Computed: forecast extension from historical avg monthly return ───────
