@@ -1422,7 +1422,7 @@ export async function registerRoutes(
         return invested - withdrawn;
       };
 
-      const result: Record<string, { platformId: number; name: string; color: string; gain: number; gainPct: number | null }[]> = {};
+      const result: Record<string, { platformId: number; name: string; color: string; gain: number; gainPct: number | null; inProgress?: boolean }[]> = {};
 
       for (let i = 1; i < sortedMonths.length; i++) {
         const prevYM = sortedMonths[i - 1];
@@ -1442,6 +1442,38 @@ export async function registerRoutes(
 
         breakdown.sort((a, b) => Math.abs(b.gain) - Math.abs(a.gain));
         if (breakdown.length > 0) result[currYM] = breakdown;
+      }
+
+      // Generate a live "current month in progress" cell when today's month
+      // is not yet represented in the data (e.g. it's April 16 but the last
+      // recorded entry is still April because no May data exists yet).
+      const now = new Date();
+      const todayYM = toYM(now);
+      const lastKnownMonth = sortedMonths[sortedMonths.length - 1];
+      if (lastKnownMonth && todayYM > lastKnownMonth && !result[todayYM]) {
+        const liveBreakdown: { platformId: number; name: string; color: string; prevVal: number; currVal: number; gain: number; gainPct: number | null; inProgress: boolean }[] = [];
+
+        for (const p of userPlatforms) {
+          // prev = nearest to 10th of last known month (locked anchor)
+          const prev = getPlatformValueNearTenthOfMonth(p.id, lastKnownMonth);
+          // curr = absolute latest valuation for this platform
+          const platformValuations = userValuations.filter(v => v.platformId === p.id);
+          if (platformValuations.length === 0) continue;
+          const latest = platformValuations.reduce((a, b) =>
+            new Date(a.date) > new Date(b.date) ? a : b
+          );
+          const currVal = Number(latest.value);
+          const currDate = new Date(latest.date);
+          const netCash = getNetCashBetween(p.id, prev.date, currDate);
+          const gain = currVal - prev.value - netCash;
+          const gainPct = prev.value > 0 ? (gain / prev.value) * 100 : null;
+          if (prev.value > 0 || currVal > 0) {
+            liveBreakdown.push({ platformId: p.id, name: p.name, color: p.color, prevVal: prev.value, currVal, gain, gainPct, inProgress: true });
+          }
+        }
+
+        liveBreakdown.sort((a, b) => Math.abs(b.gain) - Math.abs(a.gain));
+        if (liveBreakdown.length > 0) result[todayYM] = liveBreakdown;
       }
 
       res.json(result);

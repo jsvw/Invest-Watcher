@@ -171,6 +171,7 @@ interface PlatformGain {
   currVal: number;
   gain: number;
   gainPct: number | null;
+  inProgress?: boolean;
 }
 
 interface HeatmapTooltipData {
@@ -178,14 +179,23 @@ interface HeatmapTooltipData {
   returnPct: number;
   absoluteChange: number;
   currency: string;
+  inProgress?: boolean;
   platformBreakdown?: PlatformGain[];
 }
 
-function HeatmapTooltipCard({ label, returnPct, absoluteChange, currency, platformBreakdown }: HeatmapTooltipData) {
+function HeatmapTooltipCard({ label, returnPct, absoluteChange, currency, inProgress, platformBreakdown }: HeatmapTooltipData) {
   const significant = platformBreakdown?.filter(p => Math.abs(p.gain) > 0.01) ?? [];
   return (
     <div className="bg-popover border rounded-lg shadow-lg p-3 text-xs pointer-events-none min-w-[200px]">
-      <p className="font-semibold mb-1">{label}</p>
+      <div className="flex items-center gap-2 mb-1">
+        <p className="font-semibold">{label}</p>
+        {inProgress && (
+          <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 text-[10px] font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            Live
+          </span>
+        )}
+      </div>
       <div className="flex justify-between gap-4 mb-2">
         <span className={returnPct >= 0 ? "text-emerald-500" : "text-red-500"}>{fmtPct(returnPct)}</span>
         <span className="text-muted-foreground">{formatCurrency(absoluteChange, currency)}</span>
@@ -915,7 +925,7 @@ export default function Dashboard() {
     if (monthKeys.length < 1) return null;
 
     const years = Array.from(new Set(monthKeys.map(k => k.split("-")[0]))).sort();
-    const cells: { year: string; month: number; returnPct: number; absoluteChange: number }[] = [];
+    const cells: { year: string; month: number; returnPct: number; absoluteChange: number; inProgress?: boolean }[] = [];
 
     for (const key of monthKeys) {
       const entries = platformBreakdownByMonth[key].filter(p => !excludedPlatforms.has(p.platformId));
@@ -923,7 +933,8 @@ export default function Dashboard() {
       const filteredPrevVal = entries.reduce((s, p) => s + p.prevVal, 0);
       const [cy, cm] = key.split("-").map(Number);
       const returnPct = filteredPrevVal > 0 ? (filteredGain / filteredPrevVal) * 100 : 0;
-      cells.push({ year: String(cy), month: cm, returnPct, absoluteChange: filteredGain });
+      const isLive = entries.length > 0 && entries.every(p => p.inProgress);
+      cells.push({ year: String(cy), month: cm, returnPct, absoluteChange: filteredGain, inProgress: isLive || undefined });
     }
 
     return { years, cells };
@@ -1923,7 +1934,10 @@ export default function Dashboard() {
                               return (
                                 <div
                                   key={monthNum}
-                                  className="flex-1 mx-0.5 h-10 rounded flex items-center justify-center text-[10px] font-medium cursor-default transition-transform hover:scale-105"
+                                  className={cn(
+                                    "flex-1 mx-0.5 h-10 rounded flex items-center justify-center text-[10px] font-medium cursor-default transition-transform hover:scale-105",
+                                    cell.inProgress && "border-2 border-dashed border-amber-400/70 opacity-80"
+                                  )}
                                   style={{ backgroundColor: bg, color: intensity > 0.5 ? "#fff" : undefined }}
                                   data-testid={`heatmap-cell-${year}-${monthNum}`}
                                   onMouseEnter={e => {
@@ -1937,6 +1951,7 @@ export default function Dashboard() {
                                         returnPct: cell.returnPct,
                                         absoluteChange: cell.absoluteChange,
                                         currency,
+                                        inProgress: cell.inProgress,
                                         platformBreakdown: platformBreakdownByMonth?.[ymKey]?.filter(p => !excludedPlatforms.has(p.platformId)),
                                       },
                                     });
