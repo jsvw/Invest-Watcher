@@ -821,7 +821,7 @@ export default function Dashboard() {
         const baseAmount = Math.min(last.value, last.invested);
         const gainPortion = Math.max(0, gain);
         const lostPortion = Math.max(0, -gain);
-        return { date: key, value: last.value, invested: last.invested, gain, gainPct, baseAmount, gainPortion, lostPortion };
+        return { date: key, value: last.value, invested: last.invested, gain, gainPct, baseAmount, gainPortion, lostPortion, isLive: last.isLive ?? false };
       });
   }, [chartData, displayedChartAggregation]);
 
@@ -1785,7 +1785,7 @@ export default function Dashboard() {
                           <Tooltip content={<ChartTooltip />} />
                           <Legend verticalAlign="top" height={36} />
                           {(displayedChartView === "overview" || displayedChartView === "all") && <>
-                            <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke="hsl(var(--primary))" strokeWidth={4} dot={false} activeDot={{ r: 6 }} animationDuration={350} />
+                            <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke="hsl(var(--primary))" strokeWidth={4} dot={<LiveDot />} activeDot={{ r: 6 }} animationDuration={350} />
                             <Line type="monotone" dataKey="invested" name="Invested" yAxisId="left" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={false} animationDuration={350} />
                           </>}
                           {(displayedChartView === "profit" || displayedChartView === "all") && (

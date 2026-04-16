@@ -835,7 +835,7 @@ export default function PlatformDetails() {
 
   const platAggregatedData = useMemo(() => {
     if (!activeChartData || chartAggregation === "month") return null;
-    type Bucket = { values: number[]; investeds: number[]; gains: number[]; monthlyChanges: number[] };
+    type Bucket = { values: number[]; investeds: number[]; gains: number[]; monthlyChanges: number[]; lastIsLive: boolean };
     const groups = new Map<string, Bucket>();
     activeChartData.forEach((h: any, i: number, arr: any[]) => {
       const prev = arr[i - 1];
@@ -844,12 +844,13 @@ export default function PlatformDetails() {
       const y = d.getFullYear();
       const m = d.getMonth() + 1;
       const key = chartAggregation === "quarter" ? `${y}-Q${Math.ceil(m / 3)}` : `${y}`;
-      if (!groups.has(key)) groups.set(key, { values: [], investeds: [], gains: [], monthlyChanges: [] });
+      if (!groups.has(key)) groups.set(key, { values: [], investeds: [], gains: [], monthlyChanges: [], lastIsLive: false });
       const g = groups.get(key)!;
       g.values.push(h.value);
       g.investeds.push(h.invested);
       g.gains.push(h.value - h.invested);
       g.monthlyChanges.push(monthlyChange);
+      g.lastIsLive = h.isLive ?? false;
     });
     const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
     const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
@@ -862,6 +863,7 @@ export default function PlatformDetails() {
         gain: avg(g.gains),
         monthlyChange: avg(g.monthlyChanges),
         totalMonthlyChange: sum(g.monthlyChanges),
+        isLive: g.lastIsLive,
       }));
   }, [activeChartData, chartAggregation]);
 
@@ -1342,7 +1344,7 @@ export default function PlatformDetails() {
                             <Tooltip formatter={(v: number, name: string) => [formatAxisValue(v, name === "Profit/Loss" || name === "Monthly Growth" || name === "Quarterly Growth" || name === "Yearly Growth"), name]} labelFormatter={platAggXFmt} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
                             <Legend verticalAlign="top" height={36} />
                             {(chartView === "overview" || chartView === "all") && <>
-                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={3} dot={false} activeDot={{ r: 6 }} animationDuration={350} />
+                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={3} dot={<LiveDot />} activeDot={{ r: 6 }} animationDuration={350} />
                               <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={false} animationDuration={350} />
                             </>}
                             {(chartView === "profit" || chartView === "all") && <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6 }} animationDuration={350} />}
@@ -1778,7 +1780,7 @@ export default function PlatformDetails() {
                             <Tooltip formatter={(v: number, name: string) => [formatAxisValue(v, name === "Profit/Loss" || name === "Monthly Growth" || name === "Quarterly Growth" || name === "Yearly Growth"), name]} labelFormatter={platAggXFmt} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
                             <Legend verticalAlign="top" height={36} />
                             {(chartView === "overview" || chartView === "all") && <>
-                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={3} dot={false} activeDot={{ r: 6 }} animationDuration={350} />
+                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={3} dot={<LiveDot />} activeDot={{ r: 6 }} animationDuration={350} />
                               <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={false} animationDuration={350} />
                             </>}
                             {(chartView === "profit" || chartView === "all") && <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6 }} animationDuration={350} />}
