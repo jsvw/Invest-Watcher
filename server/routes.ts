@@ -1395,12 +1395,40 @@ export async function registerRoutes(
       const sortedMonths = Array.from(monthSet).sort();
 
       // For a given platform, get the valuation closest to the 10th of a given year-month.
-      // Searches all valuations (no boundary restriction) to find the nearest data point.
+      // Once the 10th of that month has passed (relative to today), prefers valuations on or
+      // before the 10th so that post-10th movements flow into the next month's live cell
+      // instead of being absorbed into the already-closed month's anchor.
+      // Falls back to the nearest valuation overall if no pre/on-10th data exists.
       const getPlatformValueNearTenthOfMonth = (platformId: number, ym: string): { value: number; date: Date } => {
         const [year, month] = ym.split('-').map(Number);
-        const tenth = new Date(year, month - 1, 10).getTime();
+        // Reference point for proximity calculations (start of the 10th)
+        const tenthStart = new Date(year, month - 1, 10, 0, 0, 0, 0);
+        const tenth = tenthStart.getTime();
+        // End-of-day boundary for the 10th — ensures valuations at any time on the 10th
+        // are treated as "on or before the 10th" regardless of their time component.
+        const tenthEndOfDay = new Date(year, month - 1, 10, 23, 59, 59, 999);
         const relevant = userValuations.filter(v => v.platformId === platformId);
         if (relevant.length === 0) return { value: 0, date: new Date(tenth) };
+
+        // If today is past the 10th of this month, lock the anchor to valuations on or before the 10th.
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const tenthHasPassed = todayStart > tenthEndOfDay;
+
+        if (tenthHasPassed) {
+          const preOrOnTenth = relevant.filter(v => new Date(v.date) <= tenthEndOfDay);
+          if (preOrOnTenth.length > 0) {
+            // Closest valuation on or before the end of the 10th
+            const closest = preOrOnTenth.reduce((best, v) => {
+              const dist = Math.abs(new Date(v.date).getTime() - tenth);
+              const bestDist = Math.abs(new Date(best.date).getTime() - tenth);
+              return dist < bestDist ? v : best;
+            });
+            return { value: Number(closest.value), date: new Date(closest.date) };
+          }
+          // No pre/on-10th data — fall through to nearest overall (existing behavior)
+        }
+
         const closest = relevant.reduce((best, v) => {
           const dist = Math.abs(new Date(v.date).getTime() - tenth);
           const bestDist = Math.abs(new Date(best.date).getTime() - tenth);
