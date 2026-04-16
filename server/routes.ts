@@ -1706,11 +1706,10 @@ export async function registerRoutes(
       }
 
       // Post-10th live-period fix: when today is past the 10th of the current calendar
-      // month and the last known period is the current month, re-cap that period's close
-      // at the pre-10th anchor and append a synthetic live "next month" bar for post-10th gains.
-      // Only applies to monthly granularity — quarterly/yearly views already absorb the latest
-      // valuation naturally and adding a synthetic next-period bar (e.g. "2027") is incorrect.
-      if (granularity === 'month' && result.length > 0) {
+      // month and the last known period is the current period, re-cap that period's close
+      // at the pre-10th anchor and append a synthetic "next period" bar for post-10th gains.
+      // Applies to all granularities (month, quarter, year).
+      if (result.length > 0) {
         const now = new Date();
         const todayY = now.getFullYear();
         const todayM = now.getMonth() + 1;
@@ -1752,10 +1751,22 @@ export async function registerRoutes(
                 platformBreakdown: tenthPlatformBreakdown,
               });
 
-              // Derive the next month key (monthly granularity only)
-              const nextMonth = todayM === 12 ? 1 : todayM + 1;
-              const nextYear = todayM === 12 ? todayY + 1 : todayY;
-              const nextPeriodKey = `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
+              // Derive the next-period key based on granularity
+              let nextPeriodKey: string;
+              if (granularity === 'year') {
+                nextPeriodKey = `${todayY + 1}`;
+              } else if (granularity === 'quarter') {
+                const q = Math.ceil(todayM / 3);
+                if (q === 4) {
+                  nextPeriodKey = `${todayY + 1}-Q1`;
+                } else {
+                  nextPeriodKey = `${todayY}-Q${q + 1}`;
+                }
+              } else {
+                const nextMonth = todayM === 12 ? 1 : todayM + 1;
+                const nextYear = todayM === 12 ? todayY + 1 : todayY;
+                nextPeriodKey = `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
+              }
 
               // Compute the live next-period entry
               const latestValDate = filteredValuations.reduce((latest, v) => {

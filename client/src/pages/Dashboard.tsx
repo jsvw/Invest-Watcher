@@ -1689,24 +1689,6 @@ export default function Dashboard() {
                     };
                   });
 
-                  // Year-boundary tick label: "Jan '25" at Jan, "Mar"/"Jun"/"Sep" at quarter starts, "" otherwise
-                  const monthlyXLabel = (ts: number): string => {
-                    const d = new Date(ts);
-                    const m = d.getMonth() + 1;
-                    if (m === 1) return format(d, "MMM ''yy");
-                    if (m === 3 || m === 6 || m === 9) return format(d, 'MMM');
-                    return '';
-                  };
-                  const monthlyXLabelFromStr = (d: string): string => {
-                    try {
-                      const dt = new Date(d);
-                      const m = dt.getMonth() + 1;
-                      if (m === 1) return format(dt, "MMM ''yy");
-                      if (m === 3 || m === 6 || m === 9) return format(dt, 'MMM');
-                      return '';
-                    } catch { return ''; }
-                  };
-
                   const commonXAxis = (
                     <XAxis
                       dataKey="timestamp"
@@ -1717,7 +1699,7 @@ export default function Dashboard() {
                       fontSize={12}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={monthlyXLabel}
+                      tickFormatter={(ts) => format(new Date(ts), 'MMM yy')}
                       ticks={(() => {
                         const seen = new Set<string>();
                         return chartData.filter((entry: any) => {
@@ -1725,8 +1707,7 @@ export default function Dashboard() {
                           if (seen.has(key)) return false;
                           seen.add(key);
                           return true;
-                        }).map((entry: any) => new Date(entry.date).getTime())
-                          .filter(ts => { const m = new Date(ts).getMonth() + 1; return m === 1 || m === 3 || m === 6 || m === 9; });
+                        }).map((entry: any) => new Date(entry.date).getTime());
                       })()}
                     />
                   );
@@ -1769,7 +1750,7 @@ export default function Dashboard() {
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={aggregatedChartData} barCategoryGap="20%">
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                            <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={aggXFmt2} interval={0} />
+                            <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={aggXFmt2} interval="preserveStartEnd" />
                             {(displayedChartView === "overview" || displayedChartView === "all") && <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={v => formatAxisValue(v)} domain={[0, 'auto']} />}
                             {displayedChartView === "profit" && <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={profitAxisFmt} domain={['auto', 'auto']} />}
                             {displayedChartView === "all" && <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={profitAxisFmt} domain={['auto', 'auto']} />}
@@ -1797,7 +1778,7 @@ export default function Dashboard() {
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={mergedAggData}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                          <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={aggXFmt2} interval={0} />
+                          <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={aggXFmt2} interval="preserveStartEnd" />
                           {(displayedChartView === "overview" || displayedChartView === "all") && <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={v => formatAxisValue(v)} domain={['auto', 'auto']} />}
                           {(displayedChartView === "profit" || displayedChartView === "all") && <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={profitAxisFmt} domain={['auto', 'auto']} />}
                           {displayedChartView === "all" && <YAxis yAxisId="growth" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={monthlyAxisFmt} domain={['auto', 'auto']} />}
@@ -1833,7 +1814,7 @@ export default function Dashboard() {
                         return `${q} '${y.slice(2)}`;
                       }
                       if (displayedChartAggregation === "year") return d;
-                      return monthlyXLabelFromStr(d);
+                      return format(new Date(d), 'MMM yy');
                     };
                     const aggSeriesName = displayedChartAggregation === "quarter"
                       ? "Quarterly Growth"
@@ -1845,7 +1826,7 @@ export default function Dashboard() {
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={aggregatedSeriesData} barCategoryGap="20%">
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                            <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={aggXFmt} interval={0} />
+                            <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={aggXFmt} interval="preserveStartEnd" />
                             <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={monthlyAxisFmt} domain={['auto', 'auto']} />
                             <Tooltip content={<ChartTooltip />} />
                             <Legend verticalAlign="top" height={36} />
@@ -1860,7 +1841,7 @@ export default function Dashboard() {
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={aggregatedSeriesData}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                          <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={aggXFmt} interval={0} />
+                          <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={aggXFmt} interval="preserveStartEnd" />
                           <YAxis yAxisId="monthly" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={monthlyAxisFmt} domain={['auto', 'auto']} />
                           <Tooltip content={<ChartTooltip />} />
                           <Legend verticalAlign="top" height={36} />
@@ -1890,12 +1871,11 @@ export default function Dashboard() {
                             fontSize={12}
                             tickLine={false}
                             axisLine={false}
-                            tickFormatter={monthlyXLabel}
+                            tickFormatter={ts => format(new Date(ts), 'MMM yy')}
                             ticks={fcData.filter((_, i, a) => {
                               const key = format(new Date(a[i].date), 'yyyy-MM');
                               return i === 0 || format(new Date(a[i-1].date), 'yyyy-MM') !== key;
-                            }).map(p => p.timestamp)
-                              .filter(ts => { const m = new Date(ts).getMonth() + 1; return m === 1 || m === 3 || m === 6 || m === 9; })}
+                            }).map(p => p.timestamp)}
                           />
                           <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={v => formatAxisValue(v)} domain={['auto', 'auto']} />
                           <Tooltip content={<ChartTooltip />} />
@@ -1913,7 +1893,7 @@ export default function Dashboard() {
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={mappedData} barCategoryGap="20%">
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                          <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={monthlyXLabelFromStr} interval={0} />
+                          <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={d => format(new Date(d), 'MMM yy')} interval="preserveStartEnd" />
                           {(displayedChartView === "overview" || displayedChartView === "all") && (
                             <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={value => formatAxisValue(value)} domain={[0, 'auto']} />
                           )}

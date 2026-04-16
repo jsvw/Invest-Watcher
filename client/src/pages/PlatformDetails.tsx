@@ -867,15 +867,6 @@ export default function PlatformDetails() {
       }));
   }, [activeChartData, chartAggregation]);
 
-  // Year-boundary tick label helpers
-  const platMonthlyXLabel = (ts: number): string => {
-    const d = new Date(ts);
-    const m = d.getMonth() + 1;
-    if (m === 1) return format(d, "MMM ''yy");
-    if (m === 3 || m === 6 || m === 9) return format(d, 'MMM');
-    return '';
-  };
-
   const platAggXFmt = (d: unknown) => {
     if (typeof d !== 'string') return String(d ?? '');
     if (chartAggregation === "quarter") {
@@ -883,13 +874,7 @@ export default function PlatformDetails() {
       return `${q} '${y.slice(2)}`;
     }
     if (chartAggregation === "year") return d;
-    try {
-      const dt = new Date(d);
-      const m = dt.getMonth() + 1;
-      if (m === 1) return format(dt, "MMM ''yy");
-      if (m === 3 || m === 6 || m === 9) return format(dt, 'MMM');
-      return '';
-    } catch { return d; }
+    try { return format(new Date(d), 'MMM yy'); } catch { return d; }
   };
 
   const formatAxisValue = (value: number, showSign: boolean = false) => {
@@ -1352,7 +1337,7 @@ export default function PlatformDetails() {
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={platAggregatedData}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                            <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={platAggXFmt} interval={0} />
+                            <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={platAggXFmt} interval="preserveStartEnd" />
                             {(chartView === "overview" || chartView === "all") && <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v)} domain={['auto', 'auto']} />}
                             {(chartView === "profit" || chartView === "all") && <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />}
                             {(chartView === "monthly" || chartView === "all") && <YAxis yAxisId="monthly" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />}
@@ -1788,7 +1773,7 @@ export default function PlatformDetails() {
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={platAggregatedData}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                            <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={platAggXFmt} interval={0} />
+                            <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={platAggXFmt} interval="preserveStartEnd" />
                             {(chartView === "overview" || chartView === "all") && <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v)} domain={['auto', 'auto']} />}
                             {(chartView === "profit" || chartView === "all") && <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />}
                             {(chartView === "monthly" || chartView === "all") && <YAxis yAxisId="monthly" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />}
