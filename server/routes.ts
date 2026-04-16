@@ -1508,6 +1508,47 @@ export async function registerRoutes(
         if (liveBreakdown.length > 0) result[todayYM] = liveBreakdown;
       }
 
+      // Second live-cell trigger: we're past the 10th of the current month and
+      // the current month already has a locked (pre-10th) cell in result.
+      // Post-10th movements should appear as a live "next month" cell.
+      const todayYear = now.getFullYear();
+      const todayMonth = now.getMonth() + 1; // 1-indexed
+      const tenthEndToday = new Date(todayYear, todayMonth - 1, 10, 23, 59, 59, 999);
+      const pastTenthOfCurrentMonth = now > tenthEndToday;
+      if (pastTenthOfCurrentMonth && lastKnownMonth === todayYM) {
+        // Compute next month's YM string
+        const nextMonth = todayMonth === 12 ? 1 : todayMonth + 1;
+        const nextYear = todayMonth === 12 ? todayYear + 1 : todayYear;
+        const nextMonthYM = `${nextYear}-${String(nextMonth).padStart(2, "0")}`;
+        if (!result[nextMonthYM]) {
+          const liveNextBreakdown: { platformId: number; name: string; color: string; prevVal: number; currVal: number; gain: number; gainPct: number | null; inProgress: boolean }[] = [];
+
+          for (const p of userPlatforms) {
+            // prev = current month's pre-10th locked anchor
+            const prev = getPlatformValueNearTenthOfMonth(p.id, todayYM);
+            // curr = absolute latest valuation for this platform (includes post-10th entries)
+            const platformValuations = userValuations.filter(v => v.platformId === p.id);
+            if (platformValuations.length === 0) continue;
+            const latest = platformValuations.reduce((a, b) =>
+              new Date(a.date) > new Date(b.date) ? a : b
+            );
+            const currVal = Number(latest.value);
+            const currDate = new Date(latest.date);
+            // Only include if there is a post-10th valuation (otherwise nothing new to show)
+            if (currDate <= tenthEndToday) continue;
+            const netCash = getNetCashBetween(p.id, prev.date, currDate);
+            const gain = currVal - prev.value - netCash;
+            const gainPct = prev.value > 0 ? (gain / prev.value) * 100 : null;
+            if (prev.value > 0 || currVal > 0) {
+              liveNextBreakdown.push({ platformId: p.id, name: p.name, color: p.color, prevVal: prev.value, currVal, gain, gainPct, inProgress: true });
+            }
+          }
+
+          liveNextBreakdown.sort((a, b) => Math.abs(b.gain) - Math.abs(a.gain));
+          if (liveNextBreakdown.length > 0) result[nextMonthYM] = liveNextBreakdown;
+        }
+      }
+
       res.json(result);
     } catch (error) {
       console.error("Error fetching monthly platform breakdown:", error);
