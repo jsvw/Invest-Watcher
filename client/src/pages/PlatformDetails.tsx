@@ -282,7 +282,15 @@ export default function PlatformDetails() {
     };
     return (
       <div className="rounded-xl border border-border bg-card shadow-lg px-4 py-3 text-sm min-w-[200px]">
-        <p className="font-semibold text-foreground mb-2">{fmtLabel(label)}</p>
+        <div className="flex items-center gap-2 mb-2">
+          <p className="font-semibold text-foreground">{fmtLabel(label)}</p>
+          {d?.isLive && (
+            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 text-[10px] font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              Live
+            </span>
+          )}
+        </div>
         {payload.map((entry: any) => {
           const deltaKey = entry.dataKey === 'value' ? 'valueChange'
             : entry.dataKey === 'invested' ? 'investedChange'
