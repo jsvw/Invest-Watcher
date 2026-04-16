@@ -37,6 +37,25 @@ import type { DashboardFilter } from "@shared/schema";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
+interface LiveDotProps {
+  cx?: number;
+  cy?: number;
+  payload?: { isLive?: boolean };
+}
+
+function LiveDot({ cx, cy, payload }: LiveDotProps) {
+  if (!payload?.isLive || cx == null || cy == null) return null;
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={8} fill="#f59e0b" opacity={0.25}>
+        <animate attributeName="r" values="8;14;8" dur="1.8s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.25;0;0.25" dur="1.8s" repeatCount="indefinite" />
+      </circle>
+      <circle cx={cx} cy={cy} r={5} fill="#f59e0b" stroke="#fff" strokeWidth={1.5} />
+    </g>
+  );
+}
+
 function fmtPct(v: number): string {
   return `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
 }
@@ -1914,7 +1933,7 @@ export default function Dashboard() {
                         <Legend verticalAlign="top" height={36} />
                         {(displayedChartView === "overview" || displayedChartView === "all") && (
                           <>
-                            <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke="hsl(var(--primary))" strokeWidth={4} dot={false} activeDot={{ r: 6 }} animationDuration={350} />
+                            <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke="hsl(var(--primary))" strokeWidth={4} dot={<LiveDot />} activeDot={{ r: 6 }} animationDuration={350} />
                             <Line type="monotone" dataKey="invested" name="Invested" yAxisId="left" stroke="#3b82f6" strokeWidth={2} strokeDasharray="5 5" dot={false} activeDot={{ r: 4 }} animationDuration={350} />
                           </>
                         )}

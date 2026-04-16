@@ -41,6 +41,25 @@ import { ScraperConfigDialog } from "@/components/ScraperConfigDialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 
+interface LiveDotProps {
+  cx?: number;
+  cy?: number;
+  payload?: { isLive?: boolean };
+}
+
+function LiveDot({ cx, cy, payload }: LiveDotProps) {
+  if (!payload?.isLive || cx == null || cy == null) return null;
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={8} fill="#f59e0b" opacity={0.25}>
+        <animate attributeName="r" values="8;14;8" dur="1.8s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="0.25;0;0.25" dur="1.8s" repeatCount="indefinite" />
+      </circle>
+      <circle cx={cx} cy={cy} r={5} fill="#f59e0b" stroke="#fff" strokeWidth={1.5} />
+    </g>
+  );
+}
+
 function TickerPriceHover({ ticker, currency, children }: { ticker: string; currency: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const { data, isLoading } = useQuery({
@@ -1374,7 +1393,7 @@ export default function PlatformDetails() {
                           <Legend verticalAlign="top" height={36}/>
                           {(chartView === "overview" || chartView === "all") && (
                             <>
-                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={4} dot={false} activeDot={{ r: 7 }} />
+                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={4} dot={<LiveDot />} activeDot={{ r: 7 }} />
                               <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={false} />
                             </>
                           )}
@@ -1810,7 +1829,7 @@ export default function PlatformDetails() {
                           <Legend verticalAlign="top" height={36}/>
                           {(chartView === "overview" || chartView === "all") && (
                             <>
-                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={4} dot={false} activeDot={{ r: 7 }} />
+                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={4} dot={<LiveDot />} activeDot={{ r: 7 }} />
                               <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={false} />
                             </>
                           )}
