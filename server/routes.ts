@@ -1449,7 +1449,11 @@ export async function registerRoutes(
       // recorded entry is still April because no May data exists yet).
       const now = new Date();
       const todayYM = toYM(now);
-      const lastKnownMonth = sortedMonths[sortedMonths.length - 1];
+      // Use last key present in result (months with actual breakdown rows) rather
+      // than sortedMonths, so we don't skip the live cell when the latest
+      // activity month produced no breakdown entries.
+      const resultMonths = Object.keys(result).sort();
+      const lastKnownMonth = resultMonths.length > 0 ? resultMonths[resultMonths.length - 1] : sortedMonths[sortedMonths.length - 1];
       if (lastKnownMonth && todayYM > lastKnownMonth && !result[todayYM]) {
         const liveBreakdown: { platformId: number; name: string; color: string; prevVal: number; currVal: number; gain: number; gainPct: number | null; inProgress: boolean }[] = [];
 
