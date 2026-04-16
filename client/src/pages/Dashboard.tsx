@@ -621,7 +621,7 @@ export default function Dashboard() {
           monthMap.set(nextKey, {
             value: latestEntry.value,
             invested: latestEntry.invested,
-            date: `${nextKey}-01`,
+            date: latestEntry.date,
             dist: 0,
             isLive: true,
           });
