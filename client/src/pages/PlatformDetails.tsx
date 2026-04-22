@@ -2092,7 +2092,7 @@ export default function PlatformDetails() {
                       )}
 
                       <div className="rounded-md border overflow-x-auto">
-                        <table className="w-full text-sm" data-testid="table-holdings">
+                        <table className="w-full min-w-[640px] text-sm" data-testid="table-holdings">
                           <thead>
                             <tr className="border-b bg-muted/50">
                               {([
@@ -2382,7 +2382,7 @@ export default function PlatformDetails() {
                           </Badge>
                         </div>
                         <div className="rounded-md border overflow-x-auto">
-                          <table className="w-full text-sm" data-testid="table-holdings-history">
+                          <table className="w-full min-w-[640px] text-sm" data-testid="table-holdings-history">
                             <thead>
                               <tr className="border-b bg-muted/50">
                                 <th className="text-left p-3 font-medium">Ticker</th>

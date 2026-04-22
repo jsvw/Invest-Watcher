@@ -298,7 +298,7 @@ export function DividendCalendar({ payments, projections, hasFmpKey, currency }:
               </p>
             ) : (
               <div className="overflow-auto">
-                <table className="w-full text-xs">
+                <table className="w-full min-w-[360px] text-xs">
                   <thead>
                     <tr className="border-b">
                       <th className="text-left py-2.5 px-4 font-medium text-muted-foreground">Date</th>
