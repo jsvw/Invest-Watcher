@@ -1,5 +1,8 @@
-import puppeteer from "puppeteer-core";
+import puppeteer from "puppeteer-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import { getChromiumPath } from "./chromium";
+
+puppeteer.use(StealthPlugin());
 
 export interface LandeScrapedData {
   totalBalance: number;
@@ -9,9 +12,9 @@ export interface LandeScrapedData {
 const LOGIN_URL = "https://lande.finance/login";
 
 export async function scrapeLande(email: string, password: string): Promise<LandeScrapedData> {
-  let browser;
+  let browser: any;
   try {
-    browser = await puppeteer.launch({
+    browser = await (puppeteer as any).launch({
       executablePath: getChromiumPath(),
       headless: true,
       protocolTimeout: 180000,
@@ -32,18 +35,49 @@ export async function scrapeLande(email: string, password: string): Promise<Land
         "--disable-software-rasterizer",
         "--disable-features=site-per-process",
         "--js-flags=--max-old-space-size=256",
+        "--window-size=1280,800",
       ],
     });
 
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 800 });
     await page.setUserAgent(
-      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
     );
 
+    await page.setExtraHTTPHeaders({
+      "Accept-Language": "en-US,en;q=0.9",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    });
+
     console.log("[Lande Scraper] Navigating to login page...");
-    await page.goto(LOGIN_URL, { waitUntil: "networkidle2", timeout: 30000 });
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await page.goto(LOGIN_URL, { waitUntil: "networkidle2", timeout: 60000 });
+
+    // Wait for Cloudflare Turnstile to auto-solve — poll up to 30s for login fields to appear
+    console.log("[Lande Scraper] Waiting for Cloudflare challenge to pass...");
+    let loginFieldFound = false;
+    for (let attempt = 0; attempt < 15; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const inputs = await page.evaluate(`(function() {
+        return Array.from(document.querySelectorAll('input')).map(function(i) {
+          return { name: i.name, type: i.type, id: i.id };
+        });
+      })()`);
+      const hasLogin = (inputs as any[]).some((i: any) =>
+        i.id === "inp-email" || i.name === "email" || i.type === "email"
+      );
+      console.log(`[Lande Scraper] Attempt ${attempt + 1}: inputs found: ${JSON.stringify(inputs)}`);
+      if (hasLogin) {
+        loginFieldFound = true;
+        console.log("[Lande Scraper] Login form is visible.");
+        break;
+      }
+    }
+
+    if (!loginFieldFound) {
+      const pageText = await page.evaluate(`document.body.innerText.substring(0, 500)`);
+      throw new Error(`Cloudflare challenge not solved — login fields not found. Page text: ${pageText}`);
+    }
 
     console.log("[Lande Scraper] Dismissing cookie consent if present...");
     try {
@@ -59,33 +93,30 @@ export async function scrapeLande(email: string, password: string): Promise<Land
           }
         }
       })()`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 500));
     } catch {
       console.log("[Lande Scraper] Cookie banner handling skipped");
     }
-
-    console.log("[Lande Scraper] Waiting for login form...");
-    await page.waitForSelector("#inp-email", { timeout: 15000 }).catch(() => {});
-
-    const availableInputs = await page.evaluate(`(function() {
-      return Array.from(document.querySelectorAll('input')).map(function(i) {
-        return { name: i.name, type: i.type, id: i.id, placeholder: i.placeholder };
-      });
-    })()`) as Array<{ name: string; type: string; id: string; placeholder: string }>;
-    console.log("[Lande Scraper] Available inputs:", JSON.stringify(availableInputs));
 
     const emailInput = await page.$("#inp-email");
     const passwordInput = await page.$("#password");
 
     if (!emailInput || !passwordInput) {
+      const availableInputs = await page.evaluate(`(function() {
+        return Array.from(document.querySelectorAll('input')).map(function(i) {
+          return { name: i.name, type: i.type, id: i.id };
+        });
+      })()`);
       throw new Error(`Could not find login fields. Available inputs: ${JSON.stringify(availableInputs)}`);
     }
 
     console.log("[Lande Scraper] Filling login form...");
     await emailInput.click({ clickCount: 3 });
-    await emailInput.type(email, { delay: 50 });
+    await emailInput.type(email, { delay: 60 });
+    await new Promise(resolve => setTimeout(resolve, 300));
     await passwordInput.click({ clickCount: 3 });
-    await passwordInput.type(password, { delay: 50 });
+    await passwordInput.type(password, { delay: 60 });
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     console.log("[Lande Scraper] Submitting login...");
     await page.keyboard.press("Enter");
@@ -105,15 +136,14 @@ export async function scrapeLande(email: string, password: string): Promise<Land
     }
 
     console.log("[Lande Scraper] Waiting for balance element...");
-    await page.waitForSelector("#total_balance", { timeout: 15000 }).catch(() => {});
+    await page.waitForSelector("#total_balance", { timeout: 20000 }).catch(() => {});
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     const diag = await page.evaluate(`(function() {
       var url = window.location.href;
-      var bodyText = (document.body.innerText || "").substring(0, 1000);
       var balEl = document.querySelector("#total_balance");
-      return { url: url, bodyText: bodyText, balanceText: balEl ? balEl.textContent.trim() : null };
-    })()`) as { url: string; bodyText: string; balanceText: string | null };
+      return { url: url, balanceText: balEl ? balEl.textContent.trim() : null };
+    })()`) as { url: string; balanceText: string | null };
     console.log("[Lande Scraper] Page URL:", diag.url);
     console.log("[Lande Scraper] #total_balance text:", diag.balanceText);
 
