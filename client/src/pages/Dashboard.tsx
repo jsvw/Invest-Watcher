@@ -270,11 +270,16 @@ export default function Dashboard() {
         setLongRangeOpen(false);
       }
     }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setLongRangeOpen(false);
+    }
     document.addEventListener("mousedown", handleOutside);
     document.addEventListener("touchstart", handleOutside);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
       document.removeEventListener("mousedown", handleOutside);
       document.removeEventListener("touchstart", handleOutside);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [longRangeOpen]);
 
@@ -1540,47 +1545,12 @@ export default function Dashboard() {
                   <CardTitle>Portfolio Performance</CardTitle>
                   <CardDescription>Invested amount vs. current valuation over time</CardDescription>
                 </div>
-                {/* All controls — stack on mobile, row on desktop */}
+                {/* All controls
+                    Mobile order: 1=range tabs, 2=chart-type, 3=conditional selects, 4=forecast input
+                    Desktop order: 1=conditional selects, 2=range tabs, 3=forecast input, 4=chart-type */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                  {/* Conditional year select */}
-                  {(range === "year" || range.startsWith("year-")) && (
-                    <Select value={specificYear || (range.startsWith("year-") ? range.split("-")[1] : "")} onValueChange={(val) => {
-                      setRange(`year-${val}`);
-                      setSpecificYear(val);
-                    }}>
-                      <SelectTrigger className="w-[100px] h-9">
-                        <SelectValue placeholder="Year" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {years.map((y: string) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  {/* Conditional month + year selects */}
-                  {(range === "month" || range.startsWith("month-")) && (
-                    <div className="flex gap-2">
-                      <Select value={specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear)} onValueChange={val => setSpecificYear(val)}>
-                        <SelectTrigger className="w-[100px] h-9"><SelectValue placeholder="Year" /></SelectTrigger>
-                        <SelectContent>
-                          {years.map((y: string) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <Select value={specificMonth || (range.startsWith("month-") ? range.split("-")[2] : "")} onValueChange={val => {
-                        const year = specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear);
-                        setRange(`month-${year}-${val}`);
-                        setSpecificMonth(val);
-                      }}>
-                        <SelectTrigger className="w-[120px] h-9"><SelectValue placeholder="Month" /></SelectTrigger>
-                        <SelectContent>
-                          {monthsData.filter((m: any) => m.year === (specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear))).map((m: any) => (
-                            <SelectItem key={`${m.year}-${m.value}`} value={m.value}>{m.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                  {/* Range tabs — horizontally scrollable on mobile */}
-                  <div className="overflow-x-auto pb-0.5 -mb-0.5">
+                  {/* Range tabs — mobile: 1st; desktop: 2nd; horizontally scrollable on mobile */}
+                  <div className="order-1 sm:order-2 overflow-x-auto pb-0.5 -mb-0.5">
                     <Tabs
                       value={forecastRange ? (["10y","20y","30y","40y"].includes(forecastRange) ? "forecast-5y" : `forecast-${forecastRange}`) : (range.startsWith("year-") ? "year" : range.startsWith("month-") ? "month" : range)}
                       onValueChange={val => {
@@ -1642,9 +1612,76 @@ export default function Dashboard() {
                       </TabsList>
                     </Tabs>
                   </div>
-                  {/* Conditional forecast monthly invest input */}
+                  {/* Chart-type toggle — mobile: 2nd; desktop: 4th */}
+                  <div className="order-2 sm:order-4 flex items-center border rounded-md overflow-hidden">
+                    <button
+                      onClick={() => setChartType("line")}
+                      className={cn("px-2 py-3 sm:py-1.5 min-h-[44px] sm:min-h-0 transition-colors", chartType === "line" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+                      data-testid="button-chart-type-line"
+                    >
+                      <LineChartIcon className="w-4 h-4" />
+                    </button>
+                    {chartView !== "all" && (
+                      <button
+                        onClick={() => setChartType("bar")}
+                        className={cn("px-2 py-3 sm:py-1.5 min-h-[44px] sm:min-h-0 transition-colors", chartType === "bar" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+                        data-testid="button-chart-type-bar"
+                      >
+                        <BarChart2 className="w-4 h-4" />
+                      </button>
+                    )}
+                    {chartView === "overview" && (
+                      <button
+                        onClick={() => setChartType("waterfall")}
+                        className={cn("px-2 py-3 sm:py-1.5 min-h-[44px] sm:min-h-0 transition-colors", chartType === "waterfall" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+                        data-testid="button-chart-type-waterfall"
+                      >
+                        <GitCommitHorizontal className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  {/* Conditional year select — mobile: 3rd; desktop: 1st */}
+                  {(range === "year" || range.startsWith("year-")) && (
+                    <div className="order-3 sm:order-1">
+                      <Select value={specificYear || (range.startsWith("year-") ? range.split("-")[1] : "")} onValueChange={(val) => {
+                        setRange(`year-${val}`);
+                        setSpecificYear(val);
+                      }}>
+                        <SelectTrigger className="w-[100px] h-11 sm:h-9">
+                          <SelectValue placeholder="Year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {years.map((y: string) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {/* Conditional month + year selects — mobile: 3rd; desktop: 1st */}
+                  {(range === "month" || range.startsWith("month-")) && (
+                    <div className="order-3 sm:order-1 flex gap-2">
+                      <Select value={specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear)} onValueChange={val => setSpecificYear(val)}>
+                        <SelectTrigger className="w-[100px] h-11 sm:h-9"><SelectValue placeholder="Year" /></SelectTrigger>
+                        <SelectContent>
+                          {years.map((y: string) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <Select value={specificMonth || (range.startsWith("month-") ? range.split("-")[2] : "")} onValueChange={val => {
+                        const year = specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear);
+                        setRange(`month-${year}-${val}`);
+                        setSpecificMonth(val);
+                      }}>
+                        <SelectTrigger className="w-[120px] h-11 sm:h-9"><SelectValue placeholder="Month" /></SelectTrigger>
+                        <SelectContent>
+                          {monthsData.filter((m: any) => m.year === (specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear))).map((m: any) => (
+                            <SelectItem key={`${m.year}-${m.value}`} value={m.value}>{m.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {/* Forecast monthly invest input — mobile: 4th; desktop: 3rd */}
                   {forecastRange && (
-                    <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium h-[44px] sm:h-10">
+                    <div className="order-4 sm:order-3 flex items-center border rounded-md overflow-hidden text-xs font-medium h-[44px] sm:h-10">
                       <span className="px-2 text-muted-foreground border-r bg-muted/40 h-full flex items-center select-none">
                         {getCurrencySymbol(currency)}/mo
                       </span>
@@ -1659,34 +1696,6 @@ export default function Dashboard() {
                       />
                     </div>
                   )}
-                  {/* Chart type toggle */}
-                  <div className="flex items-center border rounded-md overflow-hidden">
-                    <button
-                      onClick={() => setChartType("line")}
-                      className={cn("px-2 py-3 sm:py-1.5 transition-colors", chartType === "line" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
-                      data-testid="button-chart-type-line"
-                    >
-                      <LineChartIcon className="w-4 h-4" />
-                    </button>
-                    {chartView !== "all" && (
-                      <button
-                        onClick={() => setChartType("bar")}
-                        className={cn("px-2 py-3 sm:py-1.5 transition-colors", chartType === "bar" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
-                        data-testid="button-chart-type-bar"
-                      >
-                        <BarChart2 className="w-4 h-4" />
-                      </button>
-                    )}
-                    {chartView === "overview" && (
-                      <button
-                        onClick={() => setChartType("waterfall")}
-                        className={cn("px-2 py-3 sm:py-1.5 transition-colors", chartType === "waterfall" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
-                        data-testid="button-chart-type-waterfall"
-                      >
-                        <GitCommitHorizontal className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
                 </div>
               </div>
             </CardHeader>
@@ -1721,16 +1730,16 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
-                    <button onClick={() => setChartAggregation("month")} className={cn("px-3 py-3 sm:px-2.5 sm:py-1.5 min-w-[44px] sm:min-w-0 transition-colors", chartAggregation === "month" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-month">Mo</button>
-                    <button onClick={() => setChartAggregation("quarter")} className={cn("px-3 py-3 sm:px-2.5 sm:py-1.5 min-w-[44px] sm:min-w-0 transition-colors", chartAggregation === "quarter" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-quarter">Qtr</button>
-                    <button onClick={() => setChartAggregation("year")} className={cn("px-3 py-3 sm:px-2.5 sm:py-1.5 min-w-[44px] sm:min-w-0 transition-colors", chartAggregation === "year" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-year">Yr</button>
+                    <button onClick={() => setChartAggregation("month")} className={cn("px-3 py-3 sm:px-2.5 sm:py-1.5 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 transition-colors", chartAggregation === "month" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-month">Mo</button>
+                    <button onClick={() => setChartAggregation("quarter")} className={cn("px-3 py-3 sm:px-2.5 sm:py-1.5 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 transition-colors", chartAggregation === "quarter" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-quarter">Qtr</button>
+                    <button onClick={() => setChartAggregation("year")} className={cn("px-3 py-3 sm:px-2.5 sm:py-1.5 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 transition-colors", chartAggregation === "year" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-year">Yr</button>
                   </div>
                   {chartView !== "overview" && (
                     <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
-                      <button onClick={() => setChartValueMode("value")} className={cn("px-3 py-3 sm:px-2.5 sm:py-1.5 min-w-[44px] sm:min-w-0 transition-colors", chartValueMode === "value" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-chart-mode-value">
+                      <button onClick={() => setChartValueMode("value")} className={cn("px-3 py-3 sm:px-2.5 sm:py-1.5 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 transition-colors", chartValueMode === "value" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-chart-mode-value">
                         {getCurrencySymbol(currency)}
                       </button>
-                      <button onClick={() => setChartValueMode("pct")} className={cn("px-3 py-3 sm:px-2.5 sm:py-1.5 min-w-[44px] sm:min-w-0 transition-colors", chartValueMode === "pct" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-chart-mode-pct">
+                      <button onClick={() => setChartValueMode("pct")} className={cn("px-3 py-3 sm:px-2.5 sm:py-1.5 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 transition-colors", chartValueMode === "pct" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-chart-mode-pct">
                         %
                       </button>
                     </div>
