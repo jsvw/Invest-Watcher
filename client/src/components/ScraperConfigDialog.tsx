@@ -16,6 +16,7 @@ const SCRAPER_TYPES = [
   { value: "crowdpear", label: "CrowdPear", credentialType: "email" },
   { value: "goldrepublic", label: "GoldRepublic", credentialType: "username_email" },
   { value: "valvest", label: "Valvest (Landed.eu)", credentialType: "email" },
+  { value: "lande", label: "Lande", credentialType: "email" },
   { value: "trading212", label: "Trading 212 API", credentialType: "apikey" },
   { value: "stock_ticker", label: "Stock Ticker (Yahoo Finance)", credentialType: "stock_ticker" },
 ];
