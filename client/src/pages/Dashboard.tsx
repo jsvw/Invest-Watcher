@@ -137,8 +137,13 @@ interface KpiCardProps {
 
 function KpiCard({ label, value, sub, icon, positive, neutral, platformBreakdown, hoverTitle }: KpiCardProps) {
   const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const valueColor = neutral ? "text-foreground" : positive ? "text-emerald-500" : "text-red-500";
   const iconEl = <div className="p-2 rounded-lg bg-muted/50">{icon}</div>;
+
+  function openCard() { clearTimeout(closeTimer.current); setOpen(true); }
+  function scheduleClose() { closeTimer.current = setTimeout(() => setOpen(false), 120); }
+
   return (
     <Card data-testid={`kpi-card-${label.toLowerCase().replace(/\s+/g, "-")}`}>
       <CardContent className="pt-6">
@@ -151,9 +156,23 @@ function KpiCard({ label, value, sub, icon, positive, neutral, platformBreakdown
           {platformBreakdown && platformBreakdown.length > 0 ? (
             <Popover open={open} onOpenChange={setOpen}>
               <PopoverTrigger asChild>
-                <div className="cursor-pointer" data-testid={`kpi-breakdown-trigger-${label.toLowerCase().replace(/\s+/g, "-")}`}>{iconEl}</div>
+                <div
+                  className="cursor-pointer"
+                  data-testid={`kpi-breakdown-trigger-${label.toLowerCase().replace(/\s+/g, "-")}`}
+                  onMouseEnter={openCard}
+                  onMouseLeave={scheduleClose}
+                  onClick={() => setOpen(o => !o)}
+                >
+                  {iconEl}
+                </div>
               </PopoverTrigger>
-              <PopoverContent className="w-72 p-3" side="bottom" align="end">
+              <PopoverContent
+                className="w-72 p-3"
+                side="bottom"
+                align="end"
+                onMouseEnter={() => clearTimeout(closeTimer.current)}
+                onMouseLeave={scheduleClose}
+              >
                 <p className="text-xs font-semibold mb-2 text-foreground">{hoverTitle ?? "Platform breakdown"}</p>
                 <div className="space-y-1 max-h-56 overflow-y-auto">
                   {[...platformBreakdown].sort((a, b) => b.annualized - a.annualized).map((p, i) => (
