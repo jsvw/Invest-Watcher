@@ -2230,6 +2230,12 @@ export async function registerRoutes(
           return res.status(400).json({ message: "username, email, and password are required for GoldRepublic" });
         }
         credentialData = { username, email, password };
+      } else if (scraperType === "lande") {
+        const { cookies } = req.body;
+        if (!cookies || typeof cookies !== "string" || cookies.trim().length === 0) {
+          return res.status(400).json({ message: "cookies are required for Lande" });
+        }
+        credentialData = { cookies: cookies.trim() };
       } else {
         const { email, password, gmailAppPassword, gmailEmail } = req.body;
         if (!email || !password) {
