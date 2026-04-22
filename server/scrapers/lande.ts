@@ -9,9 +9,23 @@ export interface LandeScrapedData {
   scrapedAt: Date;
 }
 
-const LOGIN_URL = "https://lande.finance/login";
+const DASHBOARD_URL = "https://lande.finance/dashboard";
 
-export async function scrapeLande(email: string, password: string): Promise<LandeScrapedData> {
+function parseCookieString(cookieStr: string): Array<{ name: string; value: string; domain: string; path: string }> {
+  return cookieStr
+    .split(";")
+    .map(part => {
+      const eqIdx = part.indexOf("=");
+      if (eqIdx === -1) return null;
+      const name = part.slice(0, eqIdx).trim();
+      const value = part.slice(eqIdx + 1).trim();
+      if (!name) return null;
+      return { name, value, domain: ".lande.finance", path: "/" };
+    })
+    .filter(Boolean) as Array<{ name: string; value: string; domain: string; path: string }>;
+}
+
+export async function scrapeLande(cookies: string): Promise<LandeScrapedData> {
   let browser: any;
   try {
     browser = await (puppeteer as any).launch({
@@ -44,95 +58,38 @@ export async function scrapeLande(email: string, password: string): Promise<Land
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
     );
-
     await page.setExtraHTTPHeaders({
       "Accept-Language": "en-US,en;q=0.9",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
     });
 
-    console.log("[Lande Scraper] Navigating to login page...");
-    await page.goto(LOGIN_URL, { waitUntil: "networkidle2", timeout: 60000 });
-
-    // Wait for Cloudflare Turnstile to auto-solve — poll up to 30s for login fields to appear
-    console.log("[Lande Scraper] Waiting for Cloudflare challenge to pass...");
-    let loginFieldFound = false;
-    for (let attempt = 0; attempt < 15; attempt++) {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const inputs = await page.evaluate(`(function() {
-        return Array.from(document.querySelectorAll('input')).map(function(i) {
-          return { name: i.name, type: i.type, id: i.id };
-        });
-      })()`);
-      const hasLogin = (inputs as any[]).some((i: any) =>
-        i.id === "inp-email" || i.name === "email" || i.type === "email"
-      );
-      console.log(`[Lande Scraper] Attempt ${attempt + 1}: inputs found: ${JSON.stringify(inputs)}`);
-      if (hasLogin) {
-        loginFieldFound = true;
-        console.log("[Lande Scraper] Login form is visible.");
-        break;
-      }
+    // Inject the user's browser cookies so Cloudflare sees a trusted session
+    const parsedCookies = parseCookieString(cookies);
+    console.log(`[Lande Scraper] Injecting ${parsedCookies.length} cookies...`);
+    if (parsedCookies.length === 0) {
+      throw new Error("No valid cookies found. Please paste the full Cookie header value from your browser.");
     }
+    await page.setCookie(...parsedCookies);
 
-    if (!loginFieldFound) {
-      const pageText = await page.evaluate(`document.body.innerText.substring(0, 500)`);
-      throw new Error(`Cloudflare challenge not solved — login fields not found. Page text: ${pageText}`);
-    }
-
-    console.log("[Lande Scraper] Dismissing cookie consent if present...");
-    try {
-      await page.evaluate(`(function() {
-        var specific = document.querySelector("#onetrust-accept-btn-handler, .onetrust-accept-btn-handler, [id*='accept-btn-handler']");
-        if (specific) { specific.click(); return; }
-        var btns = Array.from(document.querySelectorAll("button, a"));
-        for (var i = 0; i < btns.length; i++) {
-          var t = (btns[i].textContent || "").toLowerCase().trim();
-          if (t === "accept all" || t === "allow all" || t === "accept" || t === "agree" || t === "ok") {
-            btns[i].click();
-            return;
-          }
-        }
-      })()`);
-      await new Promise(resolve => setTimeout(resolve, 500));
-    } catch {
-      console.log("[Lande Scraper] Cookie banner handling skipped");
-    }
-
-    const emailInput = await page.$("#inp-email");
-    const passwordInput = await page.$("#password");
-
-    if (!emailInput || !passwordInput) {
-      const availableInputs = await page.evaluate(`(function() {
-        return Array.from(document.querySelectorAll('input')).map(function(i) {
-          return { name: i.name, type: i.type, id: i.id };
-        });
-      })()`);
-      throw new Error(`Could not find login fields. Available inputs: ${JSON.stringify(availableInputs)}`);
-    }
-
-    console.log("[Lande Scraper] Filling login form...");
-    await emailInput.click({ clickCount: 3 });
-    await emailInput.type(email, { delay: 60 });
-    await new Promise(resolve => setTimeout(resolve, 300));
-    await passwordInput.click({ clickCount: 3 });
-    await passwordInput.type(password, { delay: 60 });
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    console.log("[Lande Scraper] Submitting login...");
-    await page.keyboard.press("Enter");
-
-    await page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 }).catch(() => {});
+    console.log("[Lande Scraper] Navigating to dashboard...");
+    await page.goto(DASHBOARD_URL, { waitUntil: "networkidle2", timeout: 60000 });
     await new Promise(resolve => setTimeout(resolve, 3000));
 
     const currentUrl = page.url();
-    console.log(`[Lande Scraper] Current URL after login: ${currentUrl}`);
+    console.log(`[Lande Scraper] Current URL: ${currentUrl}`);
 
-    if (currentUrl.includes("login")) {
-      const errorText = await page.evaluate(`(function() {
-        var errorEl = document.querySelector('.error, .alert-danger, .alert, [class*="error"], [class*="alert"]');
-        return errorEl ? errorEl.textContent.trim() : null;
-      })()`) as string | null;
-      throw new Error(`Login failed${errorText ? `: ${errorText}` : ". Check your credentials."}`);
+    // If redirected back to login or Cloudflare challenge, the cookies have expired
+    if (currentUrl.includes("/login") || currentUrl.includes("cloudflare")) {
+      const pageText = await page.evaluate(`document.body.innerText.substring(0, 300)`);
+      throw new Error(`Session cookies have expired or are invalid. Please refresh your cookies from the browser. Page: ${pageText}`);
+    }
+
+    // Check for Cloudflare challenge page
+    const cfCheck = await page.evaluate(`(function() {
+      var t = document.body ? document.body.innerText : "";
+      return t.includes("Performing security verification") || t.includes("security service");
+    })()`);
+    if (cfCheck) {
+      throw new Error("Cloudflare challenge still active. Make sure to include the cf_clearance cookie when copying from your browser.");
     }
 
     console.log("[Lande Scraper] Waiting for balance element...");

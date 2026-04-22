@@ -2505,7 +2505,7 @@ export async function registerRoutes(
           balanceData = await scrapeValvest(creds.email, creds.password);
         } else if (config.scraperType === "lande") {
           const { scrapeLande } = await import("./scrapers/lande");
-          balanceData = await scrapeLande(creds.email, creds.password);
+          balanceData = await scrapeLande(creds.cookies);
         } else {
           const { scrapeCrowdPear } = await import("./scrapers/crowdpear");
           balanceData = await scrapeCrowdPear(creds.email, creds.password, creds.gmailAppPassword, creds.gmailEmail);
