@@ -88,6 +88,7 @@ interface PlatformRollingEntry {
   change: number;
   pct: number;
   prevValue: number;
+  stale?: boolean;
 }
 
 interface PlatformRollingReturns {
@@ -401,7 +402,8 @@ export default function Dashboard() {
   const rollingReturns = useMemo(() => {
     if (!platformRollingReturns) return undefined;
     const computeWindow = (entries: PlatformRollingEntry[]) => {
-      const active = entries.filter(p => !excludedPlatforms.has(p.platformId));
+      const active = entries.filter(p => !excludedPlatforms.has(p.platformId) && !p.stale);
+      if (active.length === 0) return null;
       const totalChange = active.reduce((sum, p) => sum + p.change, 0);
       const totalPrevValue = active.reduce((sum, p) => sum + (p.prevValue ?? 0), 0);
       const pct = totalPrevValue > 0 ? (totalChange / totalPrevValue) * 100 : 0;
@@ -1427,7 +1429,7 @@ export default function Dashboard() {
               platformBreakdown={annReturn12M?.platforms}
               hoverTitle={`Return by platform (last ${annReturn12M?.months ?? 12}mo)`}
             />
-            <Card className={cn("hover:shadow-lg transition-all duration-300 border-l-4", rollingReturns ? (rollingReturns.d30.change >= 0 ? "border-l-emerald-500" : "border-l-rose-500") : "border-l-muted")} data-testid="stat-rolling-returns">
+            <Card className={cn("hover:shadow-lg transition-all duration-300 border-l-4", rollingReturns?.d30 ? (rollingReturns.d30.change >= 0 ? "border-l-emerald-500" : "border-l-rose-500") : "border-l-muted")} data-testid="stat-rolling-returns">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">Performance</CardTitle>
                 <TrendingUp className="w-4 h-4 text-muted-foreground" />
@@ -1439,7 +1441,7 @@ export default function Dashboard() {
                       const key = label === "7d" ? "d7" : label === "30d" ? "d30" : "d90";
                       const w = rollingReturns?.[key];
                       const platforms = platformRollingReturns?.[key]
-                        ?.filter(p => !excludedPlatforms.has(p.platformId))
+                        ?.filter(p => !excludedPlatforms.has(p.platformId) && !p.stale)
                         .slice()
                         .sort((a, b) => b.change - a.change);
                       return (

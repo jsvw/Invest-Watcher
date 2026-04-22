@@ -1274,6 +1274,13 @@ export async function registerRoutes(
           const latestVal = platformVals[0];
           const currentValue = Number(latestVal.value);
           const currentDate = new Date(latestVal.date);
+
+          const now = new Date();
+          const daysSinceLatest = (now.getTime() - currentDate.getTime()) / (24 * 60 * 60 * 1000);
+          if (daysSinceLatest > days) {
+            return { platformId: platform.id, name: platform.name, color: platform.color || '#6b7280', change: 0, pct: 0, prevValue: 0, stale: true };
+          }
+
           const target = new Date(currentDate.getTime() - days * 24 * 60 * 60 * 1000);
 
           const prevValEntry = platformVals.slice(1).reduce((best: any, v: any) => {
