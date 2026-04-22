@@ -1656,7 +1656,7 @@ export default function Dashboard() {
                     </Tabs>
                   </div>
                   {/* Chart-type toggle — mobile: 2nd; desktop: 4th */}
-                  <div className="order-2 sm:order-4 flex items-center border rounded-md overflow-hidden">
+                  <div className="order-2 sm:order-4 self-start flex items-center border rounded-md overflow-hidden">
                     <button
                       onClick={() => setChartType("line")}
                       className={cn("px-2 py-3 sm:py-1.5 min-h-[44px] sm:min-h-0 transition-colors", chartType === "line" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
@@ -1685,7 +1685,7 @@ export default function Dashboard() {
                   </div>
                   {/* Conditional year select — mobile: 3rd; desktop: 1st */}
                   {(range === "year" || range.startsWith("year-")) && (
-                    <div className="order-3 sm:order-1">
+                    <div className="order-3 sm:order-1 self-start">
                       <Select value={specificYear || (range.startsWith("year-") ? range.split("-")[1] : "")} onValueChange={(val) => {
                         setRange(`year-${val}`);
                         setSpecificYear(val);
@@ -1701,7 +1701,7 @@ export default function Dashboard() {
                   )}
                   {/* Conditional month + year selects — mobile: 3rd; desktop: 1st */}
                   {(range === "month" || range.startsWith("month-")) && (
-                    <div className="order-3 sm:order-1 flex gap-2">
+                    <div className="order-3 sm:order-1 self-start flex gap-2">
                       <Select value={specificYear || (range.startsWith("month-") ? range.split("-")[1] : currentYear)} onValueChange={val => setSpecificYear(val)}>
                         <SelectTrigger className="w-[100px] h-11 sm:h-9"><SelectValue placeholder="Year" /></SelectTrigger>
                         <SelectContent>
@@ -1724,7 +1724,7 @@ export default function Dashboard() {
                   )}
                   {/* Forecast monthly invest input — mobile: 4th; desktop: 3rd */}
                   {forecastRange && (
-                    <div className="order-4 sm:order-3 flex items-center border rounded-md overflow-hidden text-xs font-medium h-[44px] sm:h-10">
+                    <div className="order-4 sm:order-3 self-start flex items-center border rounded-md overflow-hidden text-xs font-medium h-[44px] sm:h-10">
                       <span className="px-2 text-muted-foreground border-r bg-muted/40 h-full flex items-center select-none">
                         {getCurrencySymbol(currency)}/mo
                       </span>
