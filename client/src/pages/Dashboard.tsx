@@ -1478,6 +1478,8 @@ export default function Dashboard() {
                                   </div>
                                 ))}
                               </div>
+                            ) : platformRollingReturns ? (
+                              <p className="text-xs text-muted-foreground">No data for this period</p>
                             ) : (
                               <p className="text-xs text-muted-foreground">Loading…</p>
                             )}
