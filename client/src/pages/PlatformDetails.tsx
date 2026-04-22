@@ -1218,7 +1218,8 @@ export default function PlatformDetails() {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue={platformMode !== "standard" ? "assets" : "chart"} className="space-y-6">
-          <TabsList>
+          <div className="overflow-x-auto pb-1 -mb-1">
+          <TabsList className="inline-flex min-w-max">
             {platformMode !== "standard" && (
               <TabsTrigger value="assets" className="gap-2"><Package className="h-4 w-4" /> Assets</TabsTrigger>
             )}
@@ -1235,12 +1236,13 @@ export default function PlatformDetails() {
             )}
             <TabsTrigger value="analytics" className="gap-2" data-testid="tab-platform-analytics"><TrendingUp className="h-4 w-4" /> Analytics</TabsTrigger>
           </TabsList>
+          </div>
 
           {/* Assets Tab for non-standard modes */}
           {platformMode !== "standard" && (
             <TabsContent value="assets" className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-6">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-wrap">
                   <div>
                     <CardTitle>Platform Performance</CardTitle>
                     <CardDescription>Invested vs. Valuation over time</CardDescription>
@@ -1305,7 +1307,7 @@ export default function PlatformDetails() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
                     <Tabs value={chartView} onValueChange={(v) => setChartView(v as any)}>
                       <TabsList>
                         <TabsTrigger value="overview">Value Overview</TabsTrigger>
@@ -1331,7 +1333,7 @@ export default function PlatformDetails() {
                       </Button>
                     </div>
                   </div>
-                  <div className="h-[400px] w-full">
+                  <div className="h-[260px] sm:h-[400px] w-full">
                     {activeChartData && activeChartData.length > 0 ? (
                       platAggregatedData ? (
                         <ResponsiveContainer width="100%" height="100%">
@@ -1482,7 +1484,8 @@ export default function PlatformDetails() {
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <div className="rounded-md border">
+                  <div className="overflow-x-auto">
+                  <div className="rounded-md border min-w-[900px]">
                     <div className={`grid ${platformMode === "asset_returns" ? "grid-cols-[0.8fr_0.8fr_1.2fr_1.2fr_0.5fr_0.8fr_0.7fr_0.7fr_0.8fr_1.8fr_minmax(9rem,9rem)]" : "grid-cols-[1fr_1.5fr_1fr_0.8fr_0.7fr_0.7fr_0.8fr_1.5fr_minmax(9rem,9rem)]"} p-4 bg-muted/50 font-medium text-sm gap-2`}>
                       <button onClick={() => setAssetSort(assetSort === "date" ? "date-asc" : "date")} className="flex items-center gap-1 hover:text-foreground text-left" data-testid="sort-date">
                         Date {assetSort === "date" ? <ArrowDown className="h-3 w-3 shrink-0" /> : assetSort === "date-asc" ? <ArrowUp className="h-3 w-3 shrink-0" /> : <ChevronsUpDown className="h-3 w-3 shrink-0 opacity-40" />}
@@ -1668,6 +1671,7 @@ export default function PlatformDetails() {
                       )}
                     </div>
                   </div>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -1676,7 +1680,7 @@ export default function PlatformDetails() {
           {platformMode === "standard" && (
             <TabsContent value="chart" className="animate-in fade-in slide-in-from-bottom-2 duration-300">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-wrap">
                   <div>
                     <CardTitle>Platform Performance</CardTitle>
                     <CardDescription>Invested vs. Valuation over time</CardDescription>
@@ -1741,7 +1745,7 @@ export default function PlatformDetails() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
                     <Tabs value={chartView} onValueChange={(v) => setChartView(v as any)}>
                       <TabsList>
                         <TabsTrigger value="overview" data-testid="tab-platform-chart-overview">Value Overview</TabsTrigger>
@@ -1767,7 +1771,7 @@ export default function PlatformDetails() {
                       </Button>
                     </div>
                   </div>
-                  <div className="h-[400px] w-full">
+                  <div className="h-[260px] sm:h-[400px] w-full">
                     {activeChartData && activeChartData.length > 0 ? (
                       platAggregatedData ? (
                         <ResponsiveContainer width="100%" height="100%">
@@ -1866,7 +1870,8 @@ export default function PlatformDetails() {
           <TabsContent value="investments">
             <Card>
               <CardContent className="p-0">
-                <div className="rounded-md border">
+                <div className="overflow-x-auto">
+                <div className="rounded-md border min-w-[480px]">
                   <div className="grid grid-cols-5 p-4 bg-muted/50 font-medium text-sm">
                     <div>Date</div>
                     <div>Type</div>
@@ -1931,6 +1936,7 @@ export default function PlatformDetails() {
                       ))
                     )}
                   </div>
+                </div>
                 </div>
               </CardContent>
             </Card>
@@ -2458,7 +2464,7 @@ export default function PlatformDetails() {
             ) : (
               <>
                 {/* Scorecard strip */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                   <Card className="bg-gradient-to-br from-card to-muted/30" data-testid="analytics-stat-roi">
                     <CardContent className="pt-5 pb-4">
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">All-time ROI</p>

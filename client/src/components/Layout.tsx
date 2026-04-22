@@ -204,8 +204,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto h-screen bg-background/50">
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1 overflow-y-auto md:h-screen bg-background/50">
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
           {children}
         </div>
       </main>

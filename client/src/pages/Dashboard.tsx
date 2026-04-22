@@ -1288,7 +1288,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[1, 2, 3].map(i => <Skeleton key={i} className="h-32 rounded-xl" />)}
           </div>
-          <Skeleton className="h-[400px] rounded-xl" />
+          <Skeleton className="h-[280px] sm:h-[400px] rounded-xl" />
         </div>
       </Layout>
     );
@@ -1495,7 +1495,7 @@ export default function Dashboard() {
 
           {/* Portfolio Performance Chart */}
           <Card className="shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-wrap">
               <div>
                 <CardTitle>Portfolio Performance</CardTitle>
                 <CardDescription>Invested amount vs. current valuation over time</CardDescription>
@@ -1634,7 +1634,7 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <Tabs value={chartView} onValueChange={v => {
                   const next = v as typeof chartView;
                   if (next === "all" && chartType === "bar") setChartType("line");
@@ -1669,7 +1669,7 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
-              <div className={cn("h-[400px] w-full transition-opacity duration-150", chartFading ? "opacity-0" : "opacity-100")}>
+              <div className={cn("h-[280px] sm:h-[400px] w-full transition-opacity duration-150", chartFading ? "opacity-0" : "opacity-100")}>
                 {(chartData && chartData.length > 0) || (displayedChartView === "monthly" && monthlySeriesData.length > 0) ? (() => {
                   const mappedData = chartData.map((h: any, i: number, arr: any[]) => {
                     const prev = arr[i - 1];
