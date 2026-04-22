@@ -26,7 +26,6 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip as UITooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
@@ -137,6 +136,7 @@ interface KpiCardProps {
 }
 
 function KpiCard({ label, value, sub, icon, positive, neutral, platformBreakdown, hoverTitle }: KpiCardProps) {
+  const [open, setOpen] = useState(false);
   const valueColor = neutral ? "text-foreground" : positive ? "text-emerald-500" : "text-red-500";
   const iconEl = <div className="p-2 rounded-lg bg-muted/50">{icon}</div>;
   return (
@@ -149,11 +149,11 @@ function KpiCard({ label, value, sub, icon, positive, neutral, platformBreakdown
             {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
           </div>
           {platformBreakdown && platformBreakdown.length > 0 ? (
-            <HoverCard openDelay={100} closeDelay={100}>
-              <HoverCardTrigger asChild>
-                <div className="cursor-pointer">{iconEl}</div>
-              </HoverCardTrigger>
-              <HoverCardContent className="w-72 p-3" side="bottom" align="end">
+            <Popover open={open} onOpenChange={setOpen}>
+              <PopoverTrigger asChild>
+                <div className="cursor-pointer" data-testid={`kpi-breakdown-trigger-${label.toLowerCase().replace(/\s+/g, "-")}`}>{iconEl}</div>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-3" side="bottom" align="end">
                 <p className="text-xs font-semibold mb-2 text-foreground">{hoverTitle ?? "Platform breakdown"}</p>
                 <div className="space-y-1 max-h-56 overflow-y-auto">
                   {[...platformBreakdown].sort((a, b) => b.annualized - a.annualized).map((p, i) => (
@@ -175,8 +175,8 @@ function KpiCard({ label, value, sub, icon, positive, neutral, platformBreakdown
                     </div>
                   ))}
                 </div>
-              </HoverCardContent>
-            </HoverCard>
+              </PopoverContent>
+            </Popover>
           ) : iconEl}
         </div>
       </CardContent>
@@ -313,8 +313,13 @@ export default function Dashboard() {
     }
   }, [platforms]);
 
+  // ── Rolling returns popover state (tap-accessible on mobile) ────────────
+  const [rollingPopoverOpen, setRollingPopoverOpen] = useState<string | null>(null);
+
   // ── Analytics state ──────────────────────────────────────────────────────
   const [tooltip, setTooltip] = useState<{ x: number; y: number; data: HeatmapTooltipData } | null>(null);
+  const [heatmapPinnedCell, setHeatmapPinnedCell] = useState<string | null>(null);
+  const heatmapRef = useRef<HTMLDivElement>(null);
   const [heatmapMode, setHeatmapMode] = useState<"pct" | "value">("pct");
   const [activeHeatmapTab, setActiveHeatmapTab] = useState<string>("monthly");
   const [sortKey, setSortKey] = useState<SortKey>("roi");
@@ -324,6 +329,18 @@ export default function Dashboard() {
   const [scrapeLog, setScrapeLog] = useState<{ platformName: string; success: boolean; message: string }[] | null>(null);
   const [scrapeLogOpen, setScrapeLogOpen] = useState(false);
   const scrapeLogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!heatmapPinnedCell) return;
+    function handleOutside(e: PointerEvent) {
+      if (heatmapRef.current && !heatmapRef.current.contains(e.target as Node)) {
+        setHeatmapPinnedCell(null);
+        setTooltip(null);
+      }
+    }
+    document.addEventListener("pointerdown", handleOutside);
+    return () => document.removeEventListener("pointerdown", handleOutside);
+  }, [heatmapPinnedCell]);
 
   useEffect(() => {
     if (scrapeLogRef.current) {
@@ -1489,9 +1506,16 @@ export default function Dashboard() {
                         .slice()
                         .sort((a, b) => b.change - a.change);
                       return (
-                        <UITooltip key={label}>
+                        <UITooltip
+                          key={label}
+                          open={rollingPopoverOpen === label}
+                          onOpenChange={(o) => setRollingPopoverOpen(o ? label : null)}
+                        >
                           <TooltipTrigger asChild>
-                            <tr className="border-b border-border/40 last:border-0 cursor-default hover:bg-muted/30 transition-colors">
+                            <tr
+                              className="border-b border-border/40 last:border-0 cursor-pointer hover:bg-muted/30 transition-colors"
+                              onClick={() => setRollingPopoverOpen(v => v === label ? null : label)}
+                            >
                               <td className="py-1 pr-2 text-muted-foreground font-medium w-8">{label}</td>
                               <td className={cn("py-1 pr-2 font-semibold tabular-nums text-right", !w ? "text-muted-foreground" : w.change >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
                                 {!w ? "—" : `${w.change >= 0 ? "+" : ""}${formatCurrencyRounded(w.change, currency)}`}
@@ -2071,7 +2095,7 @@ export default function Dashboard() {
 
                 <TabsContent value="monthly">
                   {activeHeatmapData ? (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto" ref={heatmapRef}>
                       <div className="min-w-[600px]">
                         <div className="flex mb-1">
                           <div className="w-12 shrink-0" />
@@ -2091,32 +2115,44 @@ export default function Dashboard() {
                                 ? `rgba(16,185,129,${0.15 + intensity * 0.75})`
                                 : `rgba(239,68,68,${0.15 + intensity * 0.75})`;
                               const label = `${MONTHS[monthNum - 1]} ${year}`;
+                              const cellKey = `${year}-${monthNum}`;
+                              const isPinned = heatmapPinnedCell === cellKey;
+                              const tooltipData = {
+                                label,
+                                returnPct: cell.returnPct,
+                                absoluteChange: cell.absoluteChange,
+                                currency,
+                                inProgress: cell.inProgress,
+                                platformBreakdown: platformBreakdownByMonth?.[`${year}-${String(monthNum).padStart(2, "0")}`]?.filter(p => !excludedPlatforms.has(p.platformId)),
+                              };
                               return (
                                 <div
                                   key={monthNum}
                                   className={cn(
-                                    "flex-1 mx-0.5 h-10 rounded flex items-center justify-center text-[10px] font-medium cursor-default transition-transform hover:scale-105",
-                                    cell.inProgress && "border-2 border-dashed border-amber-400/70 opacity-80"
+                                    "flex-1 mx-0.5 h-10 rounded flex items-center justify-center text-[10px] font-medium cursor-pointer transition-transform hover:scale-105",
+                                    cell.inProgress && "border-2 border-dashed border-amber-400/70 opacity-80",
+                                    isPinned && "ring-2 ring-offset-1 ring-foreground/30"
                                   )}
                                   style={{ backgroundColor: bg, color: intensity > 0.5 ? "#fff" : undefined }}
                                   data-testid={`heatmap-cell-${year}-${monthNum}`}
                                   onMouseEnter={e => {
-                                    const rect = (e.target as HTMLElement).getBoundingClientRect();
-                                    const ymKey = `${year}-${String(monthNum).padStart(2, "0")}`;
-                                    setTooltip({
-                                      x: rect.left + rect.width / 2,
-                                      y: rect.top,
-                                      data: {
-                                        label,
-                                        returnPct: cell.returnPct,
-                                        absoluteChange: cell.absoluteChange,
-                                        currency,
-                                        inProgress: cell.inProgress,
-                                        platformBreakdown: platformBreakdownByMonth?.[ymKey]?.filter(p => !excludedPlatforms.has(p.platformId)),
-                                      },
-                                    });
+                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                    setTooltip({ x: rect.left + rect.width / 2, y: rect.top, data: tooltipData });
                                   }}
-                                  onMouseLeave={() => setTooltip(null)}
+                                  onMouseLeave={() => {
+                                    if (!isPinned) setTooltip(null);
+                                  }}
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    if (isPinned) {
+                                      setHeatmapPinnedCell(null);
+                                      setTooltip(null);
+                                    } else {
+                                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                      setHeatmapPinnedCell(cellKey);
+                                      setTooltip({ x: rect.left + rect.width / 2, y: rect.top, data: tooltipData });
+                                    }
+                                  }}
                                 >
                                   {heatmapMode === "pct" ? fmtPct(cell.returnPct) : formatCompactCurrency(cell.absoluteChange, currency)}
                                 </div>
@@ -2617,7 +2653,7 @@ export default function Dashboard() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                            className="h-8 w-8 p-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
                             onClick={e => {
                               e.stopPropagation();
                               deleteFilterMutation.mutate(filter.id);
