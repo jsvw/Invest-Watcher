@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { LayoutDashboard, TrendingUp, Menu, X, LogOut, Settings, Coffee, Plus, AlertTriangle } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/App";
@@ -16,6 +16,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user } = useAuth();
   const { data: platforms } = usePlatforms();
+
+  const touchStartX = useRef<number | null>(null);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartX.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    if (deltaX < -50) {
+      setIsMobileMenuOpen(false);
+    }
+    touchStartX.current = null;
+  }, []);
+
+  const closeMobileMenu = useCallback(() => setIsMobileMenuOpen(false), []);
 
   const thirtyOneDaysAgo = new Date();
   thirtyOneDaysAgo.setDate(thirtyOneDaysAgo.getDate() - 31);
@@ -51,24 +68,55 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="h-screen bg-background flex flex-col md:flex-row overflow-hidden">
       {/* Mobile Header */}
-      <div className="md:hidden flex items-center justify-between p-4 border-b bg-card">
+      <div className="md:hidden flex items-center justify-between px-4 h-14 border-b bg-card/95 backdrop-blur-sm shrink-0">
         <div className="flex items-center gap-2 font-display text-xl font-bold text-primary">
-          <TrendingUp className="h-6 w-6" />
+          <div className="relative">
+            <TrendingUp className="h-6 w-6" />
+            {hasStaleValuation && (
+              <AlertTriangle
+                className="absolute -top-1.5 -right-1.5 h-3.5 w-3.5 text-amber-500"
+                data-testid="icon-stale-valuation-warning-mobile"
+              />
+            )}
+          </div>
           <span>InvestTrack</span>
         </div>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-          {isMobileMenuOpen ? <X /> : <Menu />}
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="flex items-center justify-center w-11 h-11 rounded-xl hover:bg-muted transition-colors"
+          aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+          data-testid="button-mobile-menu-toggle"
+        >
+          {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </div>
 
       {/* Sidebar Navigation */}
-      <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-card border-r shadow-xl transform transition-transform duration-200 ease-in-out md:translate-x-0 md:relative md:shadow-none flex flex-col h-full",
-        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 w-72 bg-card border-r shadow-2xl transform transition-transform duration-250 ease-in-out md:translate-x-0 md:relative md:shadow-none md:w-64 flex flex-col h-full",
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Mobile drawer top bar */}
+        <div className="md:hidden flex items-center justify-between px-5 h-14 border-b shrink-0">
+          <span className="font-display text-lg font-semibold text-foreground">Menu</span>
+          <button
+            onClick={closeMobileMenu}
+            className="flex items-center justify-center w-11 h-11 rounded-xl hover:bg-muted transition-colors"
+            aria-label="Close menu"
+            data-testid="button-close-mobile-menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
         {/* Scrollable top section */}
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="flex items-center gap-2 font-display text-2xl font-bold text-primary mb-8">
+          {/* Desktop logo */}
+          <div className="hidden md:flex items-center gap-2 font-display text-2xl font-bold text-primary mb-8">
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="relative shrink-0 cursor-default">
@@ -90,18 +138,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <span>InvestTrack</span>
           </div>
 
-          <nav className="space-y-2">
+          <nav className="space-y-1">
             {navItems.map((item) => {
               const isActive = location === item.href;
               return (
-                <Link key={item.href} href={item.href}>
+                <Link key={item.href} href={item.href} onClick={closeMobileMenu}>
                   <div className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer",
+                    "flex items-center gap-3 px-4 min-h-[44px] rounded-xl transition-all duration-200 cursor-pointer",
                     isActive
                       ? "bg-primary text-primary-foreground shadow-md shadow-primary/20 font-medium"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}>
-                    <item.icon className="h-5 w-5" />
+                    <item.icon className="h-5 w-5 shrink-0" />
                     {item.label}
                   </div>
                 </Link>
@@ -118,10 +166,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 return (
                   <Tooltip key={p.id}>
                     <TooltipTrigger asChild>
-                      <Link href={`/platforms/${encodeURIComponent(p.name.toLowerCase().replace(/\s+/g, '-'))}`}>
+                      <Link
+                        href={`/platforms/${encodeURIComponent(p.name.toLowerCase().replace(/\s+/g, '-'))}`}
+                        onClick={closeMobileMenu}
+                      >
                         <div
                           data-testid={`sidebar-platform-${p.id}`}
-                          className="relative flex items-center justify-center p-2 rounded-lg hover:bg-muted transition-colors cursor-pointer"
+                          className="relative flex items-center justify-center min-h-[44px] rounded-lg hover:bg-muted transition-colors cursor-pointer"
                         >
                           <PlatformIcon
                             icon={p.icon}
@@ -151,7 +202,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <div
                     title="Add Platform"
                     data-testid="sidebar-add-platform"
-                    className="flex items-center justify-center p-2 rounded-lg hover:bg-muted transition-colors cursor-pointer border border-dashed border-muted-foreground/30"
+                    className="flex items-center justify-center min-h-[44px] rounded-lg hover:bg-muted transition-colors cursor-pointer border border-dashed border-muted-foreground/30"
                   >
                     <Plus className="w-4 h-4 text-muted-foreground" />
                   </div>
@@ -167,20 +218,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center justify-between">
               <div className="text-xs text-muted-foreground truncate">{user.email}</div>
               <div className="flex items-center gap-1 shrink-0">
-              <Link href="/settings">
-                <Button variant="ghost" size="icon" title="Settings" data-testid="button-settings">
-                  <Settings className="h-4 w-4" />
+                <Link href="/settings" onClick={closeMobileMenu}>
+                  <Button variant="ghost" size="icon" title="Settings" data-testid="button-settings" className="min-h-[44px] min-w-[44px]">
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleLogout}
+                  title="Log out"
+                  data-testid="button-logout"
+                  className="min-h-[44px] min-w-[44px]"
+                >
+                  <LogOut className="h-4 w-4" />
                 </Button>
-              </Link>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleLogout}
-                title="Log out"
-                data-testid="button-logout"
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
               </div>
             </div>
           )}
@@ -213,8 +265,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
+          className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-[1px]"
+          onClick={closeMobileMenu}
         />
       )}
     </div>
