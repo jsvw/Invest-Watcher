@@ -1871,7 +1871,7 @@ export default function PlatformDetails() {
             <Card>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                <div className="rounded-md border min-w-[480px]">
+                <div className="rounded-md border min-w-[600px]">
                   <div className="grid grid-cols-5 p-4 bg-muted/50 font-medium text-sm">
                     <div>Date</div>
                     <div>Type</div>
