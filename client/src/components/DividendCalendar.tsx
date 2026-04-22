@@ -297,7 +297,7 @@ export function DividendCalendar({ payments, projections, hasFmpKey, currency }:
                 <span className="block text-xs mt-1">Projections require at least 2 historical payments per ticker.</span>
               </p>
             ) : (
-              <div className="overflow-auto">
+              <div className="overflow-x-auto">
                 <table className="w-full min-w-[360px] text-xs">
                   <thead>
                     <tr className="border-b">
