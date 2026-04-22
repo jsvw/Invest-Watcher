@@ -1945,7 +1945,8 @@ export default function PlatformDetails() {
           <TabsContent value="valuations">
              <Card>
               <CardContent className="p-0">
-                <div className="rounded-md border">
+                <div className="overflow-x-auto">
+                <div className="rounded-md border min-w-[480px]">
                   <div className="grid grid-cols-[1fr_1fr_1fr_minmax(9rem,9rem)] p-4 bg-muted/50 font-medium text-sm gap-2">
                     <div>Date</div>
                     <div>Recorded Value</div>
@@ -2008,6 +2009,7 @@ export default function PlatformDetails() {
                       })
                     )}
                   </div>
+                </div>
                 </div>
               </CardContent>
             </Card>
