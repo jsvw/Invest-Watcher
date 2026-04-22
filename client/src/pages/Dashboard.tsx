@@ -31,6 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PortfolioHeatmap, type EnrichedAsset } from "@/components/PortfolioHeatmap";
 import { WaterfallChart } from "@/components/WaterfallChart";
 import type { DashboardFilter } from "@shared/schema";
@@ -258,6 +259,7 @@ export default function Dashboard() {
   const [singleSelectMode, setSingleSelectMode] = useState(false);
   const [filterPresetsOpen, setFilterPresetsOpen] = useState(false);
   const [filterPresetName, setFilterPresetName] = useState("");
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   // ── Dashboard chart state ────────────────────────────────────────────────
   const [range, setRange] = useState("all");
@@ -1308,6 +1310,25 @@ export default function Dashboard() {
               <h1 className="text-3xl font-bold font-display tracking-tight text-foreground">Dashboard</h1>
               <p className="text-muted-foreground">Your financial overview at a glance.</p>
             </div>
+            <div className="flex items-center gap-2 flex-wrap justify-end">
+              {/* Mobile filter button */}
+              {platforms && platforms.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="md:hidden gap-1.5"
+                  onClick={() => setMobileFilterOpen(true)}
+                  data-testid="button-mobile-filter"
+                >
+                  <Filter className="w-4 h-4" />
+                  Platforms
+                  {excludedPlatforms.size > 0 && (
+                    <span className="bg-primary text-primary-foreground rounded-full px-1.5 text-xs leading-tight">
+                      {(platforms.length) - excludedPlatforms.size}/{platforms.length}
+                    </span>
+                  )}
+                </Button>
+              )}
             <div className="flex flex-col items-end gap-1">
               <Button
                 data-testid="button-scrape-all"
@@ -1329,6 +1350,7 @@ export default function Dashboard() {
                     : "Never scraped"}
                 </span>
               )}
+            </div>
             </div>
           </div>
 
@@ -2441,7 +2463,7 @@ export default function Dashboard() {
 
         {/* ── Sticky right filter panel ─────────────────────────────────── */}
         {platforms && platforms.length > 0 && (
-          <div className="sticky top-8 w-48 shrink-0 space-y-3 bg-card border border-border rounded-xl p-3 shadow-sm" data-testid="platform-filter-bar">
+          <div className="sticky top-8 w-48 shrink-0 space-y-3 bg-card border border-border rounded-xl p-3 shadow-sm hidden md:block" data-testid="platform-filter-bar">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
               <Filter className="w-3.5 h-3.5" />
               Platforms
@@ -2588,6 +2610,54 @@ export default function Dashboard() {
         )}
 
       </div>
+
+      {/* ── Mobile platform filter sheet ─────────────────────────────────── */}
+      {platforms && platforms.length > 0 && (
+        <Sheet open={mobileFilterOpen} onOpenChange={setMobileFilterOpen}>
+          <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto rounded-t-2xl" data-testid="sheet-mobile-filter">
+            <SheetHeader className="mb-4">
+              <SheetTitle className="flex items-center gap-2 text-base">
+                <Filter className="w-4 h-4" />
+                Filter Platforms
+              </SheetTitle>
+            </SheetHeader>
+            <div className="space-y-4 pb-4">
+              <div className="grid grid-cols-2 gap-2">
+                {platforms.map(p => {
+                  const excluded = excludedPlatforms.has(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        if (singleSelectMode) {
+                          setExcludedPlatforms(new Set(platforms.filter(o => o.id !== p.id).map(o => o.id)));
+                        } else {
+                          togglePlatform(p.id);
+                        }
+                      }}
+                      data-testid={`sheet-filter-platform-${p.id}`}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left",
+                        excluded
+                          ? "opacity-40 text-muted-foreground border border-border"
+                          : "bg-muted/70 hover:bg-muted text-foreground border border-transparent"
+                      )}
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: excluded ? "#888" : p.color }} />
+                      <span className="truncate">{p.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2 pt-2 border-t">
+                <Button variant="outline" size="sm" className="flex-1 h-9" onClick={() => { setSingleSelectMode(false); setExcludedPlatforms(new Set()); }} data-testid="sheet-filter-select-all">All</Button>
+                <Button variant="outline" size="sm" className="flex-1 h-9" onClick={() => { setSingleSelectMode(false); setExcludedPlatforms(new Set(platforms.map(p => p.id))); }} data-testid="sheet-filter-deselect-all">None</Button>
+                <Button variant={singleSelectMode ? "default" : "outline"} size="sm" className="flex-1 h-9" onClick={() => setSingleSelectMode(v => !v)} data-testid="sheet-filter-single-select">Single</Button>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
     </Layout>
   );
 }
