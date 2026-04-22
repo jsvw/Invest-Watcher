@@ -1560,7 +1560,7 @@ export default function Dashboard() {
                         if (val in FORECAST_MAP) {
                           setForecastRange(FORECAST_MAP[val]); setRange("all"); setSpecificYear(null); setSpecificMonth(null); setChartType("line");
                         } else {
-                          setRange(val); setSpecificYear(null); setSpecificMonth(null); setForecastRange(null); setForecastMonthlyInvest(0);
+                          setRange(val); setSpecificYear(null); setSpecificMonth(null); setForecastRange(null); setForecastMonthlyInvest(0); setLongRangeOpen(false);
                         }
                       }}
                       className="w-auto"
@@ -1706,7 +1706,7 @@ export default function Dashboard() {
                     const next = v as typeof chartView;
                     if (next === "all" && chartType === "bar") setChartType("line");
                     if (next !== "overview" && chartType === "waterfall") setChartType("line");
-                    if (next !== "overview") { setForecastRange(null); setForecastMonthlyInvest(0); }
+                    if (next !== "overview") { setForecastRange(null); setForecastMonthlyInvest(0); setLongRangeOpen(false); }
                     setChartView(next);
                   }}>
                     <TabsList className="flex-nowrap w-max">
@@ -1730,9 +1730,9 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
-                    <button onClick={() => setChartAggregation("month")} className={cn("px-3 py-3 sm:px-2.5 sm:py-1.5 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 transition-colors", chartAggregation === "month" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-month">Mo</button>
-                    <button onClick={() => setChartAggregation("quarter")} className={cn("px-3 py-3 sm:px-2.5 sm:py-1.5 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 transition-colors", chartAggregation === "quarter" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-quarter">Qtr</button>
-                    <button onClick={() => setChartAggregation("year")} className={cn("px-3 py-3 sm:px-2.5 sm:py-1.5 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 transition-colors", chartAggregation === "year" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-year">Yr</button>
+                    <button onClick={() => { setChartAggregation("month"); setLongRangeOpen(false); }} className={cn("px-3 py-3 sm:px-2.5 sm:py-1.5 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 transition-colors", chartAggregation === "month" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-month">Mo</button>
+                    <button onClick={() => { setChartAggregation("quarter"); setLongRangeOpen(false); }} className={cn("px-3 py-3 sm:px-2.5 sm:py-1.5 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 transition-colors", chartAggregation === "quarter" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-quarter">Qtr</button>
+                    <button onClick={() => { setChartAggregation("year"); setLongRangeOpen(false); }} className={cn("px-3 py-3 sm:px-2.5 sm:py-1.5 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 transition-colors", chartAggregation === "year" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-agg-year">Yr</button>
                   </div>
                   {chartView !== "overview" && (
                     <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
