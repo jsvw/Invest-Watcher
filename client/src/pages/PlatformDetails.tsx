@@ -745,6 +745,18 @@ export default function PlatformDetails() {
     }
   });
 
+  const isRangeStale = useMemo(() => {
+    const typedPlatform = platform as PlatformResponse | null | undefined;
+    if (!typedPlatform?.lastValuationDate) return false;
+    const lastVal = new Date(typedPlatform.lastValuationDate);
+    const now = new Date();
+    const daysSince = (now.getTime() - lastVal.getTime()) / (1000 * 60 * 60 * 24);
+    if (range === "7d") return daysSince > 7;
+    if (range === "month") return daysSince > 30;
+    if (range === "quarter") return daysSince > 90;
+    return false;
+  }, [platform, range]);
+
   const platformChartData = useMemo(() => {
     if (!history || history.length === 0) return [];
 
@@ -1334,7 +1346,12 @@ export default function PlatformDetails() {
                     </div>
                   </div>
                   <div className="h-[260px] sm:h-[400px] w-full">
-                    {activeChartData && activeChartData.length > 0 ? (
+                    {isRangeStale ? (
+                      <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
+                        <span className="text-3xl font-semibold">—</span>
+                        <span className="text-sm">No valuation within this period</span>
+                      </div>
+                    ) : activeChartData && activeChartData.length > 0 ? (
                       platAggregatedData ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={platAggregatedData}>
@@ -1772,7 +1789,12 @@ export default function PlatformDetails() {
                     </div>
                   </div>
                   <div className="h-[260px] sm:h-[400px] w-full">
-                    {activeChartData && activeChartData.length > 0 ? (
+                    {isRangeStale ? (
+                      <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
+                        <span className="text-3xl font-semibold">—</span>
+                        <span className="text-sm">No valuation within this period</span>
+                      </div>
+                    ) : activeChartData && activeChartData.length > 0 ? (
                       platAggregatedData ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={platAggregatedData}>
