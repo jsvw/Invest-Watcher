@@ -148,6 +148,17 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
       const periodEntry = waterfallData.find(p => p.period === waterfallKey) ?? null;
       const historyRows = getPeriodHistoryRows(waterfallData);
 
+      // Warn the user if the selected period has no portfolio data at all
+      if (!periodEntry && historyRows.length === 0) {
+        toast({
+          title: "No data for this period",
+          description: `No portfolio records were found for ${getPeriodLabel()}. Try selecting a different period.`,
+          variant: "destructive",
+        });
+        setGenerating(false);
+        return;
+      }
+
       // Step 2: Build a data-enriched AI prompt using actual period metrics
       const periodRoi = periodEntry && periodEntry.openValue > 0
         ? ((periodEntry.valueChange / periodEntry.openValue) * 100).toFixed(2)
