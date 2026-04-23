@@ -45,17 +45,36 @@ export async function scrapeMaclear(email: string, password: string): Promise<Ma
     await page.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
 
     console.log("[Maclear Scraper] Navigating to login page...");
-    await page.goto(LOGIN_URL, { waitUntil: "networkidle2", timeout: 30000 });
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    // Diagnostic: log what inputs are available on the page
+    const pageInputs = await page.evaluate(`(function() {
+      return Array.from(document.querySelectorAll("input")).map(function(i) {
+        return { id: i.id, name: i.name, type: i.type, className: i.className };
+      });
+    })()`) as Array<{ id: string; name: string; type: string; className: string }>;
+    console.log("[Maclear Scraper] Inputs found on page:", JSON.stringify(pageInputs));
+    console.log("[Maclear Scraper] Current URL:", page.url());
+
+    // Try progressively broader selectors for the email field
+    const emailSelector = '#email, input[name="Email"], input[name="email"], input[type="email"]';
+    const passSelector = '#pass, input[name="pass"], input[name="password"], input[type="password"]';
 
     console.log("[Maclear Scraper] Waiting for login form...");
-    await page.waitForSelector("#email", { timeout: 15000 }).catch(() => {});
+    await page.waitForSelector(emailSelector, { timeout: 20000 });
 
     console.log("[Maclear Scraper] Filling credentials...");
-    await page.click("#email", { clickCount: 3 });
-    await page.type("#email", email, { delay: 50 });
-    await page.click("#pass", { clickCount: 3 });
-    await page.type("#pass", password, { delay: 50 });
+    const emailInput = await page.$(emailSelector);
+    const passInput = await page.$(passSelector);
+    if (!emailInput || !passInput) {
+      throw new Error(`Login form fields not found. Inputs on page: ${JSON.stringify(pageInputs)}`);
+    }
+
+    await emailInput.click({ clickCount: 3 });
+    await emailInput.type(email, { delay: 50 });
+    await passInput.click({ clickCount: 3 });
+    await passInput.type(password, { delay: 50 });
 
     console.log("[Maclear Scraper] Submitting login...");
     await Promise.all([
