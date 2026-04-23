@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -7,6 +7,53 @@ import { Loader2, Download } from "lucide-react";
 import { useAuth } from "@/App";
 import { formatCurrency } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
+
+// ── API response types ──────────────────────────────────────────────────────
+
+interface PlatformBreakdown {
+  platformId: number;
+  name: string;
+  netInvested: number;
+  valueChange: number;
+}
+
+interface WaterfallPeriod {
+  period: string;
+  openValue: number;
+  closeValue: number;
+  netInvested: number;
+  valueChange: number;
+  isLive?: boolean;
+  platformBreakdown?: PlatformBreakdown[];
+}
+
+interface PlatformMom {
+  platformId: number;
+  name: string;
+  currentValue: number;
+  momChange: number;
+  momGrowthPercent: number;
+}
+
+interface RollingEntry {
+  platformId: number;
+  name: string;
+  change: number;
+  pct: number;
+  stale?: boolean;
+}
+
+interface RollingReturns {
+  d7: RollingEntry[];
+  d30: RollingEntry[];
+  d90: RollingEntry[];
+}
+
+interface InsightResponse {
+  insight?: string;
+}
+
+// ── Component ───────────────────────────────────────────────────────────────
 
 type PeriodType = "month" | "quarter" | "year";
 
@@ -17,8 +64,8 @@ interface ExportReportDialogProps {
 }
 
 const MONTH_NAMES = [
-  "January","February","March","April","May","June",
-  "July","August","September","October","November","December",
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
 ];
 
 export function ExportReportDialog({ open, onOpenChange, currency }: ExportReportDialogProps) {
@@ -46,6 +93,39 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
     return `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
   }
 
+  /** Return periods from `allPeriods` that belong to the scope of the selected report. */
+  function getPeriodHistoryRows(allPeriods: WaterfallPeriod[]): WaterfallPeriod[] {
+    if (periodType === "year") {
+      // All years — sorted ascending
+      return [...allPeriods].sort((a, b) => a.period.localeCompare(b.period));
+    }
+    if (periodType === "quarter") {
+      // All quarters whose year matches selectedYear
+      return [...allPeriods]
+        .filter(p => p.period.startsWith(selectedYear + "-Q"))
+        .sort((a, b) => a.period.localeCompare(b.period));
+    }
+    // Month: all months for the selected year
+    return [...allPeriods]
+      .filter(p => p.period.startsWith(selectedYear + "-") && !p.period.includes("Q"))
+      .sort((a, b) => a.period.localeCompare(b.period));
+  }
+
+  function formatPeriodLabel(period: string): string {
+    // "2025" → "2025"
+    // "2025-Q2" → "Q2 2025"
+    // "2025-03" → "Mar 2025"
+    if (/^\d{4}$/.test(period)) return period;
+    const qMatch = period.match(/^(\d{4})-Q(\d)$/);
+    if (qMatch) return `Q${qMatch[2]} ${qMatch[1]}`;
+    const mMatch = period.match(/^(\d{4})-(\d{2})$/);
+    if (mMatch) {
+      const mIdx = parseInt(mMatch[2], 10) - 1;
+      return `${MONTH_NAMES[mIdx]?.slice(0, 3) ?? mMatch[2]} ${mMatch[1]}`;
+    }
+    return period;
+  }
+
   async function handleGenerate() {
     setGenerating(true);
     try {
@@ -53,25 +133,26 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
       const waterfallKey = getWaterfallKey();
 
       const [momRes, rollingRes, waterfallRes, insightRes] = await Promise.allSettled([
-        fetch("/api/portfolio/platform-mom", { credentials: "include" }).then(r => r.json()),
-        fetch("/api/portfolio/platform-rolling-returns", { credentials: "include" }).then(r => r.json()),
-        fetch(`/api/portfolio/waterfall?granularity=${periodType}`, { credentials: "include" }).then(r => r.json()),
+        fetch("/api/portfolio/platform-mom", { credentials: "include" }).then(r => r.json() as Promise<PlatformMom[]>),
+        fetch("/api/portfolio/platform-rolling-returns", { credentials: "include" }).then(r => r.json() as Promise<RollingReturns>),
+        fetch(`/api/portfolio/waterfall?granularity=${periodType}`, { credentials: "include" }).then(r => r.json() as Promise<WaterfallPeriod[]>),
         fetch("/api/insights", {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            prompt: `Give a concise 3-4 sentence portfolio performance summary for ${periodLabel}. Focus on key gains, notable movements, diversification, and any risks.`,
+            prompt: `Give a concise 3–4 sentence portfolio performance summary for ${periodLabel}. Highlight key gains, notable platform movements, diversification, and any risks worth monitoring.`,
           }),
-        }).then(r => r.json()),
+        }).then(r => r.json() as Promise<InsightResponse>),
       ]);
 
-      const momData: any[] = momRes.status === "fulfilled" ? momRes.value : [];
-      const rollingData: any = rollingRes.status === "fulfilled" ? rollingRes.value : null;
-      const waterfallData: any[] = waterfallRes.status === "fulfilled" ? waterfallRes.value : [];
-      const insightData: any = insightRes.status === "fulfilled" ? insightRes.value : null;
+      const momData: PlatformMom[] = momRes.status === "fulfilled" ? momRes.value : [];
+      const rollingData: RollingReturns | null = rollingRes.status === "fulfilled" ? rollingRes.value : null;
+      const waterfallData: WaterfallPeriod[] = waterfallRes.status === "fulfilled" ? waterfallRes.value : [];
+      const insightData: InsightResponse | null = insightRes.status === "fulfilled" ? insightRes.value : null;
 
-      const periodEntry = waterfallData.find((p: any) => p.period === waterfallKey) ?? null;
+      const periodEntry = waterfallData.find(p => p.period === waterfallKey) ?? null;
+      const historyRows = getPeriodHistoryRows(waterfallData);
 
       const { jsPDF } = await import("jspdf");
       const autoTable = (await import("jspdf-autotable")).default;
@@ -106,6 +187,8 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
         y += 5;
       }
 
+      type RGB = [number, number, number];
+
       // ── Header ────────────────────────────────────────────────────────
       doc.setFontSize(22);
       doc.setFont("helvetica", "bold");
@@ -127,7 +210,6 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
         doc.text(`Account: ${user.email}`, margin, y);
         y += 5.5;
       }
-
       doc.setDrawColor(220, 220, 220);
       doc.setLineWidth(0.3);
       doc.line(margin, y + 2, pageW - margin, y + 2);
@@ -136,42 +218,97 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
       // ── Portfolio Snapshot ───────────────────────────────────────────
       if (periodEntry) {
         sectionTitle("Portfolio Snapshot");
-        const roi =
-          periodEntry.openValue > 0
-            ? fmtPct((periodEntry.valueChange / periodEntry.openValue) * 100)
-            : "—";
-
         const deposited = Math.max(0, periodEntry.netInvested);
         const withdrawn = Math.abs(Math.min(0, periodEntry.netInvested));
-
-        const snapshotRows = [
-          ["Opening Value", fmt(periodEntry.openValue)],
-          ["Capital Deposited", fmt(deposited)],
-          ["Capital Withdrawn", fmt(withdrawn)],
-          ["Value Gain / Loss", `${periodEntry.valueChange >= 0 ? "+" : ""}${fmt(periodEntry.valueChange)}`],
-          ["Closing Value", fmt(periodEntry.closeValue)],
-          ["Period ROI", roi],
-        ];
+        const roi = periodEntry.openValue > 0
+          ? fmtPct((periodEntry.valueChange / periodEntry.openValue) * 100)
+          : "—";
 
         autoTable(doc, {
           startY: y,
           head: [["Metric", "Value"]],
-          body: snapshotRows,
+          body: [
+            ["Opening Value", fmt(periodEntry.openValue)],
+            ["Capital Deposited", fmt(deposited)],
+            ["Capital Withdrawn", fmt(withdrawn)],
+            ["Value Gain / Loss", `${periodEntry.valueChange >= 0 ? "+" : ""}${fmt(periodEntry.valueChange)}`],
+            ["Closing Value", fmt(periodEntry.closeValue)],
+            ["Period ROI", roi],
+          ],
           margin: { left: margin, right: margin },
           styles: { fontSize: 10, cellPadding: 3 },
-          headStyles: { fillColor: [59, 130, 246] as [number, number, number], textColor: 255, fontStyle: "bold" },
-          alternateRowStyles: { fillColor: [248, 250, 252] as [number, number, number] },
+          headStyles: { fillColor: [59, 130, 246] as RGB, textColor: 255, fontStyle: "bold" },
+          alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
           columnStyles: { 1: { halign: "right" } },
         });
-        y = (doc as any).lastAutoTable.finalY + 8;
+        y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+      }
+
+      // ── Growth History Table ─────────────────────────────────────────
+      if (historyRows.length > 0) {
+        checkPage(40);
+        const histLabel =
+          periodType === "year" ? "Yearly Growth History"
+          : periodType === "quarter" ? `Quarterly Growth — ${selectedYear}`
+          : `Monthly Growth — ${selectedYear}`;
+        sectionTitle(histLabel);
+
+        autoTable(doc, {
+          startY: y,
+          head: [["Period", "Open", "Net Invested", "Gain / Loss", "Close", "ROI"]],
+          body: historyRows.map(row => {
+            const rowRoi = row.openValue > 0
+              ? fmtPct((row.valueChange / row.openValue) * 100)
+              : "—";
+            return [
+              formatPeriodLabel(row.period) + (row.isLive ? " *" : ""),
+              fmt(row.openValue),
+              `${row.netInvested >= 0 ? "+" : ""}${fmt(row.netInvested)}`,
+              `${row.valueChange >= 0 ? "+" : ""}${fmt(row.valueChange)}`,
+              fmt(row.closeValue),
+              rowRoi,
+            ];
+          }),
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 9, cellPadding: 2.5 },
+          headStyles: { fillColor: [37, 99, 235] as RGB, textColor: 255, fontStyle: "bold" },
+          alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
+          columnStyles: {
+            1: { halign: "right" },
+            2: { halign: "right" },
+            3: { halign: "right" },
+            4: { halign: "right" },
+            5: { halign: "right" },
+          },
+          didParseCell(data) {
+            // Highlight negative gain/loss cells red
+            if (data.column.index === 3 && data.section === "body") {
+              const raw = data.cell.raw as string;
+              if (raw.startsWith("-")) {
+                data.cell.styles.textColor = [220, 38, 38] as RGB;
+              }
+            }
+          },
+        });
+        y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4;
+        // Legend for live period
+        if (historyRows.some(r => r.isLive)) {
+          doc.setFontSize(7.5);
+          doc.setFont("helvetica", "italic");
+          doc.setTextColor(130, 130, 130);
+          doc.text("* Current period — data up to latest valuation date", margin, y);
+          y += 6;
+        } else {
+          y += 4;
+        }
       }
 
       // ── Capital Flow by Platform ─────────────────────────────────────
-      if (periodEntry?.platformBreakdown?.length > 0) {
-        const platformRows = [...periodEntry.platformBreakdown]
-          .filter((pb: any) => Math.abs(pb.netInvested) > 0.01 || Math.abs(pb.valueChange) > 0.01)
-          .sort((a: any, b: any) => Math.abs(b.valueChange) - Math.abs(a.valueChange))
-          .map((pb: any) => [
+      if ((periodEntry?.platformBreakdown?.length ?? 0) > 0) {
+        const platformRows = [...(periodEntry!.platformBreakdown!)]
+          .filter(pb => Math.abs(pb.netInvested) > 0.01 || Math.abs(pb.valueChange) > 0.01)
+          .sort((a, b) => Math.abs(b.valueChange) - Math.abs(a.valueChange))
+          .map(pb => [
             pb.name,
             `${pb.netInvested >= 0 ? "+" : ""}${fmt(pb.netInvested)}`,
             `${pb.valueChange >= 0 ? "+" : ""}${fmt(pb.valueChange)}`,
@@ -186,57 +323,98 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
             body: platformRows,
             margin: { left: margin, right: margin },
             styles: { fontSize: 10, cellPadding: 3 },
-            headStyles: { fillColor: [16, 185, 129] as [number, number, number], textColor: 255, fontStyle: "bold" },
-            alternateRowStyles: { fillColor: [248, 250, 252] as [number, number, number] },
+            headStyles: { fillColor: [16, 185, 129] as RGB, textColor: 255, fontStyle: "bold" },
+            alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
             columnStyles: { 1: { halign: "right" }, 2: { halign: "right" } },
           });
-          y = (doc as any).lastAutoTable.finalY + 8;
+          y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
         }
       }
 
       // ── Platform Performance ─────────────────────────────────────────
+      // For month view: show MoM, 30d, 90d rolling returns
+      // For quarter/year view: use the selected period's platform breakdown for period return
       if (momData.length > 0) {
         checkPage(40);
-        sectionTitle("Platform Performance");
 
-        const d30Map = new Map<number, any>();
-        const d90Map = new Map<number, any>();
+        const isMonthView = periodType === "month";
+
+        const d30Map = new Map<number, RollingEntry>();
+        const d90Map = new Map<number, RollingEntry>();
         if (rollingData) {
-          for (const e of rollingData.d30 ?? []) d30Map.set(e.platformId, e);
-          for (const e of rollingData.d90 ?? []) d90Map.set(e.platformId, e);
+          for (const e of rollingData.d30) d30Map.set(e.platformId, e);
+          for (const e of rollingData.d90) d90Map.set(e.platformId, e);
         }
 
-        const perfRows = momData
-          .filter((p: any) => p.currentValue > 0)
-          .sort((a: any, b: any) => b.currentValue - a.currentValue)
-          .map((p: any) => {
-            const r30 = d30Map.get(p.platformId);
-            const r90 = d90Map.get(p.platformId);
-            return [
-              p.name,
-              fmt(p.currentValue),
-              p.momGrowthPercent != null ? fmtPct(p.momGrowthPercent) : "—",
-              r30 && !r30.stale ? fmtPct(r30.pct) : "—",
-              r90 && !r90.stale ? fmtPct(r90.pct) : "—",
-            ];
-          });
+        // Build a map of platformName -> breakdown for period-specific returns
+        const periodPlatformMap = new Map<string, PlatformBreakdown>();
+        if (periodEntry?.platformBreakdown) {
+          for (const pb of periodEntry.platformBreakdown) {
+            periodPlatformMap.set(pb.name, pb);
+          }
+        }
 
-        autoTable(doc, {
-          startY: y,
-          head: [["Platform", "Current Value", "MoM", "30d", "90d"]],
-          body: perfRows,
-          margin: { left: margin, right: margin },
-          styles: { fontSize: 9, cellPadding: 2.5 },
-          headStyles: { fillColor: [99, 102, 241] as [number, number, number], textColor: 255, fontStyle: "bold" },
-          alternateRowStyles: { fillColor: [248, 250, 252] as [number, number, number] },
-          columnStyles: {
-            1: { halign: "right" },
-            2: { halign: "right" },
-            3: { halign: "right" },
-            4: { halign: "right" },
-          },
-        });
-        y = (doc as any).lastAutoTable.finalY + 8;
+        if (isMonthView) {
+          sectionTitle("Platform Performance (Rolling Returns)");
+          autoTable(doc, {
+            startY: y,
+            head: [["Platform", "Current Value", "MoM", "30d", "90d"]],
+            body: momData
+              .filter(p => p.currentValue > 0)
+              .sort((a, b) => b.currentValue - a.currentValue)
+              .map(p => {
+                const r30 = d30Map.get(p.platformId);
+                const r90 = d90Map.get(p.platformId);
+                return [
+                  p.name,
+                  fmt(p.currentValue),
+                  fmtPct(p.momGrowthPercent),
+                  r30 && !r30.stale ? fmtPct(r30.pct) : "—",
+                  r90 && !r90.stale ? fmtPct(r90.pct) : "—",
+                ];
+              }),
+            margin: { left: margin, right: margin },
+            styles: { fontSize: 9, cellPadding: 2.5 },
+            headStyles: { fillColor: [99, 102, 241] as RGB, textColor: 255, fontStyle: "bold" },
+            alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
+            columnStyles: {
+              1: { halign: "right" },
+              2: { halign: "right" },
+              3: { halign: "right" },
+              4: { halign: "right" },
+            },
+          });
+        } else {
+          // Quarter / year: show period net invested, period value change, and current value
+          const periodLabel2 = periodType === "quarter" ? "Period (QoQ)" : "Period (YoY)";
+          sectionTitle(`Platform Performance — ${periodLabel2}`);
+          autoTable(doc, {
+            startY: y,
+            head: [["Platform", "Current Value", "Period Net Invested", "Period Gain / Loss"]],
+            body: momData
+              .filter(p => p.currentValue > 0)
+              .sort((a, b) => b.currentValue - a.currentValue)
+              .map(p => {
+                const pb = periodPlatformMap.get(p.name);
+                return [
+                  p.name,
+                  fmt(p.currentValue),
+                  pb ? `${pb.netInvested >= 0 ? "+" : ""}${fmt(pb.netInvested)}` : "—",
+                  pb ? `${pb.valueChange >= 0 ? "+" : ""}${fmt(pb.valueChange)}` : "—",
+                ];
+              }),
+            margin: { left: margin, right: margin },
+            styles: { fontSize: 9, cellPadding: 2.5 },
+            headStyles: { fillColor: [99, 102, 241] as RGB, textColor: 255, fontStyle: "bold" },
+            alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
+            columnStyles: {
+              1: { halign: "right" },
+              2: { halign: "right" },
+              3: { halign: "right" },
+            },
+          });
+        }
+        y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
       }
 
       // ── AI Insights ──────────────────────────────────────────────────
@@ -255,21 +433,21 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
       }
 
       // ── Page footer ──────────────────────────────────────────────────
-      const pageCount = (doc.internal as any).getNumberOfPages();
+      const pageCount = (doc.internal as unknown as { getNumberOfPages: () => number }).getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
         doc.setFontSize(8);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(160, 160, 160);
         doc.text(
-          `InvestTrack · ${periodLabel} Report · Page ${i} of ${pageCount}`,
+          `InvestTrack · ${getPeriodLabel()} Report · Page ${i} of ${pageCount}`,
           pageW / 2,
           pageH - 8,
           { align: "center" },
         );
       }
 
-      const filename = `report-${waterfallKey.toLowerCase().replace(/[\s]/g, "-")}.pdf`;
+      const filename = `report-${getWaterfallKey().toLowerCase()}.pdf`;
       doc.save(filename);
       onOpenChange(false);
       toast({ title: "Report downloaded", description: filename });
@@ -290,6 +468,9 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Export Portfolio Report</DialogTitle>
+          <DialogDescription>
+            Choose a period and download a PDF summary of your portfolio.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
@@ -358,7 +539,7 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
           <p className="text-xs text-muted-foreground">
             Generating a report for{" "}
             <span className="font-medium text-foreground">{getPeriodLabel()}</span>.
-            {" "}Includes portfolio snapshot, platform performance, and AI insights.
+            {" "}Includes snapshot, growth history, platform performance, and AI insights.
           </p>
         </div>
 
