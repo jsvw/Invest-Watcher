@@ -1,0 +1,104 @@
+1. Executive Summary (1 page)
+Portfolio value (start vs end)
+Absolute return (€) and % return
+Benchmark comparison (vs MSCI World / S&P500)
+Best and worst performing assets
+Key changes (new positions, sold positions)
+Biggest risks / concentration warnings
+2. Performance Overview
+Performance this period (month/quarter/year)
+YTD performance (for monthly/quarterly)
+Since inception performance
+Time-weighted return (TWR)
+Money-weighted return (XIRR/IRR)
+Chart: portfolio growth over time
+3. Contributions & Cashflow
+Deposits and withdrawals
+Dividends received
+Interest received
+Fees paid (broker + fund fees if possible)
+Net cashflow impact
+4. Asset Allocation Snapshot
+Allocation by asset class (stocks, bonds, cash, crypto, real estate)
+Allocation by region
+Allocation by sector
+Allocation by currency
+Drift vs target allocation (important!)
+5. Holdings Summary
+Top 10 holdings by size
+Each holding: value, weight, gain/loss, dividend yield
+New positions opened
+Positions closed
+6. Risk & Stability Metrics
+Volatility (period and rolling)
+Max drawdown this period
+Sharpe/Sortino ratio (if available)
+Concentration risk (single stock exposure)
+Correlation insights (optional but strong)
+7. Income & Dividend Report
+Dividends received this period
+Dividend yield (portfolio)
+Dividend growth vs previous period
+Dividend calendar for next period
+Forecasted annual dividend income
+8. Fees & Costs Report
+Trading costs
+Fund/ETF TER estimate
+Total cost drag % estimate
+Most expensive holdings (fee-wise)
+9. Tax Summary (especially yearly)
+Realized gains/losses
+Unrealized gains/losses
+Dividend taxes paid / withheld
+Tax efficiency notes
+Loss harvesting opportunities
+Smart / Premium Sections (what makes it “wow”)
+10. Key Insights (AI-style)
+“What drove performance?”
+“What changed vs last report?”
+“Main risk exposures increased/decreased”
+“Rebalancing suggested: yes/no + why”
+11. Rebalancing Plan
+Current vs target allocation
+Suggested trades (with estimated impact)
+Tax-aware suggestions (avoid triggering gains)
+12. Forward Outlook / Next Actions
+Upcoming dividends and earnings
+Watchlist updates
+Suggested contribution amount to stay on track
+Risks to monitor next month/quarter
+Differences by Report Type
+Monthly Report (short + tactical)
+
+Focus on:
+
+performance
+cashflow
+allocation drift
+biggest movers
+quick action items
+Quarterly Report (deeper analysis)
+
+Add:
+
+risk metrics
+sector/region shifts
+strategy evaluation
+rebalancing proposal
+Yearly Report (full investor statement)
+
+Add:
+
+full tax section
+annual performance attribution
+goal progress (retirement/FIRE/net worth)
+drawdowns and worst month analysis
+year review + next year strategy
+Ideal Output Format
+
+A great report usually has:
+
+1 page summary
+charts section
+holdings table
+action list at the end

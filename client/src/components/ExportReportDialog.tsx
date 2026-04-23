@@ -134,27 +134,54 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
       const periodLabel = getPeriodLabel();
       const waterfallKey = getWaterfallKey();
 
-      const [momRes, rollingRes, waterfallRes, insightRes] = await Promise.allSettled([
+      // Step 1: Fetch period data and current snapshot in parallel (no AI yet)
+      const [momRes, rollingRes, waterfallRes] = await Promise.allSettled([
         fetch("/api/portfolio/platform-mom", { credentials: "include" }).then(r => r.json() as Promise<PlatformMom[]>),
         fetch("/api/portfolio/platform-rolling-returns", { credentials: "include" }).then(r => r.json() as Promise<RollingReturns>),
         fetch(`/api/portfolio/waterfall?granularity=${periodType}`, { credentials: "include" }).then(r => r.json() as Promise<WaterfallPeriod[]>),
-        fetch("/api/insights", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: `Give a concise 3–4 sentence portfolio performance summary for ${periodLabel}. Highlight key gains, notable platform movements, diversification, and any risks worth monitoring.`,
-          }),
-        }).then(r => r.json() as Promise<InsightResponse>),
       ]);
 
       const momData: PlatformMom[] = momRes.status === "fulfilled" ? momRes.value : [];
       const rollingData: RollingReturns | null = rollingRes.status === "fulfilled" ? rollingRes.value : null;
       const waterfallData: WaterfallPeriod[] = waterfallRes.status === "fulfilled" ? waterfallRes.value : [];
-      const insightData: InsightResponse | null = insightRes.status === "fulfilled" ? insightRes.value : null;
 
       const periodEntry = waterfallData.find(p => p.period === waterfallKey) ?? null;
       const historyRows = getPeriodHistoryRows(waterfallData);
+
+      // Step 2: Build a data-enriched AI prompt using actual period metrics
+      const periodRoi = periodEntry && periodEntry.openValue > 0
+        ? ((periodEntry.valueChange / periodEntry.openValue) * 100).toFixed(2)
+        : null;
+      const topGainers = (periodEntry?.platformBreakdown ?? [])
+        .filter(pb => pb.valueChange > 0)
+        .sort((a, b) => b.valueChange - a.valueChange)
+        .slice(0, 3)
+        .map(pb => `${pb.name}: +${formatCurrency(pb.valueChange, currency)}`)
+        .join(", ");
+      const topLosers = (periodEntry?.platformBreakdown ?? [])
+        .filter(pb => pb.valueChange < 0)
+        .sort((a, b) => a.valueChange - b.valueChange)
+        .slice(0, 2)
+        .map(pb => `${pb.name}: ${formatCurrency(pb.valueChange, currency)}`)
+        .join(", ");
+      const aiPrompt = [
+        `Give a concise 3–4 sentence portfolio performance summary for ${periodLabel}.`,
+        periodEntry ? `Period snapshot: opened at ${formatCurrency(periodEntry.openValue, currency)}, closed at ${formatCurrency(periodEntry.closeValue, currency)}, net invested ${formatCurrency(periodEntry.netInvested, currency)}, value change ${formatCurrency(periodEntry.valueChange, currency)}${periodRoi ? `, ROI ${periodRoi}%` : ""}.` : "",
+        topGainers ? `Top gainers: ${topGainers}.` : "",
+        topLosers ? `Underperformers: ${topLosers}.` : "",
+        "Highlight diversification and any risks worth monitoring.",
+      ].filter(Boolean).join(" ");
+
+      // Step 3: Fetch AI insight with the enriched prompt
+      const insightRes = await fetch("/api/insights", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: aiPrompt }),
+      }).catch(() => null);
+      const insightData: InsightResponse | null = insightRes?.ok
+        ? await insightRes.json().catch(() => null)
+        : null;
 
       const { jsPDF } = await import("jspdf");
       const autoTable = (await import("jspdf-autotable")).default;
@@ -333,7 +360,57 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
         }
       }
 
-      // ── Platform Performance ─────────────────────────────────────────
+      // ── Platform Performance ──────────────────────────────────────────
+      // Primary: period-scoped returns from the waterfall breakdown.
+      // Secondary: current rolling returns (MoM/30d/90d) as a position reference.
+
+      const hasPlatformBreakdown = (periodEntry?.platformBreakdown?.length ?? 0) > 0;
+
+      if (hasPlatformBreakdown) {
+        checkPage(40);
+
+        // Build a name→MoM map for current value lookup
+        const momByName = new Map<string, PlatformMom>();
+        for (const p of momData) momByName.set(p.name, p);
+
+        const periodTypeLabel =
+          periodType === "year" ? "YoY" : periodType === "quarter" ? "QoQ" : "MoM";
+
+        sectionTitle(`Platform Returns — ${getPeriodLabel()} (${periodTypeLabel})`);
+        autoTable(doc, {
+          startY: y,
+          head: [["Platform", "Current Value", "Net Invested (period)", "Value Gain / Loss (period)"]],
+          body: [...(periodEntry!.platformBreakdown!)]
+            .sort((a, b) => b.valueChange - a.valueChange)
+            .map(pb => {
+              const mom = momByName.get(pb.name);
+              return [
+                pb.name,
+                mom ? fmt(mom.currentValue) : "—",
+                `${pb.netInvested >= 0 ? "+" : ""}${fmt(pb.netInvested)}`,
+                `${pb.valueChange >= 0 ? "+" : ""}${fmt(pb.valueChange)}`,
+              ];
+            }),
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 9, cellPadding: 2.5 },
+          headStyles: { fillColor: [99, 102, 241] as RGB, textColor: 255, fontStyle: "bold" },
+          alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
+          columnStyles: {
+            1: { halign: "right" },
+            2: { halign: "right" },
+            3: { halign: "right" },
+          },
+          didParseCell(data) {
+            if (data.column.index === 3 && data.section === "body") {
+              const raw = data.cell.raw as string;
+              if (raw.startsWith("-")) data.cell.styles.textColor = [220, 38, 38] as RGB;
+            }
+          },
+        });
+        y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+      }
+
+      // Current position reference (MoM / 30d / 90d rolling returns from today)
       if (momData.length > 0) {
         checkPage(40);
 
@@ -344,8 +421,7 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
           for (const e of rollingData.d90) d90Map.set(e.platformId, e);
         }
 
-        // Platform performance — always show MoM / 30d / 90d rolling returns
-        sectionTitle("Platform Performance");
+        sectionTitle("Current Position Reference (rolling from today)");
         autoTable(doc, {
           startY: y,
           head: [["Platform", "Current Value", "MoM", "30d", "90d"]],
@@ -365,7 +441,7 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
             }),
           margin: { left: margin, right: margin },
           styles: { fontSize: 9, cellPadding: 2.5 },
-          headStyles: { fillColor: [99, 102, 241] as RGB, textColor: 255, fontStyle: "bold" },
+          headStyles: { fillColor: [107, 114, 128] as RGB, textColor: 255, fontStyle: "bold" },
           alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
           columnStyles: {
             1: { halign: "right" },
@@ -375,42 +451,6 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
           },
         });
         y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
-
-        // For quarter/year reports: also show period-specific breakdown per platform
-        if (periodType !== "month" && (periodEntry?.platformBreakdown?.length ?? 0) > 0) {
-          const periodPlatformMap = new Map<string, PlatformBreakdown>();
-          for (const pb of periodEntry!.platformBreakdown!) {
-            periodPlatformMap.set(pb.name, pb);
-          }
-          const periodLabel2 = periodType === "quarter" ? "QoQ" : "YoY";
-          const periodRows = momData
-            .filter(p => p.currentValue > 0)
-            .sort((a, b) => b.currentValue - a.currentValue)
-            .map(p => {
-              const pb = periodPlatformMap.get(p.name);
-              return [
-                p.name,
-                pb ? `${pb.netInvested >= 0 ? "+" : ""}${fmt(pb.netInvested)}` : "—",
-                pb ? `${pb.valueChange >= 0 ? "+" : ""}${fmt(pb.valueChange)}` : "—",
-              ];
-            });
-
-          if (periodRows.length > 0) {
-            checkPage(35);
-            sectionTitle(`Period Returns (${periodLabel2}) — ${getPeriodLabel()}`);
-            autoTable(doc, {
-              startY: y,
-              head: [["Platform", "Net Invested (period)", "Value Gain / Loss (period)"]],
-              body: periodRows,
-              margin: { left: margin, right: margin },
-              styles: { fontSize: 9, cellPadding: 2.5 },
-              headStyles: { fillColor: [79, 70, 229] as RGB, textColor: 255, fontStyle: "bold" },
-              alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
-              columnStyles: { 1: { halign: "right" }, 2: { halign: "right" } },
-            });
-            y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
-          }
-        }
       }
 
       // ── AI Insights ──────────────────────────────────────────────────
