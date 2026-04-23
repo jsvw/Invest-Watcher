@@ -1082,6 +1082,32 @@ export default function Dashboard() {
       return (monthCells.reduce((prod, c) => prod * (1 + c.returnPct / 100), 1) - 1) * 100;
     }
 
+    function aggregatePlatformBreakdown(monthKeys: string[]): PlatformGain[] {
+      const byPlatform = new Map<number, { name: string; color: string; gains: number[]; gainPcts: (number | null)[] }>();
+      for (const key of monthKeys) {
+        const entries = platformBreakdownByMonth?.[key]?.filter(p => !excludedPlatforms.has(p.platformId)) ?? [];
+        for (const e of entries) {
+          if (!byPlatform.has(e.platformId)) {
+            byPlatform.set(e.platformId, { name: e.name, color: e.color, gains: [], gainPcts: [] });
+          }
+          const rec = byPlatform.get(e.platformId)!;
+          rec.gains.push(e.gain);
+          rec.gainPcts.push(e.gainPct);
+        }
+      }
+      return Array.from(byPlatform.entries()).map(([platformId, rec]) => ({
+        platformId,
+        name: rec.name,
+        color: rec.color,
+        prevVal: 0,
+        currVal: 0,
+        gain: rec.gains.reduce((s, g) => s + g, 0),
+        gainPct: rec.gainPcts.every(p => p !== null)
+          ? (rec.gainPcts.reduce((prod, p) => prod * (1 + (p as number) / 100), 1) - 1) * 100
+          : null,
+      }));
+    }
+
     if (heatmapAgg === "month") {
       const cols = MONTHS.map((m, i) => ({ label: m, colIdx: i + 1 }));
       const aggCells = cells.map(c => ({ ...c, colIdx: c.month, colLabel: MONTHS[c.month - 1] }));
@@ -1090,12 +1116,13 @@ export default function Dashboard() {
 
     if (heatmapAgg === "quarter") {
       const cols = [1, 2, 3, 4].map(q => ({ label: `Q${q}`, colIdx: q }));
-      const aggCells: { year: string; colIdx: number; colLabel: string; returnPct: number; absoluteChange: number; inProgress?: boolean }[] = [];
+      const aggCells: { year: string; colIdx: number; colLabel: string; returnPct: number; absoluteChange: number; inProgress?: boolean; platformBreakdown?: PlatformGain[] }[] = [];
       for (const year of years) {
         for (let q = 1; q <= 4; q++) {
           const m1 = q * 3 - 2, m2 = q * 3 - 1, m3 = q * 3;
           const monthCells = cells.filter(c => c.year === year && (c.month === m1 || c.month === m2 || c.month === m3));
           if (monthCells.length === 0) continue;
+          const monthKeys = [m1, m2, m3].map(m => `${year}-${String(m).padStart(2, "0")}`);
           aggCells.push({
             year,
             colIdx: q,
@@ -1103,6 +1130,7 @@ export default function Dashboard() {
             returnPct: compoundReturn(monthCells),
             absoluteChange: monthCells.reduce((s, c) => s + c.absoluteChange, 0),
             inProgress: monthCells.some(c => c.inProgress) || undefined,
+            platformBreakdown: aggregatePlatformBreakdown(monthKeys),
           });
         }
       }
@@ -1111,10 +1139,11 @@ export default function Dashboard() {
 
     // year
     const cols = [{ label: "Total", colIdx: 1 }];
-    const aggCells: { year: string; colIdx: number; colLabel: string; returnPct: number; absoluteChange: number; inProgress?: boolean }[] = [];
+    const aggCells: { year: string; colIdx: number; colLabel: string; returnPct: number; absoluteChange: number; inProgress?: boolean; platformBreakdown?: PlatformGain[] }[] = [];
     for (const year of years) {
       const monthCells = cells.filter(c => c.year === year);
       if (monthCells.length === 0) continue;
+      const monthKeys = monthCells.map(c => `${year}-${String(c.month).padStart(2, "0")}`);
       aggCells.push({
         year,
         colIdx: 1,
@@ -1122,10 +1151,11 @@ export default function Dashboard() {
         returnPct: compoundReturn(monthCells),
         absoluteChange: monthCells.reduce((s, c) => s + c.absoluteChange, 0),
         inProgress: monthCells.some(c => c.inProgress) || undefined,
+        platformBreakdown: aggregatePlatformBreakdown(monthKeys),
       });
     }
     return { years, cols, aggCells };
-  }, [activeHeatmapData, heatmapAgg]);
+  }, [activeHeatmapData, heatmapAgg, platformBreakdownByMonth, excludedPlatforms]);
 
   const roiData = useMemo(() => {
     if (!activePlatforms) return [];
@@ -2210,7 +2240,7 @@ export default function Dashboard() {
                                 inProgress: cell.inProgress,
                                 platformBreakdown: heatmapAgg === "month"
                                   ? platformBreakdownByMonth?.[`${year}-${String(col.colIdx).padStart(2, "0")}`]?.filter(p => !excludedPlatforms.has(p.platformId))
-                                  : undefined,
+                                  : cell.platformBreakdown,
                               };
                               return (
                                 <div
