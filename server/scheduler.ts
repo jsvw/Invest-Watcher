@@ -239,10 +239,10 @@ async function runScrapeForConfig(config: any) {
         balanceData = await scrapeValvest(creds.email, creds.password);
       } else if (scraperType === "lande") {
         const { scrapeLande } = await import("./scrapers/lande");
-        balanceData = await scrapeLande(creds.cookies);
+        balanceData = await scrapeLande(creds.email, creds.password);
       } else if (scraperType === "maclear") {
         const { scrapeMaclear } = await import("./scrapers/maclear");
-        balanceData = await scrapeMaclear(creds.cookies);
+        balanceData = await scrapeMaclear(creds.email, creds.password);
       } else {
         const { scrapeCrowdPear } = await import("./scrapers/crowdpear");
         balanceData = await scrapeCrowdPear(creds.email, creds.password, creds.gmailAppPassword, creds.gmailEmail);

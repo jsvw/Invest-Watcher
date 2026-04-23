@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Globe, Loader2, Settings2, CheckCircle, XCircle, Trash2 } from "lucide-react";
 
@@ -17,8 +16,8 @@ const SCRAPER_TYPES = [
   { value: "crowdpear", label: "CrowdPear", credentialType: "email" },
   { value: "goldrepublic", label: "GoldRepublic", credentialType: "username_email" },
   { value: "valvest", label: "Valvest (Landed.eu)", credentialType: "email" },
-  { value: "lande", label: "Lande", credentialType: "lande_cookie" },
-  { value: "maclear", label: "Maclear", credentialType: "lande_cookie" },
+  { value: "lande", label: "Lande", credentialType: "email" },
+  { value: "maclear", label: "Maclear", credentialType: "email" },
   { value: "trading212", label: "Trading 212 API", credentialType: "apikey" },
   { value: "stock_ticker", label: "Stock Ticker (Yahoo Finance)", credentialType: "stock_ticker" },
 ];
@@ -42,7 +41,6 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
   const [shares, setShares] = useState("");
   const [averagePrice, setAveragePrice] = useState("");
   const [investedEur, setInvestedEur] = useState("");
-  const [cookieString, setCookieString] = useState("");
   const [scraperType, setScraperType] = useState("monefit");
   const { toast } = useToast();
 
@@ -50,8 +48,6 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
   const isApiKeyType = selectedType?.credentialType === "apikey";
   const isUsernameEmailType = selectedType?.credentialType === "username_email";
   const isStockTickerType = selectedType?.credentialType === "stock_ticker";
-  const isLandeCookieType = selectedType?.credentialType === "lande_cookie";
-
   const { data: config, isLoading: configLoading } = useQuery({
     queryKey: ['/api/platforms', platformId, 'scraper-config'],
     queryFn: async () => {
@@ -69,15 +65,12 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
       const effectiveIsStock = effectiveType === "stock_ticker";
       const effectiveIsApiKey = effectiveType === "trading212";
       const effectiveIsUsernameEmail = effectiveType === "goldrepublic";
-      const effectiveIsLandeCookie = effectiveType === "lande" || effectiveType === "maclear";
       if (effectiveIsStock) {
         body = { scraperType: effectiveType, ticker, shares, averagePrice: averagePrice || undefined, investedEur: investedEur || undefined };
       } else if (effectiveIsApiKey) {
         body = { scraperType: effectiveType, apiKey, apiSecret, pieName: pieName || undefined };
       } else if (effectiveIsUsernameEmail) {
         body = { scraperType: effectiveType, username, email, password };
-      } else if (effectiveIsLandeCookie) {
-        body = { scraperType: effectiveType, cookies: cookieString };
       } else {
         body = { scraperType: effectiveType, email, password, ...(effectiveType === "crowdpear" ? { ...(gmailAppPassword ? { gmailAppPassword } : {}), ...(gmailEmail ? { gmailEmail } : {}) } : {}) };
       }
@@ -99,7 +92,6 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
       setShares("");
       setAveragePrice("");
       setInvestedEur("");
-      setCookieString("");
     },
     onError: () => {
       toast({ title: "Failed to save credentials", variant: "destructive" });
@@ -150,16 +142,12 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
   const isConfigApiKeyType = config?.scraperType === "trading212";
   const isConfigUsernameEmailType = config?.scraperType === "goldrepublic";
   const isConfigStockTickerType = config?.scraperType === "stock_ticker";
-  const isConfigLandeCookieType = config?.scraperType === "lande" || config?.scraperType === "maclear";
-
   const canSaveNew = isStockTickerType
     ? ticker.length > 0 && shares.length > 0 && !isNaN(Number(shares))
     : isApiKeyType
     ? apiKey.length > 0 && apiSecret.length > 0
     : isUsernameEmailType
     ? username.length > 0 && email.length > 0 && password.length > 0
-    : isLandeCookieType
-    ? cookieString.trim().length > 0
     : email.length > 0 && password.length > 0;
 
   const canUpdateCredentials = isConfigStockTickerType
@@ -168,8 +156,6 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
     ? apiKey.length > 0 && apiSecret.length > 0
     : isConfigUsernameEmailType
     ? username.length > 0 && email.length > 0 && password.length > 0
-    : isConfigLandeCookieType
-    ? cookieString.trim().length > 0
     : email.length > 0 && password.length > 0;
 
   return (
@@ -263,24 +249,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
             <div className="border-t pt-4">
               <p className="text-sm font-medium mb-2">Update credentials</p>
               <div className="space-y-3">
-                {isConfigLandeCookieType ? (
-                  <>
-                    <div>
-                      <Label htmlFor="scraper-cookies">Browser Cookies</Label>
-                      <Textarea
-                        id="scraper-cookies"
-                        value={cookieString}
-                        onChange={e => setCookieString(e.target.value)}
-                        placeholder="Paste the full Cookie header value here (e.g. session=abc123; cf_clearance=xyz...)"
-                        className="font-mono text-xs h-28"
-                        data-testid="input-scraper-cookies"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        In your browser: log into <strong>{config?.scraperType === "maclear" ? "app.maclear.ch" : "lande.finance"}</strong> → F12 → Network tab → click any request to that site → find <strong>Cookie:</strong> in Request Headers → copy the full value and paste it above.
-                      </p>
-                    </div>
-                  </>
-                ) : isConfigStockTickerType ? (
+                {isConfigStockTickerType ? (
                   <>
                     <div>
                       <Label htmlFor="scraper-ticker">Ticker Symbol</Label>
@@ -476,8 +445,6 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                 ? "Enter a stock ticker symbol and number of shares to automatically track the current value using Yahoo Finance with FX conversion."
                 : isApiKeyType
                 ? "Enter your API credentials to enable automatic portfolio syncing via the Trading 212 API."
-                : isLandeCookieType
-                ? "This platform uses Cloudflare protection that blocks automated logins from server IPs. Paste your browser session cookies instead — the scraper will use them to access your dashboard directly."
                 : "Enter your login credentials to enable automatic balance scraping. Your credentials are stored securely and only used to log into the platform."}
             </p>
             <div className="space-y-3">
@@ -618,23 +585,6 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                       placeholder="Your GoldRepublic password"
                       data-testid="input-scraper-password-new"
                     />
-                  </div>
-                </>
-              ) : isLandeCookieType ? (
-                <>
-                  <div>
-                    <Label htmlFor="scraper-cookies-new">Browser Cookies</Label>
-                    <Textarea
-                      id="scraper-cookies-new"
-                      value={cookieString}
-                      onChange={e => setCookieString(e.target.value)}
-                      placeholder="Paste the full Cookie header value here (e.g. session=abc123; cf_clearance=xyz...)"
-                      className="font-mono text-xs h-28"
-                      data-testid="input-scraper-cookies-new"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      In your browser: log into <strong>{scraperType === "maclear" ? "app.maclear.ch" : "lande.finance"}</strong> → press <strong>F12</strong> → Network tab → click any request to that site → find <strong>Cookie:</strong> in the Request Headers panel → copy the full value and paste it above.
-                    </p>
                   </div>
                 </>
               ) : (

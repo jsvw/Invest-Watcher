@@ -10,23 +10,10 @@ export interface MaclearScrapedData {
   scrapedAt: Date;
 }
 
+const LOGIN_URL = "https://app.maclear.ch/en/login";
 const OVERVIEW_URL = "https://app.maclear.ch/en/overview";
 
-function parseCookieString(cookieStr: string): Array<{ name: string; value: string; domain: string; path: string }> {
-  return cookieStr
-    .split(";")
-    .map(part => {
-      const eqIdx = part.indexOf("=");
-      if (eqIdx === -1) return null;
-      const name = part.slice(0, eqIdx).trim();
-      const value = part.slice(eqIdx + 1).trim();
-      if (!name) return null;
-      return { name, value, domain: ".maclear.ch", path: "/" };
-    })
-    .filter(Boolean) as Array<{ name: string; value: string; domain: string; path: string }>;
-}
-
-export async function scrapeMaclear(cookies: string): Promise<MaclearScrapedData> {
+export async function scrapeMaclear(email: string, password: string): Promise<MaclearScrapedData> {
   let browser: any;
   try {
     browser = await (puppeteer as any).launch({
@@ -62,47 +49,106 @@ export async function scrapeMaclear(cookies: string): Promise<MaclearScrapedData
     );
     await page.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
 
-    const parsedCookies = parseCookieString(cookies);
-    console.log(`[Maclear Scraper] Injecting ${parsedCookies.length} cookies...`);
-    if (parsedCookies.length === 0) {
-      throw new Error("No valid cookies found. Please paste the full Cookie header value from your browser.");
-    }
-    await page.setCookie(...parsedCookies);
+    console.log("[Maclear Scraper] Navigating to login page...");
+    await page.goto(LOGIN_URL, { waitUntil: "networkidle2", timeout: 60000 });
+    await new Promise(resolve => setTimeout(resolve, 5000));
 
-    console.log("[Maclear Scraper] Navigating to overview...");
-    await page.goto(OVERVIEW_URL, { waitUntil: "networkidle2", timeout: 60000 });
+    console.log("[Maclear Scraper] Current URL:", page.url());
+
+    const emailSelector = 'input[type="email"], input[name="email"], input[id="email"]';
+    const passSelector = 'input[type="password"], input[name="password"], input[id="password"]';
+
+    console.log("[Maclear Scraper] Waiting for login form...");
+    await page.waitForSelector(emailSelector, { timeout: 30000 }).catch(async () => {
+      const html = await page.evaluate(`document.body ? document.body.innerHTML.slice(0, 1000) : "no body"`);
+      throw new Error(`Login form not found. Page HTML: ${html}`);
+    });
+
+    console.log("[Maclear Scraper] Filling credentials...");
+    await page.$eval(emailSelector, (el: any) => el.value = "");
+    await page.type(emailSelector, email, { delay: 50 });
+    await page.$eval(passSelector, (el: any) => el.value = "");
+    await page.type(passSelector, password, { delay: 50 });
+
+    console.log("[Maclear Scraper] Submitting login...");
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 }).catch(() => {}),
+      page.click('button[type="submit"]'),
+    ]);
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    const currentUrl = page.url();
-    console.log(`[Maclear Scraper] Current URL: ${currentUrl}`);
+    const urlAfterLogin = page.url();
+    console.log("[Maclear Scraper] URL after login:", urlAfterLogin);
 
-    if (currentUrl.includes("/login") || currentUrl.includes("cloudflare")) {
-      const pageText = await page.evaluate(`document.body.innerText.substring(0, 300)`);
-      throw new Error(`Session cookies have expired or are invalid. Please refresh your cookies from the browser. Page: ${pageText}`);
+    if (urlAfterLogin.includes("/login")) {
+      const errorText = await page.evaluate(`(function() {
+        var el = document.querySelector('.error, .alert, [class*="error"], [class*="alert"]');
+        return el ? el.textContent.trim() : null;
+      })()`);
+      throw new Error(`Login failed${errorText ? ": " + errorText : ". Please check your credentials."}`);
     }
 
-    const cfCheck = await page.evaluate(`(function() {
-      var t = document.body ? document.body.innerText : "";
-      return t.includes("Sorry, you have been blocked") || t.includes("Performing security verification") || t.includes("security service");
-    })()`);
-    if (cfCheck) {
-      const snippet = await page.evaluate(`document.body ? document.body.innerText.substring(0, 300) : "no body"`);
-      throw new Error(`Cloudflare is blocking the request. Make sure your cookies include cf_clearance and are fresh. Page: ${snippet}`);
+    // Dismiss post-login popup if present
+    try {
+      const popupClosed = await page.evaluate(`(function() {
+        var containers = Array.from(document.querySelectorAll(
+          '[class*="modal"], [class*="popup"], [class*="dialog"], [class*="overlay"], [role="dialog"]'
+        ));
+        for (var c = 0; c < containers.length; c++) {
+          var container = containers[c];
+          var ariaClose = container.querySelector('[aria-label="Close"], [aria-label="close"]');
+          if (ariaClose) { ariaClose.click(); return true; }
+          var classClose = container.querySelector('button[class*="close"], [class*="close-btn"], [class*="btn-close"]');
+          if (classClose) { classClose.click(); return true; }
+          var btns = Array.from(container.querySelectorAll('button, [role="button"]'));
+          for (var j = 0; j < btns.length; j++) {
+            var txt = (btns[j].textContent || "").trim();
+            if (txt === "\\u00d7" || txt === "\\u2715" || txt === "\\u2716") { btns[j].click(); return true; }
+          }
+        }
+        return false;
+      })()`);
+      if (popupClosed) {
+        console.log("[Maclear Scraper] Popup dismissed.");
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    } catch (_) {}
+
+    if (!urlAfterLogin.includes("/overview")) {
+      console.log("[Maclear Scraper] Navigating to overview...");
+      await page.goto(OVERVIEW_URL, { waitUntil: "networkidle2", timeout: 30000 });
+      await new Promise(resolve => setTimeout(resolve, 3000));
     }
+
+    // Dismiss popup again after navigation
+    try {
+      await page.evaluate(`(function() {
+        var containers = Array.from(document.querySelectorAll(
+          '[class*="modal"], [class*="popup"], [class*="dialog"], [class*="overlay"], [role="dialog"]'
+        ));
+        for (var c = 0; c < containers.length; c++) {
+          var ariaClose = containers[c].querySelector('[aria-label="Close"], [aria-label="close"]');
+          if (ariaClose) { ariaClose.click(); return; }
+          var classClose = containers[c].querySelector('button[class*="close"], [class*="close-btn"], [class*="btn-close"]');
+          if (classClose) { classClose.click(); return; }
+          var btns = Array.from(containers[c].querySelectorAll('button, [role="button"]'));
+          for (var j = 0; j < btns.length; j++) {
+            var txt = (btns[j].textContent || "").trim();
+            if (txt === "\\u00d7" || txt === "\\u2715" || txt === "\\u2716") { btns[j].click(); return; }
+          }
+        }
+      })()`);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (_) {}
 
     console.log("[Maclear Scraper] Waiting for overview statistics...");
     await page.waitForSelector(".overview-statistics__value-number", { timeout: 20000 }).catch(() => {});
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     const diag = await page.evaluate(`(function() {
-      var url = window.location.href;
-      var titles = Array.from(document.querySelectorAll('.overview-statistics__title')).map(function(el) {
-        return el.textContent.trim();
-      });
-      var values = Array.from(document.querySelectorAll('.overview-statistics__value-number')).map(function(el) {
-        return el.textContent.trim();
-      });
-      return { url: url, titles: titles, values: values };
+      var titles = Array.from(document.querySelectorAll('.overview-statistics__title')).map(function(el) { return el.textContent.trim(); });
+      var values = Array.from(document.querySelectorAll('.overview-statistics__value-number')).map(function(el) { return el.textContent.trim(); });
+      return { url: window.location.href, titles: titles, values: values };
     })()`) as { url: string; titles: string[]; values: string[] };
     console.log("[Maclear Scraper] URL:", diag.url);
     console.log("[Maclear Scraper] Stat titles:", JSON.stringify(diag.titles));
@@ -154,7 +200,7 @@ export async function scrapeMaclear(cookies: string): Promise<MaclearScrapedData
         }
       }
 
-      throw new Error("Could not find 'Active investments' stat block on the overview page. The page layout may have changed.");
+      throw new Error("Could not find 'Active investments' stat block. Titles found: " + Array.from(document.querySelectorAll('.overview-statistics__title')).map(function(el) { return el.textContent.trim(); }).join(", "));
     })()`) as number;
 
     console.log(`[Maclear Scraper] Scraping complete. Active investments: €${totalBalance}`);

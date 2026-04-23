@@ -2230,18 +2230,6 @@ export async function registerRoutes(
           return res.status(400).json({ message: "username, email, and password are required for GoldRepublic" });
         }
         credentialData = { username, email, password };
-      } else if (scraperType === "lande") {
-        const { cookies } = req.body;
-        if (!cookies || typeof cookies !== "string" || cookies.trim().length === 0) {
-          return res.status(400).json({ message: "cookies are required for Lande" });
-        }
-        credentialData = { cookies: cookies.trim() };
-      } else if (scraperType === "maclear") {
-        const { cookies } = req.body;
-        if (!cookies || typeof cookies !== "string" || cookies.trim().length === 0) {
-          return res.status(400).json({ message: "cookies are required for Maclear" });
-        }
-        credentialData = { cookies: cookies.trim() };
       } else {
         const { email, password, gmailAppPassword, gmailEmail } = req.body;
         if (!email || !password) {
@@ -2517,10 +2505,10 @@ export async function registerRoutes(
           balanceData = await scrapeValvest(creds.email, creds.password);
         } else if (config.scraperType === "lande") {
           const { scrapeLande } = await import("./scrapers/lande");
-          balanceData = await scrapeLande(creds.cookies);
+          balanceData = await scrapeLande(creds.email, creds.password);
         } else if (config.scraperType === "maclear") {
           const { scrapeMaclear } = await import("./scrapers/maclear");
-          balanceData = await scrapeMaclear(creds.cookies);
+          balanceData = await scrapeMaclear(creds.email, creds.password);
         } else {
           const { scrapeCrowdPear } = await import("./scrapers/crowdpear");
           balanceData = await scrapeCrowdPear(creds.email, creds.password, creds.gmailAppPassword, creds.gmailEmail);

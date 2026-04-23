@@ -10,23 +10,10 @@ export interface LandeScrapedData {
   scrapedAt: Date;
 }
 
-const DASHBOARD_URL = "https://lande.finance/investor";
+const LOGIN_URL = "https://lande.finance/login";
+const INVESTOR_URL = "https://lande.finance/investor";
 
-function parseCookieString(cookieStr: string): Array<{ name: string; value: string; domain: string; path: string }> {
-  return cookieStr
-    .split(";")
-    .map(part => {
-      const eqIdx = part.indexOf("=");
-      if (eqIdx === -1) return null;
-      const name = part.slice(0, eqIdx).trim();
-      const value = part.slice(eqIdx + 1).trim();
-      if (!name) return null;
-      return { name, value, domain: ".lande.finance", path: "/" };
-    })
-    .filter(Boolean) as Array<{ name: string; value: string; domain: string; path: string }>;
-}
-
-export async function scrapeLande(cookies: string): Promise<LandeScrapedData> {
+export async function scrapeLande(email: string, password: string): Promise<LandeScrapedData> {
   let browser: any;
   try {
     browser = await (puppeteer as any).launch({
@@ -41,7 +28,6 @@ export async function scrapeLande(cookies: string): Promise<LandeScrapedData> {
         "--disable-gpu",
         "--no-first-run",
         "--disable-extensions",
-        "--disable-background-networking",
         "--disable-default-apps",
         "--disable-sync",
         "--disable-translate",
@@ -61,57 +47,56 @@ export async function scrapeLande(cookies: string): Promise<LandeScrapedData> {
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
     );
-    await page.setExtraHTTPHeaders({
-      "Accept-Language": "en-US,en;q=0.9",
-    });
+    await page.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
 
-    // Inject the user's browser cookies so Cloudflare sees a trusted session
-    const parsedCookies = parseCookieString(cookies);
-    console.log(`[Lande Scraper] Injecting ${parsedCookies.length} cookies...`);
-    if (parsedCookies.length === 0) {
-      throw new Error("No valid cookies found. Please paste the full Cookie header value from your browser.");
-    }
-    await page.setCookie(...parsedCookies);
-
-    console.log("[Lande Scraper] Navigating to dashboard...");
-    await page.goto(DASHBOARD_URL, { waitUntil: "networkidle2", timeout: 60000 });
+    console.log("[Lande Scraper] Navigating to login page...");
+    await page.goto(LOGIN_URL, { waitUntil: "networkidle2", timeout: 60000 });
     await new Promise(resolve => setTimeout(resolve, 3000));
 
-    const currentUrl = page.url();
-    console.log(`[Lande Scraper] Current URL: ${currentUrl}`);
+    console.log("[Lande Scraper] Current URL:", page.url());
 
-    // If redirected back to login or Cloudflare challenge, the cookies have expired
-    if (currentUrl.includes("/login") || currentUrl.includes("cloudflare")) {
-      const pageText = await page.evaluate(`document.body.innerText.substring(0, 300)`);
-      throw new Error(`Session cookies have expired or are invalid. Please refresh your cookies from the browser. Page: ${pageText}`);
+    const emailSelector = 'input[type="email"], input[name="email"], input[id="email"]';
+    const passSelector = 'input[type="password"], input[name="password"], input[id="password"]';
+
+    console.log("[Lande Scraper] Waiting for login form...");
+    await page.waitForSelector(emailSelector, { timeout: 30000 }).catch(async () => {
+      const html = await page.evaluate(`document.body ? document.body.innerHTML.slice(0, 1000) : "no body"`);
+      throw new Error(`Login form not found. Page HTML: ${html}`);
+    });
+
+    console.log("[Lande Scraper] Filling credentials...");
+    await page.$eval(emailSelector, (el: any) => el.value = "");
+    await page.type(emailSelector, email, { delay: 50 });
+    await page.$eval(passSelector, (el: any) => el.value = "");
+    await page.type(passSelector, password, { delay: 50 });
+
+    console.log("[Lande Scraper] Submitting login...");
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 }).catch(() => {}),
+      page.keyboard.press("Enter"),
+    ]);
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    const urlAfterLogin = page.url();
+    console.log("[Lande Scraper] URL after login:", urlAfterLogin);
+
+    if (urlAfterLogin.includes("/login")) {
+      const errorText = await page.evaluate(`(function() {
+        var el = document.querySelector('.alert, .error, [class*="error"], [class*="alert"]');
+        return el ? el.textContent.trim() : null;
+      })()`);
+      throw new Error(`Login failed${errorText ? ": " + errorText : ". Please check your credentials."}`);
     }
 
-    // Check for Cloudflare challenge page
-    const cfCheck = await page.evaluate(`(function() {
-      var t = document.body ? document.body.innerText : "";
-      return t.includes("Performing security verification") || t.includes("security service");
-    })()`);
-    if (cfCheck) {
-      throw new Error("Cloudflare challenge still active. Make sure to include the cf_clearance cookie when copying from your browser.");
+    if (!urlAfterLogin.includes("/investor")) {
+      console.log("[Lande Scraper] Navigating to investor page...");
+      await page.goto(INVESTOR_URL, { waitUntil: "networkidle2", timeout: 30000 });
+      await new Promise(resolve => setTimeout(resolve, 3000));
     }
 
     console.log("[Lande Scraper] Waiting for balance element...");
     await page.waitForSelector("#total_balance", { timeout: 20000 }).catch(() => {});
     await new Promise(resolve => setTimeout(resolve, 1000));
-
-    const diag = await page.evaluate(`(function() {
-      var url = window.location.href;
-      var balEl = document.querySelector("#total_balance");
-      var bodyHtml = document.body ? document.body.innerHTML.slice(0, 4000) : "no body";
-      var allIds = Array.from(document.querySelectorAll("[id]")).map(function(el) { return el.id; }).slice(0, 50);
-      var allText = document.body ? document.body.innerText.slice(0, 1000) : "";
-      return { url: url, balanceText: balEl ? balEl.textContent.trim() : null, bodyHtml: bodyHtml, allIds: allIds, allText: allText };
-    })()`) as { url: string; balanceText: string | null; bodyHtml: string; allIds: string[]; allText: string };
-    console.log("[Lande Scraper] Page URL:", diag.url);
-    console.log("[Lande Scraper] #total_balance text:", diag.balanceText);
-    console.log("[Lande Scraper] All element IDs on page:", JSON.stringify(diag.allIds));
-    console.log("[Lande Scraper] Page text (first 1000):", diag.allText);
-    console.log("[Lande Scraper] Body HTML (first 4000):", diag.bodyHtml);
 
     const totalBalance = await page.evaluate(`(function() {
       var extractNumber = function(text) {
@@ -178,12 +163,21 @@ export async function scrapeLande(cookies: string): Promise<LandeScrapedData> {
       return 0;
     })()`) as number;
 
+    if (totalBalance === 0) {
+      const dump = await page.evaluate(`(function() {
+        return {
+          url: window.location.href,
+          ids: Array.from(document.querySelectorAll("[id]")).map(function(el) { return el.id; }).slice(0, 40),
+          text: document.body ? document.body.innerText.slice(0, 800) : "",
+          html: document.body ? document.body.innerHTML.slice(0, 3000) : ""
+        };
+      })()`);
+      console.log("[Lande Scraper] Balance is 0 — diagnostic dump:", JSON.stringify(dump));
+    }
+
     console.log(`[Lande Scraper] Scraping complete. Total balance: €${totalBalance}`);
 
-    return {
-      totalBalance,
-      scrapedAt: new Date(),
-    };
+    return { totalBalance, scrapedAt: new Date() };
 
   } finally {
     if (browser) {
