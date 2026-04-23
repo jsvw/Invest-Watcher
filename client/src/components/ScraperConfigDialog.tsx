@@ -18,7 +18,7 @@ const SCRAPER_TYPES = [
   { value: "goldrepublic", label: "GoldRepublic", credentialType: "username_email" },
   { value: "valvest", label: "Valvest (Landed.eu)", credentialType: "email" },
   { value: "lande", label: "Lande", credentialType: "lande_cookie" },
-  { value: "maclear", label: "Maclear", credentialType: "email" },
+  { value: "maclear", label: "Maclear", credentialType: "lande_cookie" },
   { value: "trading212", label: "Trading 212 API", credentialType: "apikey" },
   { value: "stock_ticker", label: "Stock Ticker (Yahoo Finance)", credentialType: "stock_ticker" },
 ];
@@ -69,7 +69,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
       const effectiveIsStock = effectiveType === "stock_ticker";
       const effectiveIsApiKey = effectiveType === "trading212";
       const effectiveIsUsernameEmail = effectiveType === "goldrepublic";
-      const effectiveIsLandeCookie = effectiveType === "lande";
+      const effectiveIsLandeCookie = effectiveType === "lande" || effectiveType === "maclear";
       if (effectiveIsStock) {
         body = { scraperType: effectiveType, ticker, shares, averagePrice: averagePrice || undefined, investedEur: investedEur || undefined };
       } else if (effectiveIsApiKey) {
@@ -150,7 +150,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
   const isConfigApiKeyType = config?.scraperType === "trading212";
   const isConfigUsernameEmailType = config?.scraperType === "goldrepublic";
   const isConfigStockTickerType = config?.scraperType === "stock_ticker";
-  const isConfigLandeCookieType = config?.scraperType === "lande";
+  const isConfigLandeCookieType = config?.scraperType === "lande" || config?.scraperType === "maclear";
 
   const canSaveNew = isStockTickerType
     ? ticker.length > 0 && shares.length > 0 && !isNaN(Number(shares))
@@ -276,7 +276,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                         data-testid="input-scraper-cookies"
                       />
                       <p className="text-xs text-muted-foreground mt-1">
-                        In your browser: open lande.finance → F12 → Network tab → click any request → find <strong>Cookie:</strong> in Request Headers → copy the full value.
+                        In your browser: log into <strong>{config?.scraperType === "maclear" ? "app.maclear.ch" : "lande.finance"}</strong> → F12 → Network tab → click any request to that site → find <strong>Cookie:</strong> in Request Headers → copy the full value and paste it above.
                       </p>
                     </div>
                   </>
@@ -477,7 +477,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                 : isApiKeyType
                 ? "Enter your API credentials to enable automatic portfolio syncing via the Trading 212 API."
                 : isLandeCookieType
-                ? "Lande uses Cloudflare protection that blocks automated logins. Paste your browser session cookies instead — the scraper will use them to access your dashboard directly."
+                ? "This platform uses Cloudflare protection that blocks automated logins from server IPs. Paste your browser session cookies instead — the scraper will use them to access your dashboard directly."
                 : "Enter your login credentials to enable automatic balance scraping. Your credentials are stored securely and only used to log into the platform."}
             </p>
             <div className="space-y-3">
@@ -633,7 +633,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
                       data-testid="input-scraper-cookies-new"
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      In your browser: open <strong>lande.finance</strong> and log in → press <strong>F12</strong> → Network tab → click any request to lande.finance → find <strong>Cookie:</strong> in the Request Headers panel → copy the full value and paste it above.
+                      In your browser: log into <strong>{scraperType === "maclear" ? "app.maclear.ch" : "lande.finance"}</strong> → press <strong>F12</strong> → Network tab → click any request to that site → find <strong>Cookie:</strong> in the Request Headers panel → copy the full value and paste it above.
                     </p>
                   </div>
                 </>

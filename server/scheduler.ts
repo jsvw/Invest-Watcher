@@ -242,7 +242,7 @@ async function runScrapeForConfig(config: any) {
         balanceData = await scrapeLande(creds.cookies);
       } else if (scraperType === "maclear") {
         const { scrapeMaclear } = await import("./scrapers/maclear");
-        balanceData = await scrapeMaclear(creds.email, creds.password);
+        balanceData = await scrapeMaclear(creds.cookies);
       } else {
         const { scrapeCrowdPear } = await import("./scrapers/crowdpear");
         balanceData = await scrapeCrowdPear(creds.email, creds.password, creds.gmailAppPassword, creds.gmailEmail);

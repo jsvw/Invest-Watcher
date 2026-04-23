@@ -1,6 +1,7 @@
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import { getChromiumPath } from "./chromium";
+import { getProxyArgs, applyProxy } from "./proxy";
 
 puppeteer.use(StealthPlugin());
 
@@ -50,10 +51,12 @@ export async function scrapeLande(cookies: string): Promise<LandeScrapedData> {
         "--disable-features=site-per-process",
         "--js-flags=--max-old-space-size=256",
         "--window-size=1280,800",
+        ...getProxyArgs(),
       ],
     });
 
     const page = await browser.newPage();
+    await applyProxy(page);
     await page.setViewport({ width: 1280, height: 800 });
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
