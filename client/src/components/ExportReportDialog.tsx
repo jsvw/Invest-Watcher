@@ -96,8 +96,10 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
   /** Return periods from `allPeriods` that belong to the scope of the selected report. */
   function getPeriodHistoryRows(allPeriods: WaterfallPeriod[]): WaterfallPeriod[] {
     if (periodType === "year") {
-      // All years — sorted ascending
-      return [...allPeriods].sort((a, b) => a.period.localeCompare(b.period));
+      // All years up to and including the selected year — sorted ascending
+      return [...allPeriods]
+        .filter(p => /^\d{4}$/.test(p.period) && p.period <= selectedYear)
+        .sort((a, b) => a.period.localeCompare(b.period));
     }
     if (periodType === "quarter") {
       // All quarters whose year matches selectedYear
@@ -332,12 +334,8 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
       }
 
       // ── Platform Performance ─────────────────────────────────────────
-      // For month view: show MoM, 30d, 90d rolling returns
-      // For quarter/year view: use the selected period's platform breakdown for period return
       if (momData.length > 0) {
         checkPage(40);
-
-        const isMonthView = periodType === "month";
 
         const d30Map = new Map<number, RollingEntry>();
         const d90Map = new Map<number, RollingEntry>();
@@ -346,75 +344,73 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
           for (const e of rollingData.d90) d90Map.set(e.platformId, e);
         }
 
-        // Build a map of platformName -> breakdown for period-specific returns
-        const periodPlatformMap = new Map<string, PlatformBreakdown>();
-        if (periodEntry?.platformBreakdown) {
-          for (const pb of periodEntry.platformBreakdown) {
+        // Platform performance — always show MoM / 30d / 90d rolling returns
+        sectionTitle("Platform Performance");
+        autoTable(doc, {
+          startY: y,
+          head: [["Platform", "Current Value", "MoM", "30d", "90d"]],
+          body: momData
+            .filter(p => p.currentValue > 0)
+            .sort((a, b) => b.currentValue - a.currentValue)
+            .map(p => {
+              const r30 = d30Map.get(p.platformId);
+              const r90 = d90Map.get(p.platformId);
+              return [
+                p.name,
+                fmt(p.currentValue),
+                fmtPct(p.momGrowthPercent),
+                r30 && !r30.stale ? fmtPct(r30.pct) : "—",
+                r90 && !r90.stale ? fmtPct(r90.pct) : "—",
+              ];
+            }),
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 9, cellPadding: 2.5 },
+          headStyles: { fillColor: [99, 102, 241] as RGB, textColor: 255, fontStyle: "bold" },
+          alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
+          columnStyles: {
+            1: { halign: "right" },
+            2: { halign: "right" },
+            3: { halign: "right" },
+            4: { halign: "right" },
+          },
+        });
+        y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+
+        // For quarter/year reports: also show period-specific breakdown per platform
+        if (periodType !== "month" && (periodEntry?.platformBreakdown?.length ?? 0) > 0) {
+          const periodPlatformMap = new Map<string, PlatformBreakdown>();
+          for (const pb of periodEntry!.platformBreakdown!) {
             periodPlatformMap.set(pb.name, pb);
           }
-        }
+          const periodLabel2 = periodType === "quarter" ? "QoQ" : "YoY";
+          const periodRows = momData
+            .filter(p => p.currentValue > 0)
+            .sort((a, b) => b.currentValue - a.currentValue)
+            .map(p => {
+              const pb = periodPlatformMap.get(p.name);
+              return [
+                p.name,
+                pb ? `${pb.netInvested >= 0 ? "+" : ""}${fmt(pb.netInvested)}` : "—",
+                pb ? `${pb.valueChange >= 0 ? "+" : ""}${fmt(pb.valueChange)}` : "—",
+              ];
+            });
 
-        if (isMonthView) {
-          sectionTitle("Platform Performance (Rolling Returns)");
-          autoTable(doc, {
-            startY: y,
-            head: [["Platform", "Current Value", "MoM", "30d", "90d"]],
-            body: momData
-              .filter(p => p.currentValue > 0)
-              .sort((a, b) => b.currentValue - a.currentValue)
-              .map(p => {
-                const r30 = d30Map.get(p.platformId);
-                const r90 = d90Map.get(p.platformId);
-                return [
-                  p.name,
-                  fmt(p.currentValue),
-                  fmtPct(p.momGrowthPercent),
-                  r30 && !r30.stale ? fmtPct(r30.pct) : "—",
-                  r90 && !r90.stale ? fmtPct(r90.pct) : "—",
-                ];
-              }),
-            margin: { left: margin, right: margin },
-            styles: { fontSize: 9, cellPadding: 2.5 },
-            headStyles: { fillColor: [99, 102, 241] as RGB, textColor: 255, fontStyle: "bold" },
-            alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
-            columnStyles: {
-              1: { halign: "right" },
-              2: { halign: "right" },
-              3: { halign: "right" },
-              4: { halign: "right" },
-            },
-          });
-        } else {
-          // Quarter / year: show period net invested, period value change, and current value
-          const periodLabel2 = periodType === "quarter" ? "Period (QoQ)" : "Period (YoY)";
-          sectionTitle(`Platform Performance — ${periodLabel2}`);
-          autoTable(doc, {
-            startY: y,
-            head: [["Platform", "Current Value", "Period Net Invested", "Period Gain / Loss"]],
-            body: momData
-              .filter(p => p.currentValue > 0)
-              .sort((a, b) => b.currentValue - a.currentValue)
-              .map(p => {
-                const pb = periodPlatformMap.get(p.name);
-                return [
-                  p.name,
-                  fmt(p.currentValue),
-                  pb ? `${pb.netInvested >= 0 ? "+" : ""}${fmt(pb.netInvested)}` : "—",
-                  pb ? `${pb.valueChange >= 0 ? "+" : ""}${fmt(pb.valueChange)}` : "—",
-                ];
-              }),
-            margin: { left: margin, right: margin },
-            styles: { fontSize: 9, cellPadding: 2.5 },
-            headStyles: { fillColor: [99, 102, 241] as RGB, textColor: 255, fontStyle: "bold" },
-            alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
-            columnStyles: {
-              1: { halign: "right" },
-              2: { halign: "right" },
-              3: { halign: "right" },
-            },
-          });
+          if (periodRows.length > 0) {
+            checkPage(35);
+            sectionTitle(`Period Returns (${periodLabel2}) — ${getPeriodLabel()}`);
+            autoTable(doc, {
+              startY: y,
+              head: [["Platform", "Net Invested (period)", "Value Gain / Loss (period)"]],
+              body: periodRows,
+              margin: { left: margin, right: margin },
+              styles: { fontSize: 9, cellPadding: 2.5 },
+              headStyles: { fillColor: [79, 70, 229] as RGB, textColor: 255, fontStyle: "bold" },
+              alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
+              columnStyles: { 1: { halign: "right" }, 2: { halign: "right" } },
+            });
+            y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+          }
         }
-        y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
       }
 
       // ── AI Insights ──────────────────────────────────────────────────
