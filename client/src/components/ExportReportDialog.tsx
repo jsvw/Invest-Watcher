@@ -285,7 +285,62 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
   const [generating, setGenerating] = useState(false);
   const [selectedSections, setSelectedSections] = useState<Set<SectionId>>(() => loadSavedSections("month") ?? defaultSections("month"));
 
-  const availableYears = Array.from({ length: 6 }, (_, i) => String(now.getFullYear() - i));
+  // ── Period discovery (data-aware selectors) ───────────────────────────────
+  const [periodsLoading, setPeriodsLoading] = useState(false);
+  // year → Set of "MM" strings that have data
+  const [dataMonths, setDataMonths] = useState<Map<string, Set<string>>>(new Map());
+
+  // Derived from dataMonths
+  const availableYears = [...dataMonths.keys()].sort().reverse();
+  const availableMonths = [...(dataMonths.get(selectedYear) ?? [])].sort();
+  const availableQuarters = [...new Set(
+    [...(dataMonths.get(selectedYear) ?? [])].map(m => String(Math.ceil(Number(m) / 3)))
+  )].sort();
+
+  // Fetch available periods when dialog opens
+  useEffect(() => {
+    if (!open) return;
+    setPeriodsLoading(true);
+    fetch("/api/portfolio/waterfall?granularity=month", { credentials: "include" })
+      .then(r => r.ok ? r.json() as Promise<WaterfallPeriod[]> : Promise.resolve([] as WaterfallPeriod[]))
+      .then(periods => {
+        const map = new Map<string, Set<string>>();
+        for (const p of periods) {
+          const m = p.period.match(/^(\d{4})-(\d{2})$/);
+          if (m) {
+            const [, yr, mo] = m;
+            if (!map.has(yr)) map.set(yr, new Set());
+            map.get(yr)!.add(mo);
+          }
+        }
+        setDataMonths(map);
+
+        // Auto-select the most recent period with data
+        if (map.size > 0) {
+          const latestYear = [...map.keys()].sort().reverse()[0];
+          const latestMonth = [...map.get(latestYear)!].sort().reverse()[0];
+          const latestQuarter = String(Math.ceil(Number(latestMonth) / 3));
+          setSelectedYear(latestYear);
+          setSelectedMonth(String(Number(latestMonth))); // remove leading zero
+          setSelectedQuarter(latestQuarter);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setPeriodsLoading(false));
+  }, [open]);
+
+  // When year changes, snap month/quarter to a valid value for that year
+  useEffect(() => {
+    const months = [...(dataMonths.get(selectedYear) ?? [])].sort().reverse();
+    if (months.length === 0) return;
+    const quarters = [...new Set(months.map(m => String(Math.ceil(Number(m) / 3))))].sort().reverse();
+    if (!months.includes(selectedMonth.padStart(2, "0"))) {
+      setSelectedMonth(String(Number(months[0])));
+    }
+    if (!quarters.includes(selectedQuarter)) {
+      setSelectedQuarter(quarters[0]);
+    }
+  }, [selectedYear, dataMonths]);
 
   useEffect(() => {
     // Load saved selections for the new period type; fall back to all-available
@@ -1611,47 +1666,72 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
             {periodType === "month" && (
               <div className="flex-1 space-y-1.5">
                 <Label htmlFor="select-month">Month</Label>
-                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger id="select-month" data-testid="select-month">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MONTH_NAMES.map((m, i) => (
-                      <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {periodsLoading ? (
+                  <div className="h-9 rounded-md border bg-muted/40 flex items-center px-3 gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />Loading…
+                  </div>
+                ) : availableMonths.length === 0 ? (
+                  <div className="h-9 rounded-md border bg-muted/40 flex items-center px-3 text-sm text-muted-foreground">No data</div>
+                ) : (
+                  <Select value={selectedMonth} onValueChange={setSelectedMonth} disabled={periodsLoading}>
+                    <SelectTrigger id="select-month" data-testid="select-month">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableMonths.map(mm => {
+                        const num = Number(mm);
+                        return <SelectItem key={mm} value={String(num)}>{MONTH_NAMES[num - 1]}</SelectItem>;
+                      })}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             )}
 
             {periodType === "quarter" && (
               <div className="flex-1 space-y-1.5">
                 <Label htmlFor="select-quarter">Quarter</Label>
-                <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
-                  <SelectTrigger id="select-quarter" data-testid="select-quarter">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {["1", "2", "3", "4"].map(q => (
-                      <SelectItem key={q} value={q}>Q{q}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {periodsLoading ? (
+                  <div className="h-9 rounded-md border bg-muted/40 flex items-center px-3 gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />Loading…
+                  </div>
+                ) : availableQuarters.length === 0 ? (
+                  <div className="h-9 rounded-md border bg-muted/40 flex items-center px-3 text-sm text-muted-foreground">No data</div>
+                ) : (
+                  <Select value={selectedQuarter} onValueChange={setSelectedQuarter} disabled={periodsLoading}>
+                    <SelectTrigger id="select-quarter" data-testid="select-quarter">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableQuarters.map(q => (
+                        <SelectItem key={q} value={q}>Q{q}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             )}
 
             <div className={periodType === "year" ? "flex-1 space-y-1.5" : "w-28 space-y-1.5"}>
               <Label htmlFor="select-year">Year</Label>
-              <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger id="select-year" data-testid="select-year">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableYears.map(yr => (
-                    <SelectItem key={yr} value={yr}>{yr}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {periodsLoading ? (
+                <div className="h-9 rounded-md border bg-muted/40 flex items-center px-3 gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />Loading…
+                </div>
+              ) : availableYears.length === 0 ? (
+                <div className="h-9 rounded-md border bg-muted/40 flex items-center px-3 text-sm text-muted-foreground">No data</div>
+              ) : (
+                <Select value={selectedYear} onValueChange={setSelectedYear} disabled={periodsLoading}>
+                  <SelectTrigger id="select-year" data-testid="select-year">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableYears.map(yr => (
+                      <SelectItem key={yr} value={yr}>{yr}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
 
@@ -1721,7 +1801,7 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={generating}>
             Cancel
           </Button>
-          <Button onClick={handleGenerate} disabled={generating} data-testid="button-generate-report">
+          <Button onClick={handleGenerate} disabled={generating || periodsLoading || availableYears.length === 0} data-testid="button-generate-report">
             {generating ? (
               <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating…</>
             ) : (
