@@ -82,6 +82,7 @@ export interface IStorage {
 
   // Assets (require platform ownership verification in routes)
   getAssets(platformId: number): Promise<AssetResponse[]>;
+  getAllAssetsForUser(userId: number): Promise<(AssetResponse & { platformId: number })[]>;
   getAsset(id: number): Promise<AssetResponse | undefined>;
   createAsset(asset: InsertAsset): Promise<Asset>;
   updateAsset(id: number, asset: Partial<InsertAsset>): Promise<Asset>;
@@ -597,6 +598,107 @@ export class DatabaseStorage implements IStorage {
         totalRepaid: totalRepaid > 0 ? Math.round(totalRepaid * 100) / 100 : undefined,
         remainingPrincipal: totalRepaid > 0 ? Math.round(remainingPrincipal * 100) / 100 : undefined,
         previousValue: previousVal !== undefined ? Math.round(previousVal * 100) / 100 : undefined,
+      };
+    });
+  }
+
+  async getAllAssetsForUser(userId: number): Promise<(AssetResponse & { platformId: number })[]> {
+    const allAssets = await db.select({
+      id: assets.id,
+      platformId: assets.platformId,
+      name: assets.name,
+      description: assets.description,
+      investedAmount: assets.investedAmount,
+      bonusAmount: assets.bonusAmount,
+      annualYield: assets.annualYield,
+      quantity: assets.quantity,
+      pricePerUnit: assets.pricePerUnit,
+      acquisitionDate: assets.acquisitionDate,
+      expectedExitDate: assets.expectedExitDate,
+      status: assets.status,
+      exitDate: assets.exitDate,
+      exitPrice: assets.exitPrice,
+      createdAt: assets.createdAt,
+    })
+      .from(assets)
+      .innerJoin(platforms, eq(assets.platformId, platforms.id))
+      .where(eq(platforms.userId, userId))
+      .orderBy(desc(assets.acquisitionDate));
+
+    if (allAssets.length === 0) return [];
+
+    const assetIds = allAssets.map(a => a.id);
+
+    // Fetch latest valuation per asset using a single query (ordered newest first)
+    const allValuations = await db.select({
+      assetId: assetValuations.assetId,
+      value: assetValuations.value,
+    })
+      .from(assetValuations)
+      .where(sql`${assetValuations.assetId} = ANY(ARRAY[${sql.join(assetIds.map(id => sql`${id}`), sql`, `)}]::int[])`)
+      .orderBy(desc(assetValuations.date));
+
+    const latestValuationMap = new Map<number, number>();
+    for (const row of allValuations) {
+      if (!latestValuationMap.has(row.assetId)) {
+        latestValuationMap.set(row.assetId, Number(row.value));
+      }
+    }
+
+    // Fetch total repayments per asset
+    const allRepayments = await db.select({
+      assetId: assetRepayments.assetId,
+      amount: assetRepayments.amount,
+    })
+      .from(assetRepayments)
+      .where(sql`${assetRepayments.assetId} = ANY(ARRAY[${sql.join(assetIds.map(id => sql`${id}`), sql`, `)}]::int[])`);
+
+    const repaymentTotals = new Map<number, number>();
+    for (const row of allRepayments) {
+      repaymentTotals.set(row.assetId, (repaymentTotals.get(row.assetId) ?? 0) + Number(row.amount));
+    }
+
+    const now = Date.now();
+    return allAssets.map(asset => {
+      const userInvested = Number(asset.investedAmount);
+      const bonus = Number(asset.bonusAmount || 0);
+      const totalRepaid = repaymentTotals.get(asset.id) ?? 0;
+      const remainingPrincipal = Math.max(0, userInvested - totalRepaid);
+      const workingCapital = remainingPrincipal + bonus;
+      const latestVal = latestValuationMap.get(asset.id);
+
+      let currentValue: number;
+      let profitLoss: number | undefined;
+      const isMatured = asset.exitDate && new Date(asset.exitDate).getTime() <= now && asset.status === "active" && !asset.exitPrice;
+
+      if (asset.status === "exited" && asset.exitPrice) {
+        currentValue = Number(asset.exitPrice);
+        profitLoss = currentValue - userInvested;
+      } else if (isMatured && asset.annualYield && asset.acquisitionDate) {
+        const exitTime = new Date(asset.exitDate!).getTime();
+        const yearsElapsed = (exitTime - new Date(asset.acquisitionDate).getTime()) / (365 * 24 * 60 * 60 * 1000);
+        const accumulatedYield = (userInvested + bonus) * (Number(asset.annualYield) / 100) * yearsElapsed;
+        currentValue = workingCapital + accumulatedYield;
+        profitLoss = accumulatedYield;
+      } else if (latestVal !== undefined) {
+        currentValue = latestVal;
+        profitLoss = currentValue - workingCapital;
+      } else if (asset.annualYield && asset.acquisitionDate) {
+        const yearsElapsed = (now - new Date(asset.acquisitionDate).getTime()) / (365 * 24 * 60 * 60 * 1000);
+        const accumulatedYield = workingCapital * (Number(asset.annualYield) / 100) * yearsElapsed;
+        currentValue = workingCapital + accumulatedYield;
+        profitLoss = accumulatedYield;
+      } else {
+        currentValue = workingCapital;
+        profitLoss = 0;
+      }
+
+      return {
+        ...asset,
+        currentValue,
+        profitLoss,
+        totalRepaid,
+        remainingPrincipal,
       };
     });
   }

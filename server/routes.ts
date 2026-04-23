@@ -1168,6 +1168,53 @@ export async function registerRoutes(
     }
   });
 
+  // --- Portfolio: Cashflow data (all investments + withdrawals with dates) ---
+  app.get('/api/portfolio/cashflow-data', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const [userInvestments, userWithdrawals] = await Promise.all([
+        storage.getAllInvestmentsForUser(userId),
+        storage.getAllWithdrawalsForUser(userId),
+      ]);
+      res.json({
+        investments: userInvestments.map(inv => ({
+          platformId: inv.platformId,
+          amount: Number(inv.amount),
+          date: new Date(inv.date).toISOString().slice(0, 10),
+        })),
+        withdrawals: userWithdrawals.map(wd => ({
+          platformId: wd.platformId,
+          amount: Number(wd.amount),
+          date: new Date(wd.date).toISOString().slice(0, 10),
+        })),
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch cashflow data" });
+    }
+  });
+
+  // --- Portfolio: All assets across platforms (for tax summary in yearly reports) ---
+  app.get('/api/portfolio/all-assets', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const allAssets = await storage.getAllAssetsForUser(userId);
+      res.json(allAssets.map(a => ({
+        id: a.id,
+        platformId: a.platformId,
+        name: a.name,
+        status: a.status,
+        investedAmount: Number(a.investedAmount),
+        exitPrice: a.exitPrice ? Number(a.exitPrice) : null,
+        exitDate: a.exitDate ? new Date(a.exitDate).toISOString().slice(0, 10) : null,
+        acquisitionDate: a.acquisitionDate ? new Date(a.acquisitionDate).toISOString().slice(0, 10) : null,
+        currentValue: a.currentValue ?? 0,
+        profitLoss: a.profitLoss ?? 0,
+      })));
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch all assets" });
+    }
+  });
+
   // Per-platform month-over-month performance
   app.get('/api/portfolio/platform-mom', requireAuth, async (req, res) => {
     try {

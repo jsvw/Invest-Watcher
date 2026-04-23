@@ -7,8 +7,19 @@ import { Loader2, Download } from "lucide-react";
 import { useAuth } from "@/App";
 import { formatCurrency } from "@/lib/currency";
 import { useToast } from "@/hooks/use-toast";
+import { xirr } from "@/lib/xirr";
 
 // ── API response types ──────────────────────────────────────────────────────
+
+interface Platform {
+  id: number;
+  name: string;
+  category: string;
+  currency: string;
+  targetAllocation: string | null;
+  color: string;
+  icon: string | null;
+}
 
 interface PlatformBreakdown {
   platformId: number;
@@ -49,13 +60,74 @@ interface RollingReturns {
   d90: RollingEntry[];
 }
 
+interface CashflowData {
+  investments: { platformId: number; amount: number; date: string }[];
+  withdrawals: { platformId: number; amount: number; date: string }[];
+}
+
+interface HistoryPoint {
+  date: string;
+  value: number;
+  invested: number;
+}
+
+interface T212Instrument {
+  ticker: string;
+  shares: number | null;
+  currentPrice: number | null;
+  averagePrice: number | null;
+  ppl: number | null;
+  currentShare: number | null;
+}
+
+interface T212Holdings {
+  instruments: T212Instrument[];
+  currentValue: number;
+  result: number;
+  dividendsGained: number;
+  fromDb?: boolean;
+}
+
+interface DivPayment {
+  ticker: string;
+  amount: number;
+  paidOn: string;
+}
+
+interface DivProjection {
+  ticker: string;
+  amount: number;
+  date: string;
+  frequency: string;
+  source: "declared" | "estimated";
+}
+
+interface DividendCalendar {
+  payments: DivPayment[];
+  projections: DivProjection[];
+}
+
+interface AssetSummary {
+  id: number;
+  platformId: number;
+  name: string;
+  status: string;
+  investedAmount: number;
+  exitPrice: number | null;
+  exitDate: string | null;
+  acquisitionDate: string | null;
+  currentValue: number;
+  profitLoss: number;
+}
+
 interface InsightResponse {
   insight?: string;
 }
 
-// ── Component ───────────────────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────────────
 
 type PeriodType = "month" | "quarter" | "year";
+type RGB = [number, number, number];
 
 interface ExportReportDialogProps {
   open: boolean;
@@ -67,6 +139,76 @@ const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+
+// ── Period helpers ────────────────────────────────────────────────────────────
+
+function getPeriodBounds(periodType: PeriodType, selectedYear: string, selectedMonth: string, selectedQuarter: string): { start: Date; end: Date } {
+  const y = Number(selectedYear);
+  if (periodType === "year") {
+    return { start: new Date(y, 0, 1), end: new Date(y, 11, 31, 23, 59, 59) };
+  }
+  if (periodType === "quarter") {
+    const q = Number(selectedQuarter);
+    const startMonth = (q - 1) * 3;
+    const endMonth = q * 3;
+    return { start: new Date(y, startMonth, 1), end: new Date(y, endMonth, 0, 23, 59, 59) };
+  }
+  const m = Number(selectedMonth) - 1;
+  return { start: new Date(y, m, 1), end: new Date(y, m + 1, 0, 23, 59, 59) };
+}
+
+function isInPeriod(dateStr: string, start: Date, end: Date): boolean {
+  const d = new Date(dateStr);
+  return d >= start && d <= end;
+}
+
+// ── Statistical helpers ───────────────────────────────────────────────────────
+
+function computeVolatility(historyPoints: HistoryPoint[]): number | null {
+  if (historyPoints.length < 3) return null;
+  const sorted = [...historyPoints].sort((a, b) => a.date.localeCompare(b.date));
+  const returns: number[] = [];
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1].value;
+    const curr = sorted[i].value;
+    if (prev > 0) returns.push((curr - prev) / prev);
+  }
+  if (returns.length < 2) return null;
+  const mean = returns.reduce((s, r) => s + r, 0) / returns.length;
+  const variance = returns.reduce((s, r) => s + (r - mean) ** 2, 0) / (returns.length - 1);
+  const periodDays = returns.length > 0
+    ? (new Date(sorted[sorted.length - 1].date).getTime() - new Date(sorted[0].date).getTime()) / (returns.length * 86400000)
+    : 30;
+  const annualisationFactor = Math.sqrt(365 / Math.max(periodDays, 1));
+  return Math.sqrt(variance) * annualisationFactor * 100;
+}
+
+function computeMaxDrawdown(historyPoints: HistoryPoint[]): number | null {
+  if (historyPoints.length < 2) return null;
+  const sorted = [...historyPoints].sort((a, b) => a.date.localeCompare(b.date));
+  let peak = sorted[0].value;
+  let maxDd = 0;
+  for (const pt of sorted) {
+    if (pt.value > peak) peak = pt.value;
+    const dd = peak > 0 ? (peak - pt.value) / peak : 0;
+    if (dd > maxDd) maxDd = dd;
+  }
+  return maxDd * 100;
+}
+
+function computeTwr(historyRows: WaterfallPeriod[]): number | null {
+  if (historyRows.length === 0) return null;
+  let twr = 1;
+  for (const row of historyRows) {
+    const adjustedOpen = row.openValue + Math.max(0, row.netInvested);
+    if (adjustedOpen > 0) {
+      twr *= (row.closeValue / adjustedOpen);
+    }
+  }
+  return (twr - 1) * 100;
+}
+
+// ── Component ───────────────────────────────────────────────────────────────
 
 export function ExportReportDialog({ open, onOpenChange, currency }: ExportReportDialogProps) {
   const { user } = useAuth();
@@ -93,30 +235,23 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
     return `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`;
   }
 
-  /** Return periods from `allPeriods` that belong to the scope of the selected report. */
   function getPeriodHistoryRows(allPeriods: WaterfallPeriod[]): WaterfallPeriod[] {
     if (periodType === "year") {
-      // All years up to and including the selected year — sorted ascending
       return [...allPeriods]
         .filter(p => /^\d{4}$/.test(p.period) && p.period <= selectedYear)
         .sort((a, b) => a.period.localeCompare(b.period));
     }
     if (periodType === "quarter") {
-      // All quarters whose year matches selectedYear
       return [...allPeriods]
         .filter(p => p.period.startsWith(selectedYear + "-Q"))
         .sort((a, b) => a.period.localeCompare(b.period));
     }
-    // Month: all months for the selected year
     return [...allPeriods]
       .filter(p => p.period.startsWith(selectedYear + "-") && !p.period.includes("Q"))
       .sort((a, b) => a.period.localeCompare(b.period));
   }
 
   function formatPeriodLabel(period: string): string {
-    // "2025" → "2025"
-    // "2025-Q2" → "Q2 2025"
-    // "2025-03" → "Mar 2025"
     if (/^\d{4}$/.test(period)) return period;
     const qMatch = period.match(/^(\d{4})-Q(\d)$/);
     if (qMatch) return `Q${qMatch[2]} ${qMatch[1]}`;
@@ -133,22 +268,32 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
     try {
       const periodLabel = getPeriodLabel();
       const waterfallKey = getWaterfallKey();
+      const { start: periodStart, end: periodEnd } = getPeriodBounds(periodType, selectedYear, selectedMonth, selectedQuarter);
 
-      // Step 1: Fetch period data and current snapshot in parallel (no AI yet)
-      const [momRes, rollingRes, waterfallRes] = await Promise.allSettled([
-        fetch("/api/portfolio/platform-mom", { credentials: "include" }).then(r => r.json() as Promise<PlatformMom[]>),
-        fetch("/api/portfolio/platform-rolling-returns", { credentials: "include" }).then(r => r.json() as Promise<RollingReturns>),
-        fetch(`/api/portfolio/waterfall?granularity=${periodType}`, { credentials: "include" }).then(r => r.json() as Promise<WaterfallPeriod[]>),
+      // ── Fetch core data in parallel ──────────────────────────────────────
+      const isQuarterlyOrYearly = periodType === "quarter" || periodType === "year";
+
+      const [
+        platforms,
+        momData,
+        rollingData,
+        waterfallData,
+        cashflowData,
+        historyData,
+        allAssets,
+      ] = await Promise.all([
+        fetch("/api/platforms", { credentials: "include" }).then(r => r.ok ? r.json() as Promise<Platform[]> : Promise.resolve([] as Platform[])),
+        fetch("/api/portfolio/platform-mom", { credentials: "include" }).then(r => r.ok ? r.json() as Promise<PlatformMom[]> : Promise.resolve([] as PlatformMom[])),
+        fetch("/api/portfolio/platform-rolling-returns", { credentials: "include" }).then(r => r.ok ? r.json() as Promise<RollingReturns> : Promise.resolve(null as RollingReturns | null)),
+        fetch(`/api/portfolio/waterfall?granularity=${periodType}`, { credentials: "include" }).then(r => r.ok ? r.json() as Promise<WaterfallPeriod[]> : Promise.resolve([] as WaterfallPeriod[])),
+        fetch("/api/portfolio/cashflow-data", { credentials: "include" }).then(r => r.ok ? r.json() as Promise<CashflowData> : Promise.resolve({ investments: [], withdrawals: [] } as CashflowData)),
+        fetch(`/api/portfolio/history?range=year-${selectedYear}`, { credentials: "include" }).then(r => r.ok ? r.json() as Promise<HistoryPoint[]> : Promise.resolve([] as HistoryPoint[])),
+        fetch("/api/portfolio/all-assets", { credentials: "include" }).then(r => r.ok ? r.json() as Promise<AssetSummary[]> : Promise.resolve([] as AssetSummary[])),
       ]);
-
-      const momData: PlatformMom[] = momRes.status === "fulfilled" ? momRes.value : [];
-      const rollingData: RollingReturns | null = rollingRes.status === "fulfilled" ? rollingRes.value : null;
-      const waterfallData: WaterfallPeriod[] = waterfallRes.status === "fulfilled" ? waterfallRes.value : [];
 
       const periodEntry = waterfallData.find(p => p.period === waterfallKey) ?? null;
       const historyRows = getPeriodHistoryRows(waterfallData);
 
-      // Warn the user if the selected period has no portfolio data at all
       if (!periodEntry && historyRows.length === 0) {
         toast({
           title: "No data for this period",
@@ -159,31 +304,260 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
         return;
       }
 
-      // Step 2: Build a data-enriched AI prompt using actual period metrics
-      const periodRoi = periodEntry && periodEntry.openValue > 0
-        ? ((periodEntry.valueChange / periodEntry.openValue) * 100).toFixed(2)
+      // ── Fetch T212 holdings + dividend calendar for all platforms ────────
+      // Fetches run independently — dividend calendar does NOT require successful holdings fetch
+      const t212HoldingsMap = new Map<number, T212Holdings>();
+      const dividendCalendarMap = new Map<number, DividendCalendar>();
+
+      if (platforms.length > 0) {
+        const t212Fetches = platforms.map(async (p) => {
+          await Promise.all([
+            // Holdings (for ticker-level Holdings Summary)
+            fetch(`/api/platforms/${p.id}/trading212-holdings`, { credentials: "include" })
+              .then(async r => { if (r.ok) t212HoldingsMap.set(p.id, await r.json() as T212Holdings); })
+              .catch(() => {}),
+            // Dividend calendar (for Cashflow dividends and Dividend Report sections)
+            fetch(`/api/platforms/${p.id}/dividend-calendar`, { credentials: "include" })
+              .then(async r => { if (r.ok) dividendCalendarMap.set(p.id, await r.json() as DividendCalendar); })
+              .catch(() => {}),
+          ]);
+        });
+        await Promise.all(t212Fetches);
+      }
+
+      // ── Cashflow calculations ─────────────────────────────────────────────
+      const periodInvestments = cashflowData.investments.filter(inv => isInPeriod(inv.date, periodStart, periodEnd));
+      const periodWithdrawals = cashflowData.withdrawals.filter(wd => isInPeriod(wd.date, periodStart, periodEnd));
+      const totalDeposits = periodInvestments.reduce((s, i) => s + i.amount, 0);
+      const totalWithdrawals = periodWithdrawals.reduce((s, w) => s + w.amount, 0);
+
+      // T212 dividends for the period (from all dividend calendars)
+      let periodDividends = 0;
+      const dividendsByTicker = new Map<string, number>();
+      for (const [, calendar] of dividendCalendarMap) {
+        for (const payment of calendar.payments) {
+          if (isInPeriod(payment.paidOn, periodStart, periodEnd)) {
+            periodDividends += payment.amount;
+            dividendsByTicker.set(payment.ticker, (dividendsByTicker.get(payment.ticker) ?? 0) + payment.amount);
+          }
+        }
+      }
+      const netCashflow = totalDeposits - totalWithdrawals + periodDividends;
+
+      // Prior period cashflow comparison — exact equivalent period boundaries
+      const yr = Number(selectedYear);
+      let prevStart: Date;
+      let prevEnd: Date;
+      if (periodType === "month") {
+        const m = Number(selectedMonth) - 1; // 0-indexed current month
+        prevStart = new Date(yr, m - 1, 1);        // 1st of previous month
+        prevEnd = new Date(yr, m, 0, 23, 59, 59); // last day of previous month
+      } else if (periodType === "quarter") {
+        const q = Number(selectedQuarter) - 1; // 0-indexed current quarter
+        if (q === 0) {
+          // Q1 → prior period is Q4 of previous year
+          prevStart = new Date(yr - 1, 9, 1);      // Oct 1 of previous year
+          prevEnd = new Date(yr - 1, 12, 0, 23, 59, 59); // Dec 31 of previous year
+        } else {
+          const startMonth = (q - 1) * 3; // previous quarter start month
+          prevStart = new Date(yr, startMonth, 1);
+          prevEnd = new Date(yr, startMonth + 3, 0, 23, 59, 59);
+        }
+      } else {
+        prevStart = new Date(yr - 1, 0, 1);         // Jan 1 of previous year
+        prevEnd = new Date(yr - 1, 11, 31, 23, 59, 59); // Dec 31 of previous year
+      }
+      const prevDeposits = cashflowData.investments.filter(i => isInPeriod(i.date, prevStart, prevEnd)).reduce((s, i) => s + i.amount, 0);
+      const prevWithdrawals = cashflowData.withdrawals.filter(w => isInPeriod(w.date, prevStart, prevEnd)).reduce((s, w) => s + w.amount, 0);
+      let prevDividends = 0;
+      for (const [, calendar] of dividendCalendarMap) {
+        for (const payment of calendar.payments) {
+          if (isInPeriod(payment.paidOn, prevStart, prevEnd)) prevDividends += payment.amount;
+        }
+      }
+      const prevNetCashflow = prevDeposits - prevWithdrawals + prevDividends;
+
+      // ── XIRR calculation ─────────────────────────────────────────────────
+      // Opening portfolio value is the initial outflow at period start;
+      // deposits are additional outflows; withdrawals are inflows;
+      // closing portfolio value is the final inflow.
+      let xirrResult: number | null = null;
+      if (periodEntry && periodEntry.openValue > 0) {
+        const xirrFlows: { date: Date; amount: number }[] = [
+          { date: periodStart, amount: -periodEntry.openValue },
+        ];
+        for (const inv of cashflowData.investments) {
+          if (isInPeriod(inv.date, periodStart, periodEnd)) {
+            xirrFlows.push({ date: new Date(inv.date), amount: -inv.amount });
+          }
+        }
+        for (const wd of cashflowData.withdrawals) {
+          if (isInPeriod(wd.date, periodStart, periodEnd)) {
+            xirrFlows.push({ date: new Date(wd.date), amount: wd.amount });
+          }
+        }
+        xirrFlows.push({ date: periodEnd, amount: periodEntry.closeValue });
+        if (xirrFlows.length >= 2) {
+          xirrResult = xirr(xirrFlows);
+        }
+      }
+
+      // ── Performance metrics ───────────────────────────────────────────────
+      const periodReturn = periodEntry && periodEntry.openValue > 0
+        ? (periodEntry.valueChange / periodEntry.openValue) * 100
         : null;
-      const topGainers = (periodEntry?.platformBreakdown ?? [])
-        .filter(pb => pb.valueChange > 0)
-        .sort((a, b) => b.valueChange - a.valueChange)
+
+      // YTD return (for monthly/quarterly): sum value changes across all periods this year up to selected
+      let ytdReturn: number | null = null;
+      if (periodType !== "year") {
+        const yearKey = selectedYear;
+        const ytdPeriods = waterfallData.filter(p => {
+          if (periodType === "quarter") return p.period.startsWith(yearKey + "-Q") && p.period <= waterfallKey;
+          return p.period.startsWith(yearKey + "-") && !p.period.includes("Q") && p.period <= waterfallKey;
+        });
+        if (ytdPeriods.length > 0) {
+          const ytdStart = ytdPeriods[0].openValue;
+          const ytdEnd = ytdPeriods[ytdPeriods.length - 1].closeValue;
+          const ytdNetInvested = ytdPeriods.reduce((s, p) => s + p.netInvested, 0);
+          if (ytdStart + Math.max(0, ytdNetInvested) > 0) {
+            ytdReturn = ((ytdEnd - ytdStart - ytdNetInvested) / (ytdStart + Math.max(0, ytdNetInvested))) * 100;
+          }
+        }
+      }
+
+      // Since-inception: first waterfall row to last
+      const allWaterfallSorted = [...waterfallData]
+        .filter(p => {
+          if (periodType === "year") return /^\d{4}$/.test(p.period);
+          if (periodType === "quarter") return /\d{4}-Q\d/.test(p.period);
+          return /\d{4}-\d{2}$/.test(p.period);
+        })
+        .sort((a, b) => a.period.localeCompare(b.period));
+      let sinceInceptionReturn: number | null = null;
+      if (allWaterfallSorted.length > 0) {
+        const firstPeriod = allWaterfallSorted[0];
+        const lastPeriod = allWaterfallSorted[allWaterfallSorted.length - 1];
+        const totalNetInv = allWaterfallSorted.reduce((s, p) => s + p.netInvested, 0);
+        if (firstPeriod.openValue + Math.max(0, totalNetInv) > 0) {
+          sinceInceptionReturn = ((lastPeriod.closeValue - firstPeriod.openValue - totalNetInv) / (firstPeriod.openValue + Math.max(0, totalNetInv))) * 100;
+        }
+      }
+
+      // TWR
+      const twrResult = computeTwr(historyRows);
+
+      // ── Allocation data ───────────────────────────────────────────────────
+      const totalPortfolioValue = momData.reduce((s, p) => s + p.currentValue, 0);
+      const platformValueMap = new Map<number, number>();
+      for (const p of momData) platformValueMap.set(p.platformId, p.currentValue);
+
+      // By category
+      const byCategory = new Map<string, number>();
+      for (const p of platforms) {
+        const val = platformValueMap.get(p.id) ?? 0;
+        byCategory.set(p.category, (byCategory.get(p.category) ?? 0) + val);
+      }
+
+      // By currency
+      const byCurrency = new Map<string, number>();
+      for (const p of platforms) {
+        const val = platformValueMap.get(p.id) ?? 0;
+        byCurrency.set(p.currency, (byCurrency.get(p.currency) ?? 0) + val);
+      }
+
+      // Drift vs target
+      const driftRows = platforms
+        .map(p => {
+          const currentVal = platformValueMap.get(p.id) ?? 0;
+          const actualWeight = totalPortfolioValue > 0 ? (currentVal / totalPortfolioValue) * 100 : 0;
+          const targetWeight = p.targetAllocation ? Number(p.targetAllocation) : null;
+          const delta = targetWeight !== null ? actualWeight - targetWeight : null;
+          return { name: p.name, currentVal, actualWeight, targetWeight, delta };
+        })
+        .filter(r => r.currentVal > 0 || r.targetWeight !== null)
+        .sort((a, b) => b.currentVal - a.currentVal);
+
+      // ── Holdings summary ──────────────────────────────────────────────────
+      const holdingsSummary = platforms
+        .map(p => {
+          const val = platformValueMap.get(p.id) ?? 0;
+          const weight = totalPortfolioValue > 0 ? (val / totalPortfolioValue) * 100 : 0;
+          const breakdown = periodEntry?.platformBreakdown?.find(pb => pb.platformId === p.id);
+          const gainLoss = breakdown?.valueChange ?? 0;
+          // Platform open value = closing value minus gain; use as denominator for return %
+          const platformOpenValue = val - gainLoss;
+          const gainLossPct = breakdown && platformOpenValue > 0
+            ? (gainLoss / platformOpenValue) * 100
+            : 0;
+          return { platformId: p.id, name: p.name, val, weight, gainLoss, gainLossPct };
+        })
+        .filter(r => r.val > 0)
+        .sort((a, b) => b.val - a.val);
+
+      // ── Risk metrics (quarterly/yearly) ───────────────────────────────────
+      const periodHistoryPoints = historyData.filter(h => isInPeriod(h.date, periodStart, periodEnd));
+      const annualisedVol = computeVolatility(periodHistoryPoints);
+      const maxDrawdown = computeMaxDrawdown(periodHistoryPoints);
+      const concentrationPlatform = holdingsSummary.length > 0 ? holdingsSummary[0] : null;
+
+      // ── Tax summary (yearly) ──────────────────────────────────────────────
+      const realisedGains = allAssets.filter(a =>
+        a.status === "exited" && a.exitDate && isInPeriod(a.exitDate, periodStart, periodEnd)
+      );
+      const unrealisedPositions = allAssets.filter(a => a.status === "active");
+
+      // ── Rebalancing plan ─────────────────────────────────────────────────
+      const rebalancingRows = driftRows
+        .filter(r => r.targetWeight !== null)
+        .map(r => ({
+          ...r,
+          action: r.delta! > 5 ? "Overweight" : r.delta! < -5 ? "Underweight" : "On Target",
+        }))
+        .sort((a, b) => Math.abs(b.delta!) - Math.abs(a.delta!));
+
+      // ── Concentration warnings ────────────────────────────────────────────
+      const concentrationWarnings = holdingsSummary.filter(h => h.weight > 30);
+
+      // ── Best / worst performers — by period return % ─────────────────────
+      const performersSorted = [...holdingsSummary].filter(h => h.val > 0);
+      const bestPlatform = performersSorted.length > 0
+        ? [...performersSorted].sort((a, b) => b.gainLossPct - a.gainLossPct)[0]
+        : null;
+      const worstPlatform = performersSorted.length > 1
+        ? [...performersSorted].sort((a, b) => a.gainLossPct - b.gainLossPct)[0]
+        : null;
+
+      // ── Dividend yield — trailing 12m from period end date ────────────────
+      const trailingStart = new Date(periodEnd);
+      trailingStart.setFullYear(trailingStart.getFullYear() - 1);
+      let totalAnnualisedDivs = 0;
+      for (const [, calendar] of dividendCalendarMap) {
+        totalAnnualisedDivs += calendar.payments
+          .filter(p => { const d = new Date(p.paidOn); return d >= trailingStart && d <= periodEnd; })
+          .reduce((s, p) => s + p.amount, 0);
+      }
+      const divYield = totalPortfolioValue > 0 ? (totalAnnualisedDivs / totalPortfolioValue) * 100 : 0;
+
+      // ── Build AI prompt ───────────────────────────────────────────────────
+      const driftSummary = driftRows
+        .filter(r => r.delta !== null && Math.abs(r.delta) > 5)
+        .map(r => `${r.name}: actual ${r.actualWeight.toFixed(1)}% vs target ${r.targetWeight!.toFixed(1)}%`)
         .slice(0, 3)
-        .map(pb => `${pb.name}: +${formatCurrency(pb.valueChange, currency)}`)
-        .join(", ");
-      const topLosers = (periodEntry?.platformBreakdown ?? [])
-        .filter(pb => pb.valueChange < 0)
-        .sort((a, b) => a.valueChange - b.valueChange)
-        .slice(0, 2)
-        .map(pb => `${pb.name}: ${formatCurrency(pb.valueChange, currency)}`)
-        .join(", ");
+        .join("; ");
+
       const aiPrompt = [
-        `Give a concise 3–4 sentence portfolio performance summary for ${periodLabel}.`,
-        periodEntry ? `Period snapshot: opened at ${formatCurrency(periodEntry.openValue, currency)}, closed at ${formatCurrency(periodEntry.closeValue, currency)}, net invested ${formatCurrency(periodEntry.netInvested, currency)}, value change ${formatCurrency(periodEntry.valueChange, currency)}${periodRoi ? `, ROI ${periodRoi}%` : ""}.` : "",
-        topGainers ? `Top gainers: ${topGainers}.` : "",
-        topLosers ? `Underperformers: ${topLosers}.` : "",
-        "Highlight diversification and any risks worth monitoring.",
+        `You are a financial analyst. Answer the following 4 questions in numbered format for a ${periodType} portfolio report covering ${periodLabel}.`,
+        periodEntry ? `Portfolio data: opened at ${formatCurrency(periodEntry.openValue, currency)}, closed at ${formatCurrency(periodEntry.closeValue, currency)}, value change ${formatCurrency(periodEntry.valueChange, currency)}${periodReturn != null ? ` (${periodReturn.toFixed(2)}%)` : ""}.` : "",
+        `Cashflow: deposits ${formatCurrency(totalDeposits, currency)}, withdrawals ${formatCurrency(totalWithdrawals, currency)}, dividends ${formatCurrency(periodDividends, currency)}.`,
+        bestPlatform ? `Best performer: ${bestPlatform.name} returned ${bestPlatform.gainLossPct.toFixed(2)}% (${formatCurrency(bestPlatform.gainLoss, currency)}).` : "",
+        driftSummary ? `Allocation drift: ${driftSummary}.` : "",
+        "1. What drove portfolio performance this period?",
+        "2. What changed vs the prior period?",
+        "3. What are the main risk changes?",
+        "4. Is rebalancing suggested and why?",
+        "Keep each answer to 2-3 sentences.",
       ].filter(Boolean).join(" ");
 
-      // Step 3: Fetch AI insight with the enriched prompt
       const insightRes = await fetch("/api/insights", {
         method: "POST",
         credentials: "include",
@@ -194,6 +568,7 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
         ? await insightRes.json().catch(() => null)
         : null;
 
+      // ── PDF generation ────────────────────────────────────────────────────
       const { jsPDF } = await import("jspdf");
       const autoTable = (await import("jspdf-autotable")).default;
 
@@ -205,7 +580,8 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
       let y = margin;
 
       const fmt = (v: number) => formatCurrency(v, currency);
-      const fmtPct = (v: number) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
+      const fmtPct = (v: number | null) => v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
+      const fmtDelta = (v: number | null) => v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)}pp`;
 
       function checkPage(needed = 30) {
         if (y + needed > pageH - margin) {
@@ -214,77 +590,191 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
         }
       }
 
-      function sectionTitle(title: string) {
-        checkPage(20);
-        doc.setFontSize(12);
+      function sectionDivider(title: string) {
+        doc.addPage();
+        y = margin;
+        doc.setFillColor(37, 99, 235);
+        doc.rect(0, 0, pageW, 14, "F");
+        doc.setFontSize(11);
         doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text(title, margin, 9);
+        y = 22;
         doc.setTextColor(30, 30, 30);
-        doc.text(title, margin, y);
-        y += 1;
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.2);
-        doc.line(margin, y + 1, pageW - margin, y + 1);
-        y += 5;
       }
 
-      type RGB = [number, number, number];
+      function sectionTitle(title: string) {
+        checkPage(20);
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(37, 99, 235);
+        doc.text(title, margin, y);
+        y += 1;
+        doc.setDrawColor(37, 99, 235);
+        doc.setLineWidth(0.3);
+        doc.line(margin, y + 1, pageW - margin, y + 1);
+        y += 6;
+        doc.setTextColor(30, 30, 30);
+      }
 
-      // ── Header ────────────────────────────────────────────────────────
-      doc.setFontSize(22);
+      function kpiRow(items: { label: string; value: string; color?: RGB }[]) {
+        checkPage(20);
+        const colW = contentW / items.length;
+        const boxH = 14;
+        items.forEach((item, i) => {
+          const x = margin + i * colW;
+          doc.setFillColor(248, 250, 252);
+          doc.rect(x + 1, y, colW - 2, boxH, "F");
+          doc.setFontSize(7.5);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(100, 100, 100);
+          doc.text(item.label, x + colW / 2, y + 4, { align: "center" });
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "bold");
+          if (item.color) doc.setTextColor(...item.color);
+          else doc.setTextColor(30, 30, 30);
+          doc.text(item.value, x + colW / 2, y + 10, { align: "center" });
+          doc.setTextColor(30, 30, 30);
+        });
+        y += boxH + 5;
+      }
+
+      function bodyText(text: string) {
+        doc.setFontSize(9.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(55, 55, 55);
+        const lines: string[] = doc.splitTextToSize(text, contentW);
+        for (const line of lines) {
+          checkPage(6);
+          doc.text(line, margin, y);
+          y += 5;
+        }
+      }
+
+      // ══ HEADER PAGE ════════════════════════════════════════════════════════
+      doc.setFontSize(26);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 30, 30);
       doc.text("Portfolio Report", margin, y);
-      y += 9;
+      y += 10;
 
-      doc.setFontSize(11);
+      doc.setFontSize(13);
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(100, 100, 100);
-      doc.text(`Period: ${periodLabel}`, margin, y);
-      y += 5.5;
+      doc.setTextColor(37, 99, 235);
       doc.text(
-        `Generated: ${now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`,
+        `${periodType === "month" ? "Monthly" : periodType === "quarter" ? "Quarterly" : "Annual"} Report — ${periodLabel}`,
         margin, y,
       );
-      y += 5.5;
+      y += 7;
+
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Generated: ${now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`, margin, y);
+      y += 5;
       if (user?.email) {
         doc.text(`Account: ${user.email}`, margin, y);
-        y += 5.5;
+        y += 5;
       }
       doc.setDrawColor(220, 220, 220);
       doc.setLineWidth(0.3);
       doc.line(margin, y + 2, pageW - margin, y + 2);
-      y += 8;
+      y += 10;
 
-      // ── Portfolio Snapshot ───────────────────────────────────────────
+      // ══ SECTION 1: EXECUTIVE SUMMARY ═══════════════════════════════════════
+      sectionTitle("Executive Summary");
+
       if (periodEntry) {
-        sectionTitle("Portfolio Snapshot");
-        const deposited = Math.max(0, periodEntry.netInvested);
-        const withdrawn = Math.abs(Math.min(0, periodEntry.netInvested));
-        const roi = periodEntry.openValue > 0
-          ? fmtPct((periodEntry.valueChange / periodEntry.openValue) * 100)
-          : "—";
-
-        autoTable(doc, {
-          startY: y,
-          head: [["Metric", "Value"]],
-          body: [
-            ["Opening Value", fmt(periodEntry.openValue)],
-            ["Capital Deposited", fmt(deposited)],
-            ["Capital Withdrawn", fmt(withdrawn)],
-            ["Value Gain / Loss", `${periodEntry.valueChange >= 0 ? "+" : ""}${fmt(periodEntry.valueChange)}`],
-            ["Closing Value", fmt(periodEntry.closeValue)],
-            ["Period ROI", roi],
-          ],
-          margin: { left: margin, right: margin },
-          styles: { fontSize: 10, cellPadding: 3 },
-          headStyles: { fillColor: [59, 130, 246] as RGB, textColor: 255, fontStyle: "bold" },
-          alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
-          columnStyles: { 1: { halign: "right" } },
-        });
-        y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+        kpiRow([
+          { label: "Opening Value", value: fmt(periodEntry.openValue) },
+          { label: "Closing Value", value: fmt(periodEntry.closeValue) },
+          {
+            label: "Period Return",
+            value: fmtPct(periodReturn),
+            color: periodReturn != null && periodReturn >= 0 ? [16, 185, 129] : [220, 38, 38],
+          },
+          { label: "Value Change", value: `${periodEntry.valueChange >= 0 ? "+" : ""}${fmt(periodEntry.valueChange)}` },
+        ]);
       }
 
-      // ── Growth History Table ─────────────────────────────────────────
+      if (bestPlatform || worstPlatform) {
+        checkPage(30);
+        autoTable(doc, {
+          startY: y,
+          head: [["", "Platform", "Period Return"]],
+          body: [
+            bestPlatform && bestPlatform !== worstPlatform ? ["Best Performer", bestPlatform.name, `${bestPlatform.gainLossPct >= 0 ? "+" : ""}${bestPlatform.gainLossPct.toFixed(2)}% (${fmt(bestPlatform.gainLoss)})`] : null,
+            worstPlatform ? ["Worst Performer", worstPlatform.name, `${worstPlatform.gainLossPct >= 0 ? "+" : ""}${worstPlatform.gainLossPct.toFixed(2)}% (${fmt(worstPlatform.gainLoss)})`] : null,
+          ].filter(Boolean) as string[][],
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 9, cellPadding: 2.5 },
+          headStyles: { fillColor: [37, 99, 235] as RGB, textColor: 255, fontStyle: "bold" },
+          columnStyles: { 2: { halign: "right" } },
+        });
+        y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
+      }
+
+      if (concentrationWarnings.length > 0) {
+        checkPage(18);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(220, 38, 38);
+        doc.text("Concentration Warning:", margin, y);
+        y += 5;
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(55, 55, 55);
+        for (const w of concentrationWarnings) {
+          doc.text(`  • ${w.name} represents ${w.weight.toFixed(1)}% of portfolio (>30% threshold)`, margin, y);
+          y += 5;
+        }
+        y += 2;
+      }
+
+      // New/closed assets during period (from allAssets, available for all report types)
+      {
+        const newPositions = allAssets.filter(a =>
+          a.acquisitionDate && isInPeriod(a.acquisitionDate, periodStart, periodEnd)
+        );
+        const closedPositions = allAssets.filter(a =>
+          a.exitDate && isInPeriod(a.exitDate, periodStart, periodEnd)
+        );
+
+        if (newPositions.length > 0 || closedPositions.length > 0) {
+          checkPage(20);
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(30, 30, 30);
+          doc.text("Position Changes this Period:", margin, y);
+          y += 5;
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(55, 55, 55);
+          for (const a of newPositions.slice(0, 5)) {
+            doc.text(`  + New: ${a.name} (${fmt(a.investedAmount)})`, margin, y);
+            y += 4.5;
+          }
+          for (const a of closedPositions.slice(0, 5)) {
+            doc.text(`  - Closed: ${a.name} (exit ${fmt(a.exitPrice ?? 0)}, P/L ${fmt(a.profitLoss)})`, margin, y);
+            y += 4.5;
+          }
+          y += 4;
+        }
+      }
+
+      // ══ SECTION 2: PERFORMANCE ══════════════════════════════════════════════
+      sectionDivider("Performance");
+
+      kpiRow([
+        {
+          label: "Period Return",
+          value: fmtPct(periodReturn),
+          color: periodReturn != null && periodReturn >= 0 ? [16, 185, 129] : [220, 38, 38],
+        },
+        ...(periodType !== "year" ? [{ label: "YTD Return", value: fmtPct(ytdReturn) }] : []),
+        { label: "Since Inception", value: fmtPct(sinceInceptionReturn) },
+        { label: "TWR", value: fmtPct(twrResult) },
+        { label: "XIRR (period)", value: xirrResult != null ? `${xirrResult.toFixed(2)}%` : "—" },
+      ]);
+
+      // Growth history table
       if (historyRows.length > 0) {
         checkPage(40);
         const histLabel =
@@ -314,83 +804,37 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
           headStyles: { fillColor: [37, 99, 235] as RGB, textColor: 255, fontStyle: "bold" },
           alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
           columnStyles: {
-            1: { halign: "right" },
-            2: { halign: "right" },
-            3: { halign: "right" },
-            4: { halign: "right" },
-            5: { halign: "right" },
+            1: { halign: "right" }, 2: { halign: "right" },
+            3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" },
           },
           didParseCell(data) {
-            // Highlight negative gain/loss cells red
             if (data.column.index === 3 && data.section === "body") {
               const raw = data.cell.raw as string;
-              if (raw.startsWith("-")) {
-                data.cell.styles.textColor = [220, 38, 38] as RGB;
-              }
+              if (raw.startsWith("-")) data.cell.styles.textColor = [220, 38, 38] as RGB;
             }
           },
         });
         y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 4;
-        // Legend for live period
         if (historyRows.some(r => r.isLive)) {
           doc.setFontSize(7.5);
           doc.setFont("helvetica", "italic");
           doc.setTextColor(130, 130, 130);
           doc.text("* Current period — data up to latest valuation date", margin, y);
           y += 6;
-        } else {
-          y += 4;
-        }
+        } else { y += 4; }
       }
 
-      // ── Capital Flow by Platform ─────────────────────────────────────
+      // Platform returns table
       if ((periodEntry?.platformBreakdown?.length ?? 0) > 0) {
-        const platformRows = [...(periodEntry!.platformBreakdown!)]
-          .filter(pb => Math.abs(pb.netInvested) > 0.01 || Math.abs(pb.valueChange) > 0.01)
-          .sort((a, b) => Math.abs(b.valueChange) - Math.abs(a.valueChange))
-          .map(pb => [
-            pb.name,
-            `${pb.netInvested >= 0 ? "+" : ""}${fmt(pb.netInvested)}`,
-            `${pb.valueChange >= 0 ? "+" : ""}${fmt(pb.valueChange)}`,
-          ]);
-
-        if (platformRows.length > 0) {
-          checkPage(40);
-          sectionTitle("Capital Flow by Platform");
-          autoTable(doc, {
-            startY: y,
-            head: [["Platform", "Net Invested", "Value Gain / Loss"]],
-            body: platformRows,
-            margin: { left: margin, right: margin },
-            styles: { fontSize: 10, cellPadding: 3 },
-            headStyles: { fillColor: [16, 185, 129] as RGB, textColor: 255, fontStyle: "bold" },
-            alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
-            columnStyles: { 1: { halign: "right" }, 2: { halign: "right" } },
-          });
-          y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
-        }
-      }
-
-      // ── Platform Performance ──────────────────────────────────────────
-      // Primary: period-scoped returns from the waterfall breakdown.
-      // Secondary: current rolling returns (MoM/30d/90d) as a position reference.
-
-      const hasPlatformBreakdown = (periodEntry?.platformBreakdown?.length ?? 0) > 0;
-
-      if (hasPlatformBreakdown) {
         checkPage(40);
-
-        // Build a name→MoM map for current value lookup
         const momByName = new Map<string, PlatformMom>();
         for (const p of momData) momByName.set(p.name, p);
+        const periodTypeLabel = periodType === "year" ? "YoY" : periodType === "quarter" ? "QoQ" : "MoM";
+        sectionTitle(`Platform Returns — ${periodLabel} (${periodTypeLabel})`);
 
-        const periodTypeLabel =
-          periodType === "year" ? "YoY" : periodType === "quarter" ? "QoQ" : "MoM";
-
-        sectionTitle(`Platform Returns — ${getPeriodLabel()} (${periodTypeLabel})`);
         autoTable(doc, {
           startY: y,
-          head: [["Platform", "Current Value", "Net Invested (period)", "Value Gain / Loss (period)"]],
+          head: [["Platform", "Current Value", "Net Invested", "Value Gain / Loss"]],
           body: [...(periodEntry!.platformBreakdown!)]
             .sort((a, b) => b.valueChange - a.valueChange)
             .map(pb => {
@@ -406,11 +850,7 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
           styles: { fontSize: 9, cellPadding: 2.5 },
           headStyles: { fillColor: [99, 102, 241] as RGB, textColor: 255, fontStyle: "bold" },
           alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
-          columnStyles: {
-            1: { halign: "right" },
-            2: { halign: "right" },
-            3: { halign: "right" },
-          },
+          columnStyles: { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" } },
           didParseCell(data) {
             if (data.column.index === 3 && data.section === "body") {
               const raw = data.cell.raw as string;
@@ -421,65 +861,507 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
         y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
       }
 
-      // Current position reference (MoM / 30d / 90d rolling returns from today)
-      if (momData.length > 0) {
-        checkPage(40);
+      // ══ SECTION 3: CASHFLOW ════════════════════════════════════════════════
+      sectionDivider("Cashflow");
 
-        const d30Map = new Map<number, RollingEntry>();
-        const d90Map = new Map<number, RollingEntry>();
-        if (rollingData) {
-          for (const e of rollingData.d30) d30Map.set(e.platformId, e);
-          for (const e of rollingData.d90) d90Map.set(e.platformId, e);
-        }
+      const delta = (curr: number, prev: number) => {
+        if (prev === 0 && curr === 0) return "—";
+        const d = curr - prev;
+        return `${d >= 0 ? "+" : ""}${fmt(d)}`;
+      };
 
-        sectionTitle("Current Position Reference (rolling from today)");
+      autoTable(doc, {
+        startY: y,
+        head: [["Item", "This Period", "Prior Period", "Change"]],
+        body: [
+          ["Total Deposits", fmt(totalDeposits), fmt(prevDeposits), delta(totalDeposits, prevDeposits)],
+          ["Total Withdrawals", fmt(totalWithdrawals), fmt(prevWithdrawals), delta(totalWithdrawals, prevWithdrawals)],
+          ["Dividends Received", fmt(periodDividends), fmt(prevDividends), delta(periodDividends, prevDividends)],
+          ["Net Cashflow", fmt(netCashflow), fmt(prevNetCashflow), delta(netCashflow, prevNetCashflow)],
+        ],
+        margin: { left: margin, right: margin },
+        styles: { fontSize: 10, cellPadding: 3 },
+        headStyles: { fillColor: [16, 185, 129] as RGB, textColor: 255, fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
+        columnStyles: { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" } },
+      });
+      y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+
+      // ══ SECTION 4: ALLOCATION SNAPSHOT ════════════════════════════════════
+      sectionDivider("Allocation Snapshot");
+
+      // By category
+      if (byCategory.size > 0) {
+        sectionTitle("By Asset Class");
         autoTable(doc, {
           startY: y,
-          head: [["Platform", "Current Value", "MoM", "30d", "90d"]],
-          body: momData
-            .filter(p => p.currentValue > 0)
-            .sort((a, b) => b.currentValue - a.currentValue)
-            .map(p => {
-              const r30 = d30Map.get(p.platformId);
-              const r90 = d90Map.get(p.platformId);
-              return [
-                p.name,
-                fmt(p.currentValue),
-                fmtPct(p.momGrowthPercent),
-                r30 && !r30.stale ? fmtPct(r30.pct) : "—",
-                r90 && !r90.stale ? fmtPct(r90.pct) : "—",
-              ];
-            }),
+          head: [["Asset Class", "Value", "Portfolio Weight"]],
+          body: [...byCategory.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .map(([cat, val]) => [cat, fmt(val), totalPortfolioValue > 0 ? `${((val / totalPortfolioValue) * 100).toFixed(1)}%` : "—"]),
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 9.5, cellPadding: 3 },
+          headStyles: { fillColor: [245, 158, 11] as RGB, textColor: 255, fontStyle: "bold" },
+          alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
+          columnStyles: { 1: { halign: "right" }, 2: { halign: "right" } },
+        });
+        y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+      }
+
+      // By currency
+      if (byCurrency.size > 0) {
+        checkPage(40);
+        sectionTitle("By Currency");
+        autoTable(doc, {
+          startY: y,
+          head: [["Currency", "Value", "Portfolio Weight"]],
+          body: [...byCurrency.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .map(([cur, val]) => [cur, fmt(val), totalPortfolioValue > 0 ? `${((val / totalPortfolioValue) * 100).toFixed(1)}%` : "—"]),
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 9.5, cellPadding: 3 },
+          headStyles: { fillColor: [139, 92, 246] as RGB, textColor: 255, fontStyle: "bold" },
+          alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
+          columnStyles: { 1: { halign: "right" }, 2: { halign: "right" } },
+        });
+        y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+      }
+
+      // Drift vs target
+      if (driftRows.some(r => r.targetWeight !== null)) {
+        checkPage(40);
+        sectionTitle("Drift vs Target Allocation");
+        autoTable(doc, {
+          startY: y,
+          head: [["Platform", "Actual Weight", "Target Weight", "Delta"]],
+          body: driftRows.map(r => [
+            r.name,
+            `${r.actualWeight.toFixed(1)}%`,
+            r.targetWeight !== null ? `${r.targetWeight.toFixed(1)}%` : "—",
+            r.delta !== null ? fmtDelta(r.delta) : "—",
+          ]),
           margin: { left: margin, right: margin },
           styles: { fontSize: 9, cellPadding: 2.5 },
-          headStyles: { fillColor: [107, 114, 128] as RGB, textColor: 255, fontStyle: "bold" },
+          headStyles: { fillColor: [245, 158, 11] as RGB, textColor: 255, fontStyle: "bold" },
           alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
-          columnStyles: {
-            1: { halign: "right" },
-            2: { halign: "right" },
-            3: { halign: "right" },
-            4: { halign: "right" },
+          columnStyles: { 1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" } },
+          didParseCell(data) {
+            if (data.column.index === 3 && data.section === "body") {
+              const r = driftRows[data.row.index];
+              if (r?.delta != null && Math.abs(r.delta) > 5) {
+                data.cell.styles.textColor = r.delta > 0 ? [220, 38, 38] as RGB : [37, 99, 235] as RGB;
+                data.cell.styles.fontStyle = "bold";
+              }
+            }
           },
         });
         y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
       }
 
-      // ── AI Insights ──────────────────────────────────────────────────
-      if (insightData?.insight) {
-        checkPage(50);
-        sectionTitle("AI Portfolio Insights");
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(55, 55, 55);
-        const lines: string[] = doc.splitTextToSize(insightData.insight, contentW);
-        for (const line of lines) {
-          checkPage(6);
-          doc.text(line, margin, y);
-          y += 5;
+      // ══ SECTION 5: HOLDINGS SUMMARY ════════════════════════════════════════
+      sectionDivider("Holdings Summary");
+
+      if (holdingsSummary.length > 0) {
+        autoTable(doc, {
+          startY: y,
+          head: [["Platform", "Value", "Weight", "Period Gain/Loss €", "Period Gain/Loss %"]],
+          body: holdingsSummary.map(h => [
+            h.name,
+            fmt(h.val),
+            `${h.weight.toFixed(1)}%`,
+            `${h.gainLoss >= 0 ? "+" : ""}${fmt(h.gainLoss)}`,
+            `${h.gainLossPct >= 0 ? "+" : ""}${h.gainLossPct.toFixed(2)}%`,
+          ]),
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 9, cellPadding: 2.5 },
+          headStyles: { fillColor: [30, 64, 175] as RGB, textColor: 255, fontStyle: "bold" },
+          alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
+          columnStyles: {
+            1: { halign: "right" }, 2: { halign: "right" },
+            3: { halign: "right" }, 4: { halign: "right" },
+          },
+          didParseCell(data) {
+            if ((data.column.index === 3 || data.column.index === 4) && data.section === "body") {
+              const raw = data.cell.raw as string;
+              if (raw.startsWith("-")) data.cell.styles.textColor = [220, 38, 38] as RGB;
+            }
+          },
+        });
+        y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+      }
+
+      // Opened and closed positions this period — highlighted in Holdings Summary
+      {
+        const newInPeriod = allAssets.filter(a =>
+          a.acquisitionDate && isInPeriod(a.acquisitionDate, periodStart, periodEnd)
+        );
+        const closedInPeriod = allAssets.filter(a =>
+          a.exitDate && isInPeriod(a.exitDate, periodStart, periodEnd)
+        );
+
+        if (newInPeriod.length > 0 || closedInPeriod.length > 0) {
+          checkPage(40);
+          sectionTitle("Position Changes This Period");
+          const changeRows: string[][] = [];
+          for (const a of newInPeriod) {
+            const pName = platforms.find(p => p.id === a.platformId)?.name ?? "";
+            changeRows.push(["Opened", a.name, pName, fmt(a.investedAmount), "—"]);
+          }
+          for (const a of closedInPeriod) {
+            const pName = platforms.find(p => p.id === a.platformId)?.name ?? "";
+            const pl = `${a.profitLoss >= 0 ? "+" : ""}${fmt(a.profitLoss)}`;
+            changeRows.push(["Closed", a.name, pName, fmt(a.exitPrice ?? 0), pl]);
+          }
+          autoTable(doc, {
+            startY: y,
+            head: [["Status", "Asset", "Platform", "Value", "P/L"]],
+            body: changeRows,
+            margin: { left: margin, right: margin },
+            styles: { fontSize: 9, cellPadding: 2.5 },
+            headStyles: { fillColor: [30, 64, 175] as RGB, textColor: 255, fontStyle: "bold" },
+            alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
+            columnStyles: { 3: { halign: "right" }, 4: { halign: "right" } },
+            didParseCell(data) {
+              if (data.column.index === 0 && data.section === "body") {
+                const status = data.cell.raw as string;
+                data.cell.styles.fontStyle = "bold";
+                if (status === "Opened") data.cell.styles.textColor = [16, 185, 129] as RGB;
+                else if (status === "Closed") data.cell.styles.textColor = [245, 158, 11] as RGB;
+              }
+              if (data.column.index === 4 && data.section === "body") {
+                const raw = data.cell.raw as string;
+                if (raw.startsWith("-")) data.cell.styles.textColor = [220, 38, 38] as RGB;
+                else if (raw.startsWith("+")) data.cell.styles.textColor = [16, 185, 129] as RGB;
+              }
+            },
+          });
+          y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
         }
       }
 
-      // ── Page footer ──────────────────────────────────────────────────
+      // T212 ticker-level holdings (top 10 per T212 platform)
+      for (const [platformId, holdings] of t212HoldingsMap) {
+        const platformName = platforms.find(p => p.id === platformId)?.name ?? `Platform ${platformId}`;
+        const top10 = [...holdings.instruments]
+          .filter(i => i.shares && i.currentPrice)
+          .map(i => ({ ...i, value: (i.shares ?? 0) * (i.currentPrice ?? 0) }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 10);
+
+        if (top10.length > 0) {
+          checkPage(40);
+          sectionTitle(`${platformName} — Top Holdings`);
+          autoTable(doc, {
+            startY: y,
+            head: [["Ticker", "Shares", "Price", "Value", "P/L"]],
+            body: top10.map(i => [
+              i.ticker,
+              (i.shares ?? 0).toFixed(4),
+              fmt(i.currentPrice ?? 0),
+              fmt(i.value),
+              `${(i.ppl ?? 0) >= 0 ? "+" : ""}${fmt(i.ppl ?? 0)}`,
+            ]),
+            margin: { left: margin, right: margin },
+            styles: { fontSize: 8.5, cellPadding: 2 },
+            headStyles: { fillColor: [30, 64, 175] as RGB, textColor: 255, fontStyle: "bold" },
+            alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
+            columnStyles: {
+              1: { halign: "right" }, 2: { halign: "right" },
+              3: { halign: "right" }, 4: { halign: "right" },
+            },
+            didParseCell(data) {
+              if (data.column.index === 4 && data.section === "body") {
+                const raw = data.cell.raw as string;
+                if (raw.startsWith("-")) data.cell.styles.textColor = [220, 38, 38] as RGB;
+              }
+            },
+          });
+          y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
+        }
+      }
+
+      // ══ QUARTERLY / YEARLY ADDITIONAL SECTIONS ═════════════════════════════
+      if (isQuarterlyOrYearly) {
+
+        // ── SECTION 6: RISK & STABILITY ───────────────────────────────────────
+        sectionDivider("Risk & Stability");
+
+        kpiRow([
+          { label: "Annualised Volatility", value: annualisedVol != null ? `${annualisedVol.toFixed(2)}%` : "—" },
+          { label: "Max Drawdown", value: maxDrawdown != null ? `-${maxDrawdown.toFixed(2)}%` : "—", color: [220, 38, 38] },
+          { label: "Top Concentration", value: concentrationPlatform ? `${concentrationPlatform.weight.toFixed(1)}%` : "—" },
+        ]);
+
+        if (concentrationPlatform) {
+          checkPage(15);
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(55, 55, 55);
+          doc.text(
+            `Largest holding: ${concentrationPlatform.name} at ${concentrationPlatform.weight.toFixed(1)}% of portfolio (${fmt(concentrationPlatform.val)}).`,
+            margin, y,
+          );
+          y += 6;
+        }
+
+        if (annualisedVol != null || maxDrawdown != null) {
+          checkPage(15);
+          bodyText(
+            `Annualised volatility is estimated from ${periodHistoryPoints.length} data points within the period. ` +
+            `${maxDrawdown != null ? `Max peak-to-trough drawdown: ${maxDrawdown.toFixed(2)}%.` : ""}` +
+            (annualisedVol != null && annualisedVol > 20 ? " Volatility is elevated — review position sizing." : ""),
+          );
+          y += 4;
+        }
+
+        // ── SECTION 7: DIVIDEND REPORT ────────────────────────────────────────
+        if (dividendCalendarMap.size > 0) {
+          sectionDivider("Dividend Report");
+
+          const allPeriodDivRows: { ticker: string; amount: number; paidOn: string; platformName: string }[] = [];
+          for (const [platformId, calendar] of dividendCalendarMap) {
+            const platformName = platforms.find(p => p.id === platformId)?.name ?? `Platform ${platformId}`;
+            for (const payment of calendar.payments) {
+              if (isInPeriod(payment.paidOn, periodStart, periodEnd)) {
+                allPeriodDivRows.push({ ticker: payment.ticker, amount: payment.amount, paidOn: payment.paidOn, platformName });
+              }
+            }
+          }
+          allPeriodDivRows.sort((a, b) => b.amount - a.amount);
+
+          if (allPeriodDivRows.length > 0) {
+            sectionTitle("Dividends Received This Period");
+            autoTable(doc, {
+              startY: y,
+              head: [["Ticker", "Platform", "Paid On", "Amount"]],
+              body: [
+                ...allPeriodDivRows.map(r => [r.ticker, r.platformName, r.paidOn, fmt(r.amount)]),
+                ["Total", "", "", fmt(periodDividends)],
+              ],
+              margin: { left: margin, right: margin },
+              styles: { fontSize: 9, cellPadding: 2.5 },
+              headStyles: { fillColor: [5, 150, 105] as RGB, textColor: 255, fontStyle: "bold" },
+              alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
+              columnStyles: { 3: { halign: "right" } },
+              didParseCell(data) {
+                if (data.row.index === allPeriodDivRows.length && data.section === "body") {
+                  data.cell.styles.fontStyle = "bold";
+                }
+              },
+            });
+            y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
+          }
+
+          kpiRow([
+            { label: "Period Dividends", value: fmt(periodDividends) },
+            { label: "Portfolio Dividend Yield (trailing 12m to period end)", value: divYield > 0 ? `${divYield.toFixed(2)}%` : "—" },
+            { label: "12m Dividends", value: fmt(totalAnnualisedDivs) },
+          ]);
+
+          // Forward dividend calendar (next 3 months)
+          const next3mEnd = new Date(); next3mEnd.setMonth(next3mEnd.getMonth() + 3);
+          const forwardPayments: { ticker: string; date: string; amount: number; frequency: string; source: string; platformName: string }[] = [];
+          for (const [platformId, calendar] of dividendCalendarMap) {
+            const platformName = platforms.find(p => p.id === platformId)?.name ?? `Platform ${platformId}`;
+            for (const proj of calendar.projections) {
+              const d = new Date(proj.date);
+              if (d > now && d <= next3mEnd) {
+                forwardPayments.push({ ...proj, platformName });
+              }
+            }
+          }
+          forwardPayments.sort((a, b) => a.date.localeCompare(b.date));
+
+          if (forwardPayments.length > 0) {
+            checkPage(40);
+            sectionTitle("Forward Dividend Calendar (Next 3 Months)");
+            autoTable(doc, {
+              startY: y,
+              head: [["Ticker", "Platform", "Est. Pay Date", "Est. Amount", "Frequency"]],
+              body: forwardPayments.map(p => [p.ticker, p.platformName, p.date, fmt(p.amount), `${p.frequency} (${p.source})`]),
+              margin: { left: margin, right: margin },
+              styles: { fontSize: 9, cellPadding: 2.5 },
+              headStyles: { fillColor: [5, 150, 105] as RGB, textColor: 255, fontStyle: "bold" },
+              alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
+              columnStyles: { 3: { halign: "right" } },
+            });
+            y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+          }
+        }
+
+        // ── SECTION 8: REBALANCING PLAN ───────────────────────────────────────
+        if (rebalancingRows.length > 0) {
+          sectionDivider("Rebalancing Plan");
+
+          autoTable(doc, {
+            startY: y,
+            head: [["Platform", "Current Weight", "Target Weight", "Delta", "Action"]],
+            body: rebalancingRows.map(r => [
+              r.name,
+              `${r.actualWeight.toFixed(1)}%`,
+              `${r.targetWeight!.toFixed(1)}%`,
+              fmtDelta(r.delta),
+              r.action,
+            ]),
+            margin: { left: margin, right: margin },
+            styles: { fontSize: 9, cellPadding: 2.5 },
+            headStyles: { fillColor: [124, 58, 237] as RGB, textColor: 255, fontStyle: "bold" },
+            alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
+            columnStyles: {
+              1: { halign: "right" }, 2: { halign: "right" },
+              3: { halign: "right" }, 4: { halign: "center" },
+            },
+            didParseCell(data) {
+              if (data.column.index === 4 && data.section === "body") {
+                const action = data.cell.raw as string;
+                if (action === "Overweight") data.cell.styles.textColor = [220, 38, 38] as RGB;
+                else if (action === "Underweight") data.cell.styles.textColor = [37, 99, 235] as RGB;
+                else data.cell.styles.textColor = [16, 185, 129] as RGB;
+                data.cell.styles.fontStyle = "bold";
+              }
+              if (data.column.index === 3 && data.section === "body") {
+                const raw = data.cell.raw as string;
+                if (raw.startsWith("-")) data.cell.styles.textColor = [37, 99, 235] as RGB;
+                else if (raw.startsWith("+") && raw !== "+0.0pp") data.cell.styles.textColor = [220, 38, 38] as RGB;
+              }
+            },
+          });
+          y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+
+          checkPage(15);
+          bodyText("Rows highlighted in red (overweight) should be trimmed; rows in blue (underweight) may benefit from additional allocation. 'On Target' positions are within ±5 percentage points.");
+          y += 4;
+        }
+
+        // ── SECTION 9: TAX SUMMARY (yearly only) ─────────────────────────────
+        if (periodType === "year") {
+          sectionDivider("Tax Summary");
+
+          if (realisedGains.length > 0) {
+            sectionTitle(`Realised Gains / Losses — ${selectedYear}`);
+            const totalRealised = realisedGains.reduce((s, a) => s + a.profitLoss, 0);
+            autoTable(doc, {
+              startY: y,
+              head: [["Asset", "Cost Basis", "Exit Value", "Realised Gain/Loss"]],
+              body: [
+                ...realisedGains.map(a => [
+                  a.name,
+                  fmt(a.investedAmount),
+                  fmt(a.exitPrice ?? 0),
+                  `${a.profitLoss >= 0 ? "+" : ""}${fmt(a.profitLoss)}`,
+                ]),
+                ["Total", "", "", `${totalRealised >= 0 ? "+" : ""}${fmt(totalRealised)}`],
+              ],
+              margin: { left: margin, right: margin },
+              styles: { fontSize: 9, cellPadding: 2.5 },
+              headStyles: { fillColor: [220, 38, 38] as RGB, textColor: 255, fontStyle: "bold" },
+              alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
+              columnStyles: {
+                1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" },
+              },
+              didParseCell(data) {
+                if (data.column.index === 3 && data.section === "body") {
+                  const raw = data.cell.raw as string;
+                  if (raw.startsWith("-")) data.cell.styles.textColor = [220, 38, 38] as RGB;
+                  else if (raw.startsWith("+")) data.cell.styles.textColor = [16, 185, 129] as RGB;
+                }
+                if (data.row.index === realisedGains.length && data.section === "body") {
+                  data.cell.styles.fontStyle = "bold";
+                }
+              },
+            });
+            y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+          } else {
+            checkPage(12);
+            bodyText(`No assets were fully exited during ${selectedYear}.`);
+            y += 4;
+          }
+
+          if (unrealisedPositions.length > 0) {
+            checkPage(40);
+            sectionTitle("Unrealised Gains / Losses — Open Positions");
+            const totalUnrealised = unrealisedPositions.reduce((s, a) => s + a.profitLoss, 0);
+            autoTable(doc, {
+              startY: y,
+              head: [["Asset", "Cost Basis", "Current Value", "Unrealised Gain/Loss"]],
+              body: [
+                ...unrealisedPositions.map(a => [
+                  a.name,
+                  fmt(a.investedAmount),
+                  fmt(a.currentValue),
+                  `${a.profitLoss >= 0 ? "+" : ""}${fmt(a.profitLoss)}`,
+                ]),
+                ["Total", "", fmt(unrealisedPositions.reduce((s, a) => s + a.currentValue, 0)), `${totalUnrealised >= 0 ? "+" : ""}${fmt(totalUnrealised)}`],
+              ],
+              margin: { left: margin, right: margin },
+              styles: { fontSize: 9, cellPadding: 2.5 },
+              headStyles: { fillColor: [245, 158, 11] as RGB, textColor: 255, fontStyle: "bold" },
+              alternateRowStyles: { fillColor: [248, 250, 252] as RGB },
+              columnStyles: {
+                1: { halign: "right" }, 2: { halign: "right" }, 3: { halign: "right" },
+              },
+              didParseCell(data) {
+                if (data.column.index === 3 && data.section === "body") {
+                  const raw = data.cell.raw as string;
+                  if (raw.startsWith("-")) data.cell.styles.textColor = [220, 38, 38] as RGB;
+                  else if (raw.startsWith("+")) data.cell.styles.textColor = [16, 185, 129] as RGB;
+                }
+                if (data.row.index === unrealisedPositions.length && data.section === "body") {
+                  data.cell.styles.fontStyle = "bold";
+                }
+              },
+            });
+            y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
+          }
+        }
+      }
+
+      // ══ AI INSIGHTS ════════════════════════════════════════════════════════
+      if (insightData?.insight) {
+        sectionDivider("AI Portfolio Insights");
+
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "italic");
+        doc.setTextColor(130, 130, 130);
+        doc.text("AI-generated analysis — for informational purposes only, not financial advice.", margin, y);
+        y += 7;
+
+        const insightText = insightData.insight;
+        const questionBlocks = insightText.split(/(?=\d+\.\s)/).filter(Boolean);
+
+        for (const block of questionBlocks) {
+          checkPage(20);
+          const lines = block.trim().split("\n").filter(Boolean);
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            const isHeading = /^\d+\./.test(line);
+            doc.setFontSize(isHeading ? 10 : 9.5);
+            doc.setFont("helvetica", isHeading ? "bold" : "normal");
+            doc.setTextColor(isHeading ? 30 : 55, isHeading ? 30 : 55, isHeading ? 30 : 55);
+            const wrapped: string[] = doc.splitTextToSize(line, contentW);
+            for (const wl of wrapped) {
+              checkPage(6);
+              doc.text(wl, margin, y);
+              y += 5;
+            }
+          }
+          y += 2;
+        }
+
+        if (questionBlocks.length === 0) {
+          const lines: string[] = doc.splitTextToSize(insightText, contentW);
+          doc.setFontSize(9.5);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(55, 55, 55);
+          for (const line of lines) {
+            checkPage(6);
+            doc.text(line, margin, y);
+            y += 5;
+          }
+        }
+      }
+
+      // ══ PAGE FOOTER ════════════════════════════════════════════════════════
       const pageCount = (doc.internal as unknown as { getNumberOfPages: () => number }).getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
@@ -487,9 +1369,8 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
         doc.setFont("helvetica", "normal");
         doc.setTextColor(160, 160, 160);
         doc.text(
-          `InvestTrack · ${getPeriodLabel()} Report · Page ${i} of ${pageCount}`,
-          pageW / 2,
-          pageH - 8,
+          `InvestTrack · ${getPeriodLabel()} ${periodType === "month" ? "Monthly" : periodType === "quarter" ? "Quarterly" : "Annual"} Report · Page ${i} of ${pageCount}`,
+          pageW / 2, pageH - 8,
           { align: "center" },
         );
       }
@@ -498,6 +1379,7 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
       doc.save(filename);
       onOpenChange(false);
       toast({ title: "Report downloaded", description: filename });
+
     } catch (err) {
       console.error("PDF generation failed:", err);
       toast({
@@ -516,21 +1398,21 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
         <DialogHeader>
           <DialogTitle>Export Portfolio Report</DialogTitle>
           <DialogDescription>
-            Choose a period and download a PDF summary of your portfolio.
+            Choose a period and download a structured investor-grade PDF report.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
-            <Label htmlFor="period-type">Period type</Label>
+            <Label htmlFor="period-type">Report type</Label>
             <Select value={periodType} onValueChange={(v) => setPeriodType(v as PeriodType)}>
               <SelectTrigger id="period-type" data-testid="select-period-type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="month">Month</SelectItem>
-                <SelectItem value="quarter">Quarter</SelectItem>
-                <SelectItem value="year">Year</SelectItem>
+                <SelectItem value="month">Monthly</SelectItem>
+                <SelectItem value="quarter">Quarterly</SelectItem>
+                <SelectItem value="year">Annual</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -583,11 +1465,20 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
             </div>
           </div>
 
-          <p className="text-xs text-muted-foreground">
-            Generating a report for{" "}
-            <span className="font-medium text-foreground">{getPeriodLabel()}</span>.
-            {" "}Includes snapshot, growth history, platform performance, and AI insights.
-          </p>
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p>
+              Generating a <span className="font-medium text-foreground">{periodType === "month" ? "monthly" : periodType === "quarter" ? "quarterly" : "annual"}</span>{" "}
+              report for{" "}
+              <span className="font-medium text-foreground">{getPeriodLabel()}</span>.
+            </p>
+            <p>
+              {periodType === "month"
+                ? "Includes: Executive Summary, Performance, Cashflow, Allocation, Holdings, AI Insights."
+                : periodType === "quarter"
+                ? "Includes: Monthly sections + Risk & Stability, Dividends, Rebalancing Plan."
+                : "Includes: All quarterly sections + Tax Summary (realised & unrealised gains)."}
+            </p>
+          </div>
         </div>
 
         <DialogFooter>
