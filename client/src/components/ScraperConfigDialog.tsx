@@ -18,6 +18,7 @@ const SCRAPER_TYPES = [
   { value: "goldrepublic", label: "GoldRepublic", credentialType: "username_email" },
   { value: "valvest", label: "Valvest (Landed.eu)", credentialType: "email" },
   { value: "lande", label: "Lande", credentialType: "lande_cookie" },
+  { value: "maclear", label: "Maclear", credentialType: "email" },
   { value: "trading212", label: "Trading 212 API", credentialType: "apikey" },
   { value: "stock_ticker", label: "Stock Ticker (Yahoo Finance)", credentialType: "stock_ticker" },
 ];

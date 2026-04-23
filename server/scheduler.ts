@@ -226,7 +226,7 @@ async function runScrapeForConfig(config: any) {
       return;
     }
 
-    if (scraperType === "robocash" || scraperType === "crowdpear" || scraperType === "goldrepublic" || scraperType === "valvest" || scraperType === "lande") {
+    if (scraperType === "robocash" || scraperType === "crowdpear" || scraperType === "goldrepublic" || scraperType === "valvest" || scraperType === "lande" || scraperType === "maclear") {
       let balanceData: { totalBalance: number; scrapedAt: Date };
       if (scraperType === "robocash") {
         const { scrapeRoboCash } = await import("./scrapers/robocash");
@@ -240,6 +240,9 @@ async function runScrapeForConfig(config: any) {
       } else if (scraperType === "lande") {
         const { scrapeLande } = await import("./scrapers/lande");
         balanceData = await scrapeLande(creds.cookies);
+      } else if (scraperType === "maclear") {
+        const { scrapeMaclear } = await import("./scrapers/maclear");
+        balanceData = await scrapeMaclear(creds.email, creds.password);
       } else {
         const { scrapeCrowdPear } = await import("./scrapers/crowdpear");
         balanceData = await scrapeCrowdPear(creds.email, creds.password, creds.gmailAppPassword, creds.gmailEmail);
