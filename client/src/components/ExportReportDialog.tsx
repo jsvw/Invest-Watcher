@@ -678,6 +678,13 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
       const fmtPct = (v: number | null) => v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
       const fmtDelta = (v: number | null) => v == null ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(1)}pp`;
 
+      // ── Table of Contents tracking ────────────────────────────────────────
+      const tocEntries: { label: string; page: number }[] = [];
+      const currentPageNum = () =>
+        (doc.internal as unknown as { getCurrentPageInfo: () => { pageNumber: number } })
+          .getCurrentPageInfo().pageNumber;
+      let tocPageNum = 0;
+
       function checkPage(needed = 30) {
         if (y + needed > pageH - margin) {
           doc.addPage();
@@ -688,6 +695,7 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
       function sectionDivider(title: string) {
         doc.addPage();
         y = margin;
+        tocEntries.push({ label: title, page: currentPageNum() });
         doc.setFillColor(37, 99, 235);
         doc.rect(0, 0, pageW, 14, "F");
         doc.setFontSize(11);
@@ -773,11 +781,14 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
       doc.setDrawColor(220, 220, 220);
       doc.setLineWidth(0.3);
       doc.line(margin, y + 2, pageW - margin, y + 2);
-      y += 10;
+
+      // Insert TOC placeholder (page 2) — filled in after all content is generated
+      doc.addPage();
+      tocPageNum = currentPageNum(); // = 2
 
       // ══ SECTION 1: EXECUTIVE SUMMARY ═══════════════════════════════════════
       if (sec("executive")) {
-      sectionTitle("Executive Summary");
+      sectionDivider("Executive Summary");
 
       if (periodEntry) {
         kpiRow([
@@ -1472,6 +1483,68 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
             y += 5;
           }
         }
+      }
+
+      // ══ TABLE OF CONTENTS (rendered back on page 2) ═══════════════════════
+      if (tocEntries.length > 0 && tocPageNum > 0) {
+        doc.setPage(tocPageNum);
+        y = margin;
+
+        // TOC header
+        doc.setFillColor(37, 99, 235);
+        doc.rect(0, 0, pageW, 14, "F");
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(255, 255, 255);
+        doc.text("Contents", margin, 9);
+        y = 26;
+        doc.setTextColor(30, 30, 30);
+
+        const rowH = 9;
+        tocEntries.forEach((entry, idx) => {
+          const num = `${idx + 1}`;
+          const pageStr = String(entry.page);
+
+          // Alternating row background
+          if (idx % 2 === 0) {
+            doc.setFillColor(248, 250, 252);
+            doc.rect(margin, y - 6, contentW, rowH, "F");
+          }
+
+          // Chapter number
+          doc.setFontSize(9.5);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(37, 99, 235);
+          doc.text(num, margin + 1, y);
+
+          // Chapter title
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(30, 30, 30);
+          doc.text(entry.label, margin + 10, y);
+
+          // Dotted leader
+          const titleW = doc.getTextWidth(entry.label);
+          const pageNumW = doc.getTextWidth(pageStr);
+          const leaderStart = margin + 10 + titleW + 3;
+          const leaderEnd = pageW - margin - pageNumW - 3;
+          if (leaderEnd > leaderStart) {
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.2);
+            doc.setLineDashPattern([0.5, 1.5], 0);
+            doc.line(leaderStart, y - 1, leaderEnd, y - 1);
+            doc.setLineDashPattern([], 0);
+          }
+
+          // Page number
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(37, 99, 235);
+          doc.text(pageStr, pageW - margin, y, { align: "right" });
+
+          // Clickable invisible link over the entire row
+          doc.link(margin, y - 7, contentW, rowH, { pageNumber: entry.page });
+
+          y += rowH;
+        });
       }
 
       // ══ PAGE FOOTER ════════════════════════════════════════════════════════
