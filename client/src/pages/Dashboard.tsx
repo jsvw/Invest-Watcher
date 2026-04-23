@@ -340,6 +340,7 @@ export default function Dashboard() {
   const [heatmapPinnedCell, setHeatmapPinnedCell] = useState<string | null>(null);
   const heatmapRef = useRef<HTMLDivElement>(null);
   const [heatmapMode, setHeatmapMode] = useState<"pct" | "value">("pct");
+  const [heatmapAgg, setHeatmapAgg] = useState<"month" | "quarter" | "year">("month");
   const [activeHeatmapTab, setActiveHeatmapTab] = useState<string>("monthly");
   const [sortKey, setSortKey] = useState<SortKey>("roi");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -1072,6 +1073,59 @@ export default function Dashboard() {
 
     return { years, cells };
   }, [platformBreakdownByMonth, excludedPlatforms]);
+
+  const aggregatedHeatmapData = useMemo(() => {
+    if (!activeHeatmapData) return null;
+    const { years, cells } = activeHeatmapData;
+
+    function compoundReturn(monthCells: typeof cells): number {
+      return (monthCells.reduce((prod, c) => prod * (1 + c.returnPct / 100), 1) - 1) * 100;
+    }
+
+    if (heatmapAgg === "month") {
+      const cols = MONTHS.map((m, i) => ({ label: m, colIdx: i + 1 }));
+      const aggCells = cells.map(c => ({ ...c, colIdx: c.month, colLabel: MONTHS[c.month - 1] }));
+      return { years, cols, aggCells };
+    }
+
+    if (heatmapAgg === "quarter") {
+      const cols = [1, 2, 3, 4].map(q => ({ label: `Q${q}`, colIdx: q }));
+      const aggCells: { year: string; colIdx: number; colLabel: string; returnPct: number; absoluteChange: number; inProgress?: boolean }[] = [];
+      for (const year of years) {
+        for (let q = 1; q <= 4; q++) {
+          const m1 = q * 3 - 2, m2 = q * 3 - 1, m3 = q * 3;
+          const monthCells = cells.filter(c => c.year === year && (c.month === m1 || c.month === m2 || c.month === m3));
+          if (monthCells.length === 0) continue;
+          aggCells.push({
+            year,
+            colIdx: q,
+            colLabel: `Q${q}`,
+            returnPct: compoundReturn(monthCells),
+            absoluteChange: monthCells.reduce((s, c) => s + c.absoluteChange, 0),
+            inProgress: monthCells.some(c => c.inProgress) || undefined,
+          });
+        }
+      }
+      return { years, cols, aggCells };
+    }
+
+    // year
+    const cols = [{ label: "Total", colIdx: 1 }];
+    const aggCells: { year: string; colIdx: number; colLabel: string; returnPct: number; absoluteChange: number; inProgress?: boolean }[] = [];
+    for (const year of years) {
+      const monthCells = cells.filter(c => c.year === year);
+      if (monthCells.length === 0) continue;
+      aggCells.push({
+        year,
+        colIdx: 1,
+        colLabel: "Total",
+        returnPct: compoundReturn(monthCells),
+        absoluteChange: monthCells.reduce((s, c) => s + c.absoluteChange, 0),
+        inProgress: monthCells.some(c => c.inProgress) || undefined,
+      });
+    }
+    return { years, cols, aggCells };
+  }, [activeHeatmapData, heatmapAgg]);
 
   const roiData = useMemo(() => {
     if (!activePlatforms) return [];
@@ -2105,55 +2159,69 @@ export default function Dashboard() {
                     <TabsTrigger value="portfolio" data-testid="heatmap-tab-portfolio">Portfolio Breakdown</TabsTrigger>
                   </TabsList>
                   {activeHeatmapTab === "monthly" && (
-                    <div className="flex items-center rounded-md border p-0.5 shrink-0">
-                      <button type="button" onClick={() => setHeatmapMode("pct")} className={cn("px-2.5 py-1 text-xs font-medium rounded transition-colors", heatmapMode === "pct" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")} data-testid="heatmap-toggle-pct">%</button>
-                      <button type="button" onClick={() => setHeatmapMode("value")} className={cn("px-2.5 py-1 text-xs font-medium rounded transition-colors", heatmapMode === "value" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")} data-testid="heatmap-toggle-value">{getCurrencySymbol(currency)}</button>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center rounded-md border p-0.5 shrink-0">
+                        {(["month", "quarter", "year"] as const).map(agg => (
+                          <button key={agg} type="button" onClick={() => { setHeatmapAgg(agg); setHeatmapPinnedCell(null); setTooltip(null); }} className={cn("px-2.5 py-1 text-xs font-medium rounded transition-colors", heatmapAgg === agg ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")} data-testid={`heatmap-toggle-agg-${agg}`}>
+                            {agg === "month" ? "Mo" : agg === "quarter" ? "Qtr" : "Yr"}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex items-center rounded-md border p-0.5 shrink-0">
+                        <button type="button" onClick={() => setHeatmapMode("pct")} className={cn("px-2.5 py-1 text-xs font-medium rounded transition-colors", heatmapMode === "pct" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")} data-testid="heatmap-toggle-pct">%</button>
+                        <button type="button" onClick={() => setHeatmapMode("value")} className={cn("px-2.5 py-1 text-xs font-medium rounded transition-colors", heatmapMode === "value" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")} data-testid="heatmap-toggle-value">{getCurrencySymbol(currency)}</button>
+                      </div>
                     </div>
                   )}
                 </div>
 
                 <TabsContent value="monthly">
-                  {activeHeatmapData ? (
+                  {aggregatedHeatmapData ? (
                     <div className="overflow-x-auto" ref={heatmapRef}>
-                      <div className="min-w-[600px]">
+                      <div style={{ minWidth: heatmapAgg === "year" ? "200px" : heatmapAgg === "quarter" ? "320px" : "600px" }}>
                         <div className="flex mb-1">
                           <div className="w-12 shrink-0" />
-                          {MONTHS.map(m => (
-                            <div key={m} className="flex-1 text-center text-xs text-muted-foreground font-medium">{m}</div>
+                          {aggregatedHeatmapData.cols.map(col => (
+                            <div key={col.colIdx} className="flex-1 text-center text-xs text-muted-foreground font-medium">{col.label}</div>
                           ))}
                         </div>
-                        {activeHeatmapData.years.map(year => (
+                        {aggregatedHeatmapData.years.map(year => (
                           <div key={year} className="flex items-center mb-1">
                             <div className="w-12 shrink-0 text-xs text-muted-foreground font-medium pr-2 text-right">{year}</div>
-                            {Array.from({ length: 12 }, (_, mi) => {
-                              const monthNum = mi + 1;
-                              const cell = activeHeatmapData.cells.find(c => c.year === year && c.month === monthNum);
-                              if (!cell) return <div key={monthNum} className="flex-1 mx-0.5 h-10 rounded bg-muted/30" />;
-                              const intensity = Math.min(Math.abs(cell.returnPct) / 5, 1);
+                            {aggregatedHeatmapData.cols.map(col => {
+                              const cell = aggregatedHeatmapData.aggCells.find(c => c.year === year && c.colIdx === col.colIdx);
+                              if (!cell) return <div key={col.colIdx} className="flex-1 mx-0.5 h-10 rounded bg-muted/30" />;
+                              const intensity = Math.min(Math.abs(cell.returnPct) / (heatmapAgg === "year" ? 15 : heatmapAgg === "quarter" ? 8 : 5), 1);
                               const bg = cell.returnPct >= 0
                                 ? `rgba(16,185,129,${0.15 + intensity * 0.75})`
                                 : `rgba(239,68,68,${0.15 + intensity * 0.75})`;
-                              const label = `${MONTHS[monthNum - 1]} ${year}`;
-                              const cellKey = `${year}-${monthNum}`;
+                              const label = heatmapAgg === "month"
+                                ? `${col.label} ${year}`
+                                : heatmapAgg === "quarter"
+                                ? `${col.label} ${year}`
+                                : year;
+                              const cellKey = `${year}-${col.colIdx}`;
                               const isPinned = heatmapPinnedCell === cellKey;
-                              const tooltipData = {
+                              const tooltipData: HeatmapTooltipData = {
                                 label,
                                 returnPct: cell.returnPct,
                                 absoluteChange: cell.absoluteChange,
                                 currency,
                                 inProgress: cell.inProgress,
-                                platformBreakdown: platformBreakdownByMonth?.[`${year}-${String(monthNum).padStart(2, "0")}`]?.filter(p => !excludedPlatforms.has(p.platformId)),
+                                platformBreakdown: heatmapAgg === "month"
+                                  ? platformBreakdownByMonth?.[`${year}-${String(col.colIdx).padStart(2, "0")}`]?.filter(p => !excludedPlatforms.has(p.platformId))
+                                  : undefined,
                               };
                               return (
                                 <div
-                                  key={monthNum}
+                                  key={col.colIdx}
                                   className={cn(
                                     "flex-1 mx-0.5 h-10 rounded flex items-center justify-center text-[10px] font-medium cursor-pointer transition-transform hover:scale-105",
                                     cell.inProgress && "border-2 border-dashed border-amber-400/70 opacity-80",
                                     isPinned && "ring-2 ring-offset-1 ring-foreground/30"
                                   )}
                                   style={{ backgroundColor: bg, color: intensity > 0.5 ? "#fff" : undefined }}
-                                  data-testid={`heatmap-cell-${year}-${monthNum}`}
+                                  data-testid={`heatmap-cell-${year}-${col.colIdx}`}
                                   onMouseEnter={e => {
                                     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                                     setTooltip({ x: rect.left + rect.width / 2, y: rect.top, data: tooltipData });
