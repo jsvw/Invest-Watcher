@@ -177,18 +177,21 @@ const SECTION_REGISTRY: SectionDef[] = [
 
 const LS_KEY = "exportReportSections";
 
-function loadSavedSections(periodType: PeriodType): Set<SectionId> {
+function loadSavedSections(periodType: PeriodType): Set<SectionId> | null {
   try {
     const raw = localStorage.getItem(`${LS_KEY}:${periodType}`);
-    if (raw) {
+    if (raw !== null) {
       const ids = JSON.parse(raw) as SectionId[];
       const valid = SECTION_REGISTRY.filter(s => s.availableFor.includes(periodType)).map(s => s.id);
-      const filtered = ids.filter(id => valid.includes(id));
-      if (filtered.length > 0) return new Set(filtered);
+      return new Set(ids.filter((id): id is SectionId => valid.includes(id)));
     }
   } catch {
     // ignore
   }
+  return null;
+}
+
+function defaultSections(periodType: PeriodType): Set<SectionId> {
   return new Set(SECTION_REGISTRY.filter(s => s.availableFor.includes(periodType)).map(s => s.id));
 }
 
@@ -280,27 +283,15 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
   const [selectedMonth, setSelectedMonth] = useState(String(now.getMonth() + 1));
   const [selectedQuarter, setSelectedQuarter] = useState("1");
   const [generating, setGenerating] = useState(false);
-  const [selectedSections, setSelectedSections] = useState<Set<SectionId>>(() => loadSavedSections("month"));
+  const [selectedSections, setSelectedSections] = useState<Set<SectionId>>(() => loadSavedSections("month") ?? defaultSections("month"));
 
   const availableYears = Array.from({ length: 6 }, (_, i) => String(now.getFullYear() - i));
 
   useEffect(() => {
-    // When period type changes, keep valid selections and drop invalid ones
-    setSelectedSections(prev => {
-      const next = new Set<SectionId>();
-      for (const id of prev) {
-        const def = SECTION_REGISTRY.find(s => s.id === id);
-        if (def?.availableFor.includes(periodType)) next.add(id);
-      }
-      // If nothing remains, default-select all available
-      if (next.size === 0) {
-        for (const s of SECTION_REGISTRY) {
-          if (s.availableFor.includes(periodType)) next.add(s.id);
-        }
-      }
-      saveSections(periodType, next);
-      return next;
-    });
+    // Load saved selections for the new period type; fall back to all-available
+    // only when no saved value exists (null), preserving empty selections intentionally saved.
+    const saved = loadSavedSections(periodType);
+    setSelectedSections(saved ?? defaultSections(periodType));
   }, [periodType]);
 
   function toggleSection(id: SectionId) {
