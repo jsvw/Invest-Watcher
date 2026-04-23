@@ -61,19 +61,23 @@ export async function scrapeMaclear(email: string, password: string): Promise<Ma
     console.log("[Maclear Scraper] Waiting for login form...");
     await page.waitForSelector(emailSelector, { timeout: 30000 }).catch(async () => {
       const html = await page.evaluate(`document.body ? document.body.innerHTML.slice(0, 1000) : "no body"`);
-      throw new Error(`Login form not found. Page HTML: ${html}`);
+      throw new Error(`Login email field not found. Page HTML: ${html}`);
+    });
+    await page.waitForSelector(passSelector, { timeout: 10000 }).catch(async () => {
+      throw new Error("Login password field not found. The login form may have changed.");
     });
 
     console.log("[Maclear Scraper] Filling credentials...");
-    await page.$eval(emailSelector, (el: any) => el.value = "");
+    await page.$eval(emailSelector, (el: HTMLInputElement) => { el.value = ""; });
     await page.type(emailSelector, email, { delay: 50 });
-    await page.$eval(passSelector, (el: any) => el.value = "");
+    await page.$eval(passSelector, (el: HTMLInputElement) => { el.value = ""; });
     await page.type(passSelector, password, { delay: 50 });
 
     console.log("[Maclear Scraper] Submitting login...");
+    const submitButton = await page.$('button[type="submit"]');
     await Promise.all([
       page.waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 }).catch(() => {}),
-      page.click('button[type="submit"]'),
+      submitButton ? submitButton.click() : page.keyboard.press("Enter"),
     ]);
     await new Promise(resolve => setTimeout(resolve, 3000));
 

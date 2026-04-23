@@ -61,13 +61,16 @@ export async function scrapeLande(email: string, password: string): Promise<Land
     console.log("[Lande Scraper] Waiting for login form...");
     await page.waitForSelector(emailSelector, { timeout: 30000 }).catch(async () => {
       const html = await page.evaluate(`document.body ? document.body.innerHTML.slice(0, 1000) : "no body"`);
-      throw new Error(`Login form not found. Page HTML: ${html}`);
+      throw new Error(`Login email field not found. Page HTML: ${html}`);
+    });
+    await page.waitForSelector(passSelector, { timeout: 10000 }).catch(async () => {
+      throw new Error("Login password field not found. The login form may have changed.");
     });
 
     console.log("[Lande Scraper] Filling credentials...");
-    await page.$eval(emailSelector, (el: any) => el.value = "");
+    await page.$eval(emailSelector, (el: HTMLInputElement) => { el.value = ""; });
     await page.type(emailSelector, email, { delay: 50 });
-    await page.$eval(passSelector, (el: any) => el.value = "");
+    await page.$eval(passSelector, (el: HTMLInputElement) => { el.value = ""; });
     await page.type(passSelector, password, { delay: 50 });
 
     console.log("[Lande Scraper] Submitting login...");
