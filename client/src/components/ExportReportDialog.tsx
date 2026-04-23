@@ -287,6 +287,7 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
 
   // ── Period discovery (data-aware selectors) ───────────────────────────────
   const [periodsLoading, setPeriodsLoading] = useState(false);
+  const [discoveryError, setDiscoveryError] = useState(false);
   // year → Set of "MM" strings that have data
   const [dataMonths, setDataMonths] = useState<Map<string, Set<string>>>(new Map());
 
@@ -297,12 +298,14 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
     [...(dataMonths.get(selectedYear) ?? [])].map(m => String(Math.ceil(Number(m) / 3)))
   )].sort();
 
-  // Fetch available periods when dialog opens
-  useEffect(() => {
-    if (!open) return;
+  function runDiscovery() {
     setPeriodsLoading(true);
+    setDiscoveryError(false);
     fetch("/api/portfolio/waterfall?granularity=month", { credentials: "include" })
-      .then(r => r.ok ? r.json() as Promise<WaterfallPeriod[]> : Promise.resolve([] as WaterfallPeriod[]))
+      .then(r => {
+        if (!r.ok) throw new Error("fetch failed");
+        return r.json() as Promise<WaterfallPeriod[]>;
+      })
       .then(periods => {
         const map = new Map<string, Set<string>>();
         for (const p of periods) {
@@ -315,18 +318,30 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
         }
         setDataMonths(map);
 
-        // Auto-select the most recent period with data
+        // Only snap selection when the current selection is not valid in the new data
         if (map.size > 0) {
           const latestYear = [...map.keys()].sort().reverse()[0];
-          const latestMonth = [...map.get(latestYear)!].sort().reverse()[0];
+          const yearToUse = map.has(selectedYear) ? selectedYear : latestYear;
+          const monthsForYear = [...map.get(yearToUse)!].sort().reverse();
+          const latestMonth = monthsForYear[0];
           const latestQuarter = String(Math.ceil(Number(latestMonth) / 3));
-          setSelectedYear(latestYear);
-          setSelectedMonth(String(Number(latestMonth))); // remove leading zero
-          setSelectedQuarter(latestQuarter);
+          const currentMonthPadded = selectedMonth.padStart(2, "0");
+          const currentQuarterValid = monthsForYear.some(
+            m2 => String(Math.ceil(Number(m2) / 3)) === selectedQuarter
+          );
+          if (!map.has(selectedYear)) setSelectedYear(yearToUse);
+          if (!monthsForYear.includes(currentMonthPadded)) setSelectedMonth(String(Number(latestMonth)));
+          if (!currentQuarterValid) setSelectedQuarter(latestQuarter);
         }
       })
-      .catch(() => {})
+      .catch(() => setDiscoveryError(true))
       .finally(() => setPeriodsLoading(false));
+  }
+
+  // Fetch available periods when dialog opens
+  useEffect(() => {
+    if (!open) return;
+    runDiscovery();
   }, [open]);
 
   // When year changes, snap month/quarter to a valid value for that year
@@ -1662,6 +1677,20 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
             </Select>
           </div>
 
+          {discoveryError && (
+            <div className="flex items-center justify-between rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <span>Could not load available periods.</span>
+              <button
+                type="button"
+                className="ml-3 underline underline-offset-2 hover:no-underline shrink-0"
+                onClick={runDiscovery}
+                data-testid="button-retry-discovery"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
           <div className="flex gap-2">
             {periodType === "month" && (
               <div className="flex-1 space-y-1.5">
@@ -1801,7 +1830,7 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={generating}>
             Cancel
           </Button>
-          <Button onClick={handleGenerate} disabled={generating || periodsLoading || availableYears.length === 0} data-testid="button-generate-report">
+          <Button onClick={handleGenerate} disabled={generating || periodsLoading || discoveryError || availableYears.length === 0} data-testid="button-generate-report">
             {generating ? (
               <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating…</>
             ) : (
