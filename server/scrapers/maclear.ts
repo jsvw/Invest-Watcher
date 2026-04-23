@@ -75,31 +75,30 @@ export async function scrapeMaclear(email: string, password: string): Promise<Ma
       throw new Error(`Login failed${errorText ? ": " + errorText : ". Please check your credentials."}`);
     }
 
-    // Dismiss post-login popup if present (X button in top-right corner)
+    // Dismiss post-login popup if present (X button in top-right corner of modal)
     console.log("[Maclear Scraper] Checking for post-login popup...");
     try {
       const popupClosed = await page.evaluate(`(function() {
-        var selectors = [
-          'button[class*="close"]',
-          '[aria-label="Close"]',
-          '[aria-label="close"]',
-          '.modal__close',
-          '.popup__close',
-          '.dialog__close',
-          '[class*="modal"] button[class*="close"]',
-          '[class*="popup"] button[class*="close"]',
-        ];
-        for (var i = 0; i < selectors.length; i++) {
-          var btn = document.querySelector(selectors[i]);
-          if (btn) { btn.click(); return true; }
-        }
-        // Look for a button containing × or ✕ or × inside a modal/overlay
-        var allBtns = Array.from(document.querySelectorAll('button, [role="button"]'));
-        for (var j = 0; j < allBtns.length; j++) {
-          var txt = (allBtns[j].textContent || "").trim();
-          if (txt === "×" || txt === "✕" || txt === "✖" || txt === "×") {
-            allBtns[j].click();
-            return true;
+        // Only search within modal/dialog/popup containers to avoid unintended clicks
+        var containers = Array.from(document.querySelectorAll(
+          '[class*="modal"], [class*="popup"], [class*="dialog"], [class*="overlay"], [role="dialog"]'
+        ));
+        for (var c = 0; c < containers.length; c++) {
+          var container = containers[c];
+          // Try aria-label close button first
+          var ariaClose = container.querySelector('[aria-label="Close"], [aria-label="close"]');
+          if (ariaClose) { ariaClose.click(); return true; }
+          // Try class-based close button
+          var classClose = container.querySelector('button[class*="close"], [class*="close-btn"], [class*="btn-close"]');
+          if (classClose) { classClose.click(); return true; }
+          // Try button containing only a close glyph
+          var btns = Array.from(container.querySelectorAll('button, [role="button"]'));
+          for (var j = 0; j < btns.length; j++) {
+            var txt = (btns[j].textContent || "").trim();
+            if (txt === "\u00d7" || txt === "\u2715" || txt === "\u2716" || txt === "&times;") {
+              btns[j].click();
+              return true;
+            }
           }
         }
         return false;
@@ -124,24 +123,18 @@ export async function scrapeMaclear(email: string, password: string): Promise<Ma
     // Dismiss popup again in case it appeared after navigation
     try {
       await page.evaluate(`(function() {
-        var selectors = [
-          'button[class*="close"]',
-          '[aria-label="Close"]',
-          '[aria-label="close"]',
-          '.modal__close',
-          '.popup__close',
-          '.dialog__close',
-        ];
-        for (var i = 0; i < selectors.length; i++) {
-          var btn = document.querySelector(selectors[i]);
-          if (btn) { btn.click(); return; }
-        }
-        var allBtns = Array.from(document.querySelectorAll('button, [role="button"]'));
-        for (var j = 0; j < allBtns.length; j++) {
-          var txt = (allBtns[j].textContent || "").trim();
-          if (txt === "×" || txt === "✕" || txt === "✖" || txt === "×") {
-            allBtns[j].click();
-            return;
+        var containers = Array.from(document.querySelectorAll(
+          '[class*="modal"], [class*="popup"], [class*="dialog"], [class*="overlay"], [role="dialog"]'
+        ));
+        for (var c = 0; c < containers.length; c++) {
+          var ariaClose = containers[c].querySelector('[aria-label="Close"], [aria-label="close"]');
+          if (ariaClose) { ariaClose.click(); return; }
+          var classClose = containers[c].querySelector('button[class*="close"], [class*="close-btn"], [class*="btn-close"]');
+          if (classClose) { classClose.click(); return; }
+          var btns = Array.from(containers[c].querySelectorAll('button, [role="button"]'));
+          for (var j = 0; j < btns.length; j++) {
+            var txt = (btns[j].textContent || "").trim();
+            if (txt === "\u00d7" || txt === "\u2715" || txt === "\u2716") { btns[j].click(); return; }
           }
         }
       })()`);
@@ -227,17 +220,8 @@ export async function scrapeMaclear(email: string, password: string): Promise<Ma
         }
       }
 
-      // Fallback: first .overview-statistics__value-number on the page
-      var firstVal = document.querySelector('.overview-statistics__value-number');
-      if (firstVal) {
-        var fv = extractNumber(firstVal.textContent);
-        if (fv !== null && fv > 0) {
-          console.log("[Maclear Scraper] Fallback to first value-number: " + fv);
-          return fv;
-        }
-      }
-
-      return 0;
+      // "Active investments" label was not found — throw to avoid silently returning wrong data
+      throw new Error("Could not find 'Active investments' stat block on the overview page. The page layout may have changed.");
     })()`) as number;
 
     console.log(`[Maclear Scraper] Scraping complete. Active investments: €${totalBalance}`);
