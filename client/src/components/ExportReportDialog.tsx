@@ -284,11 +284,23 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
 
   const availableYears = Array.from({ length: 6 }, (_, i) => String(now.getFullYear() - i));
 
-  const availableSections = SECTION_REGISTRY.filter(s => s.availableFor.includes(periodType));
-
   useEffect(() => {
-    const loaded = loadSavedSections(periodType);
-    setSelectedSections(loaded);
+    // When period type changes, keep valid selections and drop invalid ones
+    setSelectedSections(prev => {
+      const next = new Set<SectionId>();
+      for (const id of prev) {
+        const def = SECTION_REGISTRY.find(s => s.id === id);
+        if (def?.availableFor.includes(periodType)) next.add(id);
+      }
+      // If nothing remains, default-select all available
+      if (next.size === 0) {
+        for (const s of SECTION_REGISTRY) {
+          if (s.availableFor.includes(periodType)) next.add(s.id);
+        }
+      }
+      saveSections(periodType, next);
+      return next;
+    });
   }, [periodType]);
 
   function toggleSection(id: SectionId) {
@@ -302,7 +314,7 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
   }
 
   function selectAll() {
-    const next = new Set(availableSections.map(s => s.id));
+    const next = new Set(SECTION_REGISTRY.filter(s => s.availableFor.includes(periodType)).map(s => s.id));
     setSelectedSections(next);
     saveSections(periodType, next);
   }
@@ -1502,7 +1514,9 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
     }
   }
 
-  const checkedCount = availableSections.filter(s => selectedSections.has(s.id)).length;
+  const availableSections = SECTION_REGISTRY.filter(s => s.availableFor.includes(periodType));
+  const checkedSections = SECTION_REGISTRY.filter(s => selectedSections.has(s.id));
+  const checkedCount = checkedSections.length;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1602,35 +1616,38 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
             </div>
 
             <div className="overflow-y-auto max-h-48 rounded-md border divide-y">
-              {availableSections.map((section) => (
-                <label
-                  key={section.id}
-                  className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors"
-                  data-testid={`section-row-${section.id}`}
-                >
-                  <Checkbox
-                    id={`section-${section.id}`}
-                    checked={selectedSections.has(section.id)}
-                    onCheckedChange={() => toggleSection(section.id)}
-                    data-testid={`checkbox-section-${section.id}`}
-                  />
-                  <span className="flex-1 text-sm">{section.label}</span>
-                  {section.availableFor.length === 1 && section.availableFor[0] === "year" && (
-                    <Badge variant="secondary" className="text-xs shrink-0">Annual only</Badge>
-                  )}
-                  {section.availableFor.length === 2 && (
-                    <Badge variant="secondary" className="text-xs shrink-0">Q + Annual</Badge>
-                  )}
-                </label>
-              ))}
+              {SECTION_REGISTRY.map((section) => {
+                const isAvailable = section.availableFor.includes(periodType);
+                const isChecked = selectedSections.has(section.id);
+                return (
+                  <label
+                    key={section.id}
+                    className={`flex items-center gap-3 px-3 py-2 transition-colors ${isAvailable ? "cursor-pointer hover:bg-muted/50" : "cursor-not-allowed opacity-40"}`}
+                    data-testid={`section-row-${section.id}`}
+                  >
+                    <Checkbox
+                      id={`section-${section.id}`}
+                      checked={isChecked}
+                      disabled={!isAvailable}
+                      onCheckedChange={() => isAvailable && toggleSection(section.id)}
+                      data-testid={`checkbox-section-${section.id}`}
+                    />
+                    <span className="flex-1 text-sm">{section.label}</span>
+                    {section.availableFor.length === 1 && section.availableFor[0] === "year" && (
+                      <Badge variant="secondary" className="text-xs shrink-0">Annual only</Badge>
+                    )}
+                    {section.availableFor.length === 2 && (
+                      <Badge variant="secondary" className="text-xs shrink-0">Q + Annual</Badge>
+                    )}
+                  </label>
+                );
+              })}
             </div>
 
             <p className="text-xs text-muted-foreground">
               {checkedCount === 0
                 ? "No chapters selected — PDF will contain only the cover page."
-                : checkedCount === availableSections.length
-                ? `All ${checkedCount} chapters selected.`
-                : `${checkedCount} of ${availableSections.length} chapters selected: ${availableSections.filter(s => selectedSections.has(s.id)).map(s => s.label).join(", ")}.`
+                : `${checkedSections.length === availableSections.length ? `All ${checkedCount}` : `${checkedCount} of ${availableSections.length}`} chapters selected: ${checkedSections.map(s => s.label).join(", ")}.`
               }
             </p>
           </div>
