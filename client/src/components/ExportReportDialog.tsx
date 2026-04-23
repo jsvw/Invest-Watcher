@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { Loader2, Download } from "lucide-react";
 import { useAuth } from "@/App";
 import { formatCurrency } from "@/lib/currency";
@@ -140,6 +142,64 @@ const MONTH_NAMES = [
   "July", "August", "September", "October", "November", "December",
 ];
 
+// ── Chapter registry ──────────────────────────────────────────────────────────
+
+type SectionId =
+  | "executive"
+  | "performance"
+  | "cashflow"
+  | "allocation"
+  | "holdings"
+  | "risk"
+  | "dividends"
+  | "rebalancing"
+  | "tax"
+  | "ai";
+
+interface SectionDef {
+  id: SectionId;
+  label: string;
+  availableFor: PeriodType[];
+}
+
+const SECTION_REGISTRY: SectionDef[] = [
+  { id: "executive",   label: "Executive Summary",       availableFor: ["month", "quarter", "year"] },
+  { id: "performance", label: "Performance & Growth",    availableFor: ["month", "quarter", "year"] },
+  { id: "cashflow",    label: "Cashflow",                availableFor: ["month", "quarter", "year"] },
+  { id: "allocation",  label: "Allocation Snapshot",     availableFor: ["month", "quarter", "year"] },
+  { id: "holdings",    label: "Holdings Summary",        availableFor: ["month", "quarter", "year"] },
+  { id: "risk",        label: "Risk & Stability",        availableFor: ["quarter", "year"] },
+  { id: "dividends",   label: "Dividend Report",         availableFor: ["quarter", "year"] },
+  { id: "rebalancing", label: "Rebalancing Plan",        availableFor: ["quarter", "year"] },
+  { id: "tax",         label: "Tax Summary",             availableFor: ["year"] },
+  { id: "ai",          label: "AI Insights",             availableFor: ["month", "quarter", "year"] },
+];
+
+const LS_KEY = "exportReportSections";
+
+function loadSavedSections(periodType: PeriodType): Set<SectionId> {
+  try {
+    const raw = localStorage.getItem(`${LS_KEY}:${periodType}`);
+    if (raw) {
+      const ids = JSON.parse(raw) as SectionId[];
+      const valid = SECTION_REGISTRY.filter(s => s.availableFor.includes(periodType)).map(s => s.id);
+      const filtered = ids.filter(id => valid.includes(id));
+      if (filtered.length > 0) return new Set(filtered);
+    }
+  } catch {
+    // ignore
+  }
+  return new Set(SECTION_REGISTRY.filter(s => s.availableFor.includes(periodType)).map(s => s.id));
+}
+
+function saveSections(periodType: PeriodType, sections: Set<SectionId>) {
+  try {
+    localStorage.setItem(`${LS_KEY}:${periodType}`, JSON.stringify([...sections]));
+  } catch {
+    // ignore
+  }
+}
+
 // ── Period helpers ────────────────────────────────────────────────────────────
 
 function getPeriodBounds(periodType: PeriodType, selectedYear: string, selectedMonth: string, selectedQuarter: string): { start: Date; end: Date } {
@@ -220,8 +280,40 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
   const [selectedMonth, setSelectedMonth] = useState(String(now.getMonth() + 1));
   const [selectedQuarter, setSelectedQuarter] = useState("1");
   const [generating, setGenerating] = useState(false);
+  const [selectedSections, setSelectedSections] = useState<Set<SectionId>>(() => loadSavedSections("month"));
 
   const availableYears = Array.from({ length: 6 }, (_, i) => String(now.getFullYear() - i));
+
+  const availableSections = SECTION_REGISTRY.filter(s => s.availableFor.includes(periodType));
+
+  useEffect(() => {
+    const loaded = loadSavedSections(periodType);
+    setSelectedSections(loaded);
+  }, [periodType]);
+
+  function toggleSection(id: SectionId) {
+    setSelectedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      saveSections(periodType, next);
+      return next;
+    });
+  }
+
+  function selectAll() {
+    const next = new Set(availableSections.map(s => s.id));
+    setSelectedSections(next);
+    saveSections(periodType, next);
+  }
+
+  function clearAll() {
+    const next = new Set<SectionId>();
+    setSelectedSections(next);
+    saveSections(periodType, next);
+  }
+
+  const sec = (id: SectionId) => selectedSections.has(id);
 
   function getPeriodLabel(): string {
     if (periodType === "year") return selectedYear;
@@ -681,6 +773,7 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
       y += 10;
 
       // ══ SECTION 1: EXECUTIVE SUMMARY ═══════════════════════════════════════
+      if (sec("executive")) {
       sectionTitle("Executive Summary");
 
       if (periodEntry) {
@@ -759,7 +852,10 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
         }
       }
 
+      } // end executive
+
       // ══ SECTION 2: PERFORMANCE ══════════════════════════════════════════════
+      if (sec("performance")) {
       sectionDivider("Performance");
 
       kpiRow([
@@ -861,7 +957,10 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
         y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
       }
 
+      } // end performance
+
       // ══ SECTION 3: CASHFLOW ════════════════════════════════════════════════
+      if (sec("cashflow")) {
       sectionDivider("Cashflow");
 
       const delta = (curr: number, prev: number) => {
@@ -887,7 +986,10 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
       });
       y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
 
+      } // end cashflow
+
       // ══ SECTION 4: ALLOCATION SNAPSHOT ════════════════════════════════════
+      if (sec("allocation")) {
       sectionDivider("Allocation Snapshot");
 
       // By category
@@ -958,7 +1060,10 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
         y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8;
       }
 
+      } // end allocation
+
       // ══ SECTION 5: HOLDINGS SUMMARY ════════════════════════════════════════
+      if (sec("holdings")) {
       sectionDivider("Holdings Summary");
 
       if (holdingsSummary.length > 0) {
@@ -1080,10 +1185,13 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
         }
       }
 
+      } // end holdings
+
       // ══ QUARTERLY / YEARLY ADDITIONAL SECTIONS ═════════════════════════════
       if (isQuarterlyOrYearly) {
 
         // ── SECTION 6: RISK & STABILITY ───────────────────────────────────────
+        if (sec("risk")) {
         sectionDivider("Risk & Stability");
 
         kpiRow([
@@ -1114,8 +1222,10 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
           y += 4;
         }
 
+        } // end risk
+
         // ── SECTION 7: DIVIDEND REPORT ────────────────────────────────────────
-        if (dividendCalendarMap.size > 0) {
+        if (dividendCalendarMap.size > 0 && sec("dividends")) {
           sectionDivider("Dividend Report");
 
           const allPeriodDivRows: { ticker: string; amount: number; paidOn: string; platformName: string }[] = [];
@@ -1190,7 +1300,7 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
         }
 
         // ── SECTION 8: REBALANCING PLAN ───────────────────────────────────────
-        if (rebalancingRows.length > 0) {
+        if (rebalancingRows.length > 0 && sec("rebalancing")) {
           sectionDivider("Rebalancing Plan");
 
           autoTable(doc, {
@@ -1234,7 +1344,7 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
         }
 
         // ── SECTION 9: TAX SUMMARY (yearly only) ─────────────────────────────
-        if (periodType === "year") {
+        if (periodType === "year" && sec("tax")) {
           sectionDivider("Tax Summary");
 
           if (realisedGains.length > 0) {
@@ -1317,7 +1427,7 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
       }
 
       // ══ AI INSIGHTS ════════════════════════════════════════════════════════
-      if (insightData?.insight) {
+      if (insightData?.insight && sec("ai")) {
         sectionDivider("AI Portfolio Insights");
 
         doc.setFontSize(9);
@@ -1392,13 +1502,15 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
     }
   }
 
+  const checkedCount = availableSections.filter(s => selectedSections.has(s.id)).length;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Export Portfolio Report</DialogTitle>
           <DialogDescription>
-            Choose a period and download a structured investor-grade PDF report.
+            Choose a period and select which chapters to include in the PDF.
           </DialogDescription>
         </DialogHeader>
 
@@ -1465,18 +1577,61 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
             </div>
           </div>
 
-          <div className="text-xs text-muted-foreground space-y-1">
-            <p>
-              Generating a <span className="font-medium text-foreground">{periodType === "month" ? "monthly" : periodType === "quarter" ? "quarterly" : "annual"}</span>{" "}
-              report for{" "}
-              <span className="font-medium text-foreground">{getPeriodLabel()}</span>.
-            </p>
-            <p>
-              {periodType === "month"
-                ? "Includes: Executive Summary, Performance, Cashflow, Allocation, Holdings, AI Insights."
-                : periodType === "quarter"
-                ? "Includes: Monthly sections + Risk & Stability, Dividends, Rebalancing Plan."
-                : "Includes: All quarterly sections + Tax Summary (realised & unrealised gains)."}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Chapters</Label>
+              <div className="flex items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={selectAll}
+                  className="text-primary underline-offset-2 hover:underline"
+                  data-testid="button-select-all-sections"
+                >
+                  Select all
+                </button>
+                <span className="text-muted-foreground">·</span>
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="text-muted-foreground underline-offset-2 hover:underline"
+                  data-testid="button-clear-all-sections"
+                >
+                  Clear all
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto max-h-48 rounded-md border divide-y">
+              {availableSections.map((section) => (
+                <label
+                  key={section.id}
+                  className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors"
+                  data-testid={`section-row-${section.id}`}
+                >
+                  <Checkbox
+                    id={`section-${section.id}`}
+                    checked={selectedSections.has(section.id)}
+                    onCheckedChange={() => toggleSection(section.id)}
+                    data-testid={`checkbox-section-${section.id}`}
+                  />
+                  <span className="flex-1 text-sm">{section.label}</span>
+                  {section.availableFor.length === 1 && section.availableFor[0] === "year" && (
+                    <Badge variant="secondary" className="text-xs shrink-0">Annual only</Badge>
+                  )}
+                  {section.availableFor.length === 2 && (
+                    <Badge variant="secondary" className="text-xs shrink-0">Q + Annual</Badge>
+                  )}
+                </label>
+              ))}
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              {checkedCount === 0
+                ? "No chapters selected — PDF will contain only the cover page."
+                : checkedCount === availableSections.length
+                ? `All ${checkedCount} chapters selected.`
+                : `${checkedCount} of ${availableSections.length} chapters selected: ${availableSections.filter(s => selectedSections.has(s.id)).map(s => s.label).join(", ")}.`
+              }
             </p>
           </div>
         </div>
