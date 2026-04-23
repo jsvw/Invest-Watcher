@@ -71,6 +71,8 @@
     "imap": "^0.8.19",
     "imapflow": "^1.2.8",
     "input-otp": "^1.4.2",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.453.0",
     "mailparser": "^3.9.3",
     "memorystore": "^1.6.7",

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, TrendingUp, Menu, X, LogOut, Settings, Coffee, Plus, AlertTriangle } from "lucide-react";
+import { LayoutDashboard, TrendingUp, Menu, X, LogOut, Settings, Coffee, Plus, AlertTriangle, Download } from "lucide-react";
 import { useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -10,10 +10,12 @@ import { usePlatforms } from "@/hooks/use-platforms";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { AddPlatformDialog } from "@/components/AddPlatformDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ExportReportDialog } from "@/components/ExportReportDialog";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const { user } = useAuth();
   const { data: platforms } = usePlatforms();
 
@@ -218,6 +220,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center justify-between">
               <div className="text-xs text-muted-foreground truncate">{user.email}</div>
               <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setExportOpen(true)}
+                  title="Export report"
+                  data-testid="button-export-report"
+                  className="min-h-[44px] min-w-[44px]"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
                 <Link href="/settings" onClick={closeMobileMenu}>
                   <Button variant="ghost" size="icon" title="Settings" data-testid="button-settings" className="min-h-[44px] min-w-[44px]">
                     <Settings className="h-4 w-4" />
@@ -269,6 +281,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
           onClick={closeMobileMenu}
         />
       )}
+
+      <ExportReportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        currency={user?.currency ?? "EUR"}
+      />
     </div>
   );
 }
