@@ -10,7 +10,7 @@ export interface LandeScrapedData {
   scrapedAt: Date;
 }
 
-const DASHBOARD_URL = "https://lande.finance/dashboard";
+const DASHBOARD_URL = "https://lande.finance/investor";
 
 function parseCookieString(cookieStr: string): Array<{ name: string; value: string; domain: string; path: string }> {
   return cookieStr
