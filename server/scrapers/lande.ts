@@ -102,10 +102,16 @@ export async function scrapeLande(cookies: string): Promise<LandeScrapedData> {
     const diag = await page.evaluate(`(function() {
       var url = window.location.href;
       var balEl = document.querySelector("#total_balance");
-      return { url: url, balanceText: balEl ? balEl.textContent.trim() : null };
-    })()`) as { url: string; balanceText: string | null };
+      var bodyHtml = document.body ? document.body.innerHTML.slice(0, 4000) : "no body";
+      var allIds = Array.from(document.querySelectorAll("[id]")).map(function(el) { return el.id; }).slice(0, 50);
+      var allText = document.body ? document.body.innerText.slice(0, 1000) : "";
+      return { url: url, balanceText: balEl ? balEl.textContent.trim() : null, bodyHtml: bodyHtml, allIds: allIds, allText: allText };
+    })()`) as { url: string; balanceText: string | null; bodyHtml: string; allIds: string[]; allText: string };
     console.log("[Lande Scraper] Page URL:", diag.url);
     console.log("[Lande Scraper] #total_balance text:", diag.balanceText);
+    console.log("[Lande Scraper] All element IDs on page:", JSON.stringify(diag.allIds));
+    console.log("[Lande Scraper] Page text (first 1000):", diag.allText);
+    console.log("[Lande Scraper] Body HTML (first 4000):", diag.bodyHtml);
 
     const totalBalance = await page.evaluate(`(function() {
       var extractNumber = function(text) {
