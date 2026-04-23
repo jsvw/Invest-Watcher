@@ -24,7 +24,6 @@ export async function scrapeMaclear(email: string, password: string): Promise<Ma
         "--disable-gpu",
         "--no-first-run",
         "--disable-extensions",
-        "--disable-background-networking",
         "--disable-default-apps",
         "--disable-sync",
         "--disable-translate",
@@ -45,10 +44,10 @@ export async function scrapeMaclear(email: string, password: string): Promise<Ma
     await page.setExtraHTTPHeaders({ "Accept-Language": "en-US,en;q=0.9" });
 
     console.log("[Maclear Scraper] Navigating to login page...");
-    await page.goto(LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 30000 });
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await page.goto(LOGIN_URL, { waitUntil: "networkidle2", timeout: 60000 });
+    await new Promise(resolve => setTimeout(resolve, 5000));
 
-    // Diagnostic: log what inputs are available on the page
+    // Diagnostic: log what inputs and page text are present after load
     const pageInputs = await page.evaluate(`(function() {
       return Array.from(document.querySelectorAll("input")).map(function(i) {
         return { id: i.id, name: i.name, type: i.type, className: i.className };
@@ -57,12 +56,14 @@ export async function scrapeMaclear(email: string, password: string): Promise<Ma
     console.log("[Maclear Scraper] Inputs found on page:", JSON.stringify(pageInputs));
     console.log("[Maclear Scraper] Current URL:", page.url());
 
-    // Try progressively broader selectors for the email field
     const emailSelector = '#email, input[name="Email"], input[name="email"], input[type="email"]';
     const passSelector = '#pass, input[name="pass"], input[name="password"], input[type="password"]';
 
     console.log("[Maclear Scraper] Waiting for login form...");
-    await page.waitForSelector(emailSelector, { timeout: 20000 });
+    await page.waitForSelector(emailSelector, { timeout: 20000 }).catch(async (err: Error) => {
+      const html = await page.evaluate(`document.body ? document.body.innerHTML.slice(0, 1000) : "no body"`) as string;
+      throw new Error(`Login form not found after waiting. Page HTML: ${html}`);
+    });
 
     console.log("[Maclear Scraper] Filling credentials...");
     const emailInput = await page.$(emailSelector);
