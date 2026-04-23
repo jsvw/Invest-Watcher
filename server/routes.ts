@@ -1736,9 +1736,9 @@ export async function registerRoutes(
                 return d > latest ? d : latest;
               }, new Date(0));
 
-              if (granularity === 'year') {
-                // For year granularity the post-10th data is still within the current year —
-                // no split needed. Just extend the existing year bar to the latest valuation
+              if (granularity === 'year' || granularity === 'quarter') {
+                // For year/quarter granularity the post-10th data is still within the current
+                // period — no split needed. Just extend the existing bar to the latest valuation
                 // and mark it live.
                 const li = sortedPeriods.length - 1;
                 const prevEndDate = li === 0 ? epoch : getPeriodEndDate(sortedPeriods[li - 1]);
@@ -1763,8 +1763,8 @@ export async function registerRoutes(
                   isLive: true,
                 };
               } else {
-                // Month / quarter: split at the 10th — the closed portion stays in the current
-                // period; post-10th gains become a live preview of the next period.
+                // Month only: split at the 10th — the closed portion stays in the current
+                // period; post-10th gains become a live preview of the next month.
                 result.pop();
                 const li = sortedPeriods.length - 1;
                 const prevEndDate = li === 0 ? epoch : getPeriodEndDate(sortedPeriods[li - 1]);
@@ -1791,20 +1791,11 @@ export async function registerRoutes(
                   platformBreakdown: tenthPlatformBreakdown,
                 });
 
-                // Derive next-period key for month / quarter
-                let nextPeriodKey: string;
-                if (granularity === 'quarter') {
-                  const q = Math.ceil(todayM / 3);
-                  if (q === 4) {
-                    nextPeriodKey = `${todayY + 1}-Q1`;
-                  } else {
-                    nextPeriodKey = `${todayY}-Q${q + 1}`;
-                  }
-                } else {
-                  const nextMonth = todayM === 12 ? 1 : todayM + 1;
-                  const nextYear = todayM === 12 ? todayY + 1 : todayY;
-                  nextPeriodKey = `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
-                }
+                // Derive next-period key for month
+                const nextMonth = todayM === 12 ? 1 : todayM + 1;
+                const nextYear = todayM === 12 ? todayY + 1 : todayY;
+                const nextPeriodKey = `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
+
 
                 const latestCloseValue = getPortfolioValueAtDate(latestValDate);
                 const liveNetInvested = getNetInvested(tenthEndOfDay, latestValDate);
