@@ -704,34 +704,37 @@ export function ExportReportDialog({ open, onOpenChange, currency }: ExportRepor
       const divYield = totalPortfolioValue > 0 ? (totalAnnualisedDivs / totalPortfolioValue) * 100 : 0;
 
       // ── Build AI prompt ───────────────────────────────────────────────────
-      const driftSummary = driftRows
-        .filter(r => r.delta !== null && Math.abs(r.delta) > 5)
-        .map(r => `${r.name}: actual ${r.actualWeight.toFixed(1)}% vs target ${r.targetWeight!.toFixed(1)}%`)
-        .slice(0, 3)
-        .join("; ");
+      let insightData: InsightResponse | null = null;
+      if (sec("ai")) {
+        const driftSummary = driftRows
+          .filter(r => r.delta !== null && Math.abs(r.delta) > 5)
+          .map(r => `${r.name}: actual ${r.actualWeight.toFixed(1)}% vs target ${r.targetWeight!.toFixed(1)}%`)
+          .slice(0, 3)
+          .join("; ");
 
-      const aiPrompt = [
-        `You are a financial analyst. Answer the following 4 questions in numbered format for a ${periodType} portfolio report covering ${periodLabel}.`,
-        periodEntry ? `Portfolio data: opened at ${formatCurrency(periodEntry.openValue, currency)}, closed at ${formatCurrency(periodEntry.closeValue, currency)}, value change ${formatCurrency(periodEntry.valueChange, currency)}${periodReturn != null ? ` (${periodReturn.toFixed(2)}%)` : ""}.` : "",
-        `Cashflow: deposits ${formatCurrency(totalDeposits, currency)}, withdrawals ${formatCurrency(totalWithdrawals, currency)}, dividends ${formatCurrency(periodDividends, currency)}.`,
-        bestPlatform ? `Best performer: ${bestPlatform.name} returned ${bestPlatform.gainLossPct.toFixed(2)}% (${formatCurrency(bestPlatform.gainLoss, currency)}).` : "",
-        driftSummary ? `Allocation drift: ${driftSummary}.` : "",
-        "1. What drove portfolio performance this period?",
-        "2. What changed vs the prior period?",
-        "3. What are the main risk changes?",
-        "4. Is rebalancing suggested and why?",
-        "Keep each answer to 2-3 sentences.",
-      ].filter(Boolean).join(" ");
+        const aiPrompt = [
+          `You are a financial analyst. Answer the following 4 questions in numbered format for a ${periodType} portfolio report covering ${periodLabel}.`,
+          periodEntry ? `Portfolio data: opened at ${formatCurrency(periodEntry.openValue, currency)}, closed at ${formatCurrency(periodEntry.closeValue, currency)}, value change ${formatCurrency(periodEntry.valueChange, currency)}${periodReturn != null ? ` (${periodReturn.toFixed(2)}%)` : ""}.` : "",
+          `Cashflow: deposits ${formatCurrency(totalDeposits, currency)}, withdrawals ${formatCurrency(totalWithdrawals, currency)}, dividends ${formatCurrency(periodDividends, currency)}.`,
+          bestPlatform ? `Best performer: ${bestPlatform.name} returned ${bestPlatform.gainLossPct.toFixed(2)}% (${formatCurrency(bestPlatform.gainLoss, currency)}).` : "",
+          driftSummary ? `Allocation drift: ${driftSummary}.` : "",
+          "1. What drove portfolio performance this period?",
+          "2. What changed vs the prior period?",
+          "3. What are the main risk changes?",
+          "4. Is rebalancing suggested and why?",
+          "Keep each answer to 2-3 sentences.",
+        ].filter(Boolean).join(" ");
 
-      const insightRes = await fetch("/api/insights", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: aiPrompt }),
-      }).catch(() => null);
-      const insightData: InsightResponse | null = insightRes?.ok
-        ? await insightRes.json().catch(() => null)
-        : null;
+        const insightRes = await fetch("/api/insights", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: aiPrompt }),
+        }).catch(() => null);
+        insightData = insightRes?.ok
+          ? await insightRes.json().catch(() => null)
+          : null;
+      }
 
       // ── PDF generation ────────────────────────────────────────────────────
       const { jsPDF } = await import("jspdf");
