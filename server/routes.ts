@@ -2389,6 +2389,74 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/platforms/:platformId/stock-chart', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.platformId);
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+
+      const config = await storage.getScraperConfig(platformId, userId);
+      if (!config || config.scraperType !== "stock_ticker") {
+        return res.status(404).json({ message: "No stock ticker config found" });
+      }
+
+      let creds;
+      try {
+        const decrypted = decrypt(config.credentials);
+        creds = JSON.parse(decrypted);
+      } catch {
+        try { creds = JSON.parse(config.credentials); } catch {
+          return res.status(500).json({ message: "Failed to decrypt credentials" });
+        }
+      }
+
+      const ticker = creds.ticker;
+      if (!ticker) return res.status(400).json({ message: "No ticker configured" });
+
+      const rangeParam = (req.query.range as string) || "1y";
+      const rangeMap: Record<string, { range: string; interval: string }> = {
+        "1m": { range: "1mo", interval: "1d" },
+        "3m": { range: "3mo", interval: "1d" },
+        "6m": { range: "6mo", interval: "1d" },
+        "1y": { range: "1y", interval: "1d" },
+        "5y": { range: "5y", interval: "1wk" },
+      };
+      const yfParams = rangeMap[rangeParam] || rangeMap["1y"];
+
+      const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${yfParams.interval}&range=${yfParams.range}`;
+      const yfRes = await fetch(yfUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      });
+
+      if (!yfRes.ok) {
+        return res.status(502).json({ message: `Yahoo Finance returned ${yfRes.status} for ${ticker}` });
+      }
+
+      const yfData = await yfRes.json() as any;
+      const chart = yfData?.chart?.result?.[0];
+      if (!chart) {
+        return res.status(502).json({ message: `No chart data found for ticker ${ticker}` });
+      }
+
+      const timestamps: number[] = chart.timestamp || [];
+      const closes: (number | null)[] = chart.indicators?.quote?.[0]?.close || [];
+
+      const points: { date: string; price: number }[] = [];
+      for (let i = 0; i < timestamps.length; i++) {
+        const price = closes[i];
+        if (price == null || isNaN(price)) continue;
+        const date = new Date(timestamps[i] * 1000).toISOString().slice(0, 10);
+        points.push({ date, price });
+      }
+
+      res.json({ points, currency: chart.meta?.currency || "USD" });
+    } catch (err: any) {
+      console.error("Stock chart error:", err.message);
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   function fmtValDiff(newVal: number, prevValNum: number | null, sym: string): string {
     if (prevValNum === null) return "";
     const diff = newVal - prevValNum;

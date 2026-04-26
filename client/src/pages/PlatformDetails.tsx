@@ -21,7 +21,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { format, formatDistanceToNow } from "date-fns";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend, BarChart, Bar, Cell } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LineChart, Line, Legend, BarChart, Bar, Cell, ReferenceLine } from "recharts";
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -371,6 +371,20 @@ export default function PlatformDetails() {
       const res = await fetch(`/api/platforms/${id}/stock-info`, { credentials: 'include' });
       if (!res.ok) return null;
       return res.json();
+    },
+    enabled: isStockTicker,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+
+  const [stockChartRange, setStockChartRange] = useState<string>("1y");
+
+  const { data: stockChartData, isLoading: isStockChartLoading, error: stockChartError } = useQuery({
+    queryKey: ['/api/platforms', id, 'stock-chart', stockChartRange],
+    queryFn: async () => {
+      const res = await fetch(`/api/platforms/${id}/stock-chart?range=${stockChartRange}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to load price history');
+      return res.json() as Promise<{ points: { date: string; price: number }[]; currency: string }>;
     },
     enabled: isStockTicker,
     staleTime: 5 * 60 * 1000,
@@ -1226,6 +1240,121 @@ export default function PlatformDetails() {
                 </div>
               ) : (
                 <p className="text-muted-foreground text-sm">Could not load stock data. Configure the stock ticker scraper to get started.</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Stock Price History Chart */}
+        {isStockTicker && (
+          <Card data-testid="card-stock-price-history">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-wrap">
+              <div>
+                <CardTitle>Stock Price History</CardTitle>
+                <CardDescription>
+                  Historical share price{stockChartData?.currency ? ` (${stockChartData.currency})` : ''}
+                </CardDescription>
+              </div>
+              <div className="flex gap-1" data-testid="stock-chart-range-toggle">
+                {(['1m', '3m', '6m', '1y', '5y'] as const).map((r) => (
+                  <button
+                    key={r}
+                    data-testid={`button-range-${r}`}
+                    onClick={() => setStockChartRange(r)}
+                    className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                      stockChartRange === r
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    }`}
+                  >
+                    {r.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {isStockChartLoading ? (
+                <div className="flex items-center justify-center h-48" data-testid="stock-chart-loading">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : stockChartError ? (
+                <div className="flex items-center justify-center h-48 text-muted-foreground text-sm" data-testid="stock-chart-error">
+                  Price history unavailable for this stock.
+                </div>
+              ) : !stockChartData || stockChartData.points.length === 0 ? (
+                <div className="flex items-center justify-center h-48 text-muted-foreground text-sm" data-testid="stock-chart-empty">
+                  No price data available for this range.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <AreaChart data={stockChartData.points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                    <defs>
+                      <linearGradient id="stockPriceGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v: string) => {
+                        const d = new Date(v);
+                        return stockChartRange === '5y'
+                          ? d.getFullYear().toString()
+                          : `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}`;
+                      }}
+                      interval="preserveStartEnd"
+                      minTickGap={40}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11 }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v: number) =>
+                        stockChartData.currency
+                          ? `${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : v.toFixed(2)
+                      }
+                      width={70}
+                      domain={['auto', 'auto']}
+                    />
+                    <Tooltip
+                      formatter={(value: number) => [
+                        `${stockChartData.currency ? stockChartData.currency + ' ' : ''}${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                        'Price',
+                      ]}
+                      labelFormatter={(label: string) => new Date(label).toLocaleDateString()}
+                      contentStyle={{ fontSize: 12 }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="price"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      fill="url(#stockPriceGradient)"
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                    {stockInfo?.averagePrice != null && (
+                      <ReferenceLine
+                        y={stockInfo.averagePrice}
+                        stroke="hsl(var(--muted-foreground))"
+                        strokeDasharray="6 3"
+                        strokeWidth={1.5}
+                        label={{
+                          value: `Avg ${stockChartData.currency ?? ''} ${stockInfo.averagePrice.toFixed(2)}`,
+                          position: 'insideTopRight',
+                          fontSize: 11,
+                          fill: 'hsl(var(--muted-foreground))',
+                        }}
+                        data-testid="stock-chart-avg-reference"
+                      />
+                    )}
+                  </AreaChart>
+                </ResponsiveContainer>
               )}
             </CardContent>
           </Card>
