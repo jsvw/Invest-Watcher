@@ -293,6 +293,7 @@ export default function PlatformDetails() {
           )}
         </div>
         {payload.map((entry: any) => {
+          const isStockPrice = entry.dataKey === 'price';
           const deltaKey = entry.dataKey === 'value' ? 'valueChange'
             : entry.dataKey === 'invested' ? 'investedChange'
             : entry.dataKey === 'gain' ? 'gainChange'
@@ -310,9 +311,11 @@ export default function PlatformDetails() {
               </div>
               <div className="text-right">
                 <span className="font-semibold text-foreground">
-                  {entry.dataKey === 'monthlyChange' || entry.dataKey === 'gain'
-                    ? `${entry.value >= 0 ? '+' : ''}${formatCurrency(entry.value, currency)}`
-                    : formatCurrency(entry.value, currency)}
+                  {isStockPrice
+                    ? entry.value.toFixed(2)
+                    : entry.dataKey === 'monthlyChange' || entry.dataKey === 'gain'
+                      ? `${entry.value >= 0 ? '+' : ''}${formatCurrency(entry.value, currency)}`
+                      : formatCurrency(entry.value, currency)}
                 </span>
                 {delta != null && delta !== 0 && (
                   <span className={cn("ml-2 text-xs font-medium", delta >= 0 ? "text-emerald-500" : "text-rose-500")}>

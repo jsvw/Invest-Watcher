@@ -2442,8 +2442,13 @@ export async function registerRoutes(
             continue;
           }
           const candidate = await yfRes.json() as any;
-          const timestamps = candidate?.chart?.result?.[0]?.timestamp || [];
-          console.log(`[StockChart] ${host} → ${timestamps.length} timestamps for ${ticker}`);
+          const resultArr = candidate?.chart?.result;
+          const timestamps = resultArr?.[0]?.timestamp || [];
+          console.log(`[StockChart] ${host} → resultCount=${resultArr?.length ?? 0} timestamps=${timestamps.length} error=${candidate?.chart?.error ?? null} for ${ticker}`);
+          if (timestamps.length === 0 && resultArr?.length) {
+            const meta = resultArr[0]?.meta;
+            console.log(`[StockChart] ${host} empty timestamps — meta.symbol=${meta?.symbol} meta.currency=${meta?.currency} meta.exchangeName=${meta?.exchangeName}`);
+          }
           if (timestamps.length > 0) { yfData = candidate; break; }
         } catch (e: any) {
           console.log(`[StockChart] ${host} fetch error for ${ticker}: ${e.message}`);
@@ -2463,13 +2468,18 @@ export async function registerRoutes(
         points.push({ date, price });
       }
 
-      // Fall back to DB valuations if Yahoo Finance returned nothing
+      // Fall back to DB valuations if Yahoo Finance returned nothing — apply same range filter
       if (points.length === 0) {
-        console.log(`[StockChart] No Yahoo Finance data for ${ticker}, falling back to DB valuations`);
+        console.log(`[StockChart] No Yahoo Finance data for ${ticker}, falling back to DB valuations (range=${rangeParam})`);
+        const rangeMonthsMap: Record<string, number> = { "1m": 1, "3m": 3, "6m": 6, "1y": 12, "5y": 60 };
+        const monthsBack = rangeMonthsMap[rangeParam] ?? 12;
+        const cutoff = new Date();
+        cutoff.setMonth(cutoff.getMonth() - monthsBack);
+        const cutoffStr = cutoff.toISOString().slice(0, 10);
         const valuations = await storage.getValuations(platformId);
         const fallbackPoints = (valuations as any[])
           .map(v => ({ date: String(v.date).slice(0, 10), price: Number(v.value) }))
-          .filter(p => !isNaN(p.price))
+          .filter(p => !isNaN(p.price) && p.date >= cutoffStr)
           .sort((a, b) => a.date.localeCompare(b.date));
         return res.json({ points: fallbackPoints, currency: chartCurrency, fallback: true });
       }
