@@ -101,7 +101,7 @@ export function AddTransactionDialog({ platformId, type, initialData, mode = "ad
     const onSuccess = () => {
       setOpen(false);
       if (!isEdit) {
-        form.reset({ ...data, amount: 0, bonusAmount: 0, value: 0, currentValue: 0, notes: "" });
+        form.reset({ ...data, amount: 0, bonusAmount: 0, value: 0, currentValue: 0, notes: "", isPending: false });
       }
     };
     
