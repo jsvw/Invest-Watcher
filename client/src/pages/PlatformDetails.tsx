@@ -344,6 +344,7 @@ export default function PlatformDetails() {
   const deleteValuation = useDeleteValuation();
   const deleteInvestment = useDeleteInvestment();
   const confirmInvestment = useConfirmInvestment();
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const deleteWithdrawal = useDeleteWithdrawal();
   const { data: withdrawals, isLoading: isWithdrawalsLoading } = useWithdrawals(id);
   
@@ -1947,12 +1948,15 @@ export default function PlatformDetails() {
                                 variant="ghost"
                                 size="icon"
                                 className="text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
-                                onClick={() => confirmInvestment.mutate({ id: item.id, platformId: id })}
-                                disabled={confirmInvestment.isPending}
+                                onClick={() => {
+                                  setConfirmingId(item.id);
+                                  confirmInvestment.mutate({ id: item.id, platformId: id }, { onSettled: () => setConfirmingId(null) });
+                                }}
+                                disabled={confirmingId === item.id}
                                 title="Confirm deposit (mark as settled)"
                                 data-testid={`button-confirm-investment-${item.id}`}
                               >
-                                {confirmInvestment.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                                {confirmingId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
                               </Button>
                             )}
                             <Button
