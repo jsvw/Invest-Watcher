@@ -1862,26 +1862,24 @@ export default function PlatformDetails() {
                         {showAllPoints ? "Monthly view" : "All data points"}
                       </Button>
                       {isStockTicker && (
-                        <>
-                          <Button
-                            variant={showStockOverlay ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setShowStockOverlay(v => !v)}
-                            className="text-xs gap-1.5"
-                            data-testid="button-toggle-stock-overlay"
-                          >
-                            <TrendingUp className="h-3.5 w-3.5" />
-                            Stock price
-                          </Button>
-                          {showStockOverlay && stockChartData?.fallback && stockChartData.points.length === 0 && (
-                            <span className="text-xs text-muted-foreground italic" data-testid="text-stock-price-unavailable">
-                              Historical price data temporarily unavailable
-                            </span>
-                          )}
-                        </>
+                        <Button
+                          variant={showStockOverlay ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setShowStockOverlay(v => !v)}
+                          className="text-xs gap-1.5"
+                          data-testid="button-toggle-stock-overlay"
+                        >
+                          <TrendingUp className="h-3.5 w-3.5" />
+                          Stock price
+                        </Button>
                       )}
                     </div>
                   </div>
+                  {isStockTicker && showStockOverlay && stockChartData?.fallback && stockChartData.points.length === 0 && (
+                    <p className="text-xs text-muted-foreground italic mb-2" data-testid="text-stock-price-unavailable">
+                      Historical price data temporarily unavailable
+                    </p>
+                  )}
                   <div className="h-[260px] sm:h-[400px] w-full">
                     {isRangeStale ? (
                       <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
