@@ -386,7 +386,7 @@ export default function PlatformDetails() {
     queryFn: async () => {
       const res = await fetch(`/api/platforms/${id}/stock-chart?range=5y`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to load price history');
-      return res.json() as Promise<{ points: { date: string; price: number }[]; currency: string }>;
+      return res.json() as Promise<{ points: { date: string; price: number }[]; currency: string; fallback?: boolean }>;
     },
     enabled: isStockTicker,
     staleTime: 5 * 60 * 1000,
@@ -1862,16 +1862,23 @@ export default function PlatformDetails() {
                         {showAllPoints ? "Monthly view" : "All data points"}
                       </Button>
                       {isStockTicker && (
-                        <Button
-                          variant={showStockOverlay ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setShowStockOverlay(v => !v)}
-                          className="text-xs gap-1.5"
-                          data-testid="button-toggle-stock-overlay"
-                        >
-                          <TrendingUp className="h-3.5 w-3.5" />
-                          Stock price
-                        </Button>
+                        <>
+                          <Button
+                            variant={showStockOverlay ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setShowStockOverlay(v => !v)}
+                            className="text-xs gap-1.5"
+                            data-testid="button-toggle-stock-overlay"
+                          >
+                            <TrendingUp className="h-3.5 w-3.5" />
+                            Stock price
+                          </Button>
+                          {showStockOverlay && stockChartData?.fallback && stockChartData.points.length === 0 && (
+                            <span className="text-xs text-muted-foreground italic" data-testid="text-stock-price-unavailable">
+                              Historical price data temporarily unavailable
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>

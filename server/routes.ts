@@ -2468,20 +2468,52 @@ export async function registerRoutes(
         points.push({ date, price });
       }
 
-      // Fall back to DB valuations if Yahoo Finance returned nothing — apply same range filter
+      // Fall back to FMP historical prices if Yahoo Finance returned nothing
       if (points.length === 0) {
-        console.log(`[StockChart] No Yahoo Finance data for ${ticker}, falling back to DB valuations (range=${rangeParam})`);
-        const rangeMonthsMap: Record<string, number> = { "1m": 1, "3m": 3, "6m": 6, "1y": 12, "5y": 60 };
-        const monthsBack = rangeMonthsMap[rangeParam] ?? 12;
-        const cutoff = new Date();
-        cutoff.setMonth(cutoff.getMonth() - monthsBack);
-        const cutoffStr = cutoff.toISOString().slice(0, 10);
-        const valuations = await storage.getValuations(platformId);
-        const fallbackPoints = (valuations as any[])
-          .map(v => ({ date: new Date(v.date).toISOString().slice(0, 10), price: Number(v.value) }))
-          .filter(p => !isNaN(p.price) && p.date >= cutoffStr)
-          .sort((a, b) => a.date.localeCompare(b.date));
-        return res.json({ points: fallbackPoints, currency: chartCurrency, fallback: true });
+        const fmpKey = process.env.FMP_API_KEY;
+        if (fmpKey) {
+          try {
+            const rangeMonthsMap: Record<string, number> = { "1m": 1, "3m": 3, "6m": 6, "1y": 12, "5y": 60 };
+            const monthsBack = rangeMonthsMap[rangeParam] ?? 12;
+            const toDate = new Date().toISOString().slice(0, 10);
+            const fromDate = new Date(Date.now() - monthsBack * 30.5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+            // Try stable endpoint first, then v3 as fallback
+            const fmpUrls = [
+              `https://financialmodelingprep.com/stable/historical-price-eod/full/${encodeURIComponent(ticker)}?from=${fromDate}&to=${toDate}&apikey=${fmpKey}`,
+              `https://financialmodelingprep.com/api/v3/historical-price-full/${encodeURIComponent(ticker)}?from=${fromDate}&to=${toDate}&apikey=${fmpKey}`,
+            ];
+            let fmpPoints: { date: string; price: number }[] = [];
+            let fmpCurrency = chartCurrency || "USD";
+            for (const fmpUrl of fmpUrls) {
+              console.log(`[StockChart] Trying FMP for ${ticker} (range=${rangeParam}): ${fmpUrl.split('?')[0]}`);
+              const fmpRes = await fetch(fmpUrl);
+              if (!fmpRes.ok) {
+                console.log(`[StockChart] FMP HTTP ${fmpRes.status} for ${ticker} at ${fmpUrl.split('?')[0]}`);
+                continue;
+              }
+              const fmpData = await fmpRes.json() as any;
+              // stable endpoint: array of { date, close }; v3: { historical: [...] }
+              const rawHistorical: { date: string; close?: number; adjClose?: number }[] =
+                Array.isArray(fmpData) ? fmpData : (fmpData?.historical || []);
+              fmpCurrency = fmpData?.currency || chartCurrency || "USD";
+              fmpPoints = rawHistorical
+                .filter(h => (h.close ?? h.adjClose) != null && !isNaN((h.close ?? h.adjClose)!))
+                .map(h => ({ date: h.date, price: h.close ?? h.adjClose! }))
+                .sort((a, b) => a.date.localeCompare(b.date));
+              if (fmpPoints.length > 0) {
+                console.log(`[StockChart] FMP returned ${fmpPoints.length} points for ${ticker}`);
+                break;
+              }
+            }
+            if (fmpPoints.length > 0) {
+              return res.json({ points: fmpPoints, currency: fmpCurrency, fallback: true });
+            }
+          } catch (e: any) {
+            console.log(`[StockChart] FMP fetch error for ${ticker}: ${e.message}`);
+          }
+        }
+        console.log(`[StockChart] No price data available for ${ticker}, returning empty`);
+        return res.json({ points: [], currency: chartCurrency, fallback: true });
       }
 
       res.json({ points, currency: chartCurrency });
