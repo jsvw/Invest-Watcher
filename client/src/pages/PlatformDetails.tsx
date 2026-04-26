@@ -381,12 +381,10 @@ export default function PlatformDetails() {
     retry: false,
   });
 
-  const [stockChartRange, setStockChartRange] = useState<string>("1y");
-
   const { data: stockChartData, isLoading: isStockChartLoading, error: stockChartError } = useQuery({
-    queryKey: ['/api/platforms', id, 'stock-chart', stockChartRange],
+    queryKey: ['/api/platforms', id, 'stock-chart'],
     queryFn: async () => {
-      const res = await fetch(`/api/platforms/${id}/stock-chart?range=${stockChartRange}`, { credentials: 'include' });
+      const res = await fetch(`/api/platforms/${id}/stock-chart?range=5y`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to load price history');
       return res.json() as Promise<{ points: { date: string; price: number }[]; currency: string }>;
     },
@@ -936,14 +934,20 @@ export default function PlatformDetails() {
     }));
   }, [platAggregatedData, stockChartData, chartAggregation]);
 
-  // Merge stock prices into the non-aggregated chart data (union of all dates)
+  // Merge stock prices into the non-aggregated chart data.
+  // Only stock dates within the valuation date range are included — no new rows added outside it.
   const mergedChartDataWithStockPrice = useMemo(() => {
     if (!baseChartData || !stockChartData?.points.length) return baseChartData;
-    const priceMap = new Map(stockChartData.points.map(p => [p.date, p.price]));
+    const minDate = baseChartData[0]?.date as string | undefined;
+    const maxDate = baseChartData[baseChartData.length - 1]?.date as string | undefined;
+    const clippedPoints = stockChartData.points.filter(
+      p => (!minDate || p.date >= minDate) && (!maxDate || p.date <= maxDate)
+    );
+    const priceMap = new Map(clippedPoints.map(p => [p.date, p.price]));
     const valuationMap = new Map(baseChartData.map((h: any) => [h.date, h]));
     const allDates = new Set([
       ...Array.from(valuationMap.keys()),
-      ...stockChartData.points.map(p => p.date),
+      ...clippedPoints.map(p => p.date),
     ]);
     return Array.from(allDates).sort().map(date => ({
       ...(valuationMap.get(date) || { date, timestamp: new Date(date).getTime() }),
@@ -1870,20 +1874,6 @@ export default function PlatformDetails() {
                           <TrendingUp className="h-3.5 w-3.5" />
                           Stock price
                         </Button>
-                      )}
-                      {isStockTicker && showStockOverlay && (
-                        <div className="flex items-center gap-1 border rounded-md overflow-hidden text-xs font-medium" data-testid="stock-chart-range-toggle">
-                          {(['1m', '3m', '6m', '1y', '5y'] as const).map((r) => (
-                            <button
-                              key={r}
-                              onClick={() => setStockChartRange(r)}
-                              className={cn("px-2 py-1.5 transition-colors", stockChartRange === r ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
-                              data-testid={`button-stock-range-${r}`}
-                            >
-                              {r.toUpperCase()}
-                            </button>
-                          ))}
-                        </div>
                       )}
                     </div>
                   </div>
