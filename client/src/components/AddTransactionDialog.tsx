@@ -23,6 +23,7 @@ const investmentFormSchema = insertInvestmentSchema.extend({
   amount: z.coerce.number().min(0.01, "Amount must be greater than 0"),
   bonusAmount: z.coerce.number().min(0).optional(),
   date: z.coerce.date().transform(d => d.toISOString().split('T')[0]),
+  currentValue: z.coerce.number().min(0, "Current value cannot be negative").optional(),
 });
 
 const withdrawalFormSchema = insertWithdrawalSchema.extend({
@@ -77,7 +78,7 @@ export function AddTransactionDialog({ platformId, type, initialData, mode = "ad
       amount: 0,
       bonusAmount: 0,
       value: 0,
-      currentValue: 0,
+      currentValue: undefined,
       date: new Date().toISOString().split('T')[0],
       notes: "",
     },
@@ -101,7 +102,7 @@ export function AddTransactionDialog({ platformId, type, initialData, mode = "ad
     const onSuccess = () => {
       setOpen(false);
       if (!isEdit) {
-        form.reset({ ...data, amount: 0, bonusAmount: 0, value: 0, currentValue: 0, notes: "", isPending: false });
+        form.reset({ ...data, amount: 0, bonusAmount: 0, value: 0, currentValue: undefined, notes: "", isPending: false });
       }
     };
     
@@ -109,7 +110,19 @@ export function AddTransactionDialog({ platformId, type, initialData, mode = "ad
       if (isEdit) {
         updateInvestment.mutate({ id: initialData.id, ...payload }, { onSuccess });
       } else {
-        createInvestment.mutate(payload, { onSuccess });
+        const investmentCurrentValue = data.currentValue && data.currentValue > 0 ? data.currentValue : null;
+        createInvestment.mutate(payload, {
+          onSuccess: () => {
+            if (investmentCurrentValue) {
+              createValuation.mutate(
+                { platformId, date: data.date, value: String(investmentCurrentValue) },
+                { onSuccess }
+              );
+            } else {
+              onSuccess();
+            }
+          },
+        });
       }
     } else if (isWithdrawal) {
       if (isEdit) {
@@ -203,6 +216,25 @@ export function AddTransactionDialog({ platformId, type, initialData, mode = "ad
                 placeholder="e.g. 50"
                 data-testid="input-bonus-amount"
               />
+            </div>
+          )}
+
+          {isInvestment && !isEdit && (
+            <div className="space-y-2">
+              <Label htmlFor="investmentCurrentValue">Updated Platform Value (Optional)</Label>
+              <Input 
+                id="investmentCurrentValue"
+                type="number" 
+                step="0.01"
+                {...form.register("currentValue")} 
+                placeholder="e.g. 10500.00"
+                data-testid="input-investment-current-value"
+              />
+              {form.formState.errors.currentValue && (
+                <p className="text-sm text-destructive">
+                  {String(form.formState.errors.currentValue?.message)}
+                </p>
+              )}
             </div>
           )}
 
