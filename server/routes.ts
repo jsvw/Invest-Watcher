@@ -1702,6 +1702,15 @@ export async function registerRoutes(
         return inv - wd;
       };
 
+      // Pending deposit supplement: for any investment marked isPending whose date is on or before
+      // endDate, temporarily add its amount to the closing portfolio value. This keeps valueChange
+      // neutral (zero) while the platform balance hasn't caught up yet.
+      const getPendingSupplement = (endDate: Date, platformId?: number): number => {
+        return filteredInvestments
+          .filter(i => (i as any).isPending === true && new Date(i.date) <= endDate && (platformId === undefined || i.platformId === platformId))
+          .reduce((s, i) => s + Number(i.amount), 0);
+      };
+
       // Get per-platform net invested for period
       const getPlatformNetInvested = (platformId: number, startDate: Date, endDate: Date): number => {
         const inv = filteredInvestments
@@ -1738,14 +1747,14 @@ export async function registerRoutes(
         }
 
         const openValue = i === 0 ? 0 : getPortfolioValueAtDate(prevEndDate);
-        const closeValue = getPortfolioValueAtDate(endDate);
+        const closeValue = getPortfolioValueAtDate(endDate) + getPendingSupplement(endDate);
         const netInvested = getNetInvested(prevEndDate, endDate);
         const valueChange = closeValue - openValue - netInvested;
 
         const platformBreakdown = filteredPlatforms.map(p => {
           const pNetInvested = getPlatformNetInvested(p.id, prevEndDate, endDate);
           const pOpenValue = i === 0 ? 0 : getPlatformValueAtDate(p.id, prevEndDate);
-          const pCloseValue = getPlatformValueAtDate(p.id, endDate);
+          const pCloseValue = getPlatformValueAtDate(p.id, endDate) + getPendingSupplement(endDate, p.id);
           const pValueChange = pCloseValue - pOpenValue - pNetInvested;
           return {
             platformId: p.id,
@@ -1789,14 +1798,14 @@ export async function registerRoutes(
                 // and mark it live.
                 const li = sortedPeriods.length - 1;
                 const prevEndDate = li === 0 ? epoch : getPeriodEndDate(sortedPeriods[li - 1]);
-                const liveCloseValue = getPortfolioValueAtDate(latestValDate);
+                const liveCloseValue = getPortfolioValueAtDate(latestValDate) + getPendingSupplement(latestValDate);
                 const liveOpenValue = li === 0 ? 0 : getPortfolioValueAtDate(prevEndDate);
                 const liveNetInvested = getNetInvested(prevEndDate, latestValDate);
                 const liveValueChange = liveCloseValue - liveOpenValue - liveNetInvested;
                 const livePlatformBreakdown = filteredPlatforms.map(p => {
                   const pNetInvested = getPlatformNetInvested(p.id, prevEndDate, latestValDate);
                   const pOpenValue = li === 0 ? 0 : getPlatformValueAtDate(p.id, prevEndDate);
-                  const pCloseValue = getPlatformValueAtDate(p.id, latestValDate);
+                  const pCloseValue = getPlatformValueAtDate(p.id, latestValDate) + getPendingSupplement(latestValDate, p.id);
                   const pValueChange = pCloseValue - pOpenValue - pNetInvested;
                   return { platformId: p.id, name: p.name, color: p.color, netInvested: pNetInvested, valueChange: pValueChange };
                 }).filter(pb => Math.abs(pb.netInvested) > 0.001 || Math.abs(pb.valueChange) > 0.001);
@@ -1816,7 +1825,7 @@ export async function registerRoutes(
                 const li = sortedPeriods.length - 1;
                 const prevEndDate = li === 0 ? epoch : getPeriodEndDate(sortedPeriods[li - 1]);
 
-                const tenthCloseValue = getPortfolioValueAtDate(tenthEndOfDay);
+                const tenthCloseValue = getPortfolioValueAtDate(tenthEndOfDay) + getPendingSupplement(tenthEndOfDay);
                 const tenthOpenValue = li === 0 ? 0 : getPortfolioValueAtDate(prevEndDate);
                 const tenthNetInvested = getNetInvested(prevEndDate, tenthEndOfDay);
                 const tenthValueChange = tenthCloseValue - tenthOpenValue - tenthNetInvested;
@@ -1824,7 +1833,7 @@ export async function registerRoutes(
                 const tenthPlatformBreakdown = filteredPlatforms.map(p => {
                   const pNetInvested = getPlatformNetInvested(p.id, prevEndDate, tenthEndOfDay);
                   const pOpenValue = li === 0 ? 0 : getPlatformValueAtDate(p.id, prevEndDate);
-                  const pCloseValue = getPlatformValueAtDate(p.id, tenthEndOfDay);
+                  const pCloseValue = getPlatformValueAtDate(p.id, tenthEndOfDay) + getPendingSupplement(tenthEndOfDay, p.id);
                   const pValueChange = pCloseValue - pOpenValue - pNetInvested;
                   return { platformId: p.id, name: p.name, color: p.color, netInvested: pNetInvested, valueChange: pValueChange };
                 }).filter(pb => Math.abs(pb.netInvested) > 0.001 || Math.abs(pb.valueChange) > 0.001);
@@ -1843,15 +1852,14 @@ export async function registerRoutes(
                 const nextYear = todayM === 12 ? todayY + 1 : todayY;
                 const nextPeriodKey = `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
 
-
-                const latestCloseValue = getPortfolioValueAtDate(latestValDate);
+                const latestCloseValue = getPortfolioValueAtDate(latestValDate) + getPendingSupplement(latestValDate);
                 const liveNetInvested = getNetInvested(tenthEndOfDay, latestValDate);
                 const liveValueChange = latestCloseValue - tenthCloseValue - liveNetInvested;
 
                 const livePlatformBreakdown = filteredPlatforms.map(p => {
                   const pNetInvested = getPlatformNetInvested(p.id, tenthEndOfDay, latestValDate);
-                  const pOpenValue = getPlatformValueAtDate(p.id, tenthEndOfDay);
-                  const pCloseValue = getPlatformValueAtDate(p.id, latestValDate);
+                  const pOpenValue = getPlatformValueAtDate(p.id, tenthEndOfDay) + getPendingSupplement(tenthEndOfDay, p.id);
+                  const pCloseValue = getPlatformValueAtDate(p.id, latestValDate) + getPendingSupplement(latestValDate, p.id);
                   const pValueChange = pCloseValue - pOpenValue - pNetInvested;
                   return { platformId: p.id, name: p.name, color: p.color, netInvested: pNetInvested, valueChange: pValueChange };
                 }).filter(pb => Math.abs(pb.netInvested) > 0.001 || Math.abs(pb.valueChange) > 0.001);

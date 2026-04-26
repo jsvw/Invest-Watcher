@@ -1911,10 +1911,15 @@ export default function PlatformDetails() {
                         .map((item) => (
                         <div key={`${item.type}-${item.id}`} className="grid grid-cols-5 p-4 text-sm hover:bg-muted/30 transition-colors items-center" data-testid={`row-${item.type}-${item.id}`}>
                           <div className="text-muted-foreground">{format(new Date(item.date), 'MMM dd, yyyy')}</div>
-                          <div>
+                          <div className="flex items-center gap-1 flex-wrap">
                             <Badge variant={item.type === 'investment' ? 'default' : 'secondary'}>
                               {item.type === 'investment' ? 'Deposit' : 'Withdrawal'}
                             </Badge>
+                            {item.type === 'investment' && (item as any).isPending && (
+                              <Badge variant="outline" className="border-amber-500 text-amber-600 dark:text-amber-400 text-[10px] py-0 h-4" data-testid={`badge-pending-${item.id}`}>
+                                Pending
+                              </Badge>
+                            )}
                           </div>
                           <div className={`font-medium ${item.type === 'withdrawal' ? 'text-red-600' : ''}`}>
                             {item.type === 'withdrawal' ? '-' : ''}{formatCurrency(item.amount, currency)}

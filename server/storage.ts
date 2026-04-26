@@ -59,6 +59,7 @@ export interface IStorage {
   // Investments (require platform ownership verification in routes)
   getInvestments(platformId: number): Promise<Investment[]>;
   getAllInvestmentsForUser(userId: number): Promise<Investment[]>;
+  getPendingInvestmentsForPlatform(platformId: number): Promise<Investment[]>;
   createInvestment(investment: InsertInvestment): Promise<Investment>;
   updateInvestment(id: number, investment: Partial<InsertInvestment>): Promise<Investment>;
   deleteInvestment(id: number): Promise<void>;
@@ -205,6 +206,7 @@ export class DatabaseStorage implements IStorage {
         COALESCE(lv.value, 0) as current_value,
         COALESCE(inv_totals.total_invested, 0) as total_invested,
         COALESCE(wd_totals.total_withdrawn, 0) as total_withdrawn,
+        COALESCE(pending_totals.pending_amount, 0) as pending_amount,
         lv.date as last_valuation_date
       FROM platforms p
       LEFT JOIN LATERAL (
@@ -224,6 +226,12 @@ export class DatabaseStorage implements IStorage {
         FROM withdrawals 
         GROUP BY platform_id
       ) wd_totals ON wd_totals.platform_id = p.id
+      LEFT JOIN (
+        SELECT platform_id, SUM(amount::numeric) as pending_amount 
+        FROM investments 
+        WHERE is_pending = true
+        GROUP BY platform_id
+      ) pending_totals ON pending_totals.platform_id = p.id
       WHERE p.user_id = ${userId}
       ORDER BY p.name
     `);
@@ -247,6 +255,7 @@ export class DatabaseStorage implements IStorage {
         currentValue: Number(row.current_value) || 0,
         totalInvested: totalInvested - totalWithdrawn,
         totalWithdrawn: totalWithdrawn,
+        pendingAmount: Number(row.pending_amount) || 0,
         lastValuationDate: row.last_valuation_date || null,
       };
     });
@@ -259,6 +268,7 @@ export class DatabaseStorage implements IStorage {
         COALESCE(lv.value, 0) as current_value,
         COALESCE(inv_totals.total_invested, 0) as total_invested,
         COALESCE(wd_totals.total_withdrawn, 0) as total_withdrawn,
+        COALESCE(pending_totals.pending_amount, 0) as pending_amount,
         lv.date as last_valuation_date
       FROM platforms p
       LEFT JOIN LATERAL (
@@ -280,6 +290,12 @@ export class DatabaseStorage implements IStorage {
         WHERE platform_id = ${id}
         GROUP BY platform_id
       ) wd_totals ON wd_totals.platform_id = p.id
+      LEFT JOIN (
+        SELECT platform_id, SUM(amount::numeric) as pending_amount 
+        FROM investments 
+        WHERE is_pending = true AND platform_id = ${id}
+        GROUP BY platform_id
+      ) pending_totals ON pending_totals.platform_id = p.id
       WHERE p.id = ${id} AND p.user_id = ${userId}
     `);
 
@@ -304,6 +320,7 @@ export class DatabaseStorage implements IStorage {
       currentValue: Number(row.current_value) || 0,
       totalInvested: totalInvested - totalWithdrawn,
       totalWithdrawn: totalWithdrawn,
+      pendingAmount: Number(row.pending_amount) || 0,
       lastValuationDate: row.last_valuation_date || null,
     };
   }
@@ -366,6 +383,7 @@ export class DatabaseStorage implements IStorage {
       bonusAmount: investments.bonusAmount,
       date: investments.date,
       notes: investments.notes,
+      isPending: investments.isPending,
       createdAt: investments.createdAt,
     })
       .from(investments)
@@ -448,6 +466,12 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(valuations.date));
   }
 
+  async getPendingInvestmentsForPlatform(platformId: number): Promise<Investment[]> {
+    return await db.select().from(investments)
+      .where(and(eq(investments.platformId, platformId), eq(investments.isPending, true)))
+      .orderBy(investments.date); // oldest first
+  }
+
   async createValuation(valuation: InsertValuation): Promise<Valuation> {
     return await db.transaction(async (tx) => {
       const [newValuation] = await tx.insert(valuations).values(valuation).returning();
@@ -462,15 +486,50 @@ export class DatabaseStorage implements IStorage {
         ))
         .orderBy(desc(valuations.date), desc(valuations.id));
 
+      let finalValuation = newValuation;
       if (sameDayValuations.length > 1) {
         const toKeep = sameDayValuations[0];
         for (const v of sameDayValuations.slice(1)) {
           await tx.delete(valuations).where(eq(valuations.id, v.id));
         }
-        return toKeep;
+        finalValuation = toKeep;
       }
 
-      return newValuation;
+      // Auto-confirm pending deposits: compare with the previous valuation for this platform.
+      // If the balance increased by at least the pending deposit amount, mark that deposit confirmed.
+      const previousValuations = await tx.select()
+        .from(valuations)
+        .where(and(
+          eq(valuations.platformId, newValuation.platformId),
+          sql`${valuations.date} < ${newValuation.date}::timestamp`,
+          sql`${valuations.id} != ${finalValuation.id}`
+        ))
+        .orderBy(desc(valuations.date))
+        .limit(1);
+
+      if (previousValuations.length > 0) {
+        const prevValue = Number(previousValuations[0].value);
+        const newValue = Number(finalValuation.value);
+        let remainingIncrease = newValue - prevValue;
+
+        if (remainingIncrease > 0) {
+          const pendingInvs = await tx.select().from(investments)
+            .where(and(eq(investments.platformId, newValuation.platformId), eq(investments.isPending, true)))
+            .orderBy(investments.date); // oldest first
+
+          for (const inv of pendingInvs) {
+            const invAmount = Number(inv.amount);
+            if (remainingIncrease >= invAmount) {
+              await tx.update(investments)
+                .set({ isPending: false })
+                .where(eq(investments.id, inv.id));
+              remainingIncrease -= invAmount;
+            }
+          }
+        }
+      }
+
+      return finalValuation;
     });
   }
 

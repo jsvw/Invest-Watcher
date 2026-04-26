@@ -2548,7 +2548,14 @@ export default function Dashboard() {
                                 </div>
                               </td>
                               <td className="px-4 py-3 text-muted-foreground">{formatCurrency(p.invested, currency)}</td>
-                              <td className="px-4 py-3 font-medium">{formatCurrency(p.current, currency)}</td>
+                              <td className="px-4 py-3 font-medium">
+                                {formatCurrency(p.current, currency)}
+                                {(p as any).pendingAmount > 0 && (
+                                  <div className="text-[10px] font-normal text-amber-600 dark:text-amber-400" data-testid={`text-pending-${p.id}`}>
+                                    +{formatCurrency((p as any).pendingAmount, currency)} pending
+                                  </div>
+                                )}
+                              </td>
                               <td className={cn("px-4 py-3 font-medium", p.pnl >= 0 ? "text-emerald-500" : "text-red-500")}>
                                 {p.pnl >= 0 ? "+" : ""}{formatCurrency(p.pnl, currency)}
                               </td>

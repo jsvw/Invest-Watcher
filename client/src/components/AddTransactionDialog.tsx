@@ -8,7 +8,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useForm } from "react-hook-form";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertInvestmentSchema, insertValuationSchema, insertWithdrawalSchema } from "@shared/schema";
 import { useCreateInvestment, useUpdateInvestment } from "@/hooks/use-investments";
@@ -201,6 +202,26 @@ export function AddTransactionDialog({ platformId, type, initialData, mode = "ad
                 placeholder="e.g. 50"
                 data-testid="input-bonus-amount"
               />
+            </div>
+          )}
+
+          {isInvestment && (
+            <div className="flex items-center gap-3">
+              <Controller
+                control={form.control}
+                name="isPending"
+                render={({ field }) => (
+                  <Checkbox
+                    id="isPending"
+                    checked={!!field.value}
+                    onCheckedChange={field.onChange}
+                    data-testid="checkbox-is-pending"
+                  />
+                )}
+              />
+              <Label htmlFor="isPending" className="cursor-pointer font-normal">
+                Mark as pending (deposit not yet reflected in platform balance)
+              </Label>
             </div>
           )}
 

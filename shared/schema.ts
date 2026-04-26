@@ -40,6 +40,7 @@ export const investments = pgTable("investments", {
   bonusAmount: numeric("bonus_amount"), // Free bonus received on top of investment
   date: timestamp("date").notNull(),
   notes: text("notes"),
+  isPending: boolean("is_pending").notNull().default(false), // True while payment is not yet reflected in platform balance
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -255,6 +256,7 @@ export type PlatformResponse = Platform & {
   currentValue?: number; // Calculated on the fly or fetched from latest valuation
   totalInvested?: number; // Sum of investments minus withdrawals (net invested)
   totalWithdrawn?: number; // Sum of withdrawals
+  pendingAmount?: number; // Sum of deposits still awaiting settlement (isPending=true)
   lastValuationDate?: string | Date | null; // Date of the latest valuation
 };
 
