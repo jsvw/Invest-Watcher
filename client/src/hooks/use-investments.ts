@@ -173,7 +173,7 @@ export function useConfirmDepositWithValuation() {
       platformMode: string;
     }) => {
       let valuationPosted = false;
-      if (newValuation !== undefined && platformMode === "standard") {
+      if (newValuation !== undefined) {
         const res = await fetch(api.valuations.create.path, {
           method: api.valuations.create.method,
           headers: { "Content-Type": "application/json" },

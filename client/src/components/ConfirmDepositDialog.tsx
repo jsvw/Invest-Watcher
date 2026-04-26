@@ -26,7 +26,6 @@ export function ConfirmDepositDialog({
   isPending,
   onConfirm,
 }: ConfirmDepositDialogProps) {
-  const isStandard = item?.platformMode === "standard";
   const suggestedValue = item ? item.currentValue + item.totalAmount : 0;
 
   const form = useForm<{ newValuation: string }>({
@@ -40,13 +39,9 @@ export function ConfirmDepositDialog({
   }, [open, item, form]);
 
   const onSubmit = (data: { newValuation: string }) => {
-    if (isStandard) {
-      const parsed = parseFloat(data.newValuation);
-      if (isNaN(parsed) || parsed < 0) return;
-      onConfirm(parsed);
-    } else {
-      onConfirm(undefined);
-    }
+    const parsed = parseFloat(data.newValuation);
+    if (isNaN(parsed) || parsed < 0) return;
+    onConfirm(parsed);
   };
 
   if (!item) return null;
@@ -86,34 +81,28 @@ export function ConfirmDepositDialog({
         </div>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-1">
-          {isStandard ? (
-            <div className="space-y-2">
-              <Label htmlFor="newValuation">New platform balance after deposit</Label>
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
-                  {getCurrencySymbol(currency)}
-                </span>
-                <Input
-                  id="newValuation"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  className="pl-8"
-                  {...form.register("newValuation", { required: true })}
-                  data-testid="input-new-valuation"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Suggested: {formatCurrency(item.currentValue, currency)} (current) +{" "}
-                {formatCurrency(item.totalAmount, currency)} (deposit) ={" "}
-                <span className="font-medium">{formatCurrency(suggestedValue, currency)}</span>
-              </p>
+          <div className="space-y-2">
+            <Label htmlFor="newValuation">New platform balance after deposit</Label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                {getCurrencySymbol(currency)}
+              </span>
+              <Input
+                id="newValuation"
+                type="number"
+                step="0.01"
+                min="0"
+                className="pl-8"
+                {...form.register("newValuation", { required: true })}
+                data-testid="input-new-valuation"
+              />
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
-              This platform's balance is calculated from individual assets — no separate valuation entry is needed.
+            <p className="text-xs text-muted-foreground">
+              Suggested: {formatCurrency(item.currentValue, currency)} (current) +{" "}
+              {formatCurrency(item.totalAmount, currency)} (deposit) ={" "}
+              <span className="font-medium">{formatCurrency(suggestedValue, currency)}</span>
             </p>
-          )}
+          </div>
 
           <div className="flex justify-end gap-2 pt-1">
             <Button
