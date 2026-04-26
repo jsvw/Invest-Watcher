@@ -258,6 +258,7 @@ export type PlatformResponse = Platform & {
   totalInvested?: number; // Sum of investments minus withdrawals (net invested)
   totalWithdrawn?: number; // Sum of withdrawals
   pendingAmount?: number; // Sum of deposits still awaiting settlement (isPending=true)
+  pendingCount?: number; // Number of deposits still awaiting settlement (isPending=true)
   lastValuationDate?: string | Date | null; // Date of the latest valuation
 };
 

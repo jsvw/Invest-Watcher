@@ -208,6 +208,7 @@ export class DatabaseStorage implements IStorage {
         COALESCE(inv_totals.total_invested, 0) as total_invested,
         COALESCE(wd_totals.total_withdrawn, 0) as total_withdrawn,
         COALESCE(pending_totals.pending_amount, 0) as pending_amount,
+        COALESCE(pending_totals.pending_count, 0) as pending_count,
         lv.date as last_valuation_date
       FROM platforms p
       LEFT JOIN LATERAL (
@@ -228,7 +229,7 @@ export class DatabaseStorage implements IStorage {
         GROUP BY platform_id
       ) wd_totals ON wd_totals.platform_id = p.id
       LEFT JOIN (
-        SELECT platform_id, SUM(amount::numeric) as pending_amount 
+        SELECT platform_id, SUM(amount::numeric) as pending_amount, COUNT(*) as pending_count
         FROM investments 
         WHERE is_pending = true
         GROUP BY platform_id
@@ -258,6 +259,7 @@ export class DatabaseStorage implements IStorage {
         totalInvested: totalInvested - totalWithdrawn,
         totalWithdrawn: totalWithdrawn,
         pendingAmount: Number(row.pending_amount) || 0,
+        pendingCount: Number(row.pending_count) || 0,
         lastValuationDate: row.last_valuation_date || null,
       };
     });
@@ -271,6 +273,7 @@ export class DatabaseStorage implements IStorage {
         COALESCE(inv_totals.total_invested, 0) as total_invested,
         COALESCE(wd_totals.total_withdrawn, 0) as total_withdrawn,
         COALESCE(pending_totals.pending_amount, 0) as pending_amount,
+        COALESCE(pending_totals.pending_count, 0) as pending_count,
         lv.date as last_valuation_date
       FROM platforms p
       LEFT JOIN LATERAL (
@@ -293,7 +296,7 @@ export class DatabaseStorage implements IStorage {
         GROUP BY platform_id
       ) wd_totals ON wd_totals.platform_id = p.id
       LEFT JOIN (
-        SELECT platform_id, SUM(amount::numeric) as pending_amount 
+        SELECT platform_id, SUM(amount::numeric) as pending_amount, COUNT(*) as pending_count
         FROM investments 
         WHERE is_pending = true AND platform_id = ${id}
         GROUP BY platform_id
@@ -324,6 +327,7 @@ export class DatabaseStorage implements IStorage {
       totalInvested: totalInvested - totalWithdrawn,
       totalWithdrawn: totalWithdrawn,
       pendingAmount: Number(row.pending_amount) || 0,
+      pendingCount: Number(row.pending_count) || 0,
       lastValuationDate: row.last_valuation_date || null,
     };
   }

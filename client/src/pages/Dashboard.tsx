@@ -1674,7 +1674,7 @@ export default function Dashboard() {
 
           {/* Pending deposits notice */}
           {(() => {
-            const totalPending = (platforms || []).reduce((s, p) => s + (p.pendingAmount ?? 0), 0);
+            const totalPending = (platforms || []).filter(p => p.allowPendingDeposits).reduce((s, p) => s + (p.pendingAmount ?? 0), 0);
             if (totalPending <= 0) return null;
             const items = pendingInvestments || [];
             // Only make the notice interactive when at least one platform with
@@ -2668,9 +2668,9 @@ export default function Dashboard() {
                               <td className="px-4 py-3 text-muted-foreground">{formatCurrency(p.invested, currency)}</td>
                               <td className="px-4 py-3 font-medium">
                                 {formatCurrency(p.current, currency)}
-                                {(p.pendingAmount ?? 0) > 0 && (
+                                {p.allowPendingDeposits && (p.pendingAmount ?? 0) > 0 && (
                                   <div className="text-[10px] font-normal text-amber-600 dark:text-amber-400" data-testid={`text-pending-${p.id}`}>
-                                    +{formatCurrency(p.pendingAmount!, currency)} pending
+                                    {p.pendingCount ?? 0} pending (+{formatCurrency(p.pendingAmount!, currency)})
                                   </div>
                                 )}
                               </td>
@@ -2726,9 +2726,9 @@ export default function Dashboard() {
                               <div className={cn("text-xs font-medium", gainPct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
                                 {gainPct >= 0 ? '+' : ''}{gainPct.toFixed(2)}%
                               </div>
-                              {(p.pendingAmount ?? 0) > 0 && (
+                              {p.allowPendingDeposits && (p.pendingAmount ?? 0) > 0 && (
                                 <div className="text-[10px] text-amber-600 dark:text-amber-400 font-normal" data-testid={`text-pending-targets-${p.id}`}>
-                                  +{formatCurrency(p.pendingAmount!, currency)} pending
+                                  {p.pendingCount ?? 0} pending (+{formatCurrency(p.pendingAmount!, currency)})
                                 </div>
                               )}
                             </div>
@@ -2809,6 +2809,7 @@ export default function Dashboard() {
             <div className="space-y-1">
               {platforms.map(p => {
                 const excluded = excludedPlatforms.has(p.id);
+                const hasPending = p.allowPendingDeposits && (p.pendingCount ?? 0) > 0;
                 return (
                   <button
                     key={p.id}
@@ -2829,7 +2830,16 @@ export default function Dashboard() {
                     )}
                   >
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: excluded ? "#888" : p.color }} />
-                    <span className="truncate">{p.name}</span>
+                    <span className="truncate flex-1">{p.name}</span>
+                    {hasPending && (
+                      <span
+                        className="flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-white text-[9px] font-bold leading-none shrink-0"
+                        data-testid={`badge-pending-filter-${p.id}`}
+                        title={`${p.pendingCount} pending deposit${(p.pendingCount ?? 0) > 1 ? "s" : ""}`}
+                      >
+                        {p.pendingCount}
+                      </span>
+                    )}
                   </button>
                 );
               })}

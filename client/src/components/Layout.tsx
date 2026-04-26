@@ -165,6 +165,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="grid grid-cols-3 gap-1.5">
               {platforms?.map((p) => {
                 const stale = isPlatformStale(p.lastValuationDate);
+                const hasPending = p.allowPendingDeposits && (p.pendingCount ?? 0) > 0;
                 return (
                   <Tooltip key={p.id}>
                     <TooltipTrigger asChild>
@@ -189,12 +190,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
                               data-testid={`icon-stale-platform-${p.id}`}
                             />
                           )}
+                          {hasPending && (
+                            <span
+                              className={`absolute flex items-center justify-center min-w-[14px] h-3.5 px-0.5 rounded-full bg-amber-500 text-white text-[9px] font-bold leading-none ${stale ? "bottom-0.5 right-0.5" : "top-0.5 right-0.5"}`}
+                              data-testid={`badge-pending-platform-${p.id}`}
+                            >
+                              {p.pendingCount}
+                            </span>
+                          )}
                         </div>
                       </Link>
                     </TooltipTrigger>
                     <TooltipContent side="right">
                       <p className="font-medium">{p.name}</p>
                       {stale && <p className="text-amber-400 text-xs">No valuation in 31+ days</p>}
+                      {hasPending && <p className="text-amber-400 text-xs">{p.pendingCount} pending deposit{(p.pendingCount ?? 0) > 1 ? "s" : ""}</p>}
                     </TooltipContent>
                   </Tooltip>
                 );
