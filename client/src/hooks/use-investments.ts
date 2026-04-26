@@ -100,6 +100,7 @@ export function useUpdateInvestment() {
 
 export function useConfirmInvestment() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   return useMutation({
     mutationFn: async ({ id, platformId }: { id: number; platformId: number }) => {
@@ -116,6 +117,17 @@ export function useConfirmInvestment() {
       queryClient.invalidateQueries({ queryKey: [api.investments.list.path, data.platformId] });
       queryClient.invalidateQueries({ queryKey: [api.platforms.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.platforms.get.path, data.platformId] });
+      toast({
+        title: "Deposit confirmed",
+        description: "The deposit has been marked as settled.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
