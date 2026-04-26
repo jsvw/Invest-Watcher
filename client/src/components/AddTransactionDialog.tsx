@@ -41,9 +41,10 @@ interface Props {
   type: "investment" | "valuation" | "withdrawal";
   initialData?: any;
   mode?: "add" | "edit";
+  showPendingCheckbox?: boolean;
 }
 
-export function AddTransactionDialog({ platformId, type, initialData, mode = "add" }: Props) {
+export function AddTransactionDialog({ platformId, type, initialData, mode = "add", showPendingCheckbox = false }: Props) {
   const [open, setOpen] = useState(false);
   const isInvestment = type === "investment";
   const isWithdrawal = type === "withdrawal";
@@ -205,7 +206,7 @@ export function AddTransactionDialog({ platformId, type, initialData, mode = "ad
             </div>
           )}
 
-          {isInvestment && (
+          {isInvestment && showPendingCheckbox && (
             <div className="flex items-center gap-3">
               <Controller
                 control={form.control}

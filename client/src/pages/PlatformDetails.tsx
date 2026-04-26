@@ -1097,7 +1097,7 @@ export default function PlatformDetails() {
             </div>
             
             <div className="flex gap-2 flex-wrap">
-              <AddTransactionDialog platformId={id} type="investment" />
+              <AddTransactionDialog platformId={id} type="investment" showPendingCheckbox={platformMode === "standard"} />
               <AddTransactionDialog platformId={id} type="withdrawal" />
               <AddTransactionDialog platformId={id} type="valuation" />
               {platformMode !== "standard" && (
@@ -1915,7 +1915,7 @@ export default function PlatformDetails() {
                             <Badge variant={item.type === 'investment' ? 'default' : 'secondary'}>
                               {item.type === 'investment' ? 'Deposit' : 'Withdrawal'}
                             </Badge>
-                            {item.type === 'investment' && (item as any).isPending && (
+                            {item.type === 'investment' && !!(item as { isPending?: boolean | null }).isPending && (
                               <Badge variant="outline" className="border-amber-500 text-amber-600 dark:text-amber-400 text-[10px] py-0 h-4" data-testid={`badge-pending-${item.id}`}>
                                 Pending
                               </Badge>

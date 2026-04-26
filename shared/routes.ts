@@ -54,7 +54,7 @@ export const api = {
       method: 'GET' as const,
       path: '/api/platforms',
       responses: {
-        200: z.array(z.custom<typeof platforms.$inferSelect & { currentValue?: string, totalInvested?: string }>()),
+        200: z.array(z.custom<typeof platforms.$inferSelect & { currentValue?: string, totalInvested?: string, pendingAmount?: number }>()),
       },
     },
     create: {

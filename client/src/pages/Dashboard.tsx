@@ -1664,6 +1664,18 @@ export default function Dashboard() {
             </Card>
           </div>
 
+          {/* Pending deposits notice */}
+          {(() => {
+            const totalPending = (platforms || []).reduce((s, p) => s + (p.pendingAmount ?? 0), 0);
+            if (totalPending <= 0) return null;
+            return (
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-sm" data-testid="notice-pending-total">
+                <span className="font-semibold">{formatCurrency(totalPending, currency)}</span>
+                <span className="text-amber-700 dark:text-amber-400">in pending deposits — not yet reflected in platform balances</span>
+              </div>
+            );
+          })()}
+
           {/* Portfolio Performance Chart */}
           <Card className="shadow-md">
             <CardHeader className="gap-3 pb-4">
@@ -2550,9 +2562,9 @@ export default function Dashboard() {
                               <td className="px-4 py-3 text-muted-foreground">{formatCurrency(p.invested, currency)}</td>
                               <td className="px-4 py-3 font-medium">
                                 {formatCurrency(p.current, currency)}
-                                {(p as any).pendingAmount > 0 && (
+                                {(p.pendingAmount ?? 0) > 0 && (
                                   <div className="text-[10px] font-normal text-amber-600 dark:text-amber-400" data-testid={`text-pending-${p.id}`}>
-                                    +{formatCurrency((p as any).pendingAmount, currency)} pending
+                                    +{formatCurrency(p.pendingAmount!, currency)} pending
                                   </div>
                                 )}
                               </td>
@@ -2608,6 +2620,11 @@ export default function Dashboard() {
                               <div className={cn("text-xs font-medium", gainPct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
                                 {gainPct >= 0 ? '+' : ''}{gainPct.toFixed(2)}%
                               </div>
+                              {(p.pendingAmount ?? 0) > 0 && (
+                                <div className="text-[10px] text-amber-600 dark:text-amber-400 font-normal" data-testid={`text-pending-targets-${p.id}`}>
+                                  +{formatCurrency(p.pendingAmount!, currency)} pending
+                                </div>
+                              )}
                             </div>
                             <div className="text-xs text-muted-foreground min-w-[55px] text-right">
                               {currentPct.toFixed(1)}% alloc

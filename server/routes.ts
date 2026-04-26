@@ -1707,7 +1707,7 @@ export async function registerRoutes(
       // neutral (zero) while the platform balance hasn't caught up yet.
       const getPendingSupplement = (endDate: Date, platformId?: number): number => {
         return filteredInvestments
-          .filter(i => (i as any).isPending === true && new Date(i.date) <= endDate && (platformId === undefined || i.platformId === platformId))
+          .filter(i => i.isPending === true && new Date(i.date) <= endDate && (platformId === undefined || i.platformId === platformId))
           .reduce((s, i) => s + Number(i.amount), 0);
       };
 
@@ -1746,14 +1746,14 @@ export async function registerRoutes(
           prevEndDate = getPeriodEndDate(sortedPeriods[i - 1]);
         }
 
-        const openValue = i === 0 ? 0 : getPortfolioValueAtDate(prevEndDate);
+        const openValue = i === 0 ? 0 : getPortfolioValueAtDate(prevEndDate) + getPendingSupplement(prevEndDate);
         const closeValue = getPortfolioValueAtDate(endDate) + getPendingSupplement(endDate);
         const netInvested = getNetInvested(prevEndDate, endDate);
         const valueChange = closeValue - openValue - netInvested;
 
         const platformBreakdown = filteredPlatforms.map(p => {
           const pNetInvested = getPlatformNetInvested(p.id, prevEndDate, endDate);
-          const pOpenValue = i === 0 ? 0 : getPlatformValueAtDate(p.id, prevEndDate);
+          const pOpenValue = i === 0 ? 0 : getPlatformValueAtDate(p.id, prevEndDate) + getPendingSupplement(prevEndDate, p.id);
           const pCloseValue = getPlatformValueAtDate(p.id, endDate) + getPendingSupplement(endDate, p.id);
           const pValueChange = pCloseValue - pOpenValue - pNetInvested;
           return {
@@ -1799,12 +1799,12 @@ export async function registerRoutes(
                 const li = sortedPeriods.length - 1;
                 const prevEndDate = li === 0 ? epoch : getPeriodEndDate(sortedPeriods[li - 1]);
                 const liveCloseValue = getPortfolioValueAtDate(latestValDate) + getPendingSupplement(latestValDate);
-                const liveOpenValue = li === 0 ? 0 : getPortfolioValueAtDate(prevEndDate);
+                const liveOpenValue = li === 0 ? 0 : getPortfolioValueAtDate(prevEndDate) + getPendingSupplement(prevEndDate);
                 const liveNetInvested = getNetInvested(prevEndDate, latestValDate);
                 const liveValueChange = liveCloseValue - liveOpenValue - liveNetInvested;
                 const livePlatformBreakdown = filteredPlatforms.map(p => {
                   const pNetInvested = getPlatformNetInvested(p.id, prevEndDate, latestValDate);
-                  const pOpenValue = li === 0 ? 0 : getPlatformValueAtDate(p.id, prevEndDate);
+                  const pOpenValue = li === 0 ? 0 : getPlatformValueAtDate(p.id, prevEndDate) + getPendingSupplement(prevEndDate, p.id);
                   const pCloseValue = getPlatformValueAtDate(p.id, latestValDate) + getPendingSupplement(latestValDate, p.id);
                   const pValueChange = pCloseValue - pOpenValue - pNetInvested;
                   return { platformId: p.id, name: p.name, color: p.color, netInvested: pNetInvested, valueChange: pValueChange };
@@ -1826,13 +1826,13 @@ export async function registerRoutes(
                 const prevEndDate = li === 0 ? epoch : getPeriodEndDate(sortedPeriods[li - 1]);
 
                 const tenthCloseValue = getPortfolioValueAtDate(tenthEndOfDay) + getPendingSupplement(tenthEndOfDay);
-                const tenthOpenValue = li === 0 ? 0 : getPortfolioValueAtDate(prevEndDate);
+                const tenthOpenValue = li === 0 ? 0 : getPortfolioValueAtDate(prevEndDate) + getPendingSupplement(prevEndDate);
                 const tenthNetInvested = getNetInvested(prevEndDate, tenthEndOfDay);
                 const tenthValueChange = tenthCloseValue - tenthOpenValue - tenthNetInvested;
 
                 const tenthPlatformBreakdown = filteredPlatforms.map(p => {
                   const pNetInvested = getPlatformNetInvested(p.id, prevEndDate, tenthEndOfDay);
-                  const pOpenValue = li === 0 ? 0 : getPlatformValueAtDate(p.id, prevEndDate);
+                  const pOpenValue = li === 0 ? 0 : getPlatformValueAtDate(p.id, prevEndDate) + getPendingSupplement(prevEndDate, p.id);
                   const pCloseValue = getPlatformValueAtDate(p.id, tenthEndOfDay) + getPendingSupplement(tenthEndOfDay, p.id);
                   const pValueChange = pCloseValue - pOpenValue - pNetInvested;
                   return { platformId: p.id, name: p.name, color: p.color, netInvested: pNetInvested, valueChange: pValueChange };
