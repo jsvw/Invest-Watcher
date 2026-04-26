@@ -1732,7 +1732,7 @@ export default function Dashboard() {
                                   platformId: platform.id,
                                   newValuation: undefined,
                                   platformMode: platform.platformMode || "standard",
-                                }).catch(() => {})
+                                })
                               );
                             } else {
                               standardQueue.push({
@@ -1746,8 +1746,9 @@ export default function Dashboard() {
                               });
                             }
                           }
-                          // Await all non-standard confirmations first
-                          await Promise.all(nonStandardPromises);
+                          // Await all non-standard confirmations first (allSettled so individual
+                          // errors show their own toast without aborting remaining confirmations)
+                          await Promise.allSettled(nonStandardPromises);
                           if (standardQueue.length > 0) {
                             setConfirmQueue(standardQueue);
                           } else {

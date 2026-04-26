@@ -172,6 +172,7 @@ export function useConfirmDepositWithValuation() {
       newValuation?: number;
       platformMode: string;
     }) => {
+      let valuationPosted = false;
       if (newValuation !== undefined && platformMode === "standard") {
         const res = await fetch(api.valuations.create.path, {
           method: api.valuations.create.method,
@@ -180,6 +181,7 @@ export function useConfirmDepositWithValuation() {
           credentials: "include",
         });
         if (!res.ok) throw new Error("Failed to save new valuation");
+        valuationPosted = true;
       }
       for (const id of investmentIds) {
         const res = await fetch(api.investments.update.path.replace(":id", String(id)), {
@@ -190,7 +192,7 @@ export function useConfirmDepositWithValuation() {
         });
         if (!res.ok) throw new Error("Failed to confirm deposit");
       }
-      return { platformId, investmentIds };
+      return { platformId, investmentIds, valuationPosted };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [api.investments.list.path, data.platformId] });
@@ -202,7 +204,9 @@ export function useConfirmDepositWithValuation() {
       queryClient.invalidateQueries({ queryKey: ["/api/portfolio/available-filters"] });
       toast({
         title: "Deposit confirmed",
-        description: "The deposit has been settled and the new valuation recorded.",
+        description: data.valuationPosted
+          ? "The deposit has been settled and the new valuation recorded."
+          : "The deposit has been marked as settled.",
       });
     },
     onError: (error: Error) => {
