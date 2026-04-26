@@ -177,7 +177,7 @@ export function useConfirmDepositWithValuation() {
         const res = await fetch(api.valuations.create.path, {
           method: api.valuations.create.method,
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ platformId, value: newValuation, date: new Date().toISOString() }),
+          body: JSON.stringify({ platformId, value: String(newValuation), date: new Date().toISOString() }),
           credentials: "include",
         });
         if (!res.ok) throw new Error("Failed to save new valuation");
