@@ -1934,7 +1934,8 @@ export default function PlatformDetails() {
                             <AddTransactionDialog 
                               platformId={id} 
                               type={item.type} 
-                              mode="edit" 
+                              mode="edit"
+                              showPendingCheckbox={item.type === 'investment' && platformMode === 'standard'}
                               initialData={{
                                 ...item,
                                 date: new Date(item.date).toISOString().split('T')[0]

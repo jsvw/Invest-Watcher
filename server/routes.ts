@@ -1104,7 +1104,14 @@ export async function registerRoutes(
             platformLatestValuations.set(val.platformId, Number(val.value));
           });
           
-        const totalValue = Array.from(platformLatestValuations.values()).reduce((sum, val) => sum + val, 0);
+        const rawValue = Array.from(platformLatestValuations.values()).reduce((sum, val) => sum + val, 0);
+
+        // Add pending supplement: deposits not yet reflected in any platform valuation
+        const pendingSupplement = filteredInvestments
+          .filter(inv => inv.isPending === true && new Date(inv.date) <= dateObj)
+          .reduce((sum, inv) => sum + Number(inv.amount), 0);
+
+        const totalValue = rawValue + pendingSupplement;
         
         return {
           date,
