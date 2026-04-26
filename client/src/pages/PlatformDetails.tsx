@@ -2,7 +2,8 @@ import { Layout } from "@/components/Layout";
 import { AddTransactionDialog } from "@/components/AddTransactionDialog";
 import { PlatformSettingsDialog } from "@/components/PlatformSettingsDialog";
 import { usePlatform, usePlatforms } from "@/hooks/use-platforms";
-import { useInvestments, useDeleteInvestment, useConfirmInvestment } from "@/hooks/use-investments";
+import { useInvestments, useDeleteInvestment, useConfirmDepositWithValuation, type ConfirmDepositItem } from "@/hooks/use-investments";
+import { ConfirmDepositDialog } from "@/components/ConfirmDepositDialog";
 import { useValuations, useDeleteValuation } from "@/hooks/use-valuations";
 import { useWithdrawals, useDeleteWithdrawal } from "@/hooks/use-withdrawals";
 import { useAssets, useUpdateAsset } from "@/hooks/use-assets";
@@ -343,8 +344,8 @@ export default function PlatformDetails() {
   const { data: valuations, isLoading: isValuationsLoading } = useValuations(id);
   const deleteValuation = useDeleteValuation();
   const deleteInvestment = useDeleteInvestment();
-  const confirmInvestment = useConfirmInvestment();
-  const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const confirmDepositWithValuation = useConfirmDepositWithValuation();
+  const [confirmDepositDialogItem, setConfirmDepositDialogItem] = useState<ConfirmDepositItem | null>(null);
   const deleteWithdrawal = useDeleteWithdrawal();
   const { data: withdrawals, isLoading: isWithdrawalsLoading } = useWithdrawals(id);
   
@@ -1949,14 +1950,31 @@ export default function PlatformDetails() {
                                 size="icon"
                                 className="text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
                                 onClick={() => {
-                                  setConfirmingId(item.id);
-                                  confirmInvestment.mutate({ id: item.id, platformId: id }, { onSettled: () => setConfirmingId(null) });
+                                  if (platformMode !== "standard") {
+                                    confirmDepositWithValuation.mutate({
+                                      investmentIds: [item.id],
+                                      platformId: id,
+                                      newValuation: undefined,
+                                      platformMode,
+                                    });
+                                    return;
+                                  }
+                                  setConfirmDepositDialogItem({
+                                    investmentIds: [item.id],
+                                    platformId: id,
+                                    platformName: platform?.name ?? "",
+                                    platformColor: platform?.color ?? "#3b82f6",
+                                    totalAmount: Number((item as any).amount ?? 0),
+                                    depositDate: typeof item.date === "string" ? item.date : new Date(item.date).toISOString(),
+                                    currentValue: (platform as any)?.currentValue ?? 0,
+                                    platformMode,
+                                  });
                                 }}
-                                disabled={confirmingId === item.id}
+                                disabled={confirmDepositWithValuation.isPending}
                                 title="Confirm deposit (mark as settled)"
                                 data-testid={`button-confirm-investment-${item.id}`}
                               >
-                                {confirmingId === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                                {confirmDepositWithValuation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
                               </Button>
                             )}
                             <Button
@@ -2805,6 +2823,27 @@ export default function PlatformDetails() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Confirm deposit with new valuation dialog */}
+      <ConfirmDepositDialog
+        open={confirmDepositDialogItem !== null}
+        onOpenChange={(open) => { if (!open) setConfirmDepositDialogItem(null); }}
+        item={confirmDepositDialogItem}
+        currency={currency}
+        isPending={confirmDepositWithValuation.isPending}
+        onConfirm={(newValuation) => {
+          if (!confirmDepositDialogItem) return;
+          confirmDepositWithValuation.mutate(
+            {
+              investmentIds: confirmDepositDialogItem.investmentIds,
+              platformId: confirmDepositDialogItem.platformId,
+              newValuation,
+              platformMode: confirmDepositDialogItem.platformMode,
+            },
+            { onSuccess: () => setConfirmDepositDialogItem(null) }
+          );
+        }}
+      />
     </Layout>
   );
 }

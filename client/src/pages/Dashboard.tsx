@@ -30,7 +30,8 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useAllPendingInvestments, useConfirmInvestment } from "@/hooks/use-investments";
+import { useAllPendingInvestments, useConfirmDepositWithValuation, type ConfirmDepositItem } from "@/hooks/use-investments";
+import { ConfirmDepositDialog } from "@/components/ConfirmDepositDialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PortfolioHeatmap, type EnrichedAsset } from "@/components/PortfolioHeatmap";
 import { WaterfallChart } from "@/components/WaterfallChart";
@@ -273,12 +274,12 @@ export default function Dashboard() {
   const [, navigate] = useLocation();
   const { data: platforms, isLoading: isPlatformsLoading } = usePlatforms();
   const [pendingPopoverOpen, setPendingPopoverOpen] = useState(false);
-  const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const [confirmQueue, setConfirmQueue] = useState<ConfirmDepositItem[]>([]);
   // Prefetch when there are pending deposits so the count shows in the trigger badge;
   // also fetch when popover is open to keep the list fresh.
   const totalPendingCheck = (platforms || []).reduce((s, p) => s + (p.pendingAmount ?? 0), 0);
   const { data: pendingInvestments } = useAllPendingInvestments(pendingPopoverOpen || totalPendingCheck > 0);
-  const confirmInvestment = useConfirmInvestment();
+  const confirmDepositWithValuation = useConfirmDepositWithValuation();
   const { toast } = useToast();
 
   // ── Shared filter state ──────────────────────────────────────────────────
@@ -1712,21 +1713,45 @@ export default function Dashboard() {
                         size="sm"
                         variant="outline"
                         className="text-amber-600 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-700 dark:hover:bg-amber-950/40 h-7 text-xs"
-                        disabled={confirmInvestment.isPending}
-                        onClick={async () => {
+                        disabled={confirmDepositWithValuation.isPending}
+                        onClick={() => {
+                          const grouped = new Map<number, { platform: NonNullable<typeof platforms>[0]; invs: typeof items }>();
                           for (const inv of items) {
-                            await new Promise<void>((resolve) => {
-                              confirmInvestment.mutate(
-                                { id: inv.id, platformId: inv.platformId },
-                                { onSettled: () => resolve() }
-                              );
-                            });
+                            const platform = (platforms || []).find(p => p.id === inv.platformId);
+                            if (!platform) continue;
+                            if (!grouped.has(inv.platformId)) grouped.set(inv.platformId, { platform, invs: [] });
+                            grouped.get(inv.platformId)!.invs.push(inv);
                           }
-                          setPendingPopoverOpen(false);
+                          const standardQueue: ConfirmDepositItem[] = [];
+                          for (const { platform, invs } of grouped.values()) {
+                            if ((platform.platformMode || "standard") !== "standard") {
+                              confirmDepositWithValuation.mutate({
+                                investmentIds: invs.map(i => i.id),
+                                platformId: platform.id,
+                                newValuation: undefined,
+                                platformMode: platform.platformMode || "standard",
+                              });
+                            } else {
+                              standardQueue.push({
+                                investmentIds: invs.map(i => i.id),
+                                platformId: platform.id,
+                                platformName: platform.name,
+                                platformColor: platform.color,
+                                totalAmount: invs.reduce((s, i) => s + Number(i.amount), 0),
+                                currentValue: platform.currentValue ?? 0,
+                                platformMode: platform.platformMode || "standard",
+                              });
+                            }
+                          }
+                          if (standardQueue.length > 0) {
+                            setConfirmQueue(standardQueue);
+                          } else {
+                            setPendingPopoverOpen(false);
+                          }
                         }}
                         data-testid="button-confirm-all-pending"
                       >
-                        {confirmInvestment.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <CheckCircle className="h-3 w-3 mr-1" />}
+                        {confirmDepositWithValuation.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <CheckCircle className="h-3 w-3 mr-1" />}
                         Confirm all
                       </Button>
                     )}
@@ -1751,28 +1776,31 @@ export default function Dashboard() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 flex-shrink-0"
-                          disabled={confirmingId === inv.id}
                           title="Confirm deposit (mark as settled)"
                           onClick={() => {
-                            setConfirmingId(inv.id);
-                            confirmInvestment.mutate(
-                              { id: inv.id, platformId: inv.platformId },
-                              {
-                                onSuccess: () => {
-                                  // Auto-collapse when only 1 will remain after this confirm
-                                  if (items.length <= 2) {
-                                    setPendingPopoverOpen(false);
-                                  }
-                                },
-                                onSettled: () => setConfirmingId(null),
-                              }
-                            );
+                            const platform = (platforms || []).find(p => p.id === inv.platformId);
+                            if (!platform) return;
+                            if ((platform.platformMode || "standard") !== "standard") {
+                              confirmDepositWithValuation.mutate(
+                                { investmentIds: [inv.id], platformId: inv.platformId, newValuation: undefined, platformMode: platform.platformMode || "standard" },
+                                { onSuccess: () => { if (items.length <= 2) setPendingPopoverOpen(false); } }
+                              );
+                              return;
+                            }
+                            setConfirmQueue([{
+                              investmentIds: [inv.id],
+                              platformId: inv.platformId,
+                              platformName: inv.platformName,
+                              platformColor: inv.platformColor,
+                              totalAmount: Number(inv.amount),
+                              depositDate: typeof inv.date === "string" ? inv.date : new Date(inv.date).toISOString(),
+                              currentValue: platform.currentValue ?? 0,
+                              platformMode: platform.platformMode || "standard",
+                            }]);
                           }}
                           data-testid={`button-confirm-pending-${inv.id}`}
                         >
-                          {confirmingId === inv.id
-                            ? <Loader2 className="h-4 w-4 animate-spin" />
-                            : <CheckCircle className="h-4 w-4" />}
+                          <CheckCircle className="h-4 w-4" />
                         </Button>
                       </div>
                     ))}
@@ -1781,6 +1809,29 @@ export default function Dashboard() {
               </Popover>
             );
           })()}
+
+          {/* Confirm deposit with new valuation dialog (queue-based: single or confirm-all) */}
+          <ConfirmDepositDialog
+            open={confirmQueue.length > 0}
+            onOpenChange={(open) => { if (!open) setConfirmQueue([]); }}
+            item={confirmQueue[0] ?? null}
+            currency={currency}
+            isPending={confirmDepositWithValuation.isPending}
+            onConfirm={(newValuation) => {
+              const item = confirmQueue[0];
+              if (!item) return;
+              confirmDepositWithValuation.mutate(
+                { investmentIds: item.investmentIds, platformId: item.platformId, newValuation, platformMode: item.platformMode },
+                {
+                  onSuccess: () => {
+                    const remaining = confirmQueue.slice(1);
+                    setConfirmQueue(remaining);
+                    if (remaining.length === 0) setPendingPopoverOpen(false);
+                  },
+                }
+              );
+            }}
+          />
 
           {/* Portfolio Performance Chart */}
           <Card className="shadow-md">

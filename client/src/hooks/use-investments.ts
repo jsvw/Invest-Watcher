@@ -3,6 +3,17 @@ import { api, buildUrl, type InsertInvestment } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 
+export type ConfirmDepositItem = {
+  investmentIds: number[];
+  platformId: number;
+  platformName: string;
+  platformColor: string;
+  totalAmount: number;
+  depositDate?: string;
+  currentValue: number;
+  platformMode: string;
+};
+
 export function useAllPendingInvestments(enabled = true) {
   return useQuery({
     queryKey: [api.investments.pending.path],
@@ -133,6 +144,65 @@ export function useConfirmInvestment() {
       toast({
         title: "Deposit confirmed",
         description: "The deposit has been marked as settled.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useConfirmDepositWithValuation() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({
+      investmentIds,
+      platformId,
+      newValuation,
+      platformMode,
+    }: {
+      investmentIds: number[];
+      platformId: number;
+      newValuation?: number;
+      platformMode: string;
+    }) => {
+      if (newValuation !== undefined && platformMode === "standard") {
+        const res = await fetch(api.valuations.create.path, {
+          method: api.valuations.create.method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ platformId, value: newValuation, date: new Date().toISOString() }),
+          credentials: "include",
+        });
+        if (!res.ok) throw new Error("Failed to save new valuation");
+      }
+      for (const id of investmentIds) {
+        const res = await fetch(api.investments.update.path.replace(":id", String(id)), {
+          method: api.investments.update.method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isPending: false }),
+          credentials: "include",
+        });
+        if (!res.ok) throw new Error("Failed to confirm deposit");
+      }
+      return { platformId, investmentIds };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [api.investments.list.path, data.platformId] });
+      queryClient.invalidateQueries({ queryKey: [api.platforms.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.platforms.get.path, data.platformId] });
+      queryClient.invalidateQueries({ queryKey: [api.investments.pending.path] });
+      queryClient.invalidateQueries({ queryKey: [api.valuations.list.path, data.platformId] });
+      queryClient.invalidateQueries({ queryKey: [api.portfolio.history.path] });
+      queryClient.invalidateQueries({ queryKey: ["/api/portfolio/available-filters"] });
+      toast({
+        title: "Deposit confirmed",
+        description: "The deposit has been settled and the new valuation recorded.",
       });
     },
     onError: (error: Error) => {
