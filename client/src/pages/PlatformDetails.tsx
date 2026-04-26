@@ -1964,9 +1964,9 @@ export default function PlatformDetails() {
                                     platformId: id,
                                     platformName: platform?.name ?? "",
                                     platformColor: platform?.color ?? "#3b82f6",
-                                    totalAmount: Number((item as any).amount ?? 0),
+                                    totalAmount: Number(item.amount),
                                     depositDate: typeof item.date === "string" ? item.date : new Date(item.date).toISOString(),
-                                    currentValue: (platform as any)?.currentValue ?? 0,
+                                    currentValue: Number(platforms?.find(p => p.id === id)?.currentValue ?? 0),
                                     platformMode,
                                   });
                                 }}

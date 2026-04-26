@@ -1714,7 +1714,7 @@ export default function Dashboard() {
                         variant="outline"
                         className="text-amber-600 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-700 dark:hover:bg-amber-950/40 h-7 text-xs"
                         disabled={confirmDepositWithValuation.isPending}
-                        onClick={() => {
+                        onClick={async () => {
                           const grouped = new Map<number, { platform: NonNullable<typeof platforms>[0]; invs: typeof items }>();
                           for (const inv of items) {
                             const platform = (platforms || []).find(p => p.id === inv.platformId);
@@ -1723,14 +1723,17 @@ export default function Dashboard() {
                             grouped.get(inv.platformId)!.invs.push(inv);
                           }
                           const standardQueue: ConfirmDepositItem[] = [];
+                          const nonStandardPromises: Promise<unknown>[] = [];
                           for (const { platform, invs } of grouped.values()) {
                             if ((platform.platformMode || "standard") !== "standard") {
-                              confirmDepositWithValuation.mutate({
-                                investmentIds: invs.map(i => i.id),
-                                platformId: platform.id,
-                                newValuation: undefined,
-                                platformMode: platform.platformMode || "standard",
-                              });
+                              nonStandardPromises.push(
+                                confirmDepositWithValuation.mutateAsync({
+                                  investmentIds: invs.map(i => i.id),
+                                  platformId: platform.id,
+                                  newValuation: undefined,
+                                  platformMode: platform.platformMode || "standard",
+                                }).catch(() => {})
+                              );
                             } else {
                               standardQueue.push({
                                 investmentIds: invs.map(i => i.id),
@@ -1738,11 +1741,13 @@ export default function Dashboard() {
                                 platformName: platform.name,
                                 platformColor: platform.color,
                                 totalAmount: invs.reduce((s, i) => s + Number(i.amount), 0),
-                                currentValue: platform.currentValue ?? 0,
+                                currentValue: Number(platform.currentValue ?? 0),
                                 platformMode: platform.platformMode || "standard",
                               });
                             }
                           }
+                          // Await all non-standard confirmations first
+                          await Promise.all(nonStandardPromises);
                           if (standardQueue.length > 0) {
                             setConfirmQueue(standardQueue);
                           } else {
@@ -1794,7 +1799,7 @@ export default function Dashboard() {
                               platformColor: inv.platformColor,
                               totalAmount: Number(inv.amount),
                               depositDate: typeof inv.date === "string" ? inv.date : new Date(inv.date).toISOString(),
-                              currentValue: platform.currentValue ?? 0,
+                              currentValue: Number(platform.currentValue ?? 0),
                               platformMode: platform.platformMode || "standard",
                             }]);
                           }}
