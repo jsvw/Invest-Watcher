@@ -935,24 +935,22 @@ export default function PlatformDetails() {
   }, [platAggregatedData, stockChartData, chartAggregation]);
 
   // Merge stock prices into the non-aggregated chart data.
-  // Only stock dates within the valuation date range are included — no new rows added outside it.
+  // Stock prices are mapped onto existing valuation dates only — no new X-axis dates are added.
+  // For each valuation date, we use the closest stock price on or before that date.
   const mergedChartDataWithStockPrice = useMemo(() => {
     if (!baseChartData || !stockChartData?.points.length) return baseChartData;
-    const minDate = baseChartData[0]?.date as string | undefined;
-    const maxDate = baseChartData[baseChartData.length - 1]?.date as string | undefined;
-    const clippedPoints = stockChartData.points.filter(
-      p => (!minDate || p.date >= minDate) && (!maxDate || p.date <= maxDate)
-    );
-    const priceMap = new Map(clippedPoints.map(p => [p.date, p.price]));
-    const valuationMap = new Map(baseChartData.map((h: any) => [h.date, h]));
-    const allDates = new Set([
-      ...Array.from(valuationMap.keys()),
-      ...clippedPoints.map(p => p.date),
-    ]);
-    return Array.from(allDates).sort().map(date => ({
-      ...(valuationMap.get(date) || { date, timestamp: new Date(date).getTime() }),
-      price: priceMap.get(date),
-    }));
+    // Sort stock points ascending by date for binary-search style lookup
+    const sorted = [...stockChartData.points].sort((a, b) => a.date.localeCompare(b.date));
+    return baseChartData.map((h: any) => {
+      // Find the last stock point whose date is <= valuation date
+      let lo = 0, hi = sorted.length - 1, best: number | undefined;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (sorted[mid].date <= h.date) { best = sorted[mid].price; lo = mid + 1; }
+        else { hi = mid - 1; }
+      }
+      return { ...h, price: best };
+    });
   }, [baseChartData, stockChartData]);
 
   const platAggXFmt = (d: unknown) => {
