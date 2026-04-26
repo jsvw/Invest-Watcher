@@ -1099,7 +1099,7 @@ export default function PlatformDetails() {
             </div>
             
             <div className="flex gap-2 flex-wrap">
-              <AddTransactionDialog platformId={id} type="investment" showPendingCheckbox={!!(platform as any)?.allowPendingDeposits} />
+              <AddTransactionDialog platformId={id} type="investment" showPendingCheckbox={!!platform?.allowPendingDeposits} />
               <AddTransactionDialog platformId={id} type="withdrawal" />
               <AddTransactionDialog platformId={id} type="valuation" />
               {platformMode !== "standard" && (
@@ -1937,7 +1937,7 @@ export default function PlatformDetails() {
                               platformId={id} 
                               type={item.type} 
                               mode="edit"
-                              showPendingCheckbox={item.type === 'investment' && !!(platform as any)?.allowPendingDeposits}
+                              showPendingCheckbox={item.type === 'investment' && !!platform?.allowPendingDeposits}
                               initialData={{
                                 ...item,
                                 date: new Date(item.date).toISOString().split('T')[0]

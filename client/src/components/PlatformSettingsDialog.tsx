@@ -63,7 +63,7 @@ export function PlatformSettingsDialog({ platform }: PlatformSettingsDialogProps
       icon: (platform as any).icon || "",
       customIconUrl: (platform as any).customIconUrl || null,
       platformMode: (platform as any).platformMode || "standard",
-      allowPendingDeposits: (platform as any).allowPendingDeposits ?? false,
+      allowPendingDeposits: platform.allowPendingDeposits ?? false,
     },
   });
 
