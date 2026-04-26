@@ -98,6 +98,27 @@ export function useUpdateInvestment() {
   });
 }
 
+export function useConfirmInvestment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, platformId }: { id: number; platformId: number }) => {
+      const res = await fetch(api.investments.update.path.replace(':id', String(id)), {
+        method: api.investments.update.method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPending: false }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to confirm investment");
+      return { ...(await res.json()), platformId };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [api.investments.list.path, data.platformId] });
+      queryClient.invalidateQueries({ queryKey: [api.platforms.list.path] });
+    },
+  });
+}
+
 export function useDeleteInvestment() {
   const queryClient = useQueryClient();
   const { toast } = useToast();

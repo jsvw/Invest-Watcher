@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useForm } from "react-hook-form";
 import { useUpdatePlatform, useDeletePlatform } from "@/hooks/use-platforms";
 import { useState } from "react";
@@ -20,6 +21,7 @@ interface PlatformFormData {
   icon: string;
   customIconUrl: string | null;
   platformMode: string;
+  allowPendingDeposits: boolean;
 }
 
 const TRACKING_MODES = [
@@ -61,6 +63,7 @@ export function PlatformSettingsDialog({ platform }: PlatformSettingsDialogProps
       icon: (platform as any).icon || "",
       customIconUrl: (platform as any).customIconUrl || null,
       platformMode: (platform as any).platformMode || "standard",
+      allowPendingDeposits: (platform as any).allowPendingDeposits ?? false,
     },
   });
 
@@ -172,6 +175,18 @@ export function PlatformSettingsDialog({ platform }: PlatformSettingsDialogProps
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">Allow pending deposits</Label>
+              <p className="text-xs text-muted-foreground">Show "Awaiting settlement" checkbox when logging investments</p>
+            </div>
+            <Switch
+              checked={form.watch("allowPendingDeposits")}
+              onCheckedChange={(val) => form.setValue("allowPendingDeposits", val)}
+              data-testid="switch-allow-pending-deposits"
+            />
           </div>
 
           <div className="space-y-2">

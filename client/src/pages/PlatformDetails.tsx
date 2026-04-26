@@ -2,7 +2,7 @@ import { Layout } from "@/components/Layout";
 import { AddTransactionDialog } from "@/components/AddTransactionDialog";
 import { PlatformSettingsDialog } from "@/components/PlatformSettingsDialog";
 import { usePlatform, usePlatforms } from "@/hooks/use-platforms";
-import { useInvestments, useDeleteInvestment } from "@/hooks/use-investments";
+import { useInvestments, useDeleteInvestment, useConfirmInvestment } from "@/hooks/use-investments";
 import { useValuations, useDeleteValuation } from "@/hooks/use-valuations";
 import { useWithdrawals, useDeleteWithdrawal } from "@/hooks/use-withdrawals";
 import { useAssets, useUpdateAsset } from "@/hooks/use-assets";
@@ -343,6 +343,7 @@ export default function PlatformDetails() {
   const { data: valuations, isLoading: isValuationsLoading } = useValuations(id);
   const deleteValuation = useDeleteValuation();
   const deleteInvestment = useDeleteInvestment();
+  const confirmInvestment = useConfirmInvestment();
   const deleteWithdrawal = useDeleteWithdrawal();
   const { data: withdrawals, isLoading: isWithdrawalsLoading } = useWithdrawals(id);
   
@@ -1097,7 +1098,7 @@ export default function PlatformDetails() {
             </div>
             
             <div className="flex gap-2 flex-wrap">
-              <AddTransactionDialog platformId={id} type="investment" showPendingCheckbox={platformMode === "standard"} />
+              <AddTransactionDialog platformId={id} type="investment" showPendingCheckbox={!!(platform as any)?.allowPendingDeposits} />
               <AddTransactionDialog platformId={id} type="withdrawal" />
               <AddTransactionDialog platformId={id} type="valuation" />
               {platformMode !== "standard" && (
@@ -1935,12 +1936,25 @@ export default function PlatformDetails() {
                               platformId={id} 
                               type={item.type} 
                               mode="edit"
-                              showPendingCheckbox={item.type === 'investment' && platformMode === 'standard'}
+                              showPendingCheckbox={item.type === 'investment' && !!(platform as any)?.allowPendingDeposits}
                               initialData={{
                                 ...item,
                                 date: new Date(item.date).toISOString().split('T')[0]
                               }} 
                             />
+                            {item.type === 'investment' && !!(item as { isPending?: boolean | null }).isPending && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+                                onClick={() => confirmInvestment.mutate({ id: item.id, platformId: id })}
+                                disabled={confirmInvestment.isPending}
+                                title="Confirm deposit (mark as settled)"
+                                data-testid={`button-confirm-investment-${item.id}`}
+                              >
+                                {confirmInvestment.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"

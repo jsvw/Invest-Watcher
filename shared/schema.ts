@@ -29,6 +29,7 @@ export const platforms = pgTable("platforms", {
   customIconUrl: text("custom_icon_url"), // URL for custom uploaded icon image
   currency: text("currency").notNull().default("USD"), // e.g., 'USD', 'EUR', 'GBP'
   platformMode: text("platform_mode").notNull().default("standard"), // 'standard', 'asset_returns', 'item_valuations'
+  allowPendingDeposits: boolean("allow_pending_deposits").notNull().default(false), // Enable pending deposit checkbox for this platform
   targetAllocation: numeric("target_allocation"), // target % of total portfolio (0-100)
   createdAt: timestamp("created_at").defaultNow(),
 });
