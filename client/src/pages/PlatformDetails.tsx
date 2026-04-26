@@ -1950,15 +1950,6 @@ export default function PlatformDetails() {
                                 size="icon"
                                 className="text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
                                 onClick={() => {
-                                  if (platformMode !== "standard") {
-                                    confirmDepositWithValuation.mutate({
-                                      investmentIds: [item.id],
-                                      platformId: id,
-                                      newValuation: undefined,
-                                      platformMode,
-                                    });
-                                    return;
-                                  }
                                   setConfirmDepositDialogItem({
                                     investmentIds: [item.id],
                                     platformId: id,

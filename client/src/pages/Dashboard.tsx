@@ -1722,35 +1722,20 @@ export default function Dashboard() {
                             if (!grouped.has(inv.platformId)) grouped.set(inv.platformId, { platform, invs: [] });
                             grouped.get(inv.platformId)!.invs.push(inv);
                           }
-                          const standardQueue: ConfirmDepositItem[] = [];
-                          const nonStandardPromises: Promise<unknown>[] = [];
+                          const queue: ConfirmDepositItem[] = [];
                           for (const { platform, invs } of grouped.values()) {
-                            if ((platform.platformMode || "standard") !== "standard") {
-                              nonStandardPromises.push(
-                                confirmDepositWithValuation.mutateAsync({
-                                  investmentIds: invs.map(i => i.id),
-                                  platformId: platform.id,
-                                  newValuation: undefined,
-                                  platformMode: platform.platformMode || "standard",
-                                })
-                              );
-                            } else {
-                              standardQueue.push({
-                                investmentIds: invs.map(i => i.id),
-                                platformId: platform.id,
-                                platformName: platform.name,
-                                platformColor: platform.color,
-                                totalAmount: invs.reduce((s, i) => s + Number(i.amount), 0),
-                                currentValue: Number(platform.currentValue ?? 0),
-                                platformMode: platform.platformMode || "standard",
-                              });
-                            }
+                            queue.push({
+                              investmentIds: invs.map(i => i.id),
+                              platformId: platform.id,
+                              platformName: platform.name,
+                              platformColor: platform.color,
+                              totalAmount: invs.reduce((s, i) => s + Number(i.amount), 0),
+                              currentValue: Number(platform.currentValue ?? 0),
+                              platformMode: platform.platformMode || "standard",
+                            });
                           }
-                          // Await all non-standard confirmations first (allSettled so individual
-                          // errors show their own toast without aborting remaining confirmations)
-                          await Promise.allSettled(nonStandardPromises);
-                          if (standardQueue.length > 0) {
-                            setConfirmQueue(standardQueue);
+                          if (queue.length > 0) {
+                            setConfirmQueue(queue);
                           } else {
                             setPendingPopoverOpen(false);
                           }
@@ -1786,13 +1771,6 @@ export default function Dashboard() {
                           onClick={() => {
                             const platform = (platforms || []).find(p => p.id === inv.platformId);
                             if (!platform) return;
-                            if ((platform.platformMode || "standard") !== "standard") {
-                              confirmDepositWithValuation.mutate(
-                                { investmentIds: [inv.id], platformId: inv.platformId, newValuation: undefined, platformMode: platform.platformMode || "standard" },
-                                { onSuccess: () => { if (items.length <= 2) setPendingPopoverOpen(false); } }
-                              );
-                              return;
-                            }
                             setConfirmQueue([{
                               investmentIds: [inv.id],
                               platformId: inv.platformId,
