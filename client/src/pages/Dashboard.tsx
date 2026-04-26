@@ -268,6 +268,8 @@ function HeatmapTooltipCard({ label, returnPct, absoluteChange, currency, inProg
 type SortKey = "name" | "invested" | "current" | "pnl" | "roi" | "mom" | "target" | "delta";
 type SortDir = "asc" | "desc";
 
+const supportsHover = () => window.matchMedia('(hover: hover)').matches;
+
 export default function Dashboard() {
   const { user } = useAuth();
   const currency = user?.currency || "EUR";
@@ -1858,11 +1860,17 @@ export default function Dashboard() {
                           return opts.map(o => {
                             if (o.value === "forecast-5y") {
                               return (
-                                <div key={o.value} className="relative" ref={longRangeRef}>
+                                <div
+                                  key={o.value}
+                                  className="relative"
+                                  ref={longRangeRef}
+                                  onMouseEnter={() => { if (supportsHover()) setLongRangeOpen(true); }}
+                                  onMouseLeave={() => { if (supportsHover()) setLongRangeOpen(false); }}
+                                >
                                   <TabsTrigger
                                     value={o.value}
                                     data-testid="button-forecast-5y"
-                                    onClick={() => setLongRangeOpen(v => !v)}
+                                    onClick={() => { if (!supportsHover()) setLongRangeOpen(v => !v); }}
                                   >
                                     {o.label}
                                   </TabsTrigger>
