@@ -274,7 +274,10 @@ export default function Dashboard() {
   const { data: platforms, isLoading: isPlatformsLoading } = usePlatforms();
   const [pendingPopoverOpen, setPendingPopoverOpen] = useState(false);
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
-  const { data: pendingInvestments } = useAllPendingInvestments(pendingPopoverOpen);
+  // Prefetch when there are pending deposits so the count shows in the trigger badge;
+  // also fetch when popover is open to keep the list fresh.
+  const totalPendingCheck = (platforms || []).reduce((s, p) => s + (p.pendingAmount ?? 0), 0);
+  const { data: pendingInvestments } = useAllPendingInvestments(pendingPopoverOpen || totalPendingCheck > 0);
   const confirmInvestment = useConfirmInvestment();
   const { toast } = useToast();
 
@@ -1755,13 +1758,13 @@ export default function Dashboard() {
                             confirmInvestment.mutate(
                               { id: inv.id, platformId: inv.platformId },
                               {
-                                onSettled: () => {
-                                  setConfirmingId(null);
+                                onSuccess: () => {
                                   // Auto-collapse when only 1 will remain after this confirm
                                   if (items.length <= 2) {
                                     setPendingPopoverOpen(false);
                                   }
                                 },
+                                onSettled: () => setConfirmingId(null),
                               }
                             );
                           }}
