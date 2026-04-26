@@ -115,6 +115,7 @@ export function useConfirmInvestment() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [api.investments.list.path, data.platformId] });
       queryClient.invalidateQueries({ queryKey: [api.platforms.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.platforms.get.path, data.platformId] });
     },
   });
 }
