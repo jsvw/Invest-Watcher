@@ -3,9 +3,10 @@ import { api, buildUrl, type InsertInvestment } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 
-export function useAllPendingInvestments() {
+export function useAllPendingInvestments(enabled = true) {
   return useQuery({
     queryKey: [api.investments.pending.path],
+    enabled,
     queryFn: async () => {
       const res = await fetch(api.investments.pending.path, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch pending investments");

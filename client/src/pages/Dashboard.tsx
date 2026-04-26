@@ -272,10 +272,10 @@ export default function Dashboard() {
   const currency = user?.currency || "EUR";
   const [, navigate] = useLocation();
   const { data: platforms, isLoading: isPlatformsLoading } = usePlatforms();
-  const { data: pendingInvestments } = useAllPendingInvestments();
-  const confirmInvestment = useConfirmInvestment();
   const [pendingPopoverOpen, setPendingPopoverOpen] = useState(false);
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
+  const { data: pendingInvestments } = useAllPendingInvestments(pendingPopoverOpen);
+  const confirmInvestment = useConfirmInvestment();
   const { toast } = useToast();
 
   // ── Shared filter state ──────────────────────────────────────────────────
@@ -1674,6 +1674,19 @@ export default function Dashboard() {
             const totalPending = (platforms || []).reduce((s, p) => s + (p.pendingAmount ?? 0), 0);
             if (totalPending <= 0) return null;
             const items = pendingInvestments || [];
+            // Only make the notice interactive when at least one platform with
+            // allowPendingDeposits=true has pending deposits; otherwise show static.
+            const hasInteractivePending = (platforms || []).some(
+              p => (p.pendingAmount ?? 0) > 0 && p.allowPendingDeposits
+            );
+            if (!hasInteractivePending) {
+              return (
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-sm" data-testid="notice-pending-total">
+                  <span className="font-semibold">{formatCurrency(totalPending, currency)}</span>
+                  <span className="text-amber-700 dark:text-amber-400">in pending deposits — not yet reflected in platform balances</span>
+                </div>
+              );
+            }
             return (
               <Popover open={pendingPopoverOpen} onOpenChange={setPendingPopoverOpen}>
                 <PopoverTrigger asChild>
@@ -1741,7 +1754,15 @@ export default function Dashboard() {
                             setConfirmingId(inv.id);
                             confirmInvestment.mutate(
                               { id: inv.id, platformId: inv.platformId },
-                              { onSettled: () => setConfirmingId(null) }
+                              {
+                                onSettled: () => {
+                                  setConfirmingId(null);
+                                  // Auto-collapse when only 1 will remain after this confirm
+                                  if (items.length <= 2) {
+                                    setPendingPopoverOpen(false);
+                                  }
+                                },
+                              }
                             );
                           }}
                           data-testid={`button-confirm-pending-${inv.id}`}
