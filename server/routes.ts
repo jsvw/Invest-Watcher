@@ -2478,7 +2478,7 @@ export async function registerRoutes(
         const cutoffStr = cutoff.toISOString().slice(0, 10);
         const valuations = await storage.getValuations(platformId);
         const fallbackPoints = (valuations as any[])
-          .map(v => ({ date: String(v.date).slice(0, 10), price: Number(v.value) }))
+          .map(v => ({ date: new Date(v.date).toISOString().slice(0, 10), price: Number(v.value) }))
           .filter(p => !isNaN(p.price) && p.date >= cutoffStr)
           .sort((a, b) => a.date.localeCompare(b.date));
         return res.json({ points: fallbackPoints, currency: chartCurrency, fallback: true });
