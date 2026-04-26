@@ -128,7 +128,19 @@ export function AddTransactionDialog({ platformId, type, initialData, mode = "ad
       if (isEdit) {
         updateWithdrawal.mutate({ id: initialData.id, ...payload }, { onSuccess });
       } else {
-        createWithdrawal.mutate(payload, { onSuccess });
+        const withdrawalCurrentValue = data.currentValue && data.currentValue > 0 ? data.currentValue : null;
+        createWithdrawal.mutate(payload, {
+          onSuccess: () => {
+            if (withdrawalCurrentValue) {
+              createValuation.mutate(
+                { platformId, date: data.date, value: String(withdrawalCurrentValue) },
+                { onSuccess }
+              );
+            } else {
+              onSuccess();
+            }
+          },
+        });
       }
     } else {
       if (isEdit) {
