@@ -59,6 +59,7 @@ export interface IStorage {
   // Investments (require platform ownership verification in routes)
   getInvestments(platformId: number): Promise<Investment[]>;
   getAllInvestmentsForUser(userId: number): Promise<Investment[]>;
+  getAllPendingInvestments(userId: number): Promise<(Investment & { platformName: string; platformColor: string })[]>;
   getPendingInvestmentsForPlatform(platformId: number): Promise<Investment[]>;
   createInvestment(investment: InsertInvestment): Promise<Investment>;
   updateInvestment(id: number, investment: Partial<InsertInvestment>): Promise<Investment>;
@@ -394,6 +395,27 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(investments.date));
     
     return result;
+  }
+
+  async getAllPendingInvestments(userId: number): Promise<(Investment & { platformName: string; platformColor: string })[]> {
+    const result = await db.select({
+      id: investments.id,
+      platformId: investments.platformId,
+      amount: investments.amount,
+      bonusAmount: investments.bonusAmount,
+      date: investments.date,
+      notes: investments.notes,
+      isPending: investments.isPending,
+      createdAt: investments.createdAt,
+      platformName: platforms.name,
+      platformColor: platforms.color,
+    })
+      .from(investments)
+      .innerJoin(platforms, eq(investments.platformId, platforms.id))
+      .where(and(eq(platforms.userId, userId), eq(investments.isPending, true)))
+      .orderBy(desc(investments.date));
+
+    return result as (Investment & { platformName: string; platformColor: string })[];
   }
 
   // Withdrawal methods

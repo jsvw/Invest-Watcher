@@ -30,6 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useAllPendingInvestments, useConfirmInvestment } from "@/hooks/use-investments";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { PortfolioHeatmap, type EnrichedAsset } from "@/components/PortfolioHeatmap";
 import { WaterfallChart } from "@/components/WaterfallChart";
@@ -271,6 +272,10 @@ export default function Dashboard() {
   const currency = user?.currency || "EUR";
   const [, navigate] = useLocation();
   const { data: platforms, isLoading: isPlatformsLoading } = usePlatforms();
+  const { data: pendingInvestments } = useAllPendingInvestments();
+  const confirmInvestment = useConfirmInvestment();
+  const [pendingPopoverOpen, setPendingPopoverOpen] = useState(false);
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const { toast } = useToast();
 
   // ── Shared filter state ──────────────────────────────────────────────────
@@ -1668,11 +1673,88 @@ export default function Dashboard() {
           {(() => {
             const totalPending = (platforms || []).reduce((s, p) => s + (p.pendingAmount ?? 0), 0);
             if (totalPending <= 0) return null;
+            const items = pendingInvestments || [];
             return (
-              <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-sm" data-testid="notice-pending-total">
-                <span className="font-semibold">{formatCurrency(totalPending, currency)}</span>
-                <span className="text-amber-700 dark:text-amber-400">in pending deposits — not yet reflected in platform balances</span>
-              </div>
+              <Popover open={pendingPopoverOpen} onOpenChange={setPendingPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 text-sm w-full text-left hover:bg-amber-100 dark:hover:bg-amber-950/60 transition-colors cursor-pointer"
+                    data-testid="notice-pending-total"
+                  >
+                    <span className="font-semibold">{formatCurrency(totalPending, currency)}</span>
+                    <span className="text-amber-700 dark:text-amber-400">in pending deposits — click to review</span>
+                    <span className="ml-auto text-amber-500 dark:text-amber-400 text-xs underline underline-offset-2">
+                      {items.length} deposit{items.length !== 1 ? 's' : ''}
+                    </span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-96 p-0" align="start" data-testid="popover-pending-deposits">
+                  <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                    <span className="font-semibold text-sm">Pending deposits</span>
+                    {items.length > 1 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-amber-600 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-700 dark:hover:bg-amber-950/40 h-7 text-xs"
+                        disabled={confirmInvestment.isPending}
+                        onClick={async () => {
+                          for (const inv of items) {
+                            await new Promise<void>((resolve) => {
+                              confirmInvestment.mutate(
+                                { id: inv.id, platformId: inv.platformId },
+                                { onSettled: () => resolve() }
+                              );
+                            });
+                          }
+                          setPendingPopoverOpen(false);
+                        }}
+                        data-testid="button-confirm-all-pending"
+                      >
+                        {confirmInvestment.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <CheckCircle className="h-3 w-3 mr-1" />}
+                        Confirm all
+                      </Button>
+                    )}
+                  </div>
+                  <div className="max-h-72 overflow-y-auto divide-y divide-border">
+                    {items.length === 0 ? (
+                      <div className="px-4 py-6 text-sm text-muted-foreground text-center">No pending deposits</div>
+                    ) : items.map((inv) => (
+                      <div key={inv.id} className="flex items-center gap-3 px-4 py-2.5" data-testid={`row-pending-${inv.id}`}>
+                        <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: inv.platformColor }} />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{inv.platformName}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {format(new Date(inv.date), 'MMM dd, yyyy')}
+                            {inv.notes ? ` · ${inv.notes}` : ''}
+                          </div>
+                        </div>
+                        <div className="text-sm font-semibold text-amber-700 dark:text-amber-300 flex-shrink-0">
+                          {formatCurrency(Number(inv.amount), currency)}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 flex-shrink-0"
+                          disabled={confirmingId === inv.id}
+                          title="Confirm deposit (mark as settled)"
+                          onClick={() => {
+                            setConfirmingId(inv.id);
+                            confirmInvestment.mutate(
+                              { id: inv.id, platformId: inv.platformId },
+                              { onSettled: () => setConfirmingId(null) }
+                            );
+                          }}
+                          data-testid={`button-confirm-pending-${inv.id}`}
+                        >
+                          {confirmingId === inv.id
+                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                            : <CheckCircle className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
             );
           })()}
 

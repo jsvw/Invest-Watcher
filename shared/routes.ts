@@ -76,6 +76,13 @@ export const api = {
     },
   },
   investments: {
+    pending: {
+      method: 'GET' as const,
+      path: '/api/investments/pending',
+      responses: {
+        200: z.array(z.custom<typeof investments.$inferSelect & { platformName: string; platformColor: string }>()),
+      },
+    },
     list: {
       method: 'GET' as const,
       path: '/api/platforms/:platformId/investments',

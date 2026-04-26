@@ -204,6 +204,12 @@ export async function registerRoutes(
   });
 
   // --- Investments ---
+  app.get('/api/investments/pending', requireAuth, async (req, res) => {
+    const userId = getAuthenticatedUserId(req)!;
+    const pending = await storage.getAllPendingInvestments(userId);
+    res.json(pending);
+  });
+
   app.get(api.investments.list.path, requireAuth, async (req, res) => {
     const userId = getAuthenticatedUserId(req)!;
     const platformId = Number(req.params.platformId);

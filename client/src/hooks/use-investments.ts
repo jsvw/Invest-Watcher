@@ -3,6 +3,17 @@ import { api, buildUrl, type InsertInvestment } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 
+export function useAllPendingInvestments() {
+  return useQuery({
+    queryKey: [api.investments.pending.path],
+    queryFn: async () => {
+      const res = await fetch(api.investments.pending.path, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch pending investments");
+      return api.investments.pending.responses[200].parse(await res.json());
+    },
+  });
+}
+
 export function useInvestments(platformId: number) {
   return useQuery({
     queryKey: [api.investments.list.path, platformId],
@@ -117,6 +128,7 @@ export function useConfirmInvestment() {
       queryClient.invalidateQueries({ queryKey: [api.investments.list.path, data.platformId] });
       queryClient.invalidateQueries({ queryKey: [api.platforms.list.path] });
       queryClient.invalidateQueries({ queryKey: [api.platforms.get.path, data.platformId] });
+      queryClient.invalidateQueries({ queryKey: [api.investments.pending.path] });
       toast({
         title: "Deposit confirmed",
         description: "The deposit has been marked as settled.",
