@@ -336,6 +336,7 @@ export default function PlatformDetails() {
   const [chartView, setChartView] = useState<"overview" | "profit" | "monthly" | "all">("overview");
   const [chartAggregation, setChartAggregation] = useState<"month" | "quarter" | "year">("month");
   const [showAllPoints, setShowAllPoints] = useState(false);
+  const [showStockOverlay, setShowStockOverlay] = useState(false);
   
   const { data: platforms } = usePlatforms();
   const id = platforms?.find(p => p.name.toLowerCase().replace(/\s+/g, '-') === slug)?.id || 0;
@@ -896,6 +897,57 @@ export default function PlatformDetails() {
       }));
   }, [activeChartData, chartAggregation]);
 
+  // Pre-compute the non-aggregated chart data (previously inline .map())
+  const baseChartData = useMemo(() => {
+    if (!activeChartData) return null;
+    return activeChartData.map((h: any, i: number, arr: any[]) => {
+      const prev = arr[i - 1];
+      const totalChange = i === 0 ? 0 : (h.value - prev.value) - (h.invested - prev.invested);
+      return {
+        ...h,
+        timestamp: new Date(h.date).getTime(),
+        gain: h.value - h.invested,
+        monthlyChange: totalChange,
+        valueChange: i === 0 ? null : h.value - prev.value,
+        investedChange: i === 0 ? null : h.invested - prev.invested,
+        gainChange: i === 0 ? null : (h.value - h.invested) - (prev.value - prev.invested),
+      };
+    });
+  }, [activeChartData]);
+
+  // Merge stock prices into aggregated chart data (quarterly / yearly buckets)
+  const platAggDataWithStockPrice = useMemo(() => {
+    if (!platAggregatedData || !stockChartData?.points.length) return platAggregatedData;
+    const bucketMap = new Map<string, number[]>();
+    stockChartData.points.forEach(({ date, price }) => {
+      const d = new Date(date);
+      const y = d.getFullYear();
+      const m = d.getMonth() + 1;
+      const key = chartAggregation === "quarter" ? `${y}-Q${Math.ceil(m / 3)}` : `${y}`;
+      if (!bucketMap.has(key)) bucketMap.set(key, []);
+      bucketMap.get(key)!.push(price);
+    });
+    return platAggregatedData.map(entry => ({
+      ...entry,
+      price: bucketMap.get(entry.date)?.[bucketMap.get(entry.date)!.length - 1],
+    }));
+  }, [platAggregatedData, stockChartData, chartAggregation]);
+
+  // Merge stock prices into the non-aggregated chart data (union of all dates)
+  const mergedChartDataWithStockPrice = useMemo(() => {
+    if (!baseChartData || !stockChartData?.points.length) return baseChartData;
+    const priceMap = new Map(stockChartData.points.map(p => [p.date, p.price]));
+    const valuationMap = new Map(baseChartData.map((h: any) => [h.date, h]));
+    const allDates = new Set([
+      ...Array.from(valuationMap.keys()),
+      ...stockChartData.points.map(p => p.date),
+    ]);
+    return Array.from(allDates).sort().map(date => ({
+      ...(valuationMap.get(date) || { date, timestamp: new Date(date).getTime() }),
+      price: priceMap.get(date),
+    }));
+  }, [baseChartData, stockChartData]);
+
   const platAggXFmt = (d: unknown) => {
     if (typeof d !== 'string') return String(d ?? '');
     if (chartAggregation === "quarter") {
@@ -1245,120 +1297,6 @@ export default function PlatformDetails() {
           </Card>
         )}
 
-        {/* Stock Price History Chart */}
-        {isStockTicker && (
-          <Card data-testid="card-stock-price-history">
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-wrap">
-              <div>
-                <CardTitle>Stock Price History</CardTitle>
-                <CardDescription>
-                  Historical share price{stockChartData?.currency ? ` (${stockChartData.currency})` : ''}
-                </CardDescription>
-              </div>
-              <div className="flex gap-1" data-testid="stock-chart-range-toggle">
-                {(['1m', '3m', '6m', '1y', '5y'] as const).map((r) => (
-                  <button
-                    key={r}
-                    data-testid={`button-range-${r}`}
-                    onClick={() => setStockChartRange(r)}
-                    className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                      stockChartRange === r
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    }`}
-                  >
-                    {r.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {isStockChartLoading ? (
-                <div className="flex items-center justify-center h-48" data-testid="stock-chart-loading">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : stockChartError ? (
-                <div className="flex items-center justify-center h-48 text-muted-foreground text-sm" data-testid="stock-chart-error">
-                  Price history unavailable for this stock.
-                </div>
-              ) : !stockChartData || stockChartData.points.length === 0 ? (
-                <div className="flex items-center justify-center h-48 text-muted-foreground text-sm" data-testid="stock-chart-empty">
-                  No price data available for this range.
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height={280}>
-                  <AreaChart data={stockChartData.points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-                    <defs>
-                      <linearGradient id="stockPriceGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                    <XAxis
-                      dataKey="date"
-                      tick={{ fontSize: 11 }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v: string) => {
-                        const d = new Date(v);
-                        return stockChartRange === '5y'
-                          ? d.getFullYear().toString()
-                          : `${d.toLocaleString('default', { month: 'short' })} ${d.getDate()}`;
-                      }}
-                      interval="preserveStartEnd"
-                      minTickGap={40}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 11 }}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(v: number) =>
-                        stockChartData.currency
-                          ? `${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                          : v.toFixed(2)
-                      }
-                      width={70}
-                      domain={['auto', 'auto']}
-                    />
-                    <Tooltip
-                      formatter={(value: number) => [
-                        `${stockChartData.currency ? stockChartData.currency + ' ' : ''}${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-                        'Price',
-                      ]}
-                      labelFormatter={(label: string) => new Date(label).toLocaleDateString()}
-                      contentStyle={{ fontSize: 12 }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="price"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={2}
-                      fill="url(#stockPriceGradient)"
-                      dot={false}
-                      activeDot={{ r: 4 }}
-                    />
-                    {stockInfo?.averagePrice != null && (
-                      <ReferenceLine
-                        y={stockInfo.averagePrice}
-                        stroke="hsl(var(--muted-foreground))"
-                        strokeDasharray="6 3"
-                        strokeWidth={1.5}
-                        label={{
-                          value: `Avg ${stockChartData.currency ?? ''} ${stockInfo.averagePrice.toFixed(2)}`,
-                          position: 'insideTopRight',
-                          fontSize: 11,
-                          fill: 'hsl(var(--muted-foreground))',
-                        }}
-                        data-testid="stock-chart-avg-reference"
-                      />
-                    )}
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
-        )}
 
         {/* Main Content Tabs */}
         <Tabs defaultValue={platformMode !== "standard" ? "assets" : "chart"} className="space-y-6">
@@ -1903,7 +1841,7 @@ export default function PlatformDetails() {
                         <TabsTrigger value="all" data-testid="tab-platform-chart-all">All</TabsTrigger>
                       </TabsList>
                     </Tabs>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
                         <button onClick={() => setChartAggregation("month")} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "month" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-plat-agg-month-std">Mo</button>
                         <button onClick={() => setChartAggregation("quarter")} className={cn("px-2.5 py-1.5 transition-colors", chartAggregation === "quarter" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-plat-agg-quarter-std">Qtr</button>
@@ -1918,6 +1856,32 @@ export default function PlatformDetails() {
                       >
                         {showAllPoints ? "Monthly view" : "All data points"}
                       </Button>
+                      {isStockTicker && (
+                        <Button
+                          variant={showStockOverlay ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setShowStockOverlay(v => !v)}
+                          className="text-xs gap-1.5"
+                          data-testid="button-toggle-stock-overlay"
+                        >
+                          <TrendingUp className="h-3.5 w-3.5" />
+                          Stock price
+                        </Button>
+                      )}
+                      {isStockTicker && showStockOverlay && (
+                        <div className="flex items-center gap-1 border rounded-md overflow-hidden text-xs font-medium" data-testid="stock-chart-range-toggle">
+                          {(['1m', '3m', '6m', '1y', '5y'] as const).map((r) => (
+                            <button
+                              key={r}
+                              onClick={() => setStockChartRange(r)}
+                              className={cn("px-2 py-1.5 transition-colors", stockChartRange === r ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+                              data-testid={`button-stock-range-${r}`}
+                            >
+                              {r.toUpperCase()}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="h-[260px] sm:h-[400px] w-full">
@@ -1929,13 +1893,17 @@ export default function PlatformDetails() {
                     ) : activeChartData && activeChartData.length > 0 ? (
                       platAggregatedData ? (
                         <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={platAggregatedData}>
+                          <LineChart data={showStockOverlay && platAggDataWithStockPrice ? platAggDataWithStockPrice : platAggregatedData}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                             <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={platAggXFmt} interval="preserveStartEnd" />
                             {(chartView === "overview" || chartView === "all") && <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v)} domain={['auto', 'auto']} />}
                             {(chartView === "profit" || chartView === "all") && <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />}
                             {(chartView === "monthly" || chartView === "all") && <YAxis yAxisId="monthly" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => formatAxisValue(v, true)} domain={['auto', 'auto']} />}
-                            <Tooltip formatter={(v: number, name: string) => [formatAxisValue(v, name === "Profit/Loss" || name === "Monthly Growth" || name === "Quarterly Growth" || name === "Yearly Growth"), name]} labelFormatter={platAggXFmt} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
+                            {showStockOverlay && isStockTicker && <YAxis yAxisId="stockPrice" orientation="right" stroke="#a78bfa" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => v.toFixed(2)} domain={['auto', 'auto']} width={52} />}
+                            <Tooltip formatter={(v: number, name: string) => {
+                              if (name === `Share Price (${stockChartData?.currency || 'USD'})`) return [`${stockChartData?.currency || ''} ${v.toFixed(2)}`, name];
+                              return [formatAxisValue(v, name === "Profit/Loss" || name === "Monthly Growth" || name === "Quarterly Growth" || name === "Yearly Growth"), name];
+                            }} labelFormatter={platAggXFmt} contentStyle={{ borderRadius: "8px", border: "1px solid hsl(var(--border))", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
                             <Legend verticalAlign="top" height={36} />
                             {(chartView === "overview" || chartView === "all") && <>
                               <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={3} dot={<LiveDot />} activeDot={{ r: 6 }} animationDuration={350} />
@@ -1944,23 +1912,13 @@ export default function PlatformDetails() {
                             {(chartView === "profit" || chartView === "all") && <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={3} dot={false} activeDot={{ r: 6 }} animationDuration={350} />}
                             {chartView === "monthly" && <Line type="monotone" dataKey="totalMonthlyChange" name={chartAggregation === "quarter" ? "Quarterly Growth" : "Yearly Growth"} yAxisId="monthly" stroke="#f59e0b" strokeWidth={3} dot={false} activeDot={{ r: 6 }} animationDuration={350} />}
                             {chartView === "all" && <Line type="monotone" dataKey="monthlyChange" name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={3} dot={false} activeDot={{ r: 6 }} animationDuration={350} />}
+                            {showStockOverlay && isStockTicker && <Line connectNulls type="monotone" dataKey="price" name={`Share Price (${stockChartData?.currency || 'USD'})`} yAxisId="stockPrice" stroke="#a78bfa" strokeWidth={2} dot={false} activeDot={{ r: 4 }} animationDuration={350} />}
+                            {showStockOverlay && isStockTicker && stockInfo?.averagePrice != null && <ReferenceLine y={stockInfo.averagePrice} yAxisId="stockPrice" stroke="#a78bfa80" strokeDasharray="6 3" strokeWidth={1.5} label={{ value: `Avg ${stockInfo.averagePrice.toFixed(2)}`, position: 'insideTopRight', fontSize: 10, fill: '#a78bfa' }} />}
                           </LineChart>
                         </ResponsiveContainer>
                       ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={activeChartData.map((h: any, i: number, arr: any[]) => {
-                          const prev = arr[i - 1];
-                          const totalChange = i === 0 ? 0 : (h.value - prev.value) - (h.invested - prev.invested);
-                          return {
-                            ...h, 
-                            timestamp: new Date(h.date).getTime(),
-                            gain: h.value - h.invested,
-                            monthlyChange: totalChange,
-                            valueChange: i === 0 ? null : h.value - prev.value,
-                            investedChange: i === 0 ? null : h.invested - prev.invested,
-                            gainChange: i === 0 ? null : (h.value - h.invested) - (prev.value - prev.invested),
-                          };
-                        })}>
+                        <LineChart data={showStockOverlay && mergedChartDataWithStockPrice ? mergedChartDataWithStockPrice : baseChartData ?? []}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                           <XAxis 
                             dataKey="timestamp" 
@@ -1993,20 +1951,23 @@ export default function PlatformDetails() {
                           {(chartView === "monthly" || chartView === "all") && (
                             <YAxis yAxisId="monthly" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => formatAxisValue(value, true)} domain={['auto', 'auto']} />
                           )}
+                          {showStockOverlay && isStockTicker && <YAxis yAxisId="stockPrice" orientation="right" stroke="#a78bfa" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => v.toFixed(2)} domain={['auto', 'auto']} width={52} />}
                           <Tooltip content={<PlatformChartTooltip />} />
                           <Legend verticalAlign="top" height={36}/>
                           {(chartView === "overview" || chartView === "all") && (
                             <>
-                              <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={4} dot={<LiveDot />} activeDot={{ r: 7 }} />
-                              <Line type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={false} />
+                              <Line connectNulls type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke={platform.color} strokeWidth={4} dot={<LiveDot />} activeDot={{ r: 7 }} />
+                              <Line connectNulls type="monotone" dataKey="invested" name="Total Invested" yAxisId="left" stroke="#8884d8" strokeWidth={3} strokeDasharray="5 5" dot={false} />
                             </>
                           )}
                           {(chartView === "profit" || chartView === "all") && (
-                            <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={chartView === "all" ? 3 : 4} dot={false} activeDot={{ r: 7 }} />
+                            <Line connectNulls type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="right" stroke="#10b981" strokeWidth={chartView === "all" ? 3 : 4} dot={false} activeDot={{ r: 7 }} />
                           )}
                           {(chartView === "monthly" || chartView === "all") && (
-                            <Line type="monotone" dataKey="monthlyChange" name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={chartView === "all" ? 3 : 4} dot={false} activeDot={{ r: 7 }} />
+                            <Line connectNulls type="monotone" dataKey="monthlyChange" name="Monthly Growth" yAxisId="monthly" stroke="#f59e0b" strokeWidth={chartView === "all" ? 3 : 4} dot={false} activeDot={{ r: 7 }} />
                           )}
+                          {showStockOverlay && isStockTicker && <Line connectNulls type="monotone" dataKey="price" name={`Share Price (${stockChartData?.currency || 'USD'})`} yAxisId="stockPrice" stroke="#a78bfa" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />}
+                          {showStockOverlay && isStockTicker && stockInfo?.averagePrice != null && <ReferenceLine y={stockInfo.averagePrice} yAxisId="stockPrice" stroke="#a78bfa80" strokeDasharray="6 3" strokeWidth={1.5} label={{ value: `Avg ${stockInfo.averagePrice.toFixed(2)}`, position: 'insideTopRight', fontSize: 10, fill: '#a78bfa' }} />}
                         </LineChart>
                       </ResponsiveContainer>
                       )

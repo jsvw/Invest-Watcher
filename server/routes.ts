@@ -2424,23 +2424,36 @@ export async function registerRoutes(
       };
       const yfParams = rangeMap[rangeParam] || rangeMap["1y"];
 
-      const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${yfParams.interval}&range=${yfParams.range}`;
-      const yfRes = await fetch(yfUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-      });
+      const yfHeaders = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+      };
 
-      if (!yfRes.ok) {
-        return res.status(502).json({ message: `Yahoo Finance returned ${yfRes.status} for ${ticker}` });
+      let yfData: any = null;
+      for (const host of ['query2.finance.yahoo.com', 'query1.finance.yahoo.com']) {
+        const yfUrl = `https://${host}/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${yfParams.interval}&range=${yfParams.range}`;
+        try {
+          const yfRes = await fetch(yfUrl, { headers: yfHeaders });
+          if (!yfRes.ok) {
+            console.log(`[StockChart] ${host} HTTP ${yfRes.status} for ${ticker}`);
+            continue;
+          }
+          const candidate = await yfRes.json() as any;
+          const timestamps = candidate?.chart?.result?.[0]?.timestamp || [];
+          console.log(`[StockChart] ${host} → ${timestamps.length} timestamps for ${ticker}`);
+          if (timestamps.length > 0) { yfData = candidate; break; }
+        } catch (e: any) {
+          console.log(`[StockChart] ${host} fetch error for ${ticker}: ${e.message}`);
+        }
       }
 
-      const yfData = await yfRes.json() as any;
       const chart = yfData?.chart?.result?.[0];
-      if (!chart) {
-        return res.status(502).json({ message: `No chart data found for ticker ${ticker}` });
-      }
-
-      const timestamps: number[] = chart.timestamp || [];
-      const closes: (number | null)[] = chart.indicators?.quote?.[0]?.close || [];
+      const chartCurrency: string = chart?.meta?.currency || "USD";
+      const timestamps: number[] = chart?.timestamp || [];
+      const closes: (number | null)[] = chart?.indicators?.quote?.[0]?.close || [];
 
       const points: { date: string; price: number }[] = [];
       for (let i = 0; i < timestamps.length; i++) {
@@ -2450,7 +2463,18 @@ export async function registerRoutes(
         points.push({ date, price });
       }
 
-      res.json({ points, currency: chart.meta?.currency || "USD" });
+      // Fall back to DB valuations if Yahoo Finance returned nothing
+      if (points.length === 0) {
+        console.log(`[StockChart] No Yahoo Finance data for ${ticker}, falling back to DB valuations`);
+        const valuations = await storage.getValuations(platformId);
+        const fallbackPoints = (valuations as any[])
+          .map(v => ({ date: String(v.date).slice(0, 10), price: Number(v.value) }))
+          .filter(p => !isNaN(p.price))
+          .sort((a, b) => a.date.localeCompare(b.date));
+        return res.json({ points: fallbackPoints, currency: chartCurrency, fallback: true });
+      }
+
+      res.json({ points, currency: chartCurrency });
     } catch (err: any) {
       console.error("Stock chart error:", err.message);
       res.status(500).json({ message: err.message });
