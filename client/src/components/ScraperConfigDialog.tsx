@@ -130,7 +130,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
       return res.json();
     },
     onSuccess: (data) => {
-      endScrape(`platform-${platformId}`);
+      endScrape(`platform-${platformId}`, true);
       queryClient.invalidateQueries({ queryKey: ['/api/platforms', platformId, 'scraper-config'] });
       queryClient.invalidateQueries({ queryKey: ['/api/valuations'] });
       queryClient.invalidateQueries({ queryKey: ['/api/assets'] });
@@ -139,7 +139,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
       toast({ title: data.message || "Scraping complete" });
     },
     onError: (err: Error) => {
-      endScrape(`platform-${platformId}`);
+      endScrape(`platform-${platformId}`, false);
       queryClient.invalidateQueries({ queryKey: ['/api/platforms', platformId, 'scraper-config'] });
       toast({ title: `Scraping failed: ${err.message}`, variant: "destructive" });
     },

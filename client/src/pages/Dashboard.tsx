@@ -597,7 +597,7 @@ export default function Dashboard() {
             message: data.message || (scrapeRes.ok ? "Success" : "Failed"),
           };
           results.push(entry);
-          endScrape(`scrape-all-${config.platformId}`);
+          endScrape(`scrape-all-${config.platformId}`, scrapeRes.ok);
           setScrapeLog(prev => {
             const updated = [...(prev || [])];
             const idx = updated.findLastIndex(e => e.platformName === config.platformName);
@@ -607,7 +607,7 @@ export default function Dashboard() {
         } catch (err: any) {
           const entry = { platformName: config.platformName, success: false, message: err.message || "Failed" };
           results.push(entry);
-          endScrape(`scrape-all-${config.platformId}`);
+          endScrape(`scrape-all-${config.platformId}`, false);
           setScrapeLog(prev => {
             const updated = [...(prev || [])];
             const idx = updated.findLastIndex(e => e.platformName === config.platformName);
