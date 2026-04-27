@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Globe, Loader2, Settings2, CheckCircle, XCircle, Trash2 } from "lucide-react";
+import { Globe, Loader2, Settings2, CheckCircle, XCircle, Trash2, Info } from "lucide-react";
+import { useScrapeStatus } from "@/lib/scrape-context";
 
 const SCRAPER_TYPES = [
   { value: "monefit", label: "Monefit SmartSaver", credentialType: "email" },
@@ -29,6 +30,7 @@ interface ScraperConfigDialogProps {
 
 export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigDialogProps) {
   const [open, setOpen] = useState(false);
+  const { startScrape, endScrape } = useScrapeStatus();
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -112,6 +114,9 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
   });
 
   const runScrape = useMutation({
+    onMutate: () => {
+      startScrape(`platform-${platformId}`, platformName);
+    },
     mutationFn: async () => {
       const res = await fetch(`/api/platforms/${platformId}/scrape`, {
         method: "POST",
@@ -125,6 +130,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
       return res.json();
     },
     onSuccess: (data) => {
+      endScrape(`platform-${platformId}`);
       queryClient.invalidateQueries({ queryKey: ['/api/platforms', platformId, 'scraper-config'] });
       queryClient.invalidateQueries({ queryKey: ['/api/valuations'] });
       queryClient.invalidateQueries({ queryKey: ['/api/assets'] });
@@ -133,6 +139,7 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
       toast({ title: data.message || "Scraping complete" });
     },
     onError: (err: Error) => {
+      endScrape(`platform-${platformId}`);
       queryClient.invalidateQueries({ queryKey: ['/api/platforms', platformId, 'scraper-config'] });
       toast({ title: `Scraping failed: ${err.message}`, variant: "destructive" });
     },
@@ -238,13 +245,20 @@ export function ScraperConfigDialog({ platformId, platformName }: ScraperConfigD
               <Button
                 variant="destructive"
                 onClick={() => deleteConfig.mutate()}
-                disabled={deleteConfig.isPending}
+                disabled={deleteConfig.isPending || runScrape.isPending}
                 data-testid="button-delete-scraper"
               >
                 <Trash2 className="h-4 w-4 mr-1" />
                 Remove
               </Button>
             </div>
+
+            {runScrape.isPending && (
+              <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40 px-3 py-2 text-xs text-blue-700 dark:text-blue-300" data-testid="notice-safe-leave-scraper">
+                <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                <span>You can safely leave this page — scraping continues in the background.</span>
+              </div>
+            )}
 
             <div className="border-t pt-4">
               <p className="text-sm font-medium mb-2">Update credentials</p>

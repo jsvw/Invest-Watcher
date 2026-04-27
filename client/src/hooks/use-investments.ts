@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl, type InsertInvestment } from "@shared/routes";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { useScrapeStatus } from "@/lib/scrape-context";
 
 export type ConfirmDepositItem = {
   investmentIds: number[];
@@ -160,8 +161,21 @@ export function useConfirmInvestment() {
 export function useConfirmDepositWithValuation() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { startScrape, endScrape } = useScrapeStatus();
 
   return useMutation({
+    onMutate: ({ hasScraperConfig, platformId, platformName }: {
+      investmentIds: number[];
+      platformId: number;
+      platformName?: string;
+      newValuation?: number;
+      platformMode: string;
+      hasScraperConfig?: boolean;
+    }) => {
+      if (hasScraperConfig && platformName) {
+        startScrape(`deposit-${platformId}`, platformName);
+      }
+    },
     mutationFn: async ({
       investmentIds,
       platformId,
@@ -171,6 +185,7 @@ export function useConfirmDepositWithValuation() {
     }: {
       investmentIds: number[];
       platformId: number;
+      platformName?: string;
       newValuation?: number;
       platformMode: string;
       hasScraperConfig?: boolean;
@@ -239,6 +254,11 @@ export function useConfirmDepositWithValuation() {
         description: error.message,
         variant: "destructive",
       });
+    },
+    onSettled: (_data, _error, variables) => {
+      if (variables.hasScraperConfig) {
+        endScrape(`deposit-${variables.platformId}`);
+      }
     },
   });
 }

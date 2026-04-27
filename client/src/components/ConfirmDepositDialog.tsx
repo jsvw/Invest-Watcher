@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useForm } from "react-hook-form";
 import { useEffect } from "react";
-import { CheckCircle, Loader2, RefreshCw } from "lucide-react";
+import { CheckCircle, Loader2, RefreshCw, Info } from "lucide-react";
 import { formatCurrency, getCurrencySymbol } from "@/lib/currency";
 import { format } from "date-fns";
 import type { ConfirmDepositItem } from "@/hooks/use-investments";
@@ -87,11 +87,21 @@ export function ConfirmDepositDialog({
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-1">
           {hasScraperConfig ? (
-            <div className="flex items-start gap-3 rounded-md border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40 px-4 py-3">
-              <RefreshCw className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-              <p className="text-sm text-blue-700 dark:text-blue-300">
-                The updated balance will be fetched automatically from {item.platformName} after confirming.
-              </p>
+            <div className="space-y-2">
+              <div className="flex items-start gap-3 rounded-md border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/40 px-4 py-3">
+                <RefreshCw className={`h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0 ${isPending ? "animate-spin" : ""}`} />
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  {isPending
+                    ? `Fetching the latest balance from ${item.platformName}…`
+                    : `The updated balance will be fetched automatically from ${item.platformName} after confirming.`}
+                </p>
+              </div>
+              {isPending && (
+                <div className="flex items-start gap-2 rounded-md border border-blue-100 bg-blue-50/60 dark:border-blue-900 dark:bg-blue-950/20 px-3 py-2 text-xs text-blue-600 dark:text-blue-400" data-testid="notice-safe-leave-deposit">
+                  <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                  <span>You can safely leave this page — scraping continues in the background.</span>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-2">

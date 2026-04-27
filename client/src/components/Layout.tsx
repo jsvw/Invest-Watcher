@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, TrendingUp, Menu, X, LogOut, Settings, Plus, AlertTriangle, Download, Sun, Moon } from "lucide-react";
+import { LayoutDashboard, TrendingUp, Menu, X, LogOut, Settings, Plus, AlertTriangle, Download, Sun, Moon, Loader2 } from "lucide-react";
 import { useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { AddPlatformDialog } from "@/components/AddPlatformDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ExportReportDialog } from "@/components/ExportReportDialog";
 import { useTheme } from "@/lib/theme";
+import { useScrapeStatus } from "@/lib/scrape-context";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -19,6 +20,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [exportOpen, setExportOpen] = useState(false);
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { activeScrapes } = useScrapeStatus();
   const { data: platforms } = usePlatforms();
 
   const touchStartX = useRef<number | null>(null);
@@ -85,6 +87,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
           <span>InvestTrack</span>
         </div>
+        {activeScrapes.length > 0 && (
+          <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 font-medium" data-testid="badge-scraping-mobile">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <span>Scraping…</span>
+          </div>
+        )}
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className="flex items-center justify-center w-11 h-11 rounded-xl hover:bg-muted transition-colors"
@@ -268,6 +276,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <LogOut className="h-4 w-4" />
                 </Button>
               </div>
+            </div>
+          )}
+          {activeScrapes.length > 0 && (
+            <div className="flex items-center gap-2 rounded-md bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-xs text-amber-600 dark:text-amber-400" data-testid="badge-scraping-sidebar">
+              <Loader2 className="h-3.5 w-3.5 animate-spin flex-shrink-0" />
+              <span className="truncate">
+                {activeScrapes.length === 1
+                  ? `Scraping ${activeScrapes[0].label}…`
+                  : `Scraping ${activeScrapes.length} platform(s)…`}
+              </span>
             </div>
           )}
           <div className="text-center text-xs text-muted-foreground/60" data-testid="text-app-version">

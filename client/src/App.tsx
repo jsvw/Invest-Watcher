@@ -8,6 +8,7 @@ import AuthPage from "@/pages/AuthPage";
 import { lazy, Suspense, useEffect, createContext, useContext } from "react";
 import { Loader2 } from "lucide-react";
 import { ThemeProvider } from "@/lib/theme";
+import { ScrapeProvider } from "@/lib/scrape-context";
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const PlatformDetails = lazy(() => import("@/pages/PlatformDetails"));
@@ -125,12 +126,14 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <TooltipProvider>
-          <AuthProvider>
-            <Toaster />
-            <Router />
-          </AuthProvider>
-        </TooltipProvider>
+        <ScrapeProvider>
+          <TooltipProvider>
+            <AuthProvider>
+              <Toaster />
+              <Router />
+            </AuthProvider>
+          </TooltipProvider>
+        </ScrapeProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

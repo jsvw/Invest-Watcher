@@ -37,6 +37,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { PortfolioHeatmap, type EnrichedAsset } from "@/components/PortfolioHeatmap";
 import { WaterfallChart } from "@/components/WaterfallChart";
 import type { DashboardFilter } from "@shared/schema";
+import { useScrapeStatus } from "@/lib/scrape-context";
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -284,6 +285,7 @@ export default function Dashboard() {
   const { data: pendingInvestments } = useAllPendingInvestments(pendingPopoverOpen || totalPendingCheck > 0);
   const confirmDepositWithValuation = useConfirmDepositWithValuation();
   const { toast } = useToast();
+  const { startScrape, endScrape } = useScrapeStatus();
 
   // ── Shared filter state ──────────────────────────────────────────────────
   const [excludedPlatforms, setExcludedPlatforms] = useState<Set<number>>(new Set());
@@ -581,6 +583,7 @@ export default function Dashboard() {
       const results: { platformName: string; success: boolean; message: string }[] = [];
 
       for (const config of configs) {
+        startScrape(`scrape-all-${config.platformId}`, config.platformName);
         setScrapeLog(prev => [...(prev || []), { platformName: config.platformName, success: true, message: "Scraping..." }]);
         try {
           const scrapeRes = await fetch(`/api/platforms/${config.platformId}/scrape`, {
@@ -594,6 +597,7 @@ export default function Dashboard() {
             message: data.message || (scrapeRes.ok ? "Success" : "Failed"),
           };
           results.push(entry);
+          endScrape(`scrape-all-${config.platformId}`);
           setScrapeLog(prev => {
             const updated = [...(prev || [])];
             const idx = updated.findLastIndex(e => e.platformName === config.platformName);
@@ -603,6 +607,7 @@ export default function Dashboard() {
         } catch (err: any) {
           const entry = { platformName: config.platformName, success: false, message: err.message || "Failed" };
           results.push(entry);
+          endScrape(`scrape-all-${config.platformId}`);
           setScrapeLog(prev => {
             const updated = [...(prev || [])];
             const idx = updated.findLastIndex(e => e.platformName === config.platformName);
@@ -1545,6 +1550,11 @@ export default function Dashboard() {
                 </Button>
               </CardHeader>
               <CardContent className="px-4 pb-3 pt-0">
+                {scrapeAllMutation.isPending && (
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mb-2" data-testid="notice-safe-leave-scrape-all">
+                    You can close this panel or navigate away — scraping runs in the background.
+                  </p>
+                )}
                 <div ref={scrapeLogRef} className="max-h-48 overflow-y-auto space-y-1">
                   {scrapeAllMutation.isPending && scrapeLog.length === 0 && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
@@ -1828,7 +1838,7 @@ export default function Dashboard() {
               const item = confirmQueue[0];
               if (!item) return;
               confirmDepositWithValuation.mutate(
-                { investmentIds: item.investmentIds, platformId: item.platformId, newValuation, platformMode: item.platformMode, hasScraperConfig: item.hasScraperConfig },
+                { investmentIds: item.investmentIds, platformId: item.platformId, platformName: item.platformName, newValuation, platformMode: item.platformMode, hasScraperConfig: item.hasScraperConfig },
                 {
                   onSuccess: () => {
                     const remaining = confirmQueue.slice(1);
