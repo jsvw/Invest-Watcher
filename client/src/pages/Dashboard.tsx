@@ -2521,7 +2521,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm inline-block bg-emerald-500" />Achieved</span>
-                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm inline-block bg-gray-300" />Gap to target</span>
+                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm inline-block bg-muted-foreground/30" />Gap to target</span>
                     <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm inline-block bg-red-500" />Over target</span>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2">
