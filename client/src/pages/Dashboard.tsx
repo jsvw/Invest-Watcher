@@ -2135,7 +2135,7 @@ export default function Dashboard() {
                       const series = aggregatedSeriesData.find(s => s.date === row.date);
                       return { ...row, growthChange: series?.monthlyChange ?? null, growthChangePct: series?.monthlyChangePct ?? null };
                     });
-                    if (displayedChartType === "bar") {
+                    if (!forecastRange && displayedChartType === "bar") {
                       return (
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={aggregatedChartData} barCategoryGap="20%">
@@ -2211,7 +2211,7 @@ export default function Dashboard() {
                       : displayedChartAggregation === "year"
                         ? "Yearly Growth"
                         : "Monthly Growth";
-                    if (displayedChartType === "bar") {
+                    if (!forecastRange && displayedChartType === "bar") {
                       return (
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={aggregatedSeriesData} barCategoryGap="20%">
