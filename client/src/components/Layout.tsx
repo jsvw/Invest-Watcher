@@ -229,9 +229,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* Fixed bottom section */}
         <div className="p-6 border-t space-y-4 flex-shrink-0">
           {user && (
-            <div className="flex items-center justify-between">
-              <div className="text-xs text-muted-foreground truncate">{user.email}</div>
-              <div className="flex items-center gap-1 shrink-0">
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground truncate px-1">{user.email}</div>
+              <div className="flex items-center gap-1">
                 <Button
                   variant="ghost"
                   size="icon"
