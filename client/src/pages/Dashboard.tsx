@@ -1,3 +1,4 @@
+import ReactDOM from "react-dom";
 import { Layout } from "@/components/Layout";
 import { StatCard } from "@/components/StatCard";
 import { usePlatforms } from "@/hooks/use-platforms";
@@ -293,12 +294,24 @@ export default function Dashboard() {
   const [filterPresetName, setFilterPresetName] = useState("");
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
   const [longRangeOpen, setLongRangeOpen] = useState(false);
+  const [longRangePos, setLongRangePos] = useState<{ top: number; left: number } | null>(null);
   const longRangeRef = useRef<HTMLDivElement>(null);
+  const longRangeMenuRef = useRef<HTMLDivElement>(null);
+  const longRangeCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (longRangeCloseTimer.current) clearTimeout(longRangeCloseTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!longRangeOpen) return;
     function handleOutside(e: MouseEvent | TouchEvent) {
-      if (longRangeRef.current && !longRangeRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const insideTrigger = longRangeRef.current && longRangeRef.current.contains(target);
+      const insideMenu = longRangeMenuRef.current && longRangeMenuRef.current.contains(target);
+      if (!insideTrigger && !insideMenu) {
         setLongRangeOpen(false);
       }
     }
@@ -1842,18 +1855,66 @@ export default function Dashboard() {
                                   key={o.value}
                                   className="relative"
                                   ref={longRangeRef}
-                                  onMouseEnter={() => { if (supportsHover()) setLongRangeOpen(true); }}
-                                  onMouseLeave={() => { if (supportsHover()) setLongRangeOpen(false); }}
+                                  onMouseEnter={() => {
+                                    if (supportsHover()) {
+                                      if (longRangeCloseTimer.current) {
+                                        clearTimeout(longRangeCloseTimer.current);
+                                        longRangeCloseTimer.current = null;
+                                      }
+                                      if (longRangeRef.current) {
+                                        const rect = longRangeRef.current.getBoundingClientRect();
+                                        setLongRangePos({ top: rect.bottom, left: rect.right });
+                                      }
+                                      setLongRangeOpen(true);
+                                    }
+                                  }}
+                                  onMouseLeave={() => {
+                                    if (supportsHover()) {
+                                      longRangeCloseTimer.current = setTimeout(() => setLongRangeOpen(false), 100);
+                                    }
+                                  }}
                                 >
                                   <TabsTrigger
                                     value={o.value}
                                     data-testid="button-forecast-5y"
-                                    onClick={() => { if (!supportsHover()) setLongRangeOpen(v => !v); }}
+                                    onClick={() => {
+                                      if (!supportsHover()) {
+                                        if (longRangeRef.current) {
+                                          const rect = longRangeRef.current.getBoundingClientRect();
+                                          setLongRangePos({ top: rect.bottom, left: rect.right });
+                                        }
+                                        setLongRangeOpen(v => !v);
+                                      }
+                                    }}
                                   >
                                     {o.label}
                                   </TabsTrigger>
-                                  {longRangeOpen && (
-                                    <div className="absolute top-full right-0 z-50 mt-1 flex flex-col min-w-[4rem] bg-popover border border-border rounded-md shadow-md overflow-hidden">
+                                  {longRangeOpen && longRangePos && ReactDOM.createPortal(
+                                    <div
+                                      ref={longRangeMenuRef}
+                                      style={{
+                                        position: "fixed",
+                                        top: longRangePos.top + 4,
+                                        left: longRangePos.left,
+                                        transform: "translateX(-100%)",
+                                        zIndex: 9999,
+                                      }}
+                                      className="flex flex-col min-w-[4rem] bg-popover border border-border rounded-md shadow-md overflow-hidden"
+                                      onMouseEnter={() => {
+                                        if (supportsHover()) {
+                                          if (longRangeCloseTimer.current) {
+                                            clearTimeout(longRangeCloseTimer.current);
+                                            longRangeCloseTimer.current = null;
+                                          }
+                                          setLongRangeOpen(true);
+                                        }
+                                      }}
+                                      onMouseLeave={() => {
+                                        if (supportsHover()) {
+                                          longRangeCloseTimer.current = setTimeout(() => setLongRangeOpen(false), 100);
+                                        }
+                                      }}
+                                    >
                                       {(["10y","20y","30y","40y"] as const).map(yr => (
                                         <button
                                           key={yr}
@@ -1867,7 +1928,8 @@ export default function Dashboard() {
                                           +{yr.toUpperCase()}
                                         </button>
                                       ))}
-                                    </div>
+                                    </div>,
+                                    document.body
                                   )}
                                 </div>
                               );
