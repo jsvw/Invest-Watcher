@@ -1930,23 +1930,19 @@ export default function Dashboard() {
                     >
                       <LineChartIcon className="w-4 h-4" />
                     </button>
-                    {chartView !== "all" && (
+                    {!forecastRange && chartView !== "all" && (
                       <button
-                        onClick={() => { if (!forecastRange) setChartType("bar"); }}
-                        disabled={!!forecastRange}
-                        title={forecastRange ? "Not available in forecast mode" : undefined}
-                        className={cn("px-2 py-3 sm:py-1.5 min-h-[44px] sm:min-h-0 transition-colors", forecastRange ? "opacity-40 cursor-not-allowed text-muted-foreground" : chartType === "bar" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+                        onClick={() => setChartType("bar")}
+                        className={cn("px-2 py-3 sm:py-1.5 min-h-[44px] sm:min-h-0 transition-colors", chartType === "bar" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
                         data-testid="button-chart-type-bar"
                       >
                         <BarChart2 className="w-4 h-4" />
                       </button>
                     )}
-                    {chartView === "overview" && (
+                    {!forecastRange && chartView === "overview" && (
                       <button
-                        onClick={() => { if (!forecastRange) setChartType("waterfall"); }}
-                        disabled={!!forecastRange}
-                        title={forecastRange ? "Not available in forecast mode" : undefined}
-                        className={cn("px-2 py-3 sm:py-1.5 min-h-[44px] sm:min-h-0 transition-colors", forecastRange ? "opacity-40 cursor-not-allowed text-muted-foreground" : chartType === "waterfall" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+                        onClick={() => setChartType("waterfall")}
+                        className={cn("px-2 py-3 sm:py-1.5 min-h-[44px] sm:min-h-0 transition-colors", chartType === "waterfall" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
                         data-testid="button-chart-type-waterfall"
                       >
                         <GitCommitHorizontal className="w-4 h-4" />
@@ -2111,8 +2107,8 @@ export default function Dashboard() {
                   const profitAxisFmt = (v: number) => displayedChartValueMode === "pct" ? fmtPct(v) : formatAxisValue(v, true);
                   const monthlyAxisFmt = (v: number) => displayedChartValueMode === "pct" ? fmtPct(v) : formatAxisValue(v, true);
 
-                  // ── Waterfall view (overview tab only) ─────────────────────────────
-                  if (displayedChartView === "overview" && displayedChartType === "waterfall") {
+                  // ── Waterfall view (overview tab only, never in forecast mode) ───────
+                  if (!forecastRange && displayedChartView === "overview" && displayedChartType === "waterfall") {
                     return (
                       <WaterfallChart
                         currency={currency}
@@ -2282,7 +2278,7 @@ export default function Dashboard() {
                     );
                   }
 
-                  if (displayedChartType === "bar") {
+                  if (!forecastRange && displayedChartType === "bar") {
                     return (
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={mappedData} barCategoryGap="20%">
