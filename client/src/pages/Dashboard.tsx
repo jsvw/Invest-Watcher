@@ -736,9 +736,10 @@ export default function Dashboard() {
     const FORECAST_MONTHS: Record<string, number> = { "3m": 3, "3q": 9, "1y": 12, "2y": 24, "5y": 60, "10y": 120, "20y": 240, "30y": 360, "40y": 480 };
     const months = FORECAST_MONTHS[forecastRange] ?? 3;
 
-    // Average net profit rate over last 12 months (strip out new capital flows)
-    const lookback = Math.min(12, chartData.length - 1);
-    const recent = chartData.slice(chartData.length - 1 - lookback);
+    // Average net profit rate over last 12 completed months (exclude current partial month)
+    const completedData = chartData.slice(0, chartData.length - 1);
+    const lookback = Math.min(12, completedData.length - 1);
+    const recent = completedData.slice(completedData.length - 1 - lookback);
     let rateSum = 0, count = 0;
     for (let i = 1; i < recent.length; i++) {
       const prev = recent[i - 1], curr = recent[i];
