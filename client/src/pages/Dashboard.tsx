@@ -1228,7 +1228,7 @@ export default function Dashboard() {
     if (!rebalancerData) return [];
     const map = new Map<string, { currentPct: number; targetPct: number; platforms: typeof rebalancerData.items }>();
     for (const item of rebalancerData.items) {
-      const cat = (item as any).category || "Other";
+      const cat = item.category || "Other";
       const existing = map.get(cat) ?? { currentPct: 0, targetPct: 0, platforms: [] };
       existing.currentPct += item.currentPct;
       existing.targetPct += item.targetPct;
@@ -2617,7 +2617,7 @@ export default function Dashboard() {
                           <p className="text-xs text-muted-foreground">All platforms are at or below their target.</p>
                         ) : (() => {
                           const byCategory = rebalancerData.sources.reduce((acc, p) => {
-                            const cat = (p as any).category || "Other";
+                            const cat = p.category || "Other";
                             (acc[cat] = acc[cat] ?? []).push(p);
                             return acc;
                           }, {} as Record<string, typeof rebalancerData.sources>);
@@ -2626,7 +2626,7 @@ export default function Dashboard() {
                             <div className="space-y-3">
                               {cats.map(cat => (
                                 <div key={cat}>
-                                  {cats.length > 1 && <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">{cat}</p>}
+                                  {(cats.length > 1 || byCategory[cat].length > 1) && <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">{cat}</p>}
                                   <div className="space-y-2">
                                     {byCategory[cat].map(p => (
                                       <div key={p.id} className="flex items-center gap-2" data-testid={`over-item-${p.id}`}>
@@ -2648,7 +2648,7 @@ export default function Dashboard() {
                           <p className="text-xs text-muted-foreground">All platforms are at or above their target.</p>
                         ) : (() => {
                           const byCategory = rebalancerData.destinations.reduce((acc, p) => {
-                            const cat = (p as any).category || "Other";
+                            const cat = p.category || "Other";
                             (acc[cat] = acc[cat] ?? []).push(p);
                             return acc;
                           }, {} as Record<string, typeof rebalancerData.destinations>);
@@ -2657,7 +2657,7 @@ export default function Dashboard() {
                             <div className="space-y-3">
                               {cats.map(cat => (
                                 <div key={cat}>
-                                  {cats.length > 1 && <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">{cat}</p>}
+                                  {(cats.length > 1 || byCategory[cat].length > 1) && <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">{cat}</p>}
                                   <div className="space-y-2">
                                     {byCategory[cat].map(p => (
                                       <div key={p.id} className="flex items-center gap-2" data-testid={`under-item-${p.id}`}>
