@@ -255,9 +255,10 @@ export function useConfirmDepositWithValuation() {
         variant: "destructive",
       });
     },
-    onSettled: (_data, error, variables) => {
+    onSettled: (data, error, variables) => {
       if (variables.hasScraperConfig) {
-        endScrape(`deposit-${variables.platformId}`, !error);
+        const scrapeSucceeded = !error && !data?.scrapeError;
+        endScrape(`deposit-${variables.platformId}`, scrapeSucceeded);
       }
     },
   });
