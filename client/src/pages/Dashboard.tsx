@@ -2198,10 +2198,10 @@ export default function Dashboard() {
                           <LineChart data={mergedMonthlyFc}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                             <XAxis dataKey="date" type="category" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={aggXFmt} interval="preserveStartEnd" />
-                            <YAxis yAxisId="monthly" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={monthlyAxisFmt} domain={['auto', 'auto']} />
+                            <YAxis yAxisId="monthly" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={v => formatAxisValue(v, true)} domain={['auto', 'auto']} />
                             <Tooltip content={<ChartTooltip />} />
                             <Legend verticalAlign="top" height={36} />
-                            <Line type="monotone" dataKey={monthlyKey} name={aggSeriesName} yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{ r: 7 }} connectNulls={false} animationDuration={350} />
+                            <Line type="monotone" dataKey="monthlyChange" name={aggSeriesName} yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} dot={false} activeDot={{ r: 7 }} connectNulls={false} animationDuration={350} />
                             <Line type="monotone" dataKey="forecastMonthlyGain" name={aggSeriesName} yAxisId="monthly" stroke="#f59e0b" strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={{ r: 5 }} connectNulls={false} animationDuration={350} legendType="none" />
                           </LineChart>
                         </ResponsiveContainer>
@@ -2293,7 +2293,7 @@ export default function Dashboard() {
                           <LineChart data={fcData}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                             {fcXAxis}
-                            <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={profitAxisFmt} domain={['auto', 'auto']} />
+                            <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={v => formatAxisValue(v, true)} domain={['auto', 'auto']} />
                             <Tooltip content={<ChartTooltip />} />
                             <Legend verticalAlign="top" height={36} />
                             <Line type="monotone" dataKey="gain" name="Profit/Loss" yAxisId="left" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 4 }} connectNulls={false} animationDuration={350} />
@@ -2310,8 +2310,8 @@ export default function Dashboard() {
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                             {fcXAxis}
                             <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} tickFormatter={v => formatAxisValue(v)} domain={['auto', 'auto']} />
-                            <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={profitAxisFmt} domain={['auto', 'auto']} />
-                            <YAxis yAxisId="monthly" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={monthlyAxisFmt} domain={['auto', 'auto']} />
+                            <YAxis yAxisId="right" orientation="right" stroke="#10b981" fontSize={12} tickLine={false} axisLine={false} tickFormatter={v => formatAxisValue(v, true)} domain={['auto', 'auto']} />
+                            <YAxis yAxisId="monthly" orientation="right" stroke="#f59e0b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={v => formatAxisValue(v, true)} domain={['auto', 'auto']} />
                             <Tooltip content={<ChartTooltip />} />
                             <Legend verticalAlign="top" height={36} />
                             <Line type="monotone" dataKey="value" name="Current Value" yAxisId="left" stroke="hsl(var(--primary))" strokeWidth={4} dot={false} activeDot={{ r: 6 }} connectNulls={false} animationDuration={350} />
