@@ -753,7 +753,15 @@ export default function Dashboard() {
     const last = chartData[chartData.length - 1];
     const lastDate = new Date(last.date);
 
-    const actual = chartData.map(p => ({ ...p, forecast: null as number | null }));
+    const actual = chartData.map(p => ({
+      ...p,
+      forecast: null as number | null,
+      forecastProfit: null as number | null,
+      forecastProfitIncrease: null as number | null,
+      forecastMonthlyGain: null as number | null,
+      investedPerMonth: null as number | null,
+      investedIncrease: null as number | null,
+    }));
     let prevFcValue = last.value;
     const projected = Array.from({ length: months }, (_, i) => {
       const period = i + 1;
@@ -1963,7 +1971,6 @@ export default function Dashboard() {
                     const next = v as typeof chartView;
                     if (next === "all" && chartType === "bar") setChartType("line");
                     if (next !== "overview" && chartType === "waterfall") setChartType("line");
-                    if (next !== "overview") { setForecastRange(null); setForecastMonthlyInvest(0); setLongRangeOpen(false); }
                     setChartView(next);
                   }}>
                     <TabsList className="flex-nowrap w-max">
@@ -2165,10 +2172,10 @@ export default function Dashboard() {
                         .map(p => ({
                           date: p.date,
                           [monthlyKey]: null as number | null,
-                          forecastMonthlyGain: (p as any).forecastMonthlyGain as number,
-                          forecastProfit: (p as any).forecastProfit,
-                          investedPerMonth: (p as any).investedPerMonth,
-                          investedIncrease: (p as any).investedIncrease,
+                          forecastMonthlyGain: p.forecastMonthlyGain,
+                          forecastProfit: p.forecastProfit,
+                          investedPerMonth: p.investedPerMonth,
+                          investedIncrease: p.investedIncrease,
                         }));
                       const transitionMonthly = forecastCombined.points
                         .filter(p => p.value !== null)
@@ -2176,10 +2183,10 @@ export default function Dashboard() {
                         .map(p => ({
                           date: p.date,
                           [monthlyKey]: null as number | null,
-                          forecastMonthlyGain: 0,
-                          forecastProfit: (p as any).forecastProfit,
-                          investedPerMonth: (p as any).investedPerMonth,
-                          investedIncrease: 0,
+                          forecastMonthlyGain: p.forecastMonthlyGain ?? 0,
+                          forecastProfit: p.forecastProfit,
+                          investedPerMonth: p.investedPerMonth,
+                          investedIncrease: p.investedIncrease ?? 0,
                         }));
                       const mergedMonthlyFc = [
                         ...aggregatedSeriesData.map(p => ({ ...p, forecastMonthlyGain: null as number | null })),
