@@ -90,7 +90,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {activeScrapes.length > 0 && (
           <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 font-medium" data-testid="badge-scraping-mobile">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            <span>Scraping…</span>
+            <span className="max-w-[140px] truncate">
+              {activeScrapes.length === 1
+                ? `Scraping ${activeScrapes[0].label}…`
+                : `Scraping ${activeScrapes.length} platform(s)…`}
+            </span>
           </div>
         )}
         <button

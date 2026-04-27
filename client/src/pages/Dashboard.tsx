@@ -622,13 +622,6 @@ export default function Dashboard() {
     onSuccess: (data) => {
       const succeeded = data.results?.filter((r: any) => r.success).length || 0;
       const failed = data.results?.filter((r: any) => !r.success).length || 0;
-      if (data.results.length > 0) {
-        toast({
-          title: "Scraping Complete",
-          description: `${succeeded} succeeded${failed > 0 ? `, ${failed} failed` : ''}`,
-          variant: failed > 0 ? "destructive" : "default",
-        });
-      }
       queryClient.invalidateQueries({ queryKey: [api.portfolio.history.path] });
       queryClient.invalidateQueries({ queryKey: ['/api/platforms'] });
       queryClient.invalidateQueries({ queryKey: ['/api/scraper-configs'] });
