@@ -2045,6 +2045,7 @@ export default function PlatformDetails() {
                                     depositDate: typeof item.date === "string" ? item.date : new Date(item.date).toISOString(),
                                     currentValue: Number(platforms?.find(p => p.id === id)?.currentValue ?? 0),
                                     platformMode,
+                                    hasScraperConfig: !!(scraperConfig?.enabled),
                                   });
                                 }}
                                 disabled={confirmDepositWithValuation.isPending}
@@ -2916,6 +2917,7 @@ export default function PlatformDetails() {
               platformId: confirmDepositDialogItem.platformId,
               newValuation,
               platformMode: confirmDepositDialogItem.platformMode,
+              hasScraperConfig: confirmDepositDialogItem.hasScraperConfig,
             },
             { onSuccess: () => setConfirmDepositDialogItem(null) }
           );

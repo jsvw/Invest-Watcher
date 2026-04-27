@@ -12,6 +12,7 @@ export type ConfirmDepositItem = {
   depositDate?: string;
   currentValue: number;
   platformMode: string;
+  hasScraperConfig?: boolean;
 };
 
 export function useAllPendingInvestments(enabled = true) {
@@ -166,14 +167,16 @@ export function useConfirmDepositWithValuation() {
       platformId,
       newValuation,
       platformMode,
+      hasScraperConfig,
     }: {
       investmentIds: number[];
       platformId: number;
       newValuation?: number;
       platformMode: string;
+      hasScraperConfig?: boolean;
     }) => {
       let valuationPosted = false;
-      if (newValuation !== undefined) {
+      if (!hasScraperConfig && newValuation !== undefined) {
         const res = await fetch(api.valuations.create.path, {
           method: api.valuations.create.method,
           headers: { "Content-Type": "application/json" },
@@ -192,7 +195,18 @@ export function useConfirmDepositWithValuation() {
         });
         if (!res.ok) throw new Error("Failed to confirm deposit");
       }
-      return { platformId, investmentIds, valuationPosted };
+      if (hasScraperConfig) {
+        const res = await fetch(`/api/platforms/${platformId}/scrape`, {
+          method: "POST",
+          credentials: "include",
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ message: "Scrape failed" }));
+          return { platformId, investmentIds, valuationPosted: false, scrapeTriggered: false, scrapeError: err.message || "Failed to fetch updated balance from platform" };
+        }
+        return { platformId, investmentIds, valuationPosted: false, scrapeTriggered: true, scrapeError: null };
+      }
+      return { platformId, investmentIds, valuationPosted, scrapeTriggered: false, scrapeError: null };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [api.investments.list.path, data.platformId] });
@@ -202,12 +216,22 @@ export function useConfirmDepositWithValuation() {
       queryClient.invalidateQueries({ queryKey: [api.valuations.list.path, data.platformId] });
       queryClient.invalidateQueries({ queryKey: [api.portfolio.history.path] });
       queryClient.invalidateQueries({ queryKey: ["/api/portfolio/available-filters"] });
-      toast({
-        title: "Deposit confirmed",
-        description: data.valuationPosted
-          ? "The deposit has been settled and the new valuation recorded."
-          : "The deposit has been marked as settled.",
-      });
+      if (data.scrapeError) {
+        toast({
+          title: "Deposit confirmed",
+          description: `The deposit has been settled, but fetching the updated balance failed: ${data.scrapeError}. Please add a manual valuation if needed.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Deposit confirmed",
+          description: data.scrapeTriggered
+            ? "The deposit has been settled and the latest balance has been fetched from the platform."
+            : data.valuationPosted
+            ? "The deposit has been settled and the new valuation recorded."
+            : "The deposit has been marked as settled.",
+        });
+      }
     },
     onError: (error: Error) => {
       toast({

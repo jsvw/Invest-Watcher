@@ -1734,6 +1734,7 @@ export default function Dashboard() {
                               totalAmount: invs.reduce((s, i) => s + Number(i.amount), 0),
                               currentValue: Number(platform.currentValue ?? 0),
                               platformMode: platform.platformMode || "standard",
+                              hasScraperConfig: !!(scraperConfigs?.find(c => c.platformId === platform.id)),
                             });
                           }
                           if (queue.length > 0) {
@@ -1782,6 +1783,7 @@ export default function Dashboard() {
                               depositDate: typeof inv.date === "string" ? inv.date : new Date(inv.date).toISOString(),
                               currentValue: Number(platform.currentValue ?? 0),
                               platformMode: platform.platformMode || "standard",
+                              hasScraperConfig: !!(scraperConfigs?.find(c => c.platformId === inv.platformId)),
                             }]);
                           }}
                           data-testid={`button-confirm-pending-${inv.id}`}
@@ -1807,7 +1809,7 @@ export default function Dashboard() {
               const item = confirmQueue[0];
               if (!item) return;
               confirmDepositWithValuation.mutate(
-                { investmentIds: item.investmentIds, platformId: item.platformId, newValuation, platformMode: item.platformMode },
+                { investmentIds: item.investmentIds, platformId: item.platformId, newValuation, platformMode: item.platformMode, hasScraperConfig: item.hasScraperConfig },
                 {
                   onSuccess: () => {
                     const remaining = confirmQueue.slice(1);

@@ -2961,7 +2961,8 @@ export async function registerRoutes(
   app.get('/api/scraper-configs', requireAuth, async (req, res) => {
     try {
       const userId = getAuthenticatedUserId(req)!;
-      const configs = await storage.getScraperConfigsByUser(userId);
+      const allConfigs = await storage.getScraperConfigsByUser(userId);
+      const configs = allConfigs.filter(c => c.enabled);
       const results = [];
       for (const config of configs) {
         const platform = await storage.getPlatform(config.platformId, userId);
