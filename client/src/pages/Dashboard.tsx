@@ -7,6 +7,7 @@ import {
   Wallet, TrendingUp, DollarSign, Check, RefreshCw, Loader2, CheckCircle, XCircle,
   X, Save, Bookmark, Trash2, Target, ArrowUpCircle, ArrowDownCircle,
   LineChart as LineChartIcon, BarChart2, Filter, Percent, GitCommitHorizontal,
+  ChevronDown, ChevronRight,
 } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import {
@@ -922,6 +923,8 @@ export default function Dashboard() {
   }, [flowData, excludedPlatformNames]);
 
   const [flowAggregation, setFlowAggregation] = useState<"month" | "quarter" | "year">("month");
+  const [rebalancerView, setRebalancerView] = useState<"platform" | "category">("platform");
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
   const aggregatedFlowMonths = useMemo(() => {
     if (flowAggregation === "month") return filteredFlowMonths;
@@ -1220,6 +1223,22 @@ export default function Dashboard() {
 
     return { items: itemsWithPct, sources, destinations, flows, currentDonut, targetDonut };
   }, [activePlatforms, platforms]);
+
+  const rebalancerCategoryData = useMemo(() => {
+    if (!rebalancerData) return [];
+    const map = new Map<string, { currentPct: number; targetPct: number; platforms: typeof rebalancerData.items }>();
+    for (const item of rebalancerData.items) {
+      const cat = (item as any).category || "Other";
+      const existing = map.get(cat) ?? { currentPct: 0, targetPct: 0, platforms: [] };
+      existing.currentPct += item.currentPct;
+      existing.targetPct += item.targetPct;
+      existing.platforms.push(item);
+      map.set(cat, existing);
+    }
+    return Array.from(map.entries())
+      .map(([category, data]) => ({ category, ...data }))
+      .sort((a, b) => b.targetPct - a.targetPct);
+  }, [rebalancerData]);
 
   const momMap = useMemo(() => {
     const m = new Map<number, number>();
@@ -2468,9 +2487,17 @@ export default function Dashboard() {
 
           {/* Portfolio Rebalancer */}
           <Card>
-            <CardHeader>
-              <CardTitle>Portfolio Rebalancer</CardTitle>
-              <CardDescription>Current vs target allocation — and exactly where to move capital to rebalance</CardDescription>
+            <CardHeader className="flex flex-row items-start justify-between gap-4 flex-wrap pb-2">
+              <div>
+                <CardTitle>Portfolio Rebalancer</CardTitle>
+                <CardDescription>Current vs target allocation — and exactly where to move capital to rebalance</CardDescription>
+              </div>
+              {rebalancerData && (
+                <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
+                  <button onClick={() => setRebalancerView("platform")} className={cn("px-2.5 py-1.5 transition-colors", rebalancerView === "platform" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-rebalancer-view-platform">Platform</button>
+                  <button onClick={() => setRebalancerView("category")} className={cn("px-2.5 py-1.5 transition-colors", rebalancerView === "category" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-rebalancer-view-category">Category</button>
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               {rebalancerData ? (
@@ -2478,17 +2505,30 @@ export default function Dashboard() {
                   <div className="h-[280px]" data-testid="rebalancer-alloc-chart">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
-                        data={[...rebalancerData.items].sort((a, b) => b.targetPct - a.targetPct).map(item => {
-                          const over = item.currentPct > item.targetPct;
-                          return {
-                            name: item.name,
-                            currentPct: item.currentPct,
-                            targetPct: item.targetPct,
-                            green: over ? item.targetPct : item.currentPct,
-                            gray: over ? 0 : item.targetPct - item.currentPct,
-                            red: over ? item.currentPct - item.targetPct : 0,
-                          };
-                        })}
+                        data={rebalancerView === "category"
+                          ? rebalancerCategoryData.map(cat => {
+                              const over = cat.currentPct > cat.targetPct;
+                              return {
+                                name: cat.category,
+                                currentPct: cat.currentPct,
+                                targetPct: cat.targetPct,
+                                green: over ? cat.targetPct : cat.currentPct,
+                                gray: over ? 0 : cat.targetPct - cat.currentPct,
+                                red: over ? cat.currentPct - cat.targetPct : 0,
+                              };
+                            })
+                          : [...rebalancerData.items].sort((a, b) => b.targetPct - a.targetPct).map(item => {
+                              const over = item.currentPct > item.targetPct;
+                              return {
+                                name: item.name,
+                                currentPct: item.currentPct,
+                                targetPct: item.targetPct,
+                                green: over ? item.targetPct : item.currentPct,
+                                gray: over ? 0 : item.targetPct - item.currentPct,
+                                red: over ? item.currentPct - item.targetPct : 0,
+                              };
+                            })
+                        }
                         margin={{ top: 4, right: 8, bottom: 40, left: 8 }}
                         barCategoryGap="30%"
                       >
@@ -2526,48 +2566,112 @@ export default function Dashboard() {
                     <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm inline-block bg-muted-foreground/30" />Gap to target</span>
                     <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm inline-block bg-red-500" />Over target</span>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2">
-                    {rebalancerData.items.map(item => (
-                      <div key={item.id} className="flex items-center gap-2 min-w-0" data-testid={`legend-item-${item.id}`}>
-                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                        <span className="text-xs text-muted-foreground truncate">{item.name}</span>
-                        <span className="text-xs font-medium ml-auto shrink-0">{item.currentPct.toFixed(1)}% / {item.targetPct.toFixed(1)}%</span>
-                      </div>
-                    ))}
+                  {/* Two-level grouped legend: category → platforms */}
+                  <div className="space-y-2">
+                    {rebalancerCategoryData.map(catGroup => {
+                      const isCollapsed = collapsedCategories.has(catGroup.category);
+                      const catOver = catGroup.currentPct > catGroup.targetPct;
+                      const catDelta = catGroup.currentPct - catGroup.targetPct;
+                      return (
+                        <div key={catGroup.category}>
+                          <button
+                            onClick={() => setCollapsedCategories(prev => {
+                              const next = new Set(prev);
+                              if (next.has(catGroup.category)) next.delete(catGroup.category);
+                              else next.add(catGroup.category);
+                              return next;
+                            })}
+                            className="w-full flex items-center gap-2 py-1.5 px-1 rounded hover:bg-muted/40 transition-colors text-left group"
+                            data-testid={`rebalancer-category-${catGroup.category.toLowerCase().replace(/\s+/g, '-')}`}
+                          >
+                            {isCollapsed
+                              ? <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                              : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                            }
+                            <span className="text-xs font-semibold uppercase tracking-wide text-foreground">{catGroup.category}</span>
+                            <span className={cn("text-xs font-medium ml-auto shrink-0", catOver ? "text-red-500" : catDelta < -0.05 ? "text-amber-500" : "text-muted-foreground")}>
+                              {catGroup.currentPct.toFixed(1)}% / {catGroup.targetPct.toFixed(1)}%
+                            </span>
+                          </button>
+                          {!isCollapsed && (
+                            <div className="ml-5 mt-0.5 space-y-1 pb-1">
+                              {catGroup.platforms.map(item => (
+                                <div key={item.id} className="flex items-center gap-2 min-w-0 px-1" data-testid={`legend-item-${item.id}`}>
+                                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                  <span className="text-xs text-muted-foreground truncate">{item.name}</span>
+                                  <span className="text-xs font-medium ml-auto shrink-0">{item.currentPct.toFixed(1)}% / {item.targetPct.toFixed(1)}%</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
+                  {/* Over/Under allocated — grouped by category */}
                   <div className="border-t pt-6 space-y-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm font-semibold text-red-500 mb-3">Over-Allocated</p>
                         {rebalancerData.sources.length === 0 ? (
                           <p className="text-xs text-muted-foreground">All platforms are at or below their target.</p>
-                        ) : (
-                          <div className="space-y-2">
-                            {rebalancerData.sources.map(p => (
-                              <div key={p.id} className="flex items-center gap-2" data-testid={`over-item-${p.id}`}>
-                                <PlatformIcon icon={p.icon} customIconUrl={p.customIconUrl} color={p.color} name={p.name} size="sm" />
-                                <span className="text-sm flex-1 truncate">{p.name}</span>
-                                <span className="text-sm font-semibold text-red-500 shrink-0">+{formatCurrency(p.surplus, currency)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        ) : (() => {
+                          const byCategory = rebalancerData.sources.reduce((acc, p) => {
+                            const cat = (p as any).category || "Other";
+                            (acc[cat] = acc[cat] ?? []).push(p);
+                            return acc;
+                          }, {} as Record<string, typeof rebalancerData.sources>);
+                          const cats = Object.keys(byCategory).sort();
+                          return (
+                            <div className="space-y-3">
+                              {cats.map(cat => (
+                                <div key={cat}>
+                                  {cats.length > 1 && <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">{cat}</p>}
+                                  <div className="space-y-2">
+                                    {byCategory[cat].map(p => (
+                                      <div key={p.id} className="flex items-center gap-2" data-testid={`over-item-${p.id}`}>
+                                        <PlatformIcon icon={p.icon} customIconUrl={p.customIconUrl} color={p.color} name={p.name} size="sm" />
+                                        <span className="text-sm flex-1 truncate">{p.name}</span>
+                                        <span className="text-sm font-semibold text-red-500 shrink-0">+{formatCurrency(p.surplus, currency)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-emerald-500 mb-3">Under-Allocated</p>
                         {rebalancerData.destinations.length === 0 ? (
                           <p className="text-xs text-muted-foreground">All platforms are at or above their target.</p>
-                        ) : (
-                          <div className="space-y-2">
-                            {rebalancerData.destinations.map(p => (
-                              <div key={p.id} className="flex items-center gap-2" data-testid={`under-item-${p.id}`}>
-                                <PlatformIcon icon={p.icon} customIconUrl={p.customIconUrl} color={p.color} name={p.name} size="sm" />
-                                <span className="text-sm flex-1 truncate">{p.name}</span>
-                                <span className="text-sm font-semibold text-emerald-500 shrink-0">−{formatCurrency(Math.abs(p.surplus), currency)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        ) : (() => {
+                          const byCategory = rebalancerData.destinations.reduce((acc, p) => {
+                            const cat = (p as any).category || "Other";
+                            (acc[cat] = acc[cat] ?? []).push(p);
+                            return acc;
+                          }, {} as Record<string, typeof rebalancerData.destinations>);
+                          const cats = Object.keys(byCategory).sort();
+                          return (
+                            <div className="space-y-3">
+                              {cats.map(cat => (
+                                <div key={cat}>
+                                  {cats.length > 1 && <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">{cat}</p>}
+                                  <div className="space-y-2">
+                                    {byCategory[cat].map(p => (
+                                      <div key={p.id} className="flex items-center gap-2" data-testid={`under-item-${p.id}`}>
+                                        <PlatformIcon icon={p.icon} customIconUrl={p.customIconUrl} color={p.color} name={p.name} size="sm" />
+                                        <span className="text-sm flex-1 truncate">{p.name}</span>
+                                        <span className="text-sm font-semibold text-emerald-500 shrink-0">−{formatCurrency(Math.abs(p.surplus), currency)}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
