@@ -82,7 +82,7 @@ export function StatCard({ title, value, subValue, trend, trendValue, icon: Icon
                 "font-medium px-1.5 py-0.5 rounded",
                 trend === "up" ? "text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400" :
                 trend === "down" ? "text-rose-600 bg-rose-100 dark:bg-rose-900/30 dark:text-rose-400" :
-                "text-gray-600 bg-gray-100"
+                "text-muted-foreground bg-muted"
               )}>
                 {trend === "up" ? "+" : ""}{trendValue}
               </span>

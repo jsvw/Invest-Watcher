@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, TrendingUp, Menu, X, LogOut, Settings, Coffee, Plus, AlertTriangle, Download } from "lucide-react";
+import { LayoutDashboard, TrendingUp, Menu, X, LogOut, Settings, Coffee, Plus, AlertTriangle, Download, Sun, Moon } from "lucide-react";
 import { useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -11,12 +11,14 @@ import { PlatformIcon } from "@/components/PlatformIcon";
 import { AddPlatformDialog } from "@/components/AddPlatformDialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ExportReportDialog } from "@/components/ExportReportDialog";
+import { useTheme } from "@/lib/theme";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const { data: platforms } = usePlatforms();
 
   const touchStartX = useRef<number | null>(null);
@@ -230,6 +232,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center justify-between">
               <div className="text-xs text-muted-foreground truncate">{user.email}</div>
               <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleTheme}
+                  title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                  data-testid="button-toggle-theme"
+                  className="min-h-[44px] min-w-[44px]"
+                >
+                  {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </Button>
                 <Button
                   variant="ghost"
                   size="icon"

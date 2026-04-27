@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/AuthPage";
 import { lazy, Suspense, useEffect, createContext, useContext } from "react";
 import { Loader2 } from "lucide-react";
+import { ThemeProvider } from "@/lib/theme";
 
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const PlatformDetails = lazy(() => import("@/pages/PlatformDetails"));
@@ -122,14 +123,16 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <Toaster />
-          <Router />
-        </AuthProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AuthProvider>
+            <Toaster />
+            <Router />
+          </AuthProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 
