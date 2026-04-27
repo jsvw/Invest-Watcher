@@ -1932,8 +1932,10 @@ export default function Dashboard() {
                     </button>
                     {chartView !== "all" && (
                       <button
-                        onClick={() => setChartType("bar")}
-                        className={cn("px-2 py-3 sm:py-1.5 min-h-[44px] sm:min-h-0 transition-colors", chartType === "bar" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+                        onClick={() => { if (!forecastRange) setChartType("bar"); }}
+                        disabled={!!forecastRange}
+                        title={forecastRange ? "Not available in forecast mode" : undefined}
+                        className={cn("px-2 py-3 sm:py-1.5 min-h-[44px] sm:min-h-0 transition-colors", forecastRange ? "opacity-40 cursor-not-allowed text-muted-foreground" : chartType === "bar" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
                         data-testid="button-chart-type-bar"
                       >
                         <BarChart2 className="w-4 h-4" />
@@ -1941,8 +1943,10 @@ export default function Dashboard() {
                     )}
                     {chartView === "overview" && (
                       <button
-                        onClick={() => setChartType("waterfall")}
-                        className={cn("px-2 py-3 sm:py-1.5 min-h-[44px] sm:min-h-0 transition-colors", chartType === "waterfall" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
+                        onClick={() => { if (!forecastRange) setChartType("waterfall"); }}
+                        disabled={!!forecastRange}
+                        title={forecastRange ? "Not available in forecast mode" : undefined}
+                        className={cn("px-2 py-3 sm:py-1.5 min-h-[44px] sm:min-h-0 transition-colors", forecastRange ? "opacity-40 cursor-not-allowed text-muted-foreground" : chartType === "waterfall" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")}
                         data-testid="button-chart-type-waterfall"
                       >
                         <GitCommitHorizontal className="w-4 h-4" />
