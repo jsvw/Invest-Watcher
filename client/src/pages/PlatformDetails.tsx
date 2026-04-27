@@ -2915,6 +2915,7 @@ export default function PlatformDetails() {
             {
               investmentIds: confirmDepositDialogItem.investmentIds,
               platformId: confirmDepositDialogItem.platformId,
+              platformName: confirmDepositDialogItem.platformName,
               newValuation,
               platformMode: confirmDepositDialogItem.platformMode,
               hasScraperConfig: confirmDepositDialogItem.hasScraperConfig,
