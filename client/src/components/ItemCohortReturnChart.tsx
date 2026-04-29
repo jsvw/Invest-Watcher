@@ -16,6 +16,7 @@ interface AssetRow {
   assetId: number;
   assetName: string;
   status: string;
+  investedAmount: number;
   data: { calendarMonth: string; calendarLabel: string; returnPct: number }[];
 }
 

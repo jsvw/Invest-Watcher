@@ -114,7 +114,7 @@ export interface IStorage {
   
   // Item Cohort Returns
   getItemCohortReturns(platformId: number, statusFilter?: string): Promise<{ cohortKey: string; cohortLabel: string; data: { calendarMonth: string; calendarLabel: string; avgReturn: number; assetCount: number }[] }[]>;
-  getItemCohortAssets(platformId: number, cohortKey: string, statusFilter?: string): Promise<{ assetId: number; assetName: string; status: string; data: { calendarMonth: string; calendarLabel: string; returnPct: number }[] }[]>;
+  getItemCohortAssets(platformId: number, cohortKey: string, statusFilter?: string): Promise<{ assetId: number; assetName: string; status: string; investedAmount: number; data: { calendarMonth: string; calendarLabel: string; returnPct: number }[] }[]>;
 
   // Email Settings
   getEmailSettings(userId: number): Promise<EmailSettings | undefined>;
@@ -1284,7 +1284,7 @@ export class DatabaseStorage implements IStorage {
     if (cohortAssets.length === 0) return [];
 
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const result: { assetId: number; assetName: string; status: string; data: { calendarMonth: string; calendarLabel: string; returnPct: number }[] }[] = [];
+    const result: { assetId: number; assetName: string; status: string; investedAmount: number; data: { calendarMonth: string; calendarLabel: string; returnPct: number }[] }[] = [];
 
     for (const asset of cohortAssets) {
       const investedBasis = Number(asset.investedAmount) + Number(asset.bonusAmount || 0);
@@ -1315,7 +1315,7 @@ export class DatabaseStorage implements IStorage {
           return { calendarMonth, calendarLabel: `${monthNames[parseInt(m) - 1]} ${y}`, returnPct };
         });
 
-      result.push({ assetId: asset.id, assetName: asset.name, status: asset.status, data });
+      result.push({ assetId: asset.id, assetName: asset.name, status: asset.status, investedAmount: investedBasis, data });
     }
 
     return result;
