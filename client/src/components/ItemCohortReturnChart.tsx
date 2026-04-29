@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import { BarChart2, Table2 } from "lucide-react";
 
 interface CohortData {
@@ -38,6 +39,18 @@ function monthToQuarterKey(month: string): string {
 function quarterKeyToLabel(key: string): string {
   const [year, q] = key.split("-");
   return `${q} ${year}`;
+}
+
+function getHeatmapStyle(val: number | undefined, maxAbs: number): CSSProperties {
+  if (val === undefined || val === null || maxAbs === 0) return {};
+  const intensity = Math.min(Math.abs(val) / maxAbs, 1);
+  const alpha = 0.1 + intensity * 0.55;
+  if (val > 0) {
+    return { backgroundColor: `rgba(16, 185, 129, ${alpha})` };
+  } else if (val < 0) {
+    return { backgroundColor: `rgba(239, 68, 68, ${alpha})` };
+  }
+  return {};
 }
 
 export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: ItemCohortReturnChartProps) {
@@ -299,74 +312,90 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
             </LineChart>
           </ResponsiveContainer>
         ) : (
-          <div className="overflow-x-auto" data-testid="cohort-table">
-            <table className="w-full text-xs border-separate border-spacing-0">
-              <thead>
-                <tr>
-                  <th className="sticky left-0 z-10 bg-card text-left font-medium text-muted-foreground py-2 pr-4 pl-1 whitespace-nowrap border-b">
-                    Cohort
-                  </th>
-                  {allMonths.map(period => (
-                    <th
-                      key={period}
-                      className="text-center font-medium text-muted-foreground py-2 px-2 whitespace-nowrap border-b min-w-[72px]"
-                      data-testid={`th-month-${period}`}
-                    >
-                      {monthLabels.get(period) || period}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {cohortData.map((cohort, idx) => {
-                  const color = COLORS[idx % COLORS.length];
-                  const dataMap = granularity === "month"
-                    ? new Map(cohort.data.map(d => [d.calendarMonth, d.avgReturn]))
-                    : new Map(
-                        allMonths.map(qKey => {
-                          const monthsInQ = cohort.data.filter(d => monthToQuarterKey(d.calendarMonth) === qKey);
-                          const vals = monthsInQ.map(d => d.avgReturn);
-                          const avg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : undefined;
-                          return [qKey, avg] as [string, number | undefined];
-                        }).filter(([, v]) => v !== undefined) as [string, number][]
-                      );
-                  return (
-                    <tr
-                      key={cohort.cohortKey}
-                      className="hover:bg-muted/40 transition-colors"
-                      data-testid={`row-cohort-${cohort.cohortKey}`}
-                    >
-                      <td className="sticky left-0 z-10 bg-card py-2 pr-4 pl-1 whitespace-nowrap border-b border-muted/40">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                          <span className="font-medium text-foreground">{cohort.cohortLabel}</span>
-                        </div>
-                      </td>
-                      {allMonths.map(period => {
-                        const val = dataMap.get(period);
-                        const formatted = fmtReturn(val);
-                        const isPositive = val !== undefined && val > 0;
-                        const isNegative = val !== undefined && val < 0;
-                        return (
-                          <td
+          (() => {
+            const maxAbs = cohortData.reduce((m, cohort) =>
+              cohort.data.reduce((m2, d) => Math.max(m2, Math.abs(d.avgReturn)), m), 0
+            );
+            return (
+              <div>
+                <div className="overflow-x-auto" data-testid="cohort-table">
+                  <table className="w-full text-xs border-separate border-spacing-0">
+                    <thead>
+                      <tr>
+                        <th className="sticky left-0 z-10 bg-card text-left font-medium text-muted-foreground py-2 pr-4 pl-1 whitespace-nowrap border-b">
+                          Cohort
+                        </th>
+                        {allMonths.map(period => (
+                          <th
                             key={period}
-                            className={`text-center py-2 px-2 border-b border-muted/40 tabular-nums ${
-                              isPositive ? "text-emerald-600 dark:text-emerald-400" :
-                              isNegative ? "text-red-500 dark:text-red-400" :
-                              "text-muted-foreground"
-                            }`}
-                            data-testid={`cell-${cohort.cohortKey}-${period}`}
+                            className="text-center font-medium text-muted-foreground py-2 px-2 whitespace-nowrap border-b min-w-[72px]"
+                            data-testid={`th-month-${period}`}
                           >
-                            {formatted}
-                          </td>
+                            {monthLabels.get(period) || period}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cohortData.map((cohort, idx) => {
+                        const color = COLORS[idx % COLORS.length];
+                        const dataMap = granularity === "month"
+                          ? new Map(cohort.data.map(d => [d.calendarMonth, d.avgReturn]))
+                          : new Map(
+                              allMonths.map(qKey => {
+                                const monthsInQ = cohort.data.filter(d => monthToQuarterKey(d.calendarMonth) === qKey);
+                                const vals = monthsInQ.map(d => d.avgReturn);
+                                const avg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : undefined;
+                                return [qKey, avg] as [string, number | undefined];
+                              }).filter(([, v]) => v !== undefined) as [string, number][]
+                            );
+                        return (
+                          <tr
+                            key={cohort.cohortKey}
+                            data-testid={`row-cohort-${cohort.cohortKey}`}
+                          >
+                            <td className="sticky left-0 z-10 bg-card py-2 pr-4 pl-1 whitespace-nowrap border-b border-muted/40">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                                <span className="font-medium text-foreground">{cohort.cohortLabel}</span>
+                              </div>
+                            </td>
+                            {allMonths.map(period => {
+                              const val = dataMap.get(period);
+                              const formatted = fmtReturn(val);
+                              const heatStyle = getHeatmapStyle(val, maxAbs);
+                              return (
+                                <td
+                                  key={period}
+                                  className="text-center py-2 px-2 border-b border-muted/40 tabular-nums font-medium text-foreground transition-colors"
+                                  style={heatStyle}
+                                  data-testid={`cell-${cohort.cohortKey}-${period}`}
+                                >
+                                  {formatted}
+                                </td>
+                              );
+                            })}
+                          </tr>
                         );
                       })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-3 flex items-center gap-3 text-[10px] text-muted-foreground" data-testid="heatmap-legend">
+                  <span className="font-medium">Color scale:</span>
+                  <div className="flex items-center gap-1">
+                    <div className="w-16 h-3 rounded-sm" style={{ background: "linear-gradient(to right, rgba(239,68,68,0.65), rgba(239,68,68,0.1))" }} />
+                    <span>Large loss → Small loss</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-16 h-3 rounded-sm" style={{ background: "linear-gradient(to right, rgba(16,185,129,0.1), rgba(16,185,129,0.65))" }} />
+                    <span>Small gain → Large gain</span>
+                  </div>
+                  <span className="ml-1 opacity-70">Intensity ∝ return vs. max ({maxAbs > 0 ? `${maxAbs.toFixed(1)}%` : "—"})</span>
+                </div>
+              </div>
+            );
+          })()
         )}
       </CardContent>
     </Card>
