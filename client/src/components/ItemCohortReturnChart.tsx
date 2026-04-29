@@ -140,6 +140,15 @@ function CohortDetailSheet({
     });
   }, [data, sort, allMonths, granularity, lastPeriod]);
 
+  const visiblePeriods = useMemo(() => {
+    if (!cohort) return allMonths;
+    if (granularity === "month") {
+      return allMonths.filter(m => m >= cohort.cohortKey);
+    }
+    const cohortQuarter = monthToQuarterKey(cohort.cohortKey);
+    return allMonths.filter(q => q >= cohortQuarter);
+  }, [allMonths, cohort, granularity]);
+
   const totalInvested = data ? data.reduce((s, a) => s + a.investedAmount, 0) : 0;
   const assetCount = data ? data.length : (cohort?.data[cohort.data.length - 1]?.assetCount ?? 0);
 
@@ -206,7 +215,7 @@ function CohortDetailSheet({
                     <th className="sticky left-0 z-10 bg-background text-left font-medium text-muted-foreground py-2 pr-4 pl-1 whitespace-nowrap border-b min-w-[180px]">
                       Asset
                     </th>
-                    {allMonths.map(period => (
+                    {visiblePeriods.map(period => (
                       <th
                         key={period}
                         className="text-center font-medium text-muted-foreground py-2 px-2 whitespace-nowrap border-b min-w-[72px]"
@@ -219,7 +228,7 @@ function CohortDetailSheet({
                 </thead>
                 <tbody>
                   {sortedAssets.map(asset => {
-                    const dataMap = buildAssetDataMap(asset, allMonths, granularity);
+                    const dataMap = buildAssetDataMap(asset, visiblePeriods, granularity);
                     return (
                       <tr key={asset.assetId} data-testid={`sheet-asset-row-${asset.assetId}`}>
                         <td className="sticky left-0 z-10 bg-background py-2 pr-4 pl-1 whitespace-nowrap border-b border-muted/40">
@@ -239,7 +248,7 @@ function CohortDetailSheet({
                             </span>
                           </div>
                         </td>
-                        {allMonths.map(period => {
+                        {visiblePeriods.map(period => {
                           const val = dataMap.get(period);
                           return (
                             <td
