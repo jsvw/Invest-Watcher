@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { useMemo, useState, Fragment } from "react";
+import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import { BarChart2, Table2, ChevronRight, ChevronDown } from "lucide-react";
+import { BarChart2, Table2, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 
 interface CohortData {
   cohortKey: string;
@@ -58,105 +59,228 @@ function getHeatmapStyle(val: number | undefined, maxAbs: number): CSSProperties
   return {};
 }
 
-interface CohortAssetRowsProps {
-  platformId: number;
-  cohortKey: string;
-  statusFilter: string;
-  allMonths: string[];
-  granularity: "month" | "quarter";
-  maxAbs: number;
+function buildAssetDataMap(
+  asset: AssetRow,
+  allPeriods: string[],
+  granularity: "month" | "quarter"
+): Map<string, number> {
+  if (granularity === "month") {
+    return new Map(asset.data.map(d => [d.calendarMonth, d.returnPct]));
+  }
+  return new Map(
+    allPeriods
+      .map(qKey => {
+        const monthsInQ = asset.data.filter(d => monthToQuarterKey(d.calendarMonth) === qKey);
+        const vals = monthsInQ.map(d => d.returnPct);
+        if (vals.length === 0) return null;
+        return [qKey, vals.reduce((a, b) => a + b, 0) / vals.length] as [string, number];
+      })
+      .filter((x): x is [string, number] => x !== null)
+  );
 }
 
-function CohortAssetRows({ platformId, cohortKey, statusFilter, allMonths, granularity, maxAbs }: CohortAssetRowsProps) {
+type SortMode = "name" | "best" | "worst";
+
+interface CohortDetailSheetProps {
+  cohort: CohortData | null;
+  platformId: number;
+  statusFilter: string;
+  allMonths: string[];
+  monthLabels: Map<string, string>;
+  granularity: "month" | "quarter";
+  maxAbs: number;
+  open: boolean;
+  onClose: () => void;
+}
+
+function CohortDetailSheet({
+  cohort,
+  platformId,
+  statusFilter,
+  allMonths,
+  monthLabels,
+  granularity,
+  maxAbs,
+  open,
+  onClose,
+}: CohortDetailSheetProps) {
+  const [sort, setSort] = useState<SortMode>("name");
+
   const { data, isLoading } = useQuery<AssetRow[]>({
-    queryKey: ['/api/platforms', platformId, 'item-cohort-assets', cohortKey, statusFilter],
+    queryKey: ['/api/platforms', platformId, 'item-cohort-assets', cohort?.cohortKey ?? "", statusFilter],
     queryFn: async () => {
-      const url = `/api/platforms/${platformId}/item-cohort-assets?cohortKey=${cohortKey}&statusFilter=${statusFilter}`;
+      const url = `/api/platforms/${platformId}/item-cohort-assets?cohortKey=${cohort!.cohortKey}&statusFilter=${statusFilter}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch asset data");
       return res.json();
-    }
+    },
+    enabled: open && cohort !== null,
   });
 
-  const numCols = allMonths.length + 1;
+  const lastPeriod = allMonths[allMonths.length - 1];
 
-  if (isLoading) {
-    return (
-      <tr data-testid={`asset-rows-loading-${cohortKey}`}>
-        <td colSpan={numCols} className="py-2 pl-8 pr-4 border-b border-muted/30">
-          <Skeleton className="h-5 w-full" />
-        </td>
-      </tr>
-    );
-  }
+  const sortedAssets = useMemo(() => {
+    if (!data) return [];
+    return [...data].sort((a, b) => {
+      if (sort === "name") return a.assetName.localeCompare(b.assetName);
+      const aMap = buildAssetDataMap(a, allMonths, granularity);
+      const bMap = buildAssetDataMap(b, allMonths, granularity);
+      const aVal = aMap.get(lastPeriod) ?? undefined;
+      const bVal = bMap.get(lastPeriod) ?? undefined;
+      if (sort === "best") {
+        if (aVal === undefined && bVal === undefined) return 0;
+        if (aVal === undefined) return 1;
+        if (bVal === undefined) return -1;
+        return bVal - aVal;
+      }
+      if (aVal === undefined && bVal === undefined) return 0;
+      if (aVal === undefined) return 1;
+      if (bVal === undefined) return -1;
+      return aVal - bVal;
+    });
+  }, [data, sort, allMonths, granularity, lastPeriod]);
 
-  if (!data || data.length === 0) {
+  const totalInvested = data ? data.reduce((s, a) => s + a.investedAmount, 0) : 0;
+  const assetCount = data ? data.length : (cohort?.data[cohort.data.length - 1]?.assetCount ?? 0);
+
+  function SortBtn({ mode, label, icon }: { mode: SortMode; label: string; icon: typeof ArrowUp }) {
+    const Icon = icon;
+    const active = sort === mode;
     return (
-      <tr>
-        <td colSpan={numCols} className="py-2 pl-8 text-xs text-muted-foreground italic border-b border-muted/30">
-          No individual asset data available.
-        </td>
-      </tr>
+      <button
+        onClick={() => setSort(mode)}
+        data-testid={`btn-cohort-sort-${mode}`}
+        className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+          active
+            ? "bg-background shadow-sm text-foreground border border-border"
+            : "text-muted-foreground hover:text-foreground"
+        }`}
+      >
+        <Icon className="h-3 w-3" />
+        {label}
+      </button>
     );
   }
 
   return (
-    <>
-      {data.map(asset => {
-        const dataMap: Map<string, number> = granularity === "month"
-          ? new Map(asset.data.map(d => [d.calendarMonth, d.returnPct]))
-          : new Map(
-              (allMonths
-                .map(qKey => {
-                  const monthsInQ = asset.data.filter(d => monthToQuarterKey(d.calendarMonth) === qKey);
-                  const vals = monthsInQ.map(d => d.returnPct);
-                  if (vals.length === 0) return null;
-                  return [qKey, vals.reduce((a, b) => a + b, 0) / vals.length] as [string, number];
-                })
-                .filter((x): x is [string, number] => x !== null))
-            );
+    <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-[760px] flex flex-col p-0 gap-0"
+        data-testid="cohort-detail-sheet"
+      >
+        <SheetHeader className="px-6 pt-6 pb-4 border-b flex-shrink-0">
+          <div className="pr-6">
+            <SheetTitle data-testid="sheet-cohort-title">
+              {cohort?.cohortLabel ?? ""} Cohort
+            </SheetTitle>
+            <SheetDescription data-testid="sheet-cohort-meta">
+              {isLoading
+                ? "Loading assets…"
+                : `${assetCount} asset${assetCount !== 1 ? "s" : ""} · €${totalInvested.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} invested`}
+            </SheetDescription>
+          </div>
+          <div className="flex items-center gap-1 rounded-md border p-0.5 bg-muted/50 w-fit mt-3">
+            <SortBtn mode="name" label="Name A→Z" icon={ArrowUpDown} />
+            <SortBtn mode="best" label="Best return" icon={ArrowUp} />
+            <SortBtn mode="worst" label="Worst return" icon={ArrowDown} />
+          </div>
+        </SheetHeader>
 
-        return (
-          <tr key={asset.assetId} className="bg-muted/20" data-testid={`asset-row-${asset.assetId}`}>
-            <td className="sticky left-0 z-10 bg-muted/20 py-1.5 pr-4 pl-7 whitespace-nowrap border-b border-muted/30">
-              <div className="flex items-center gap-2">
-                <div className="w-px h-3.5 bg-border flex-shrink-0" />
-                <span className="text-foreground text-xs truncate max-w-[150px]" title={asset.assetName}>
-                  {asset.assetName}
-                </span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${
-                  asset.status === "active"
-                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                    : "bg-muted text-muted-foreground"
-                }`}>
-                  {asset.status}
-                </span>
-              </div>
-            </td>
-            {allMonths.map(period => {
-              const val = dataMap.get(period);
-              return (
-                <td
-                  key={period}
-                  className="text-center py-1.5 px-2 border-b border-muted/30 tabular-nums text-xs text-foreground"
-                  style={getHeatmapStyle(val, maxAbs)}
-                  data-testid={`asset-cell-${asset.assetId}-${period}`}
-                >
-                  {fmtReturn(val)}
-                </td>
-              );
-            })}
-          </tr>
-        );
-      })}
-    </>
+        <div className="flex-1 overflow-auto px-4 py-4" data-testid="sheet-asset-table-container">
+          {isLoading ? (
+            <div className="space-y-2 pt-2">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
+            </div>
+          ) : !data || data.length === 0 ? (
+            <div className="flex items-center justify-center h-32 text-sm text-muted-foreground italic">
+              No individual asset data available for this cohort.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-separate border-spacing-0">
+                <thead>
+                  <tr>
+                    <th className="sticky left-0 z-10 bg-background text-left font-medium text-muted-foreground py-2 pr-4 pl-1 whitespace-nowrap border-b min-w-[180px]">
+                      Asset
+                    </th>
+                    {allMonths.map(period => (
+                      <th
+                        key={period}
+                        className="text-center font-medium text-muted-foreground py-2 px-2 whitespace-nowrap border-b min-w-[72px]"
+                        data-testid={`sheet-th-${period}`}
+                      >
+                        {monthLabels.get(period) || period}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedAssets.map(asset => {
+                    const dataMap = buildAssetDataMap(asset, allMonths, granularity);
+                    return (
+                      <tr key={asset.assetId} data-testid={`sheet-asset-row-${asset.assetId}`}>
+                        <td className="sticky left-0 z-10 bg-background py-2 pr-4 pl-1 whitespace-nowrap border-b border-muted/40">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="text-foreground font-medium truncate max-w-[130px]"
+                              title={asset.assetName}
+                            >
+                              {asset.assetName}
+                            </span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${
+                              asset.status === "active"
+                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                                : "bg-muted text-muted-foreground"
+                            }`}>
+                              {asset.status}
+                            </span>
+                          </div>
+                        </td>
+                        {allMonths.map(period => {
+                          const val = dataMap.get(period);
+                          return (
+                            <td
+                              key={period}
+                              className="text-center py-2 px-2 border-b border-muted/40 tabular-nums text-foreground"
+                              style={getHeatmapStyle(val, maxAbs)}
+                              data-testid={`sheet-cell-${asset.assetId}-${period}`}
+                            >
+                              {fmtReturn(val)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="px-6 py-3 border-t flex items-center gap-3 text-[10px] text-muted-foreground flex-shrink-0">
+          <span className="font-medium">Color scale:</span>
+          <div className="flex items-center gap-1">
+            <div className="w-14 h-3 rounded-sm" style={{ background: "linear-gradient(to right, rgba(239,68,68,0.65), rgba(239,68,68,0.1))" }} />
+            <span>Large loss → Small loss</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-14 h-3 rounded-sm" style={{ background: "linear-gradient(to right, rgba(16,185,129,0.1), rgba(16,185,129,0.65))" }} />
+            <span>Small gain → Large gain</span>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
 export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: ItemCohortReturnChartProps) {
   const [viewMode, setViewMode] = useState<"chart" | "table">("chart");
   const [granularity, setGranularity] = useState<"month" | "quarter">("month");
-  const [expandedCohorts, setExpandedCohorts] = useState<Set<string>>(new Set());
+  const [selectedCohort, setSelectedCohort] = useState<CohortData | null>(null);
 
   const { data: cohortData, isLoading } = useQuery<CohortData[]>({
     queryKey: ['/api/platforms', platformId, 'item-cohort-returns', statusFilter],
@@ -238,15 +362,6 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
 
     return { chartData: data, allMonths: sortedQuarters, monthLabels: qLblMap, cohortInfoMap: qInfoMap };
   }, [cohortData, granularity]);
-
-  function toggleCohort(cohortKey: string) {
-    setExpandedCohorts(prev => {
-      const next = new Set(prev);
-      if (next.has(cohortKey)) next.delete(cohortKey);
-      else next.add(cohortKey);
-      return next;
-    });
-  }
 
   const granularityToggle = (
     <div className="flex items-center gap-1 rounded-md border p-0.5 bg-muted/50">
@@ -330,189 +445,186 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
     );
   }
 
+  const maxAbs = cohortData.reduce((m, cohort) =>
+    cohort.data.reduce((m2, d) => Math.max(m2, Math.abs(d.avgReturn)), m), 0
+  );
+
   return (
-    <Card data-testid="card-item-cohort-returns">
-      <CardHeader>
-        <div className="flex items-start justify-between gap-2 flex-wrap gap-y-2">
-          <div>
-            <CardTitle>Returns by Investment Cohort</CardTitle>
-            <CardDescription>
-              {viewMode === "chart"
-                ? `Each line represents assets acquired in the same month. X-axis shows ${xLabel}.`
-                : `Rows = investment cohort month · Columns = ${xLabel} · Click a row to expand individual assets`}
-            </CardDescription>
+    <div className="contents">
+      <Card data-testid="card-item-cohort-returns">
+        <CardHeader>
+          <div className="flex items-start justify-between gap-2 flex-wrap gap-y-2">
+            <div>
+              <CardTitle>Returns by Investment Cohort</CardTitle>
+              <CardDescription>
+                {viewMode === "chart"
+                  ? `Each line represents assets acquired in the same month. X-axis shows ${xLabel}.`
+                  : `Rows = investment cohort month · Columns = ${xLabel} · Click a row to view individual assets`}
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              {granularityToggle}
+              {viewToggle}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {granularityToggle}
-            {viewToggle}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {viewMode === "chart" ? (
-          <ResponsiveContainer width="100%" height={350}>
-            <LineChart data={chartData} margin={{ top: 20, right: 30, bottom: 60, left: 20 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis
-                dataKey="calendarLabel"
-                className="text-xs fill-muted-foreground"
-                angle={-45}
-                textAnchor="end"
-                height={60}
-                interval={0}
-                tick={{ fontSize: 10 }}
-              />
-              <YAxis
-                className="text-xs fill-muted-foreground"
-                tickFormatter={(val) => `${val > 0 ? '+' : ''}${val}%`}
-              />
-              <Tooltip
-                content={({ active, payload, label }) => {
-                  if (!active || !payload || !payload.length) return null;
-                  const calendarMonth = chartData.find(d => d.calendarLabel === label)?.calendarMonth as string;
-                  return (
-                    <div className="bg-popover border rounded-lg p-3 shadow-lg">
-                      <p className="font-medium mb-2">{label}</p>
-                      <div className="space-y-1 text-sm">
-                        {payload.map((entry, idx) => {
-                          const cohortLabel = entry.name as string;
-                          const count = cohortInfoMap.get(cohortLabel)?.get(calendarMonth) || 0;
-                          return (
-                            <div key={idx} className="flex items-center gap-2">
-                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-                              <span>{cohortLabel}:</span>
-                              <span className="font-medium">
-                                {(entry.value as number) >= 0 ? '+' : ''}{(entry.value as number).toFixed(2)}%
-                              </span>
-                              {count > 0 && (
-                                <span className="text-muted-foreground text-xs">({count} valuations)</span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                }}
-              />
-              {cohortData.map((cohort, idx) => (
-                <Line
-                  key={cohort.cohortKey}
-                  type="monotone"
-                  dataKey={cohort.cohortLabel}
-                  stroke={COLORS[idx % COLORS.length]}
-                  strokeWidth={3.5}
-                  dot={{ fill: COLORS[idx % COLORS.length], r: 4, strokeWidth: 0 }}
-                  connectNulls={false}
+        </CardHeader>
+        <CardContent>
+          {viewMode === "chart" ? (
+            <ResponsiveContainer width="100%" height={350}>
+              <LineChart data={chartData} margin={{ top: 20, right: 30, bottom: 60, left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis
+                  dataKey="calendarLabel"
+                  className="text-xs fill-muted-foreground"
+                  angle={-45}
+                  textAnchor="end"
+                  height={60}
+                  interval={0}
+                  tick={{ fontSize: 10 }}
                 />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        ) : (
-          (() => {
-            const maxAbs = cohortData.reduce((m, cohort) =>
-              cohort.data.reduce((m2, d) => Math.max(m2, Math.abs(d.avgReturn)), m), 0
-            );
-            return (
-              <div>
-                <div className="overflow-x-auto" data-testid="cohort-table">
-                  <table className="w-full text-xs border-separate border-spacing-0">
-                    <thead>
-                      <tr>
-                        <th className="sticky left-0 z-10 bg-card text-left font-medium text-muted-foreground py-2 pr-4 pl-1 whitespace-nowrap border-b">
-                          Cohort
-                        </th>
-                        {allMonths.map(period => (
-                          <th
-                            key={period}
-                            className="text-center font-medium text-muted-foreground py-2 px-2 whitespace-nowrap border-b min-w-[72px]"
-                            data-testid={`th-month-${period}`}
-                          >
-                            {monthLabels.get(period) || period}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {cohortData.map((cohort, idx) => {
-                        const color = COLORS[idx % COLORS.length];
-                        const isExpanded = expandedCohorts.has(cohort.cohortKey);
-                        const dataMap: Map<string, number> = granularity === "month"
-                          ? new Map(cohort.data.map(d => [d.calendarMonth, d.avgReturn]))
-                          : new Map(
-                              (allMonths
-                                .map(qKey => {
-                                  const monthsInQ = cohort.data.filter(d => monthToQuarterKey(d.calendarMonth) === qKey);
-                                  const vals = monthsInQ.map(d => d.avgReturn);
-                                  if (vals.length === 0) return null;
-                                  return [qKey, vals.reduce((a, b) => a + b, 0) / vals.length] as [string, number];
-                                })
-                                .filter((x): x is [string, number] => x !== null))
+                <YAxis
+                  className="text-xs fill-muted-foreground"
+                  tickFormatter={(val) => `${val > 0 ? '+' : ''}${val}%`}
+                />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload || !payload.length) return null;
+                    const calendarMonth = chartData.find(d => d.calendarLabel === label)?.calendarMonth as string;
+                    return (
+                      <div className="bg-popover border rounded-lg p-3 shadow-lg">
+                        <p className="font-medium mb-2">{label}</p>
+                        <div className="space-y-1 text-sm">
+                          {payload.map((entry, idx) => {
+                            const cohortLabel = entry.name as string;
+                            const count = cohortInfoMap.get(cohortLabel)?.get(calendarMonth) || 0;
+                            return (
+                              <div key={idx} className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                                <span>{cohortLabel}:</span>
+                                <span className="font-medium">
+                                  {(entry.value as number) >= 0 ? '+' : ''}{(entry.value as number).toFixed(2)}%
+                                </span>
+                                {count > 0 && (
+                                  <span className="text-muted-foreground text-xs">({count} valuations)</span>
+                                )}
+                              </div>
                             );
-                        return (
-                          <Fragment key={cohort.cohortKey}>
-                            <tr
-                              className="cursor-pointer hover:brightness-95 transition-all"
-                              onClick={() => toggleCohort(cohort.cohortKey)}
-                              data-testid={`row-cohort-${cohort.cohortKey}`}
-                            >
-                              <td className="sticky left-0 z-10 bg-card py-2 pr-4 pl-1 whitespace-nowrap border-b border-muted/40">
-                                <div className="flex items-center gap-1.5">
-                                  {isExpanded
-                                    ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                                    : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                                  }
-                                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                                  <span className="font-medium text-foreground">{cohort.cohortLabel}</span>
-                                </div>
+                          })}
+                        </div>
+                      </div>
+                    );
+                  }}
+                />
+                {cohortData.map((cohort, idx) => (
+                  <Line
+                    key={cohort.cohortKey}
+                    type="monotone"
+                    dataKey={cohort.cohortLabel}
+                    stroke={COLORS[idx % COLORS.length]}
+                    strokeWidth={3.5}
+                    dot={{ fill: COLORS[idx % COLORS.length], r: 4, strokeWidth: 0 }}
+                    connectNulls={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div>
+              <div className="overflow-x-auto" data-testid="cohort-table">
+                <table className="w-full text-xs border-separate border-spacing-0">
+                  <thead>
+                    <tr>
+                      <th className="sticky left-0 z-10 bg-card text-left font-medium text-muted-foreground py-2 pr-4 pl-1 whitespace-nowrap border-b">
+                        Cohort
+                      </th>
+                      {allMonths.map(period => (
+                        <th
+                          key={period}
+                          className="text-center font-medium text-muted-foreground py-2 px-2 whitespace-nowrap border-b min-w-[72px]"
+                          data-testid={`th-month-${period}`}
+                        >
+                          {monthLabels.get(period) || period}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cohortData.map((cohort, idx) => {
+                      const color = COLORS[idx % COLORS.length];
+                      const isSelected = selectedCohort?.cohortKey === cohort.cohortKey;
+                      const dataMap: Map<string, number> = granularity === "month"
+                        ? new Map(cohort.data.map(d => [d.calendarMonth, d.avgReturn]))
+                        : new Map(
+                            (allMonths
+                              .map(qKey => {
+                                const monthsInQ = cohort.data.filter(d => monthToQuarterKey(d.calendarMonth) === qKey);
+                                const vals = monthsInQ.map(d => d.avgReturn);
+                                if (vals.length === 0) return null;
+                                return [qKey, vals.reduce((a, b) => a + b, 0) / vals.length] as [string, number];
+                              })
+                              .filter((x): x is [string, number] => x !== null))
+                          );
+                      return (
+                        <tr
+                          key={cohort.cohortKey}
+                          className={`cursor-pointer transition-all ${isSelected ? "ring-1 ring-inset ring-primary/30 bg-primary/5" : "hover:brightness-95"}`}
+                          onClick={() => setSelectedCohort(cohort)}
+                          data-testid={`row-cohort-${cohort.cohortKey}`}
+                        >
+                          <td className="sticky left-0 z-10 bg-card py-2 pr-4 pl-1 whitespace-nowrap border-b border-muted/40">
+                            <div className="flex items-center gap-1.5">
+                              <ChevronRight className={`h-3.5 w-3.5 flex-shrink-0 transition-colors ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
+                              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                              <span className="font-medium text-foreground">{cohort.cohortLabel}</span>
+                            </div>
+                          </td>
+                          {allMonths.map(period => {
+                            const val = dataMap.get(period);
+                            return (
+                              <td
+                                key={period}
+                                className="text-center py-2 px-2 border-b border-muted/40 tabular-nums font-medium text-foreground transition-colors"
+                                style={getHeatmapStyle(val, maxAbs)}
+                                data-testid={`cell-${cohort.cohortKey}-${period}`}
+                              >
+                                {fmtReturn(val)}
                               </td>
-                              {allMonths.map(period => {
-                                const val = dataMap.get(period);
-                                return (
-                                  <td
-                                    key={period}
-                                    className="text-center py-2 px-2 border-b border-muted/40 tabular-nums font-medium text-foreground transition-colors"
-                                    style={getHeatmapStyle(val, maxAbs)}
-                                    data-testid={`cell-${cohort.cohortKey}-${period}`}
-                                  >
-                                    {fmtReturn(val)}
-                                  </td>
-                                );
-                              })}
-                            </tr>
-                            {isExpanded && (
-                              <CohortAssetRows
-                                platformId={platformId}
-                                cohortKey={cohort.cohortKey}
-                                statusFilter={statusFilter}
-                                allMonths={allMonths}
-                                granularity={granularity}
-                                maxAbs={maxAbs}
-                              />
-                            )}
-                          </Fragment>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="mt-3 flex items-center gap-3 text-[10px] text-muted-foreground" data-testid="heatmap-legend">
-                  <span className="font-medium">Color scale:</span>
-                  <div className="flex items-center gap-1">
-                    <div className="w-16 h-3 rounded-sm" style={{ background: "linear-gradient(to right, rgba(239,68,68,0.65), rgba(239,68,68,0.1))" }} />
-                    <span>Large loss → Small loss</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-16 h-3 rounded-sm" style={{ background: "linear-gradient(to right, rgba(16,185,129,0.1), rgba(16,185,129,0.65))" }} />
-                    <span>Small gain → Large gain</span>
-                  </div>
-                  <span className="ml-1 opacity-70">Intensity ∝ return vs. max ({maxAbs > 0 ? `${maxAbs.toFixed(1)}%` : "—"})</span>
-                </div>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            );
-          })()
-        )}
-      </CardContent>
-    </Card>
+              <div className="mt-3 flex items-center gap-3 text-[10px] text-muted-foreground" data-testid="heatmap-legend">
+                <span className="font-medium">Color scale:</span>
+                <div className="flex items-center gap-1">
+                  <div className="w-16 h-3 rounded-sm" style={{ background: "linear-gradient(to right, rgba(239,68,68,0.65), rgba(239,68,68,0.1))" }} />
+                  <span>Large loss → Small loss</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-16 h-3 rounded-sm" style={{ background: "linear-gradient(to right, rgba(16,185,129,0.1), rgba(16,185,129,0.65))" }} />
+                  <span>Small gain → Large gain</span>
+                </div>
+                <span className="ml-1 opacity-70">Intensity ∝ return vs. max ({maxAbs > 0 ? `${maxAbs.toFixed(1)}%` : "—"})</span>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <CohortDetailSheet
+        cohort={selectedCohort}
+        platformId={platformId}
+        statusFilter={statusFilter}
+        allMonths={allMonths}
+        monthLabels={monthLabels}
+        granularity={granularity}
+        maxAbs={maxAbs}
+        open={selectedCohort !== null}
+        onClose={() => setSelectedCohort(null)}
+      />
+    </div>
   );
 }
