@@ -175,7 +175,7 @@ function CohortDetailSheet({
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-[760px] flex flex-col p-0 gap-0"
+        className="w-full sm:max-w-[95vw] flex flex-col p-0 gap-0"
         data-testid="cohort-detail-sheet"
       >
         <SheetHeader className="px-6 pt-6 pb-4 border-b flex-shrink-0">
