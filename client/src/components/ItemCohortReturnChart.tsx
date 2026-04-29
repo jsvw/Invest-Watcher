@@ -19,7 +19,7 @@ interface ItemCohortReturnChartProps {
 }
 
 const COLORS = [
-  "#8884d8", "#82ca9d", "#ffc658", "#ff7300", "#00C49F", 
+  "#8884d8", "#82ca9d", "#ffc658", "#ff7300", "#00C49F",
   "#FFBB28", "#FF8042", "#0088FE", "#a4de6c", "#d0ed57"
 ];
 
@@ -29,8 +29,20 @@ function fmtReturn(val: number | undefined): string {
   return `${sign}${val.toFixed(2)}%`;
 }
 
+function monthToQuarterKey(month: string): string {
+  const [year, m] = month.split("-");
+  const q = Math.ceil(parseInt(m) / 3);
+  return `${year}-Q${q}`;
+}
+
+function quarterKeyToLabel(key: string): string {
+  const [year, q] = key.split("-");
+  return `${q} ${year}`;
+}
+
 export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: ItemCohortReturnChartProps) {
   const [viewMode, setViewMode] = useState<"chart" | "table">("chart");
+  const [granularity, setGranularity] = useState<"month" | "quarter">("month");
 
   const { data: cohortData, isLoading } = useQuery<CohortData[]>({
     queryKey: ['/api/platforms', platformId, 'item-cohort-returns', statusFilter],
@@ -43,9 +55,8 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
   });
 
   const { chartData, allMonths, monthLabels, cohortInfoMap } = useMemo(() => {
-    if (!cohortData || cohortData.length === 0) {
-      return { chartData: [], allMonths: [], monthLabels: new Map<string, string>(), cohortInfoMap: new Map<string, Map<string, number>>() };
-    }
+    const empty = { chartData: [], allMonths: [], monthLabels: new Map<string, string>(), cohortInfoMap: new Map<string, Map<string, number>>() };
+    if (!cohortData || cohortData.length === 0) return empty;
 
     const monthSet = new Set<string>();
     const lblMap = new Map<string, string>();
@@ -62,22 +73,89 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
 
     const sortedMonths = Array.from(monthSet).sort();
 
-    const data = sortedMonths.map(month => {
-      const row: Record<string, string | number | undefined> = { 
-        calendarMonth: month,
-        calendarLabel: lblMap.get(month) || month
+    if (granularity === "month") {
+      const data = sortedMonths.map(month => {
+        const row: Record<string, string | number | undefined> = {
+          calendarMonth: month,
+          calendarLabel: lblMap.get(month) || month
+        };
+        cohortData.forEach(cohort => {
+          const point = cohort.data.find(d => d.calendarMonth === month);
+          if (point) row[cohort.cohortLabel] = point.avgReturn;
+        });
+        return row;
+      });
+      return { chartData: data, allMonths: sortedMonths, monthLabels: lblMap, cohortInfoMap: infoMap };
+    }
+
+    // --- Quarter aggregation ---
+    const qKeySet = new Set<string>();
+    sortedMonths.forEach(m => qKeySet.add(monthToQuarterKey(m)));
+    const sortedQuarters = Array.from(qKeySet).sort();
+
+    const qLblMap = new Map<string, string>();
+    sortedQuarters.forEach(qKey => qLblMap.set(qKey, quarterKeyToLabel(qKey)));
+
+    const qInfoMap = new Map<string, Map<string, number>>();
+    cohortData.forEach(cohort => {
+      const qm = new Map<string, number>();
+      sortedQuarters.forEach(qKey => {
+        const total = sortedMonths
+          .filter(m => monthToQuarterKey(m) === qKey)
+          .reduce((sum, m) => sum + (infoMap.get(cohort.cohortLabel)?.get(m) ?? 0), 0);
+        qm.set(qKey, total);
+      });
+      qInfoMap.set(cohort.cohortLabel, qm);
+    });
+
+    const data = sortedQuarters.map(qKey => {
+      const row: Record<string, string | number | undefined> = {
+        calendarMonth: qKey,
+        calendarLabel: qLblMap.get(qKey) || qKey
       };
       cohortData.forEach(cohort => {
-        const point = cohort.data.find(d => d.calendarMonth === month);
-        if (point) row[cohort.cohortLabel] = point.avgReturn;
+        const monthsInQ = sortedMonths.filter(m => monthToQuarterKey(m) === qKey);
+        const vals = monthsInQ
+          .map(m => cohort.data.find(d => d.calendarMonth === m)?.avgReturn)
+          .filter((v): v is number => v !== undefined);
+        if (vals.length > 0) {
+          row[cohort.cohortLabel] = vals.reduce((a, b) => a + b, 0) / vals.length;
+        }
       });
       return row;
     });
 
-    return { chartData: data, allMonths: sortedMonths, monthLabels: lblMap, cohortInfoMap: infoMap };
-  }, [cohortData]);
+    return { chartData: data, allMonths: sortedQuarters, monthLabels: qLblMap, cohortInfoMap: qInfoMap };
+  }, [cohortData, granularity]);
 
-  const toggleBar = (
+  const granularityToggle = (
+    <div className="flex items-center gap-1 rounded-md border p-0.5 bg-muted/50">
+      <button
+        data-testid="btn-cohort-granularity-month"
+        onClick={() => setGranularity("month")}
+        className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+          granularity === "month"
+            ? "bg-background shadow-sm text-foreground"
+            : "text-muted-foreground hover:text-foreground"
+        }`}
+      >
+        Month
+      </button>
+      <button
+        data-testid="btn-cohort-granularity-quarter"
+        onClick={() => setGranularity("quarter")}
+        className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+          granularity === "quarter"
+            ? "bg-background shadow-sm text-foreground"
+            : "text-muted-foreground hover:text-foreground"
+        }`}
+      >
+        Quarter
+      </button>
+    </div>
+  );
+
+  const viewToggle = (
     <div className="flex items-center gap-1 rounded-md border p-0.5 bg-muted/50">
       <button
         data-testid="btn-cohort-view-chart"
@@ -105,6 +183,8 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
       </button>
     </div>
   );
+
+  const xLabel = granularity === "quarter" ? "quarters" : "calendar months";
 
   if (isLoading) {
     return (
@@ -143,16 +223,19 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
   return (
     <Card data-testid="card-item-cohort-returns">
       <CardHeader>
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start justify-between gap-2 flex-wrap gap-y-2">
           <div>
             <CardTitle>Returns by Investment Cohort</CardTitle>
             <CardDescription>
               {viewMode === "chart"
-                ? "Each line represents assets acquired in the same month. X-axis shows calendar months."
-                : "Rows = investment cohort month · Columns = calendar month · Values = average return"}
+                ? `Each line represents assets acquired in the same month. X-axis shows ${xLabel}.`
+                : `Rows = investment cohort month · Columns = ${xLabel} · Values = average return`}
             </CardDescription>
           </div>
-          {toggleBar}
+          <div className="flex items-center gap-2">
+            {granularityToggle}
+            {viewToggle}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -160,7 +243,7 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
           <ResponsiveContainer width="100%" height={350}>
             <LineChart data={chartData} margin={{ top: 20, right: 30, bottom: 60, left: 20 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis 
+              <XAxis
                 dataKey="calendarLabel"
                 className="text-xs fill-muted-foreground"
                 angle={-45}
@@ -169,11 +252,11 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
                 interval={0}
                 tick={{ fontSize: 10 }}
               />
-              <YAxis 
+              <YAxis
                 className="text-xs fill-muted-foreground"
                 tickFormatter={(val) => `${val > 0 ? '+' : ''}${val}%`}
               />
-              <Tooltip 
+              <Tooltip
                 content={({ active, payload, label }) => {
                   if (!active || !payload || !payload.length) return null;
                   const calendarMonth = chartData.find(d => d.calendarLabel === label)?.calendarMonth as string;
@@ -189,9 +272,11 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
                               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
                               <span>{cohortLabel}:</span>
                               <span className="font-medium">
-                                {(entry.value as number) >= 0 ? '+' : ''}{entry.value}%
+                                {(entry.value as number) >= 0 ? '+' : ''}{(entry.value as number).toFixed(2)}%
                               </span>
-                              <span className="text-muted-foreground text-xs">({count} valuations)</span>
+                              {count > 0 && (
+                                <span className="text-muted-foreground text-xs">({count} valuations)</span>
+                              )}
                             </div>
                           );
                         })}
@@ -221,13 +306,13 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
                   <th className="sticky left-0 z-10 bg-card text-left font-medium text-muted-foreground py-2 pr-4 pl-1 whitespace-nowrap border-b">
                     Cohort
                   </th>
-                  {allMonths.map(month => (
+                  {allMonths.map(period => (
                     <th
-                      key={month}
+                      key={period}
                       className="text-center font-medium text-muted-foreground py-2 px-2 whitespace-nowrap border-b min-w-[72px]"
-                      data-testid={`th-month-${month}`}
+                      data-testid={`th-month-${period}`}
                     >
-                      {monthLabels.get(month) || month}
+                      {monthLabels.get(period) || period}
                     </th>
                   ))}
                 </tr>
@@ -235,7 +320,16 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
               <tbody>
                 {cohortData.map((cohort, idx) => {
                   const color = COLORS[idx % COLORS.length];
-                  const dataMap = new Map(cohort.data.map(d => [d.calendarMonth, d.avgReturn]));
+                  const dataMap = granularity === "month"
+                    ? new Map(cohort.data.map(d => [d.calendarMonth, d.avgReturn]))
+                    : new Map(
+                        allMonths.map(qKey => {
+                          const monthsInQ = cohort.data.filter(d => monthToQuarterKey(d.calendarMonth) === qKey);
+                          const vals = monthsInQ.map(d => d.avgReturn);
+                          const avg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : undefined;
+                          return [qKey, avg] as [string, number | undefined];
+                        }).filter(([, v]) => v !== undefined) as [string, number][]
+                      );
                   return (
                     <tr
                       key={cohort.cohortKey}
@@ -248,20 +342,20 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
                           <span className="font-medium text-foreground">{cohort.cohortLabel}</span>
                         </div>
                       </td>
-                      {allMonths.map(month => {
-                        const val = dataMap.get(month);
+                      {allMonths.map(period => {
+                        const val = dataMap.get(period);
                         const formatted = fmtReturn(val);
                         const isPositive = val !== undefined && val > 0;
                         const isNegative = val !== undefined && val < 0;
                         return (
                           <td
-                            key={month}
+                            key={period}
                             className={`text-center py-2 px-2 border-b border-muted/40 tabular-nums ${
                               isPositive ? "text-emerald-600 dark:text-emerald-400" :
                               isNegative ? "text-red-500 dark:text-red-400" :
                               "text-muted-foreground"
                             }`}
-                            data-testid={`cell-${cohort.cohortKey}-${month}`}
+                            data-testid={`cell-${cohort.cohortKey}-${period}`}
                           >
                             {formatted}
                           </td>
