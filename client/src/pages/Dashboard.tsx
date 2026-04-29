@@ -947,6 +947,7 @@ export default function Dashboard() {
   }, [flowData, excludedPlatformNames]);
 
   const [flowAggregation, setFlowAggregation] = useState<"month" | "quarter" | "year">("month");
+  const [flowGroupBy, setFlowGroupBy] = useState<"platform" | "category">("platform");
 
   const aggregatedFlowMonths = useMemo(() => {
     if (flowAggregation === "month") return filteredFlowMonths;
@@ -966,6 +967,33 @@ export default function Dashboard() {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, g]) => ({ month: key, ...g }));
   }, [filteredFlowMonths, flowAggregation]);
+
+  const CATEGORY_COLORS = ["#6366f1","#f59e0b","#10b981","#ef4444","#8b5cf6","#06b6d4","#f97316","#84cc16","#ec4899","#14b8a6","#a16207","#be123c"];
+
+  const categoryFlowData = useMemo(() => {
+    if (!platforms || !flowData) return { items: [] as { name: string; color: string }[], months: [] as Record<string, string | number>[] };
+    const platformCatMap = new Map<string, string>();
+    for (const p of platforms) platformCatMap.set(p.name, (p as any).category || "Other");
+    const catSet = new Set<string>();
+    for (const p of filteredFlowPlatforms) catSet.add(platformCatMap.get(p.name) || "Other");
+    const uniqueCats = Array.from(catSet).sort();
+    const items = uniqueCats.map((cat, i) => ({ name: cat, color: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }));
+    const months = aggregatedFlowMonths.map(row => {
+      const newRow: Record<string, string | number> = { month: row.month };
+      for (const cat of uniqueCats) newRow[cat] = 0;
+      let total = 0;
+      for (const [key, val] of Object.entries(row)) {
+        if (key === "month" || key === "__total__") continue;
+        if (excludedPlatformNames.has(key)) continue;
+        const cat = platformCatMap.get(key) || "Other";
+        (newRow[cat] as number) += (val as number) || 0;
+        total += (val as number) || 0;
+      }
+      newRow.__total__ = total;
+      return newRow;
+    });
+    return { items, months };
+  }, [platforms, flowData, filteredFlowPlatforms, aggregatedFlowMonths, excludedPlatformNames]);
 
   function fmtFlowLabel(m: string): string {
     if (m.includes("-Q")) {
@@ -2603,37 +2631,69 @@ export default function Dashboard() {
             <CardHeader className="flex flex-row items-start justify-between gap-4 flex-wrap pb-2">
               <div>
                 <CardTitle>Investment Flow</CardTitle>
-                <CardDescription>Net new capital deployed, broken down by platform</CardDescription>
+                <CardDescription>
+                  {flowGroupBy === "category"
+                    ? "Net new capital deployed, broken down by category"
+                    : "Net new capital deployed, broken down by platform"}
+                </CardDescription>
               </div>
-              <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
-                <button onClick={() => setFlowAggregation("month")} className={cn("px-2.5 py-1.5 transition-colors", flowAggregation === "month" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-flow-agg-month">Mo</button>
-                <button onClick={() => setFlowAggregation("quarter")} className={cn("px-2.5 py-1.5 transition-colors", flowAggregation === "quarter" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-flow-agg-quarter">Qtr</button>
-                <button onClick={() => setFlowAggregation("year")} className={cn("px-2.5 py-1.5 transition-colors", flowAggregation === "year" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-flow-agg-year">Yr</button>
+              <div className="flex items-center gap-2 flex-wrap justify-end">
+                <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
+                  <button onClick={() => setFlowGroupBy("platform")} className={cn("px-2.5 py-1.5 transition-colors", flowGroupBy === "platform" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-flow-group-platform">Platform</button>
+                  <button onClick={() => setFlowGroupBy("category")} className={cn("px-2.5 py-1.5 transition-colors", flowGroupBy === "category" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-flow-group-category">Category</button>
+                </div>
+                <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
+                  <button onClick={() => setFlowAggregation("month")} className={cn("px-2.5 py-1.5 transition-colors", flowAggregation === "month" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-flow-agg-month">Mo</button>
+                  <button onClick={() => setFlowAggregation("quarter")} className={cn("px-2.5 py-1.5 transition-colors", flowAggregation === "quarter" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-flow-agg-quarter">Qtr</button>
+                  <button onClick={() => setFlowAggregation("year")} className={cn("px-2.5 py-1.5 transition-colors", flowAggregation === "year" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-flow-agg-year">Yr</button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
               {flowData && flowData.months.length > 0 && flowData.platforms ? (
                 <div className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={aggregatedFlowMonths} margin={{ left: 4, top: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="month" tickFormatter={fmtFlowLabel} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                      <YAxis tickFormatter={v => formatCurrency(v, currency)} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={70} />
-                      <Tooltip formatter={(v: number, name: string) => [formatCurrency(v, currency), name]} labelFormatter={fmtFlowLabel} contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
-                      <Legend />
-                      {filteredFlowPlatforms.map((p, i) => (
-                        <Bar key={p.name} dataKey={p.name} stackId="flow" fill={p.color}>
-                          {i === filteredFlowPlatforms.length - 1 && (
-                            <LabelList
-                              dataKey="__total__"
-                              position="top"
-                              formatter={(v: number) => v > 0 ? formatCompactCurrency(v, currency) : ""}
-                              style={{ fontSize: 9, fill: "hsl(var(--muted-foreground))", fontWeight: 500 }}
-                            />
-                          )}
-                        </Bar>
-                      ))}
-                    </BarChart>
+                    {flowGroupBy === "category" ? (
+                      <BarChart data={categoryFlowData.months} margin={{ left: 4, top: 20 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis dataKey="month" tickFormatter={fmtFlowLabel} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                        <YAxis tickFormatter={v => formatCurrency(v, currency)} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={70} />
+                        <Tooltip formatter={(v: number, name: string) => [formatCurrency(v, currency), name]} labelFormatter={fmtFlowLabel} contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
+                        <Legend />
+                        {categoryFlowData.items.map((cat, i) => (
+                          <Bar key={cat.name} dataKey={cat.name} stackId="flow" fill={cat.color}>
+                            {i === categoryFlowData.items.length - 1 && (
+                              <LabelList
+                                dataKey="__total__"
+                                position="top"
+                                formatter={(v: number) => v > 0 ? formatCompactCurrency(v, currency) : ""}
+                                style={{ fontSize: 9, fill: "hsl(var(--muted-foreground))", fontWeight: 500 }}
+                              />
+                            )}
+                          </Bar>
+                        ))}
+                      </BarChart>
+                    ) : (
+                      <BarChart data={aggregatedFlowMonths} margin={{ left: 4, top: 20 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis dataKey="month" tickFormatter={fmtFlowLabel} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                        <YAxis tickFormatter={v => formatCurrency(v, currency)} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} width={70} />
+                        <Tooltip formatter={(v: number, name: string) => [formatCurrency(v, currency), name]} labelFormatter={fmtFlowLabel} contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
+                        <Legend />
+                        {filteredFlowPlatforms.map((p, i) => (
+                          <Bar key={p.name} dataKey={p.name} stackId="flow" fill={p.color}>
+                            {i === filteredFlowPlatforms.length - 1 && (
+                              <LabelList
+                                dataKey="__total__"
+                                position="top"
+                                formatter={(v: number) => v > 0 ? formatCompactCurrency(v, currency) : ""}
+                                style={{ fontSize: 9, fill: "hsl(var(--muted-foreground))", fontWeight: 500 }}
+                              />
+                            )}
+                          </Bar>
+                        ))}
+                      </BarChart>
+                    )}
                   </ResponsiveContainer>
                 </div>
               ) : (
