@@ -81,13 +81,36 @@ function buildAssetDataMap(
 
 type SortMode = "name" | "best" | "worst";
 
+function SheetSortBtn({ mode, label, icon, activeSort, onSort }: {
+  mode: SortMode;
+  label: string;
+  icon: React.ElementType;
+  activeSort: SortMode;
+  onSort: (m: SortMode) => void;
+}) {
+  const Icon = icon;
+  return (
+    <button
+      onClick={() => onSort(mode)}
+      data-testid={`btn-cohort-sort-${mode}`}
+      className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
+        activeSort === mode
+          ? "bg-background shadow-sm text-foreground border border-border"
+          : "text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      <Icon className="h-3 w-3" />
+      {label}
+    </button>
+  );
+}
+
 interface CohortDetailSheetProps {
   cohort: CohortData | null;
   platformId: number;
   statusFilter: string;
-  allMonths: string[];
-  monthLabels: Map<string, string>;
-  granularity: "month" | "quarter";
+  rawMonths: string[];
+  rawMonthLabels: Map<string, string>;
   maxAbs: number;
   open: boolean;
   onClose: () => void;
@@ -97,14 +120,14 @@ function CohortDetailSheet({
   cohort,
   platformId,
   statusFilter,
-  allMonths,
-  monthLabels,
-  granularity,
+  rawMonths,
+  rawMonthLabels,
   maxAbs,
   open,
   onClose,
 }: CohortDetailSheetProps) {
   const [sort, setSort] = useState<SortMode>("name");
+  const [sheetGranularity, setSheetGranularity] = useState<"month" | "quarter">("month");
 
   const { data, isLoading } = useQuery<AssetRow[]>({
     queryKey: ['/api/platforms', platformId, 'item-cohort-assets', cohort?.cohortKey ?? "", statusFilter],
@@ -117,16 +140,37 @@ function CohortDetailSheet({
     enabled: open && cohort !== null,
   });
 
-  const lastPeriod = allMonths[allMonths.length - 1];
+  const { sheetAllPeriods, sheetPeriodLabels } = useMemo(() => {
+    if (sheetGranularity === "month") {
+      return { sheetAllPeriods: rawMonths, sheetPeriodLabels: rawMonthLabels };
+    }
+    const qKeySet = new Set<string>();
+    rawMonths.forEach(m => qKeySet.add(monthToQuarterKey(m)));
+    const sortedQuarters = Array.from(qKeySet).sort();
+    const qLblMap = new Map<string, string>();
+    sortedQuarters.forEach(qKey => qLblMap.set(qKey, quarterKeyToLabel(qKey)));
+    return { sheetAllPeriods: sortedQuarters, sheetPeriodLabels: qLblMap };
+  }, [rawMonths, rawMonthLabels, sheetGranularity]);
+
+  const visiblePeriods = useMemo(() => {
+    if (!cohort) return sheetAllPeriods;
+    if (sheetGranularity === "month") {
+      return sheetAllPeriods.filter(m => m >= cohort.cohortKey);
+    }
+    const cohortQuarter = monthToQuarterKey(cohort.cohortKey);
+    return sheetAllPeriods.filter(q => q >= cohortQuarter);
+  }, [sheetAllPeriods, cohort, sheetGranularity]);
+
+  const lastPeriod = visiblePeriods[visiblePeriods.length - 1];
 
   const sortedAssets = useMemo(() => {
     if (!data) return [];
     return [...data].sort((a, b) => {
       if (sort === "name") return a.assetName.localeCompare(b.assetName);
-      const aMap = buildAssetDataMap(a, allMonths, granularity);
-      const bMap = buildAssetDataMap(b, allMonths, granularity);
-      const aVal = aMap.get(lastPeriod) ?? undefined;
-      const bVal = bMap.get(lastPeriod) ?? undefined;
+      const aMap = buildAssetDataMap(a, visiblePeriods, sheetGranularity);
+      const bMap = buildAssetDataMap(b, visiblePeriods, sheetGranularity);
+      const aVal = lastPeriod ? aMap.get(lastPeriod) : undefined;
+      const bVal = lastPeriod ? bMap.get(lastPeriod) : undefined;
       if (sort === "best") {
         if (aVal === undefined && bVal === undefined) return 0;
         if (aVal === undefined) return 1;
@@ -138,38 +182,10 @@ function CohortDetailSheet({
       if (bVal === undefined) return -1;
       return aVal - bVal;
     });
-  }, [data, sort, allMonths, granularity, lastPeriod]);
-
-  const visiblePeriods = useMemo(() => {
-    if (!cohort) return allMonths;
-    if (granularity === "month") {
-      return allMonths.filter(m => m >= cohort.cohortKey);
-    }
-    const cohortQuarter = monthToQuarterKey(cohort.cohortKey);
-    return allMonths.filter(q => q >= cohortQuarter);
-  }, [allMonths, cohort, granularity]);
+  }, [data, sort, visiblePeriods, sheetGranularity, lastPeriod]);
 
   const totalInvested = data ? data.reduce((s, a) => s + a.investedAmount, 0) : 0;
   const assetCount = data ? data.length : (cohort?.data[cohort.data.length - 1]?.assetCount ?? 0);
-
-  function SortBtn({ mode, label, icon }: { mode: SortMode; label: string; icon: typeof ArrowUp }) {
-    const Icon = icon;
-    const active = sort === mode;
-    return (
-      <button
-        onClick={() => setSort(mode)}
-        data-testid={`btn-cohort-sort-${mode}`}
-        className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors ${
-          active
-            ? "bg-background shadow-sm text-foreground border border-border"
-            : "text-muted-foreground hover:text-foreground"
-        }`}
-      >
-        <Icon className="h-3 w-3" />
-        {label}
-      </button>
-    );
-  }
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -189,10 +205,32 @@ function CohortDetailSheet({
                 : `${assetCount} asset${assetCount !== 1 ? "s" : ""} · €${totalInvested.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} invested`}
             </SheetDescription>
           </div>
-          <div className="flex items-center gap-1 rounded-md border p-0.5 bg-muted/50 w-fit mt-3">
-            <SortBtn mode="name" label="Name A→Z" icon={ArrowUpDown} />
-            <SortBtn mode="best" label="Best return" icon={ArrowUp} />
-            <SortBtn mode="worst" label="Worst return" icon={ArrowDown} />
+          <div className="flex items-center gap-3 mt-3 flex-wrap">
+            <div className="flex items-center gap-1 rounded-md border p-0.5 bg-muted/50">
+              <button
+                data-testid="btn-sheet-granularity-month"
+                onClick={() => setSheetGranularity("month")}
+                className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                  sheetGranularity === "month" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Month
+              </button>
+              <button
+                data-testid="btn-sheet-granularity-quarter"
+                onClick={() => setSheetGranularity("quarter")}
+                className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                  sheetGranularity === "quarter" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Quarter
+              </button>
+            </div>
+            <div className="flex items-center gap-1 rounded-md border p-0.5 bg-muted/50">
+              <SheetSortBtn mode="name" label="Name A→Z" icon={ArrowUpDown} activeSort={sort} onSort={setSort} />
+              <SheetSortBtn mode="best" label="Best return" icon={ArrowUp} activeSort={sort} onSort={setSort} />
+              <SheetSortBtn mode="worst" label="Worst return" icon={ArrowDown} activeSort={sort} onSort={setSort} />
+            </div>
           </div>
         </SheetHeader>
 
@@ -221,7 +259,7 @@ function CohortDetailSheet({
                         className="text-center font-medium text-muted-foreground py-2 px-2 whitespace-nowrap border-b min-w-[72px]"
                         data-testid={`sheet-th-${period}`}
                       >
-                        {monthLabels.get(period) || period}
+                        {sheetPeriodLabels.get(period) || period}
                       </th>
                     ))}
                   </tr>
@@ -301,8 +339,8 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
     }
   });
 
-  const { chartData, allMonths, monthLabels, cohortInfoMap } = useMemo(() => {
-    const empty = { chartData: [], allMonths: [], monthLabels: new Map<string, string>(), cohortInfoMap: new Map<string, Map<string, number>>() };
+  const { chartData, allMonths, monthLabels, cohortInfoMap, rawMonths, rawMonthLabels } = useMemo(() => {
+    const empty = { chartData: [], allMonths: [], monthLabels: new Map<string, string>(), cohortInfoMap: new Map<string, Map<string, number>>(), rawMonths: [] as string[], rawMonthLabels: new Map<string, string>() };
     if (!cohortData || cohortData.length === 0) return empty;
 
     const monthSet = new Set<string>();
@@ -332,7 +370,7 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
         });
         return row;
       });
-      return { chartData: data, allMonths: sortedMonths, monthLabels: lblMap, cohortInfoMap: infoMap };
+      return { chartData: data, allMonths: sortedMonths, monthLabels: lblMap, cohortInfoMap: infoMap, rawMonths: sortedMonths, rawMonthLabels: lblMap };
     }
 
     const qKeySet = new Set<string>();
@@ -369,7 +407,7 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
       return row;
     });
 
-    return { chartData: data, allMonths: sortedQuarters, monthLabels: qLblMap, cohortInfoMap: qInfoMap };
+    return { chartData: data, allMonths: sortedQuarters, monthLabels: qLblMap, cohortInfoMap: qInfoMap, rawMonths: sortedMonths, rawMonthLabels: lblMap };
   }, [cohortData, granularity]);
 
   const granularityToggle = (
@@ -552,7 +590,7 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
                           className="text-center font-medium text-muted-foreground py-2 px-2 whitespace-nowrap border-b min-w-[72px]"
                           data-testid={`th-month-${period}`}
                         >
-                          {monthLabels.get(period) || period}
+                          {sheetPeriodLabels.get(period) || period}
                         </th>
                       ))}
                     </tr>
@@ -627,9 +665,8 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
         cohort={selectedCohort}
         platformId={platformId}
         statusFilter={statusFilter}
-        allMonths={allMonths}
-        monthLabels={monthLabels}
-        granularity={granularity}
+        rawMonths={rawMonths}
+        rawMonthLabels={rawMonthLabels}
         maxAbs={maxAbs}
         open={selectedCohort !== null}
         onClose={() => setSelectedCohort(null)}
