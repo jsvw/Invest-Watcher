@@ -2,14 +2,21 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { useMemo, useState } from "react";
+import { useMemo, useState, Fragment } from "react";
 import type { CSSProperties } from "react";
-import { BarChart2, Table2 } from "lucide-react";
+import { BarChart2, Table2, ChevronRight, ChevronDown } from "lucide-react";
 
 interface CohortData {
   cohortKey: string;
   cohortLabel: string;
   data: { calendarMonth: string; calendarLabel: string; avgReturn: number; assetCount: number }[];
+}
+
+interface AssetRow {
+  assetId: number;
+  assetName: string;
+  status: string;
+  data: { calendarMonth: string; calendarLabel: string; returnPct: number }[];
 }
 
 import type { AssetStatusFilter } from "@/components/AssetInsightTabs";
@@ -45,17 +52,110 @@ function getHeatmapStyle(val: number | undefined, maxAbs: number): CSSProperties
   if (val === undefined || val === null || maxAbs === 0) return {};
   const intensity = Math.min(Math.abs(val) / maxAbs, 1);
   const alpha = 0.1 + intensity * 0.55;
-  if (val > 0) {
-    return { backgroundColor: `rgba(16, 185, 129, ${alpha})` };
-  } else if (val < 0) {
-    return { backgroundColor: `rgba(239, 68, 68, ${alpha})` };
-  }
+  if (val > 0) return { backgroundColor: `rgba(16, 185, 129, ${alpha})` };
+  if (val < 0) return { backgroundColor: `rgba(239, 68, 68, ${alpha})` };
   return {};
+}
+
+interface CohortAssetRowsProps {
+  platformId: number;
+  cohortKey: string;
+  statusFilter: string;
+  allMonths: string[];
+  granularity: "month" | "quarter";
+  maxAbs: number;
+}
+
+function CohortAssetRows({ platformId, cohortKey, statusFilter, allMonths, granularity, maxAbs }: CohortAssetRowsProps) {
+  const { data, isLoading } = useQuery<AssetRow[]>({
+    queryKey: ['/api/platforms', platformId, 'item-cohort-assets', cohortKey, statusFilter],
+    queryFn: async () => {
+      const url = `/api/platforms/${platformId}/item-cohort-assets?cohortKey=${cohortKey}&statusFilter=${statusFilter}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch asset data");
+      return res.json();
+    }
+  });
+
+  const numCols = allMonths.length + 1;
+
+  if (isLoading) {
+    return (
+      <tr data-testid={`asset-rows-loading-${cohortKey}`}>
+        <td colSpan={numCols} className="py-2 pl-8 pr-4 border-b border-muted/30">
+          <Skeleton className="h-5 w-full" />
+        </td>
+      </tr>
+    );
+  }
+
+  if (!data || data.length === 0) {
+    return (
+      <tr>
+        <td colSpan={numCols} className="py-2 pl-8 text-xs text-muted-foreground italic border-b border-muted/30">
+          No individual asset data available.
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <>
+      {data.map(asset => {
+        const dataMap: Map<string, number> = granularity === "month"
+          ? new Map(asset.data.map(d => [d.calendarMonth, d.returnPct]))
+          : new Map(
+              (allMonths
+                .map(qKey => {
+                  const monthsInQ = asset.data.filter(d => monthToQuarterKey(d.calendarMonth) === qKey);
+                  const vals = monthsInQ.map(d => d.returnPct);
+                  if (vals.length === 0) return null;
+                  return [qKey, vals.reduce((a, b) => a + b, 0) / vals.length] as [string, number];
+                })
+                .filter((x): x is [string, number] => x !== null))
+            );
+
+        return (
+          <tr key={asset.assetId} className="bg-muted/20" data-testid={`asset-row-${asset.assetId}`}>
+            <td className="sticky left-0 z-10 bg-muted/20 py-1.5 pr-4 pl-7 whitespace-nowrap border-b border-muted/30">
+              <div className="flex items-center gap-2">
+                <div className="w-px h-3.5 bg-border flex-shrink-0" />
+                <span className="text-foreground text-xs truncate max-w-[150px]" title={asset.assetName}>
+                  {asset.assetName}
+                </span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${
+                  asset.status === "active"
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                    : "bg-muted text-muted-foreground"
+                }`}>
+                  {asset.status}
+                </span>
+              </div>
+            </td>
+            {allMonths.map(period => {
+              const val = dataMap.get(period);
+              return (
+                <td
+                  key={period}
+                  className="text-center py-1.5 px-2 border-b border-muted/30 tabular-nums text-xs text-foreground"
+                  style={getHeatmapStyle(val, maxAbs)}
+                  data-testid={`asset-cell-${asset.assetId}-${period}`}
+                >
+                  {fmtReturn(val)}
+                </td>
+              );
+            })}
+          </tr>
+        );
+      })}
+    </>
+  );
 }
 
 export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: ItemCohortReturnChartProps) {
   const [viewMode, setViewMode] = useState<"chart" | "table">("chart");
   const [granularity, setGranularity] = useState<"month" | "quarter">("month");
+  const [expandedCohorts, setExpandedCohorts] = useState<Set<string>>(new Set());
 
   const { data: cohortData, isLoading } = useQuery<CohortData[]>({
     queryKey: ['/api/platforms', platformId, 'item-cohort-returns', statusFilter],
@@ -101,7 +201,6 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
       return { chartData: data, allMonths: sortedMonths, monthLabels: lblMap, cohortInfoMap: infoMap };
     }
 
-    // --- Quarter aggregation ---
     const qKeySet = new Set<string>();
     sortedMonths.forEach(m => qKeySet.add(monthToQuarterKey(m)));
     const sortedQuarters = Array.from(qKeySet).sort();
@@ -131,9 +230,7 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
         const vals = monthsInQ
           .map(m => cohort.data.find(d => d.calendarMonth === m)?.avgReturn)
           .filter((v): v is number => v !== undefined);
-        if (vals.length > 0) {
-          row[cohort.cohortLabel] = vals.reduce((a, b) => a + b, 0) / vals.length;
-        }
+        if (vals.length > 0) row[cohort.cohortLabel] = vals.reduce((a, b) => a + b, 0) / vals.length;
       });
       return row;
     });
@@ -141,15 +238,22 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
     return { chartData: data, allMonths: sortedQuarters, monthLabels: qLblMap, cohortInfoMap: qInfoMap };
   }, [cohortData, granularity]);
 
+  function toggleCohort(cohortKey: string) {
+    setExpandedCohorts(prev => {
+      const next = new Set(prev);
+      if (next.has(cohortKey)) next.delete(cohortKey);
+      else next.add(cohortKey);
+      return next;
+    });
+  }
+
   const granularityToggle = (
     <div className="flex items-center gap-1 rounded-md border p-0.5 bg-muted/50">
       <button
         data-testid="btn-cohort-granularity-month"
         onClick={() => setGranularity("month")}
         className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-          granularity === "month"
-            ? "bg-background shadow-sm text-foreground"
-            : "text-muted-foreground hover:text-foreground"
+          granularity === "month" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
         }`}
       >
         Month
@@ -158,9 +262,7 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
         data-testid="btn-cohort-granularity-quarter"
         onClick={() => setGranularity("quarter")}
         className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-          granularity === "quarter"
-            ? "bg-background shadow-sm text-foreground"
-            : "text-muted-foreground hover:text-foreground"
+          granularity === "quarter" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
         }`}
       >
         Quarter
@@ -174,9 +276,7 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
         data-testid="btn-cohort-view-chart"
         onClick={() => setViewMode("chart")}
         className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-          viewMode === "chart"
-            ? "bg-background shadow-sm text-foreground"
-            : "text-muted-foreground hover:text-foreground"
+          viewMode === "chart" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
         }`}
       >
         <BarChart2 className="h-3.5 w-3.5" />
@@ -186,9 +286,7 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
         data-testid="btn-cohort-view-table"
         onClick={() => setViewMode("table")}
         className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-          viewMode === "table"
-            ? "bg-background shadow-sm text-foreground"
-            : "text-muted-foreground hover:text-foreground"
+          viewMode === "table" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
         }`}
       >
         <Table2 className="h-3.5 w-3.5" />
@@ -210,9 +308,7 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <Skeleton className="h-[300px] w-full" />
-        </CardContent>
+        <CardContent><Skeleton className="h-[300px] w-full" /></CardContent>
       </Card>
     );
   }
@@ -242,7 +338,7 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
             <CardDescription>
               {viewMode === "chart"
                 ? `Each line represents assets acquired in the same month. X-axis shows ${xLabel}.`
-                : `Rows = investment cohort month · Columns = ${xLabel} · Values = average return`}
+                : `Rows = investment cohort month · Columns = ${xLabel} · Click a row to expand individual assets`}
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
@@ -339,43 +435,61 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
                     <tbody>
                       {cohortData.map((cohort, idx) => {
                         const color = COLORS[idx % COLORS.length];
-                        const dataMap = granularity === "month"
+                        const isExpanded = expandedCohorts.has(cohort.cohortKey);
+                        const dataMap: Map<string, number> = granularity === "month"
                           ? new Map(cohort.data.map(d => [d.calendarMonth, d.avgReturn]))
                           : new Map(
-                              allMonths.map(qKey => {
-                                const monthsInQ = cohort.data.filter(d => monthToQuarterKey(d.calendarMonth) === qKey);
-                                const vals = monthsInQ.map(d => d.avgReturn);
-                                const avg = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : undefined;
-                                return [qKey, avg] as [string, number | undefined];
-                              }).filter(([, v]) => v !== undefined) as [string, number][]
+                              (allMonths
+                                .map(qKey => {
+                                  const monthsInQ = cohort.data.filter(d => monthToQuarterKey(d.calendarMonth) === qKey);
+                                  const vals = monthsInQ.map(d => d.avgReturn);
+                                  if (vals.length === 0) return null;
+                                  return [qKey, vals.reduce((a, b) => a + b, 0) / vals.length] as [string, number];
+                                })
+                                .filter((x): x is [string, number] => x !== null))
                             );
                         return (
-                          <tr
-                            key={cohort.cohortKey}
-                            data-testid={`row-cohort-${cohort.cohortKey}`}
-                          >
-                            <td className="sticky left-0 z-10 bg-card py-2 pr-4 pl-1 whitespace-nowrap border-b border-muted/40">
-                              <div className="flex items-center gap-2">
-                                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                                <span className="font-medium text-foreground">{cohort.cohortLabel}</span>
-                              </div>
-                            </td>
-                            {allMonths.map(period => {
-                              const val = dataMap.get(period);
-                              const formatted = fmtReturn(val);
-                              const heatStyle = getHeatmapStyle(val, maxAbs);
-                              return (
-                                <td
-                                  key={period}
-                                  className="text-center py-2 px-2 border-b border-muted/40 tabular-nums font-medium text-foreground transition-colors"
-                                  style={heatStyle}
-                                  data-testid={`cell-${cohort.cohortKey}-${period}`}
-                                >
-                                  {formatted}
-                                </td>
-                              );
-                            })}
-                          </tr>
+                          <Fragment key={cohort.cohortKey}>
+                            <tr
+                              className="cursor-pointer hover:brightness-95 transition-all"
+                              onClick={() => toggleCohort(cohort.cohortKey)}
+                              data-testid={`row-cohort-${cohort.cohortKey}`}
+                            >
+                              <td className="sticky left-0 z-10 bg-card py-2 pr-4 pl-1 whitespace-nowrap border-b border-muted/40">
+                                <div className="flex items-center gap-1.5">
+                                  {isExpanded
+                                    ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                    : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                  }
+                                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                                  <span className="font-medium text-foreground">{cohort.cohortLabel}</span>
+                                </div>
+                              </td>
+                              {allMonths.map(period => {
+                                const val = dataMap.get(period);
+                                return (
+                                  <td
+                                    key={period}
+                                    className="text-center py-2 px-2 border-b border-muted/40 tabular-nums font-medium text-foreground transition-colors"
+                                    style={getHeatmapStyle(val, maxAbs)}
+                                    data-testid={`cell-${cohort.cohortKey}-${period}`}
+                                  >
+                                    {fmtReturn(val)}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                            {isExpanded && (
+                              <CohortAssetRows
+                                platformId={platformId}
+                                cohortKey={cohort.cohortKey}
+                                statusFilter={statusFilter}
+                                allMonths={allMonths}
+                                granularity={granularity}
+                                maxAbs={maxAbs}
+                              />
+                            )}
+                          </Fragment>
                         );
                       })}
                     </tbody>

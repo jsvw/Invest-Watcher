@@ -114,6 +114,7 @@ export interface IStorage {
   
   // Item Cohort Returns
   getItemCohortReturns(platformId: number, statusFilter?: string): Promise<{ cohortKey: string; cohortLabel: string; data: { calendarMonth: string; calendarLabel: string; avgReturn: number; assetCount: number }[] }[]>;
+  getItemCohortAssets(platformId: number, cohortKey: string, statusFilter?: string): Promise<{ assetId: number; assetName: string; status: string; data: { calendarMonth: string; calendarLabel: string; returnPct: number }[] }[]>;
 
   // Email Settings
   getEmailSettings(userId: number): Promise<EmailSettings | undefined>;
@@ -1254,6 +1255,67 @@ export class DatabaseStorage implements IStorage {
           data
         });
       }
+    }
+
+    return result;
+  }
+
+  async getItemCohortAssets(platformId: number, cohortKey: string, statusFilter: string = "all"): Promise<{ assetId: number; assetName: string; status: string; data: { calendarMonth: string; calendarLabel: string; returnPct: number }[] }[]> {
+    let platformAssets;
+    if (statusFilter === "active") {
+      platformAssets = await db.select().from(assets)
+        .where(and(eq(assets.platformId, platformId), eq(assets.status, "active")));
+    } else if (statusFilter === "exited") {
+      platformAssets = await db.select().from(assets)
+        .where(and(eq(assets.platformId, platformId), or(eq(assets.status, "exited"), eq(assets.status, "matured"))));
+    } else {
+      platformAssets = await db.select().from(assets)
+        .where(eq(assets.platformId, platformId));
+    }
+
+    const [yearStr, monthStr] = cohortKey.split('-');
+    const targetYear = parseInt(yearStr);
+    const targetMonth = parseInt(monthStr);
+    const cohortAssets = platformAssets.filter(a => {
+      const d = new Date(a.acquisitionDate);
+      return d.getFullYear() === targetYear && (d.getMonth() + 1) === targetMonth;
+    });
+
+    if (cohortAssets.length === 0) return [];
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const result: { assetId: number; assetName: string; status: string; data: { calendarMonth: string; calendarLabel: string; returnPct: number }[] }[] = [];
+
+    for (const asset of cohortAssets) {
+      const investedBasis = Number(asset.investedAmount) + Number(asset.bonusAmount || 0);
+      if (investedBasis <= 0) continue;
+
+      const acquisitionDate = new Date(asset.acquisitionDate);
+      const vals = await db.select().from(assetValuations)
+        .where(eq(assetValuations.assetId, asset.id))
+        .orderBy(assetValuations.date);
+
+      if (vals.length === 0) continue;
+
+      const monthMap = new Map<string, number>();
+      for (const val of vals) {
+        const valDate = new Date(val.date);
+        if (valDate < acquisitionDate) continue;
+        const calendarMonth = `${valDate.getFullYear()}-${String(valDate.getMonth() + 1).padStart(2, '0')}`;
+        const returnPct = Math.round(((Number(val.value) - investedBasis) / investedBasis) * 10000) / 100;
+        monthMap.set(calendarMonth, returnPct);
+      }
+
+      if (monthMap.size === 0) continue;
+
+      const data = Array.from(monthMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([calendarMonth, returnPct]) => {
+          const [y, m] = calendarMonth.split('-');
+          return { calendarMonth, calendarLabel: `${monthNames[parseInt(m) - 1]} ${y}`, returnPct };
+        });
+
+      result.push({ assetId: asset.id, assetName: asset.name, status: asset.status, data });
     }
 
     return result;

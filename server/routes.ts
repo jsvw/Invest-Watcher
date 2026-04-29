@@ -947,6 +947,24 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/platforms/:platformId/item-cohort-assets', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.platformId);
+      const cohortKey = req.query.cohortKey as string;
+      const statusFilter = (req.query.statusFilter as string) || "all";
+      if (!cohortKey || !/^\d{4}-\d{2}$/.test(cohortKey)) {
+        return res.status(400).json({ message: "Invalid cohortKey" });
+      }
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+      const assetRows = await storage.getItemCohortAssets(platformId, cohortKey, statusFilter);
+      res.json(assetRows);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch cohort asset data" });
+    }
+  });
+
   // --- Insights ---
   app.post(api.insights.generate.path, requireAuth, async (req, res) => {
     try {
