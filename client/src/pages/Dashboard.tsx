@@ -272,6 +272,8 @@ type SortDir = "asc" | "desc";
 
 const supportsHover = () => window.matchMedia('(hover: hover)').matches;
 
+const CATEGORY_COLORS = ["#6366f1","#f59e0b","#10b981","#ef4444","#8b5cf6","#06b6d4","#f97316","#84cc16","#ec4899","#14b8a6","#a16207","#be123c"];
+
 export default function Dashboard() {
   const { user } = useAuth();
   const currency = user?.currency || "EUR";
@@ -968,12 +970,10 @@ export default function Dashboard() {
       .map(([key, g]) => ({ month: key, ...g }));
   }, [filteredFlowMonths, flowAggregation]);
 
-  const CATEGORY_COLORS = ["#6366f1","#f59e0b","#10b981","#ef4444","#8b5cf6","#06b6d4","#f97316","#84cc16","#ec4899","#14b8a6","#a16207","#be123c"];
-
   const categoryFlowData = useMemo(() => {
     if (!platforms || !flowData) return { items: [] as { name: string; color: string }[], months: [] as Record<string, string | number>[] };
     const platformCatMap = new Map<string, string>();
-    for (const p of platforms) platformCatMap.set(p.name, (p as any).category || "Other");
+    for (const p of platforms) platformCatMap.set(p.name, p.category || "Other");
     const catSet = new Set<string>();
     for (const p of filteredFlowPlatforms) catSet.add(platformCatMap.get(p.name) || "Other");
     const uniqueCats = Array.from(catSet).sort();
