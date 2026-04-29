@@ -583,6 +583,7 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
                     <tr>
                       <th className="sticky left-0 z-10 bg-card text-left font-medium text-muted-foreground py-2 pr-4 pl-1 whitespace-nowrap border-b">
                         Cohort
+                        <span className="ml-1 font-normal text-[10px] text-muted-foreground/60"># assets</span>
                       </th>
                       {allMonths.map(period => (
                         <th
@@ -623,6 +624,12 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
                               <ChevronRight className={`h-3.5 w-3.5 flex-shrink-0 transition-colors ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
                               <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
                               <span className="font-medium text-foreground">{cohort.cohortLabel}</span>
+                              <span
+                                className="ml-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground tabular-nums"
+                                data-testid={`badge-cohort-count-${cohort.cohortKey}`}
+                              >
+                                {cohort.data[cohort.data.length - 1]?.assetCount ?? 0}
+                              </span>
                             </div>
                           </td>
                           {allMonths.map(period => {
