@@ -266,7 +266,7 @@ function CohortDetailSheet({
                 </thead>
                 <tbody>
                   {sortedAssets.map(asset => {
-                    const dataMap = buildAssetDataMap(asset, visiblePeriods, granularity);
+                    const dataMap = buildAssetDataMap(asset, visiblePeriods, sheetGranularity);
                     return (
                       <tr key={asset.assetId} data-testid={`sheet-asset-row-${asset.assetId}`}>
                         <td className="sticky left-0 z-10 bg-background py-2 pr-4 pl-1 whitespace-nowrap border-b border-muted/40">
