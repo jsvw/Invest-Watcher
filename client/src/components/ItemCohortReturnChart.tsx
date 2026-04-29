@@ -591,7 +591,7 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
                           className="text-center font-medium text-muted-foreground py-2 px-2 whitespace-nowrap border-b min-w-[72px]"
                           data-testid={`th-month-${period}`}
                         >
-                          {sheetPeriodLabels.get(period) || period}
+                          {monthLabels.get(period) || period}
                         </th>
                       ))}
                     </tr>
