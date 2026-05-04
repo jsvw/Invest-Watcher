@@ -9,7 +9,7 @@ import {
   CartesianGrid, ReferenceLine, Cell,
 } from "recharts";
 import { formatCurrency, formatCompactCurrency } from "@/lib/currency";
-import { format, parse } from "date-fns";
+import { format, parse, addMonths } from "date-fns";
 
 interface ExitMonth {
   month: string;
@@ -82,11 +82,25 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
   const totalProfit = data.reduce((s, d) => s + d.profit, 0);
   const totalExits = data.reduce((s, d) => s + d.count, 0);
 
-  // Parse as the 1st of the month to avoid day-of-month rollover on days 29-31
-  const chartData = data.map(d => ({
-    ...d,
-    label: format(parse(d.month + "-01", "yyyy-MM-dd", new Date(2000, 0, 1)), "MMM yy"),
-  }));
+  // Build a complete month range so every month shows, even those with no exits
+  const parseMonth = (m: string) => parse(m + "-01", "yyyy-MM-dd", new Date(2000, 0, 1));
+  const exitsByMonth = new Map(data.map(d => [d.month, d]));
+  const firstMonth = parseMonth(data[0].month);
+  const lastMonth = parseMonth(data[data.length - 1].month);
+  const chartData: (ExitMonth & { label: string })[] = [];
+  let cursor = firstMonth;
+  while (cursor <= lastMonth) {
+    const key = format(cursor, "yyyy-MM");
+    const entry = exitsByMonth.get(key);
+    chartData.push({
+      month: key,
+      invested: entry?.invested ?? 0,
+      profit: entry?.profit ?? 0,
+      count: entry?.count ?? 0,
+      label: format(cursor, "MMM yy"),
+    });
+    cursor = addMonths(cursor, 1);
+  }
 
   return (
     <Card data-testid="card-exits-over-time">
