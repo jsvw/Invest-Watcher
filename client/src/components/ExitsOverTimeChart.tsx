@@ -22,6 +22,7 @@ interface ExitMonth {
 interface ChartEntry extends ExitMonth {
   label: string;
   cumulativeProfit: number;
+  cumulativeExits: number;
 }
 
 interface ExitsOverTimeChartProps {
@@ -90,12 +91,15 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
 
   const parseMonth = (m: string) => parse(m + "-01", "yyyy-MM-dd", new Date(2000, 0, 1));
   let runningProfit = 0;
+  let runningExits = 0;
   const chartData: ChartEntry[] = data.map(d => {
     runningProfit += d.profit;
+    runningExits += d.count;
     return {
       ...d,
       label: format(parseMonth(d.month), "MMM yy"),
       cumulativeProfit: runningProfit,
+      cumulativeExits: runningExits,
     };
   });
 
@@ -168,6 +172,10 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
                         <span className="font-medium">{d.count}</span>
                       </div>
                       <div className="flex justify-between gap-6">
+                        <span className="text-muted-foreground">Cumulative exits</span>
+                        <span className="font-medium text-orange-500">{d.cumulativeExits}</span>
+                      </div>
+                      <div className="flex justify-between gap-6">
                         <span className="text-muted-foreground">Capital returned</span>
                         <span className="font-medium">{formatCurrency(d.invested, currency)}</span>
                       </div>
@@ -238,6 +246,16 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
               activeDot={{ r: 4, fill: "#0ea5e9" }}
               strokeDasharray="5 3"
             />
+            <Line
+              yAxisId="count"
+              type="monotone"
+              dataKey="cumulativeExits"
+              name="Cumulative exits"
+              stroke="#f97316"
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4, fill: "#f97316" }}
+            />
           </ComposedChart>
         </ResponsiveContainer>
         <div className="flex items-center justify-center gap-6 mt-2 text-xs text-muted-foreground flex-wrap">
@@ -260,6 +278,10 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-4 h-0 border-t-2 border-dashed border-sky-500" />
             Active holdings
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-4 h-0 border-t-2 border-orange-500" />
+            Cumulative exits
           </span>
           <span className="flex items-center gap-1 border-l pl-4">
             <span className="font-semibold text-emerald-500">N</span>
