@@ -931,6 +931,20 @@ export async function registerRoutes(
     }
   });
 
+  // Exits over time — monthly grouped exit data for the analytics tab
+  app.get('/api/platforms/:platformId/exits-over-time', requireAuth, async (req, res) => {
+    try {
+      const userId = getAuthenticatedUserId(req)!;
+      const platformId = Number(req.params.platformId);
+      const isOwner = await storage.verifyPlatformOwnership(platformId, userId);
+      if (!isOwner) return res.status(404).json({ message: "Platform not found" });
+      const data = await storage.getExitsOverTime(platformId);
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch exits over time data" });
+    }
+  });
+
   // Item cohort return data for item_valuations platforms - shows average return per month cohort
   app.get('/api/platforms/:platformId/item-cohort-returns', requireAuth, async (req, res) => {
     try {

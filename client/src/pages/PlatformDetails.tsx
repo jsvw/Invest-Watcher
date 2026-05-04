@@ -36,6 +36,7 @@ import { AssetValuationManageDialog } from "@/components/AssetValuationManageDia
 import { AssetInsightTabs } from "@/components/AssetInsightTabs";
 import { AssetRepaymentDialog } from "@/components/AssetRepaymentDialog";
 import { DividendCalendar } from "@/components/DividendCalendar";
+import { ExitsOverTimeChart } from "@/components/ExitsOverTimeChart";
 import type { Asset, PlatformResponse } from "@shared/schema";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import { ScraperConfigDialog } from "@/components/ScraperConfigDialog";
@@ -2953,6 +2954,8 @@ export default function PlatformDetails() {
                     </div>
                   </div>
                 )}
+
+                <ExitsOverTimeChart platformId={id} currency={currency} />
               </>
             )}
           </TabsContent>

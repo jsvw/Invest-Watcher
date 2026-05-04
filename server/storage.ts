@@ -856,6 +856,34 @@ export class DatabaseStorage implements IStorage {
     await db.delete(assets).where(eq(assets.id, id));
   }
 
+  async getExitsOverTime(platformId: number): Promise<{ month: string; invested: number; profit: number; count: number }[]> {
+    const rows = await db
+      .select({
+        month: sql<string>`to_char(${assets.exitDate}, 'YYYY-MM')`,
+        invested: sql<string>`sum(${assets.investedAmount}::numeric)`,
+        profit: sql<string>`sum(${assets.exitPrice}::numeric - ${assets.investedAmount}::numeric)`,
+        count: sql<number>`count(*)`,
+      })
+      .from(assets)
+      .where(
+        and(
+          eq(assets.platformId, platformId),
+          or(eq(assets.status, "exited"), eq(assets.status, "matured")),
+          sql`${assets.exitDate} is not null`,
+          sql`${assets.exitPrice} is not null`
+        )
+      )
+      .groupBy(sql`to_char(${assets.exitDate}, 'YYYY-MM')`)
+      .orderBy(sql`to_char(${assets.exitDate}, 'YYYY-MM')`);
+
+    return rows.map(r => ({
+      month: r.month,
+      invested: Number(r.invested) || 0,
+      profit: Number(r.profit) || 0,
+      count: Number(r.count) || 0,
+    }));
+  }
+
   async exitAsset(id: number, exitDate: Date, exitPrice: string): Promise<Asset> {
     const [updated] = await db.update(assets)
       .set({
