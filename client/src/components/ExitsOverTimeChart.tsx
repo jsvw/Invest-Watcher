@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Maximize2, Minimize2, LogOut } from "lucide-react";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { useState } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -57,7 +57,17 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
             <CardTitle>Exits Over Time</CardTitle>
             <CardDescription>Monthly view of capital returned and profit realised</CardDescription>
           </div>
-          <LogOut className="h-4 w-4 text-muted-foreground mt-1 shrink-0" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => setExpanded(e => !e)}
+            data-testid="button-toggle-exits-chart-height"
+            title={expanded ? "Collapse chart" : "Expand chart"}
+            aria-label={expanded ? "Collapse chart" : "Expand chart"}
+          >
+            {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
