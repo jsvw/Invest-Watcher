@@ -111,7 +111,7 @@ export interface IStorage {
 
   // Item Bubble Chart Data
   getItemReturnBubbles(platformId: number, statusFilter?: string): Promise<{ assetId: number; assetName: string; status: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number }[]>;
-  getExitsOverTime(platformId: number): Promise<{ month: string; invested: number; profit: number; count: number }[]>;
+  getExitsOverTime(platformId: number): Promise<{ month: string; invested: number; profit: number; count: number; activeCount: number }[]>;
   
   // Item Cohort Returns
   getItemCohortReturns(platformId: number, statusFilter?: string): Promise<{ cohortKey: string; cohortLabel: string; data: { calendarMonth: string; calendarLabel: string; avgReturn: number; assetCount: number }[] }[]>;
@@ -857,8 +857,12 @@ export class DatabaseStorage implements IStorage {
     await db.delete(assets).where(eq(assets.id, id));
   }
 
-  async getExitsOverTime(platformId: number): Promise<{ month: string; invested: number; profit: number; count: number }[]> {
-    const rows = await db
+  async getExitsOverTime(platformId: number): Promise<{ month: string; invested: number; profit: number; count: number; activeCount: number }[]> {
+    const toYM = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+    // Exit data grouped by month
+    const exitRows = await db
       .select({
         month: sql<string>`to_char(${assets.exitDate}, 'YYYY-MM')`,
         invested: sql<string>`sum(${assets.investedAmount}::numeric)`,
@@ -877,12 +881,48 @@ export class DatabaseStorage implements IStorage {
       .groupBy(sql`to_char(${assets.exitDate}, 'YYYY-MM')`)
       .orderBy(sql`to_char(${assets.exitDate}, 'YYYY-MM')`);
 
-    return rows.map(r => ({
-      month: r.month,
-      invested: Number(r.invested) || 0,
-      profit: Number(r.profit) || 0,
-      count: Number(r.count) || 0,
-    }));
+    if (exitRows.length === 0) return [];
+
+    // All assets for this platform (to compute active counts)
+    const allAssets = await db
+      .select({
+        acquisitionDate: assets.acquisitionDate,
+        exitDate: assets.exitDate,
+      })
+      .from(assets)
+      .where(eq(assets.platformId, platformId));
+
+    const exitByMonth = new Map(exitRows.map(r => [r.month, r]));
+    const result: { month: string; invested: number; profit: number; count: number; activeCount: number }[] = [];
+
+    // Generate full month range from first to last exit
+    let cursor = new Date(exitRows[0].month + "-01T00:00:00");
+    const end = new Date(exitRows[exitRows.length - 1].month + "-01T00:00:00");
+
+    while (cursor <= end) {
+      const key = toYM(cursor);
+      // Last millisecond of the month
+      const endOfMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0, 23, 59, 59, 999);
+
+      const activeCount = allAssets.filter(a => {
+        const acq = new Date(a.acquisitionDate);
+        const exit = a.exitDate ? new Date(a.exitDate) : null;
+        return acq <= endOfMonth && (!exit || exit > endOfMonth);
+      }).length;
+
+      const ex = exitByMonth.get(key);
+      result.push({
+        month: key,
+        invested: Number(ex?.invested) || 0,
+        profit: Number(ex?.profit) || 0,
+        count: Number(ex?.count) || 0,
+        activeCount,
+      });
+
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+    }
+
+    return result;
   }
 
   async exitAsset(id: number, exitDate: Date, exitPrice: string): Promise<Asset> {
