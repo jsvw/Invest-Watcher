@@ -4,7 +4,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScatterChart, Scatter, XAxis, YAxis, ZAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, ReferenceLine, LineChart, Line } from "recharts";
 import { formatCurrency } from "@/lib/currency";
 import { format } from "date-fns";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Maximize2, Minimize2 } from "lucide-react";
 
 interface ValuationPoint {
   date: string;
@@ -110,6 +112,7 @@ function MiniValuationChart({ data, currency }: { data: ValuationPoint[]; curren
 }
 
 export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "all" }: ItemReturnBubbleChartProps) {
+  const [expanded, setExpanded] = useState(false);
   const { data: bubbleData, isLoading } = useQuery<BubbleDataPoint[]>({
     queryKey: ['/api/platforms', platformId, 'item-bubbles', statusFilter],
     queryFn: async () => {
@@ -173,12 +176,24 @@ export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "al
 
   return (
     <Card data-testid="card-item-return-bubbles">
-      <CardHeader>
-        <CardTitle>Item Returns Over Investment Time</CardTitle>
-        <CardDescription>X-axis shows weeks since investment. Bubble size represents invested amount. Avg return: {avgReturn >= 0 ? '+' : ''}{avgReturn}%</CardDescription>
+      <CardHeader className="flex flex-row items-start justify-between gap-2">
+        <div>
+          <CardTitle>Item Returns Over Investment Time</CardTitle>
+          <CardDescription>X-axis shows weeks since investment. Bubble size represents invested amount. Avg return: {avgReturn >= 0 ? '+' : ''}{avgReturn}%</CardDescription>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+          onClick={() => setExpanded(e => !e)}
+          data-testid="button-toggle-bubble-chart-height"
+          title={expanded ? "Collapse chart" : "Expand chart"}
+        >
+          {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </Button>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={350}>
+        <ResponsiveContainer width="100%" height={expanded ? 600 : 350}>
           <ScatterChart margin={{ top: 20, right: 20, bottom: 30, left: 20 }}>
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis 
