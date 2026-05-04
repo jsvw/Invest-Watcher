@@ -895,8 +895,15 @@ export class DatabaseStorage implements IStorage {
     const exitByMonth = new Map(exitRows.map(r => [r.month, r]));
     const result: { month: string; invested: number; profit: number; count: number; activeCount: number }[] = [];
 
-    // Generate full month range from first to last exit
-    let cursor = new Date(exitRows[0].month + "-01T00:00:00");
+    // Start from the earliest acquisition date, end at the last exit month
+    const earliestAcq = allAssets.reduce<Date | null>((min, a) => {
+      const d = new Date(a.acquisitionDate);
+      return min === null || d < min ? d : min;
+    }, null);
+    const rangeStart = earliestAcq
+      ? new Date(earliestAcq.getFullYear(), earliestAcq.getMonth(), 1)
+      : new Date(exitRows[0].month + "-01T00:00:00");
+    let cursor = rangeStart;
     const end = new Date(exitRows[exitRows.length - 1].month + "-01T00:00:00");
 
     while (cursor <= end) {
