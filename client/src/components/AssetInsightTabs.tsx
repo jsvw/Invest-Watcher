@@ -1,10 +1,8 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ItemReturnBubbleChart } from "@/components/ItemReturnBubbleChart";
 import { ItemCohortReturnChart } from "@/components/ItemCohortReturnChart";
 import { Dot, TrendingUp } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
-import { useState } from "react";
 
 export type AssetStatusFilter = "all" | "active" | "exited";
 
@@ -12,11 +10,10 @@ interface AssetInsightTabsProps {
   platformId: number;
   currency: string;
   totalInvested: number;
+  statusFilter: AssetStatusFilter;
 }
 
-export function AssetInsightTabs({ platformId, currency, totalInvested }: AssetInsightTabsProps) {
-  const [statusFilter, setStatusFilter] = useState<AssetStatusFilter>("all");
-
+export function AssetInsightTabs({ platformId, currency, totalInvested, statusFilter }: AssetInsightTabsProps) {
   return (
     <Tabs defaultValue="bubbles" className="w-full">
       <div className="flex items-center justify-between gap-4 mb-2 flex-wrap">
@@ -31,22 +28,6 @@ export function AssetInsightTabs({ platformId, currency, totalInvested }: AssetI
               <span className="hidden sm:inline">Cohorts</span>
             </TabsTrigger>
           </TabsList>
-          <ToggleGroup 
-            type="single" 
-            value={statusFilter} 
-            onValueChange={(val) => val && setStatusFilter(val as AssetStatusFilter)}
-            className="border rounded-md"
-          >
-            <ToggleGroupItem value="all" size="sm" data-testid="filter-all">
-              All
-            </ToggleGroupItem>
-            <ToggleGroupItem value="active" size="sm" data-testid="filter-active">
-              Active
-            </ToggleGroupItem>
-            <ToggleGroupItem value="exited" size="sm" data-testid="filter-exited">
-              Exited
-            </ToggleGroupItem>
-          </ToggleGroup>
         </div>
         <div className="text-sm text-muted-foreground" data-testid="text-total-invested">
           Total Invested: <span className="font-medium text-foreground">{formatCurrency(totalInvested, currency)}</span>
