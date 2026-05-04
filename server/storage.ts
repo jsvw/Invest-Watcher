@@ -111,6 +111,7 @@ export interface IStorage {
 
   // Item Bubble Chart Data
   getItemReturnBubbles(platformId: number, statusFilter?: string): Promise<{ assetId: number; assetName: string; status: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number }[]>;
+  getExitsOverTime(platformId: number): Promise<{ month: string; invested: number; profit: number; count: number }[]>;
   
   // Item Cohort Returns
   getItemCohortReturns(platformId: number, statusFilter?: string): Promise<{ cohortKey: string; cohortLabel: string; data: { calendarMonth: string; calendarLabel: string; avgReturn: number; assetCount: number }[] }[]>;

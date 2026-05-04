@@ -82,9 +82,10 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
   const totalProfit = data.reduce((s, d) => s + d.profit, 0);
   const totalExits = data.reduce((s, d) => s + d.count, 0);
 
+  // Parse as the 1st of the month to avoid day-of-month rollover on days 29-31
   const chartData = data.map(d => ({
     ...d,
-    label: format(parse(d.month, "yyyy-MM", new Date()), "MMM yy"),
+    label: format(parse(d.month + "-01", "yyyy-MM-dd", new Date(2000, 0, 1)), "MMM yy"),
   }));
 
   return (
