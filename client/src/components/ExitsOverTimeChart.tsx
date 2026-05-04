@@ -204,7 +204,7 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
                 if (!count) return <g />;
                 return (
                   <text x={x + width / 2} y={y - 5} textAnchor="middle" fontSize={10} fill="#10b981" fontWeight={600}>
-                    ↓{count}
+                    {count}
                   </text>
                 );
               }}
@@ -262,7 +262,7 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
             Active holdings
           </span>
           <span className="flex items-center gap-1 border-l pl-4">
-            <span className="font-semibold text-emerald-500">↓N</span>
+            <span className="font-semibold text-emerald-500">N</span>
             <span>= exits that month</span>
           </span>
         </div>
