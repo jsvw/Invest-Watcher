@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { useState } from "react";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, ReferenceLine, Cell,
 } from "recharts";
 import { formatCurrency, formatCompactCurrency } from "@/lib/currency";
@@ -16,6 +16,11 @@ interface ExitMonth {
   invested: number;
   profit: number;
   count: number;
+}
+
+interface ChartEntry extends ExitMonth {
+  label: string;
+  cumulativeProfit: number;
 }
 
 interface ExitsOverTimeChartProps {
@@ -87,20 +92,29 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
   const exitsByMonth = new Map(data.map(d => [d.month, d]));
   const firstMonth = parseMonth(data[0].month);
   const lastMonth = parseMonth(data[data.length - 1].month);
-  const chartData: (ExitMonth & { label: string })[] = [];
+  const chartData: ChartEntry[] = [];
   let cursor = firstMonth;
+  let runningProfit = 0;
   while (cursor <= lastMonth) {
     const key = format(cursor, "yyyy-MM");
     const entry = exitsByMonth.get(key);
+    runningProfit += entry?.profit ?? 0;
     chartData.push({
       month: key,
       invested: entry?.invested ?? 0,
       profit: entry?.profit ?? 0,
       count: entry?.count ?? 0,
       label: format(cursor, "MMM yy"),
+      cumulativeProfit: runningProfit,
     });
     cursor = addMonths(cursor, 1);
   }
+
+  // Determine whether the cumulative scale differs enough to warrant a right axis.
+  // We always use a right axis to keep bars readable alongside the line.
+  const maxBarValue = Math.max(...chartData.map(d => d.invested + Math.max(d.profit, 0)));
+  const maxCumulative = Math.max(...chartData.map(d => Math.abs(d.cumulativeProfit)));
+  const needsRightAxis = maxCumulative > maxBarValue * 1.5 || maxCumulative < maxBarValue * 0.2;
 
   return (
     <Card data-testid="card-exits-over-time">
@@ -125,7 +139,7 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={expanded ? 550 : 300}>
-          <BarChart data={chartData} margin={{ top: 10, right: 20, bottom: 20, left: 20 }} barCategoryGap="30%">
+          <ComposedChart data={chartData} margin={{ top: 10, right: needsRightAxis ? 75 : 20, bottom: 20, left: 20 }} barCategoryGap="30%">
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
             <XAxis
               dataKey="label"
@@ -133,18 +147,28 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
               className="fill-muted-foreground text-xs"
             />
             <YAxis
+              yAxisId="bars"
               tickFormatter={(v) => formatCompactCurrency(v, currency)}
               className="fill-muted-foreground text-xs"
               width={70}
             />
-            <ReferenceLine y={0} stroke="hsl(var(--border))" />
+            {needsRightAxis && (
+              <YAxis
+                yAxisId="cumulative"
+                orientation="right"
+                tickFormatter={(v) => formatCompactCurrency(v, currency)}
+                className="fill-muted-foreground text-xs"
+                width={70}
+              />
+            )}
+            <ReferenceLine yAxisId="bars" y={0} stroke="hsl(var(--border))" />
             <Tooltip
               cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }}
               content={({ active, payload, label }) => {
                 if (!active || !payload || !payload.length) return null;
-                const d = payload[0].payload as ExitMonth & { label: string };
+                const d = payload[0].payload as ChartEntry;
                 return (
-                  <div className="bg-popover border rounded-lg p-3 shadow-lg text-sm min-w-[200px]">
+                  <div className="bg-popover border rounded-lg p-3 shadow-lg text-sm min-w-[220px]">
                     <p className="font-semibold mb-2">{label}</p>
                     <div className="space-y-1">
                       <div className="flex justify-between gap-6">
@@ -156,22 +180,28 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
                         <span className="font-medium">{formatCurrency(d.invested, currency)}</span>
                       </div>
                       <div className="flex justify-between gap-6">
-                        <span className="text-muted-foreground">Profit / Loss</span>
+                        <span className="text-muted-foreground">Monthly profit / loss</span>
                         <span className={`font-medium ${d.profit >= 0 ? "text-emerald-500" : "text-red-500"}`}>
                           {d.profit >= 0 ? "+" : ""}{formatCurrency(d.profit, currency)}
                         </span>
                       </div>
-                      <div className="flex justify-between gap-6 border-t pt-1 mt-1">
+                      <div className="flex justify-between gap-6">
                         <span className="text-muted-foreground">Total received</span>
                         <span className="font-medium">{formatCurrency(d.invested + d.profit, currency)}</span>
+                      </div>
+                      <div className="flex justify-between gap-6 border-t pt-1 mt-1">
+                        <span className="text-muted-foreground">Cumulative profit</span>
+                        <span className={`font-medium ${d.cumulativeProfit >= 0 ? "text-violet-500" : "text-red-500"}`}>
+                          {d.cumulativeProfit >= 0 ? "+" : ""}{formatCurrency(d.cumulativeProfit, currency)}
+                        </span>
                       </div>
                     </div>
                   </div>
                 );
               }}
             />
-            <Bar dataKey="invested" name="Capital returned" stackId="a" fill="hsl(var(--primary))" fillOpacity={0.7} radius={[0, 0, 3, 3]} />
-            <Bar dataKey="profit" name="Profit / Loss" stackId="a" radius={[3, 3, 0, 0]}>
+            <Bar yAxisId="bars" dataKey="invested" name="Capital returned" stackId="a" fill="hsl(var(--primary))" fillOpacity={0.7} radius={[0, 0, 3, 3]} />
+            <Bar yAxisId="bars" dataKey="profit" name="Monthly profit / loss" stackId="a" radius={[3, 3, 0, 0]}>
               {chartData.map((entry, index) => (
                 <Cell
                   key={`profit-cell-${index}`}
@@ -180,9 +210,19 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
                 />
               ))}
             </Bar>
-          </BarChart>
+            <Line
+              yAxisId={needsRightAxis ? "cumulative" : "bars"}
+              type="monotone"
+              dataKey="cumulativeProfit"
+              name="Cumulative profit"
+              stroke="#8b5cf6"
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4, fill: "#8b5cf6" }}
+            />
+          </ComposedChart>
         </ResponsiveContainer>
-        <div className="flex items-center justify-center gap-6 mt-2 text-xs text-muted-foreground">
+        <div className="flex items-center justify-center gap-6 mt-2 text-xs text-muted-foreground flex-wrap">
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-3 h-3 rounded-sm" style={{ background: "hsl(var(--primary))", opacity: 0.7 }} />
             Capital returned
@@ -194,6 +234,10 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-3 h-3 rounded-sm bg-red-500" style={{ opacity: 0.85 }} />
             Loss
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-3 h-2 rounded-sm bg-violet-500" style={{ opacity: 1 }} />
+            Cumulative profit
           </span>
         </div>
       </CardContent>
