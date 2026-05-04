@@ -8,6 +8,7 @@ import {
   Wallet, TrendingUp, DollarSign, Check, RefreshCw, Loader2, CheckCircle, XCircle,
   X, Save, Bookmark, Trash2, Target, ArrowUpCircle, ArrowDownCircle,
   LineChart as LineChartIcon, BarChart2, Filter, Percent, GitCommitHorizontal,
+  Maximize2, Minimize2,
 } from "lucide-react";
 import { PlatformIcon } from "@/components/PlatformIcon";
 import {
@@ -344,6 +345,8 @@ export default function Dashboard() {
   const [displayedChartAggregation, setDisplayedChartAggregation] = useState<"month" | "quarter" | "year">("month");
   const [chartFading, setChartFading] = useState(false);
   const [forecastRange, setForecastRange] = useState<null | "3m" | "1y" | "3q" | "2y" | "5y" | "10y" | "20y" | "30y" | "40y">(null);
+  const [perfChartExpanded, setPerfChartExpanded] = useState(false);
+  const [flowChartExpanded, setFlowChartExpanded] = useState(false);
   const [forecastMonthlyInvest, setForecastMonthlyInvest] = useState<number>(0);
 
   // ── Allocation targets state ─────────────────────────────────────────────
@@ -1842,9 +1845,22 @@ export default function Dashboard() {
           <Card className="shadow-md">
             <CardHeader className="gap-3 pb-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <CardTitle>Portfolio Performance</CardTitle>
-                  <CardDescription>Invested amount vs. current valuation over time</CardDescription>
+                <div className="flex items-start gap-2 min-w-0">
+                  <div>
+                    <CardTitle>Portfolio Performance</CardTitle>
+                    <CardDescription>Invested amount vs. current valuation over time</CardDescription>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 text-muted-foreground hover:text-foreground mt-0.5"
+                    onClick={() => setPerfChartExpanded(e => !e)}
+                    data-testid="button-toggle-perf-chart-height"
+                    title={perfChartExpanded ? "Collapse chart" : "Expand chart"}
+                    aria-label={perfChartExpanded ? "Collapse chart" : "Expand chart"}
+                  >
+                    {perfChartExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                  </Button>
                 </div>
                 {/* All controls
                     Mobile order: 1=range tabs, 2=chart-type, 3=conditional selects, 4=forecast input
@@ -2101,7 +2117,7 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
-              <div className={cn("h-[280px] sm:h-[400px] w-full transition-opacity duration-150", chartFading ? "opacity-0" : "opacity-100")}>
+              <div className={cn(perfChartExpanded ? "h-[560px] sm:h-[700px]" : "h-[280px] sm:h-[400px]", "w-full transition-opacity duration-150", chartFading ? "opacity-0" : "opacity-100")}>
                 {(chartData && chartData.length > 0) || (displayedChartView === "monthly" && monthlySeriesData.length > 0) ? (() => {
                   const mappedData = chartData.map((h: any, i: number, arr: any[]) => {
                     const prev = arr[i - 1];
@@ -2638,6 +2654,17 @@ export default function Dashboard() {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2 flex-wrap justify-end">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={() => setFlowChartExpanded(e => !e)}
+                  data-testid="button-toggle-flow-chart-height"
+                  title={flowChartExpanded ? "Collapse chart" : "Expand chart"}
+                  aria-label={flowChartExpanded ? "Collapse chart" : "Expand chart"}
+                >
+                  {flowChartExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                </Button>
                 <div className="flex items-center border rounded-md overflow-hidden text-xs font-medium">
                   <button onClick={() => setFlowGroupBy("platform")} className={cn("px-2.5 py-1.5 transition-colors", flowGroupBy === "platform" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-flow-group-platform">Platform</button>
                   <button onClick={() => setFlowGroupBy("category")} className={cn("px-2.5 py-1.5 transition-colors", flowGroupBy === "category" ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground")} data-testid="button-flow-group-category">Category</button>
@@ -2651,7 +2678,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               {flowData && flowData.months.length > 0 && flowData.platforms ? (
-                <div className="h-[300px]">
+                <div className={flowChartExpanded ? "h-[560px]" : "h-[300px]"}>
                   <ResponsiveContainer width="100%" height="100%">
                     {flowGroupBy === "category" ? (
                       <BarChart data={categoryFlowData.months} margin={{ left: 4, top: 20 }}>

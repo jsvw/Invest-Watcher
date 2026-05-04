@@ -1,10 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer, Cell 
 } from "recharts";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Maximize2, Minimize2 } from "lucide-react";
 import { formatCurrency } from "@/lib/currency";
 
 interface AssetPerformancePoint {
@@ -20,6 +21,7 @@ interface AggregatedPerformancePanelProps {
 }
 
 export function AggregatedPerformancePanel({ assetPerformance, currency, totalInvested = 0, currentValue = 0 }: AggregatedPerformancePanelProps) {
+  const [expanded, setExpanded] = useState(false);
   const currencySymbol = currency === "USD" ? "$" : "";
   const currencySuffix = currency !== "USD" ? ` ${currency}` : "";
   
@@ -113,12 +115,25 @@ export function AggregatedPerformancePanel({ assetPerformance, currency, totalIn
       )}
 
       <Card>
-        <CardHeader>
-          <CardTitle>Top Holdings</CardTitle>
-          <CardDescription>Largest assets by current value</CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-2">
+          <div>
+            <CardTitle>Top Holdings</CardTitle>
+            <CardDescription>Largest assets by current value</CardDescription>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => setExpanded(e => !e)}
+            data-testid="button-toggle-top-holdings-height"
+            title={expanded ? "Collapse chart" : "Expand chart"}
+            aria-label={expanded ? "Collapse chart" : "Expand chart"}
+          >
+            {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </Button>
         </CardHeader>
         <CardContent>
-          <div className="h-[300px]">
+          <div className={expanded ? "h-[560px]" : "h-[300px]"}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart 
                 data={topContributors} 

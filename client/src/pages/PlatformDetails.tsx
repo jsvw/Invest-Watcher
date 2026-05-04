@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search, ArrowUp, ArrowDown, ChevronsUpDown, Trash2, RotateCcw, BarChart3, RefreshCw, Loader2, CalendarDays, ChevronUp, ChevronDown } from "lucide-react";
+import { TrendingUp, History, DollarSign, Package, CheckCircle, MoreHorizontal, Pencil, LogOut, Search, ArrowUp, ArrowDown, ChevronsUpDown, Trash2, RotateCcw, BarChart3, RefreshCw, Loader2, CalendarDays, ChevronUp, ChevronDown, Maximize2, Minimize2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
@@ -340,6 +340,9 @@ export default function PlatformDetails() {
   const [chartAggregation, setChartAggregation] = useState<"month" | "quarter" | "year">("month");
   const [showAllPoints, setShowAllPoints] = useState(false);
   const [showStockOverlay, setShowStockOverlay] = useState(false);
+  const [platPerfExpanded, setPlatPerfExpanded] = useState(false);
+  const [holdingsChartExpanded, setHoldingsChartExpanded] = useState(false);
+  const [monthlyReturnsExpanded, setMonthlyReturnsExpanded] = useState(false);
   
   const { data: platforms } = usePlatforms();
   const id = platforms?.find(p => p.name.toLowerCase().replace(/\s+/g, '-') === slug)?.id || 0;
@@ -1418,9 +1421,20 @@ export default function PlatformDetails() {
                       >
                         {showAllPoints ? "Monthly view" : "All data points"}
                       </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                        onClick={() => setPlatPerfExpanded(e => !e)}
+                        data-testid="button-toggle-plat-perf-height"
+                        title={platPerfExpanded ? "Collapse chart" : "Expand chart"}
+                        aria-label={platPerfExpanded ? "Collapse chart" : "Expand chart"}
+                      >
+                        {platPerfExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                      </Button>
                     </div>
                   </div>
-                  <div className="h-[260px] sm:h-[400px] w-full">
+                  <div className={cn(platPerfExpanded ? "h-[560px]" : "h-[260px] sm:h-[400px]", "w-full")}>
                     {isRangeStale ? (
                       <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
                         <span className="text-3xl font-semibold">—</span>
@@ -1873,6 +1887,17 @@ export default function PlatformDetails() {
                           Stock price
                         </Button>
                       )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                        onClick={() => setPlatPerfExpanded(e => !e)}
+                        data-testid="button-toggle-plat-perf-height-std"
+                        title={platPerfExpanded ? "Collapse chart" : "Expand chart"}
+                        aria-label={platPerfExpanded ? "Collapse chart" : "Expand chart"}
+                      >
+                        {platPerfExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                      </Button>
                     </div>
                   </div>
                   {isStockTicker && showStockOverlay && stockChartData?.fallback && stockChartData.points.length === 0 && (
@@ -1880,7 +1905,7 @@ export default function PlatformDetails() {
                       Historical price data temporarily unavailable
                     </p>
                   )}
-                  <div className="h-[260px] sm:h-[400px] w-full">
+                  <div className={cn(platPerfExpanded ? "h-[560px]" : "h-[260px] sm:h-[400px]", "w-full")}>
                     {isRangeStale ? (
                       <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
                         <span className="text-3xl font-semibold">—</span>
@@ -2425,12 +2450,25 @@ export default function PlatformDetails() {
                   });
                 return (
                   <Card>
-                    <CardHeader>
-                      <CardTitle>Holdings Value Over Time</CardTitle>
-                      <CardDescription>Monthly breakdown by instrument</CardDescription>
+                    <CardHeader className="flex flex-row items-start justify-between gap-2">
+                      <div>
+                        <CardTitle>Holdings Value Over Time</CardTitle>
+                        <CardDescription>Monthly breakdown by instrument</CardDescription>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                        onClick={() => setHoldingsChartExpanded(e => !e)}
+                        data-testid="button-toggle-holdings-chart-height"
+                        title={holdingsChartExpanded ? "Collapse chart" : "Expand chart"}
+                        aria-label={holdingsChartExpanded ? "Collapse chart" : "Expand chart"}
+                      >
+                        {holdingsChartExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                      </Button>
                     </CardHeader>
                     <CardContent>
-                      <div className="h-64">
+                      <div className={holdingsChartExpanded ? "h-[500px]" : "h-64"}>
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={stackedData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
@@ -2732,12 +2770,25 @@ export default function PlatformDetails() {
 
                 {/* Monthly return bar chart */}
                 <Card data-testid="card-monthly-return-chart">
-                  <CardHeader>
-                    <CardTitle>Monthly Returns</CardTitle>
-                    <CardDescription>Cash-flow adjusted gain / loss per month — green = gain, red = loss</CardDescription>
+                  <CardHeader className="flex flex-row items-start justify-between gap-2">
+                    <div>
+                      <CardTitle>Monthly Returns</CardTitle>
+                      <CardDescription>Cash-flow adjusted gain / loss per month — green = gain, red = loss</CardDescription>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-muted-foreground hover:text-foreground"
+                      onClick={() => setMonthlyReturnsExpanded(e => !e)}
+                      data-testid="button-toggle-monthly-returns-height"
+                      title={monthlyReturnsExpanded ? "Collapse chart" : "Expand chart"}
+                      aria-label={monthlyReturnsExpanded ? "Collapse chart" : "Expand chart"}
+                    >
+                      {monthlyReturnsExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                    </Button>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-[280px]">
+                    <div className={monthlyReturnsExpanded ? "h-[560px]" : "h-[280px]"}>
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart
                           data={monthlyReturns?.map(m => {

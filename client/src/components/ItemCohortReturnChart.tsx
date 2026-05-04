@@ -5,7 +5,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import { BarChart2, Table2, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { BarChart2, Table2, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Maximize2, Minimize2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface CohortData {
   cohortKey: string;
@@ -326,6 +327,7 @@ function CohortDetailSheet({
 
 export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: ItemCohortReturnChartProps) {
   const [viewMode, setViewMode] = useState<"chart" | "table">("chart");
+  const [chartExpanded, setChartExpanded] = useState(false);
   const [granularity, setGranularity] = useState<"month" | "quarter">("month");
   const [selectedCohort, setSelectedCohort] = useState<CohortData | null>(null);
 
@@ -512,12 +514,25 @@ export function ItemCohortReturnChart({ platformId, statusFilter = "all" }: Item
             <div className="flex items-center gap-2">
               {granularityToggle}
               {viewToggle}
+              {viewMode === "chart" && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={() => setChartExpanded(e => !e)}
+                  data-testid="button-toggle-cohort-chart-height"
+                  title={chartExpanded ? "Collapse chart" : "Expand chart"}
+                  aria-label={chartExpanded ? "Collapse chart" : "Expand chart"}
+                >
+                  {chartExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
         <CardContent>
           {viewMode === "chart" ? (
-            <ResponsiveContainer width="100%" height={350}>
+            <ResponsiveContainer width="100%" height={chartExpanded ? 600 : 350}>
               <LineChart data={chartData} margin={{ top: 20, right: 30, bottom: 60, left: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis

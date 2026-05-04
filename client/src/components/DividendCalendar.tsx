@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { format, addMonths, subMonths, startOfMonth, getDaysInMonth, parseISO, isBefore } from "date-fns";
-import { ChevronLeft, ChevronRight, CalendarDays, List, Info, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, List, Info, X, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -30,6 +30,7 @@ export function DividendCalendar({ payments, projections, hasFmpKey, currency }:
 
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(today));
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
+  const [barExpanded, setBarExpanded] = useState(false);
   const [openDay, setOpenDay] = useState<string | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
 
@@ -120,11 +121,22 @@ export function DividendCalendar({ payments, projections, hasFmpKey, currency }:
       )}
 
       <Card>
-        <CardHeader className="pb-2 pt-4">
+        <CardHeader className="pb-2 pt-4 flex flex-row items-center justify-between gap-2">
           <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Monthly Dividend Income</CardTitle>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0 h-7 w-7 text-muted-foreground hover:text-foreground"
+            onClick={() => setBarExpanded(e => !e)}
+            data-testid="button-toggle-dividend-bar-height"
+            title={barExpanded ? "Collapse chart" : "Expand chart"}
+            aria-label={barExpanded ? "Collapse chart" : "Expand chart"}
+          >
+            {barExpanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+          </Button>
         </CardHeader>
         <CardContent className="pb-4">
-          <ResponsiveContainer width="100%" height={130}>
+          <ResponsiveContainer width="100%" height={barExpanded ? 260 : 130}>
             <BarChart data={barData} barCategoryGap="25%" margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
               <XAxis dataKey="month" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis
