@@ -9,7 +9,7 @@ import {
   CartesianGrid, ReferenceLine, Cell,
 } from "recharts";
 import { formatCurrency, formatCompactCurrency } from "@/lib/currency";
-import { format, parse } from "date-fns";
+import { format, parse, addMonths } from "date-fns";
 
 interface ExitMonth {
   month: string;
@@ -88,6 +88,7 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
   const totalProfit = data.reduce((s, d) => s + d.profit, 0);
   const totalExits = data.reduce((s, d) => s + d.count, 0);
 
+  // Backend already returns the full month range with activeCount — just add labels
   const parseMonth = (m: string) => parse(m + "-01", "yyyy-MM-dd", new Date(2000, 0, 1));
   let runningProfit = 0;
   const chartData: ChartEntry[] = data.map(d => {
@@ -99,12 +100,11 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
     };
   });
 
-  // Right axis: count scale for active holdings bar
-  // Left axis: currency scale for exit bars + cumulative profit line
+  // Determine whether the cumulative scale differs enough to warrant a right axis.
+  // We always use a right axis to keep bars readable alongside the line.
   const maxBarValue = Math.max(...chartData.map(d => d.invested + Math.max(d.profit, 0)));
   const maxCumulative = Math.max(...chartData.map(d => Math.abs(d.cumulativeProfit)));
-  // Keep cumulative profit on left axis when scales are similar; otherwise it can overwhelm the bars
-  const needsCumulativeRightAxis = maxCumulative > maxBarValue * 3;
+  const needsRightAxis = maxCumulative > maxBarValue * 1.5 || maxCumulative < maxBarValue * 0.2;
 
   return (
     <Card data-testid="card-exits-over-time">
@@ -129,30 +129,20 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={expanded ? 550 : 300}>
-          <ComposedChart data={chartData} margin={{ top: 24, right: 70, bottom: 20, left: 20 }} barCategoryGap="25%" barGap={3}>
+          <ComposedChart data={chartData} margin={{ top: 30, right: needsRightAxis ? 75 : 20, bottom: 20, left: 20 }} barCategoryGap="30%">
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
             <XAxis
               dataKey="label"
               tick={{ fontSize: 12 }}
               className="fill-muted-foreground text-xs"
             />
-            {/* Left axis: currency for exit bars + cumulative profit */}
             <YAxis
               yAxisId="bars"
               tickFormatter={(v) => formatCompactCurrency(v, currency)}
               className="fill-muted-foreground text-xs"
               width={70}
             />
-            {/* Right axis: integer count for active holdings bar */}
-            <YAxis
-              yAxisId="count"
-              orientation="right"
-              tickFormatter={(v) => String(Math.round(v))}
-              allowDecimals={false}
-              className="fill-muted-foreground text-xs"
-              width={40}
-            />
-            {needsCumulativeRightAxis && (
+            {needsRightAxis && (
               <YAxis
                 yAxisId="cumulative"
                 orientation="right"
@@ -172,12 +162,12 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
                     <p className="font-semibold mb-2">{label}</p>
                     <div className="space-y-1">
                       <div className="flex justify-between gap-6">
-                        <span className="text-muted-foreground">Active holdings</span>
-                        <span className="font-medium text-sky-500">{d.activeCount}</span>
-                      </div>
-                      <div className="flex justify-between gap-6">
                         <span className="text-muted-foreground">Exits this month</span>
                         <span className="font-medium">{d.count}</span>
+                      </div>
+                      <div className="flex justify-between gap-6">
+                        <span className="text-muted-foreground">Active holdings</span>
+                        <span className="font-medium">{d.activeCount}</span>
                       </div>
                       <div className="flex justify-between gap-6">
                         <span className="text-muted-foreground">Capital returned</span>
@@ -204,28 +194,6 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
                 );
               }}
             />
-
-            {/* Active holdings bar — right count axis, side-by-side */}
-            <Bar
-              yAxisId="count"
-              dataKey="activeCount"
-              name="Active holdings"
-              fill="#0ea5e9"
-              fillOpacity={0.25}
-              stroke="#0ea5e9"
-              strokeWidth={1}
-              radius={[3, 3, 3, 3]}
-              label={({ x, y, width, value }: { x: number; y: number; width: number; value: number }) => {
-                if (!value) return <g />;
-                return (
-                  <text x={x + width / 2} y={y - 4} textAnchor="middle" fontSize={10} fill="#0ea5e9" fontWeight={600}>
-                    {value}
-                  </text>
-                );
-              }}
-            />
-
-            {/* Stacked exit bars — left currency axis */}
             <Bar yAxisId="bars" dataKey="invested" name="Capital returned" stackId="a" fill="hsl(var(--primary))" fillOpacity={0.7} radius={[0, 0, 3, 3]} />
             <Bar
               yAxisId="bars"
@@ -234,12 +202,24 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
               stackId="a"
               radius={[3, 3, 0, 0]}
               label={({ x, y, width, index }: { x: number; y: number; width: number; index: number }) => {
-                const count = chartData[index]?.count;
-                if (!count) return <g />;
+                const entry = chartData[index];
+                if (!entry) return <g />;
+                const { count, activeCount } = entry;
+                const cx = x + width / 2;
+                if (!count && !activeCount) return <g />;
                 return (
-                  <text x={x + width / 2} y={y - 4} textAnchor="middle" fontSize={10} fill="#10b981" fontWeight={700}>
-                    ↓{count}
-                  </text>
+                  <g>
+                    {count > 0 && (
+                      <text x={cx} y={y - (activeCount > 0 ? 18 : 5)} textAnchor="middle" fontSize={10} fill="#10b981" fontWeight={600}>
+                        ↓{count}
+                      </text>
+                    )}
+                    {activeCount > 0 && (
+                      <text x={cx} y={y - 5} textAnchor="middle" fontSize={10} fill="hsl(var(--muted-foreground))" fontWeight={500}>
+                        {activeCount}
+                      </text>
+                    )}
+                  </g>
                 );
               }}
             >
@@ -251,9 +231,8 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
                 />
               ))}
             </Bar>
-
             <Line
-              yAxisId={needsCumulativeRightAxis ? "cumulative" : "bars"}
+              yAxisId={needsRightAxis ? "cumulative" : "bars"}
               type="monotone"
               dataKey="cumulativeProfit"
               name="Cumulative profit"
@@ -264,11 +243,7 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
             />
           </ComposedChart>
         </ResponsiveContainer>
-        <div className="flex items-center justify-center gap-5 mt-2 text-xs text-muted-foreground flex-wrap">
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block w-3 h-3 rounded-sm" style={{ background: "#0ea5e9", opacity: 0.35, border: "1px solid #0ea5e9" }} />
-            Active holdings
-          </span>
+        <div className="flex items-center justify-center gap-6 mt-2 text-xs text-muted-foreground flex-wrap">
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-3 h-3 rounded-sm" style={{ background: "hsl(var(--primary))", opacity: 0.7 }} />
             Capital returned
@@ -282,8 +257,12 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
             Loss
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="inline-block w-3 h-2 rounded-sm bg-violet-500" />
+            <span className="inline-block w-3 h-2 rounded-sm bg-violet-500" style={{ opacity: 1 }} />
             Cumulative profit
+          </span>
+          <span className="flex items-center gap-1.5 border-l pl-4">
+            <span className="font-semibold text-emerald-500">↓1</span>
+            exits &nbsp;·&nbsp; <span className="font-medium">12</span> active holdings
           </span>
         </div>
       </CardContent>
