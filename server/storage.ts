@@ -110,7 +110,7 @@ export interface IStorage {
   getAssetPerformanceHistory(platformId: number): Promise<{ date: string; assets: { id: number; name: string; key: string; value: number }[] }[]>;
 
   // Item Bubble Chart Data
-  getItemReturnBubbles(platformId: number, statusFilter?: string): Promise<{ assetId: number; assetName: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number }[]>;
+  getItemReturnBubbles(platformId: number, statusFilter?: string): Promise<{ assetId: number; assetName: string; status: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number }[]>;
   
   // Item Cohort Returns
   getItemCohortReturns(platformId: number, statusFilter?: string): Promise<{ cohortKey: string; cohortLabel: string; data: { calendarMonth: string; calendarLabel: string; avgReturn: number; assetCount: number }[] }[]>;
@@ -1094,23 +1094,14 @@ export class DatabaseStorage implements IStorage {
     return dataPoints;
   }
 
-  async getItemReturnBubbles(platformId: number, statusFilter: string = "all"): Promise<{ assetId: number; assetName: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number; valuationHistory: { date: string; value: number }[] }[]> {
-    // Get assets for this platform with optional status filter
-    let allAssets;
-    if (statusFilter === "active") {
-      allAssets = await db.select().from(assets)
-        .where(and(eq(assets.platformId, platformId), eq(assets.status, "active")));
-    } else if (statusFilter === "exited") {
-      allAssets = await db.select().from(assets)
-        .where(and(eq(assets.platformId, platformId), or(eq(assets.status, "exited"), eq(assets.status, "matured"))));
-    } else {
-      allAssets = await db.select().from(assets)
-        .where(eq(assets.platformId, platformId));
-    }
+  async getItemReturnBubbles(platformId: number, statusFilter: string = "all"): Promise<{ assetId: number; assetName: string; status: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number; valuationHistory: { date: string; value: number }[] }[]> {
+    // Always fetch ALL assets — client-side filtering keeps array indices stable so bubbles don't jump
+    const allAssets = await db.select().from(assets)
+      .where(eq(assets.platformId, platformId));
     
     if (allAssets.length === 0) return [];
 
-    const bubbleData: { assetId: number; assetName: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number; valuationHistory: { date: string; value: number }[] }[] = [];
+    const bubbleData: { assetId: number; assetName: string; status: string; date: string; weeksFromInvestment: number; percentReturn: number; investedBasis: number; currentValue: number; valuationHistory: { date: string; value: number }[] }[] = [];
 
     const msPerWeek = 7 * 24 * 60 * 60 * 1000;
 
@@ -1148,6 +1139,7 @@ export class DatabaseStorage implements IStorage {
       bubbleData.push({
         assetId: asset.id,
         assetName: asset.name,
+        status: asset.status,
         date: latestVal.date.toISOString().split('T')[0],
         weeksFromInvestment,
         percentReturn: Math.round(percentReturn * 100) / 100,

@@ -16,6 +16,7 @@ interface ValuationPoint {
 interface BubbleDataPoint {
   assetId: number;
   assetName: string;
+  status: string;
   date: string;
   weeksFromInvestment: number;
   percentReturn: number;
@@ -113,36 +114,48 @@ function MiniValuationChart({ data, currency }: { data: ValuationPoint[]; curren
 
 export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "all" }: ItemReturnBubbleChartProps) {
   const [expanded, setExpanded] = useState(false);
+  // Always fetch ALL assets — filtering is done client-side so array indices stay
+  // stable across filter changes and bubbles don't jump positions.
   const { data: bubbleData, isLoading } = useQuery<BubbleDataPoint[]>({
-    queryKey: ['/api/platforms', platformId, 'item-bubbles', statusFilter],
+    queryKey: ['/api/platforms', platformId, 'item-bubbles'],
     queryFn: async () => {
-      const url = `/api/platforms/${platformId}/item-bubbles?statusFilter=${statusFilter}`;
+      const url = `/api/platforms/${platformId}/item-bubbles`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch bubble data");
       return await res.json();
     }
   });
 
-  const { chartData, maxWeeks, avgReturn } = useMemo(() => {
+  const { chartData, maxWeeks, avgReturn, visibleCount } = useMemo(() => {
     if (!bubbleData || bubbleData.length === 0) {
-      return { chartData: [], maxWeeks: 10, avgReturn: 0 };
+      return { chartData: [], maxWeeks: 10, avgReturn: 0, visibleCount: 0 };
     }
 
-    const data = bubbleData.map(d => ({
-      ...d,
-      x: d.weeksFromInvestment,
-      y: d.percentReturn,
-      z: d.investedBasis,
-      fill: COLORS[d.assetId % COLORS.length]
-    }));
+    const data = bubbleData.map(d => {
+      const hidden =
+        (statusFilter === "active" && d.status !== "active") ||
+        (statusFilter === "exited" && d.status !== "exited" && d.status !== "matured");
+      return {
+        ...d,
+        x: d.weeksFromInvestment,
+        y: d.percentReturn,
+        z: d.investedBasis,
+        fill: COLORS[d.assetId % COLORS.length],
+        hidden,
+      };
+    });
 
+    // maxWeeks stays fixed across all filters so the axis domain never shifts
     const maxWeeksVal = Math.max(...bubbleData.map(d => d.weeksFromInvestment), 10);
 
-    const totalReturn = bubbleData.reduce((sum, d) => sum + d.percentReturn, 0);
-    const avg = Math.round((totalReturn / bubbleData.length) * 100) / 100;
+    // avgReturn and count only consider visible points
+    const visible = data.filter(d => !d.hidden);
+    const avg = visible.length > 0
+      ? Math.round((visible.reduce((sum, d) => sum + d.percentReturn, 0) / visible.length) * 100) / 100
+      : 0;
 
-    return { chartData: data, maxWeeks: maxWeeksVal, avgReturn: avg };
-  }, [bubbleData]);
+    return { chartData: data, maxWeeks: maxWeeksVal, avgReturn: avg, visibleCount: visible.length };
+  }, [bubbleData, statusFilter]);
 
   if (isLoading) {
     return (
@@ -168,6 +181,22 @@ export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "al
         <CardContent>
           <div className="h-[200px] flex items-center justify-center text-muted-foreground">
             No valuation data recorded yet. Add valuations to see the return chart.
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (visibleCount === 0) {
+    return (
+      <Card data-testid="card-item-return-bubbles">
+        <CardHeader>
+          <CardTitle>Item Returns Over Investment Time</CardTitle>
+          <CardDescription>No items match the current filter</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+            No items to display for this filter.
           </div>
         </CardContent>
       </Card>
@@ -225,6 +254,7 @@ export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "al
               content={({ active, payload }) => {
                 if (!active || !payload || !payload.length) return null;
                 const data = payload[0].payload;
+                if (data.hidden) return null;
                 return (
                   <div className="bg-popover border rounded-lg p-3 shadow-lg w-64">
                     <p className="font-medium truncate">{data.assetName}</p>
@@ -259,7 +289,13 @@ export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "al
               name="Items"
             >
               {chartData.map((entry) => (
-                <Cell key={`cell-${entry.assetId}`} fill={entry.fill} fillOpacity={0.8} stroke={entry.fill} strokeWidth={1} />
+                <Cell
+                  key={`cell-${entry.assetId}`}
+                  fill={entry.hidden ? "transparent" : entry.fill}
+                  fillOpacity={entry.hidden ? 0 : 0.8}
+                  stroke={entry.hidden ? "none" : entry.fill}
+                  strokeWidth={entry.hidden ? 0 : 1}
+                />
               ))}
             </Scatter>
           </ScatterChart>
