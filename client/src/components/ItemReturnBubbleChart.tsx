@@ -114,11 +114,13 @@ function MiniValuationChart({ data, currency }: { data: ValuationPoint[]; curren
 
 export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "all" }: ItemReturnBubbleChartProps) {
   const [expanded, setExpanded] = useState(false);
+
+  // Always fetch the full dataset — stable array indices prevent Recharts
+  // from animating dots to wrong positions when the filter changes.
   const { data: bubbleData, isLoading } = useQuery<BubbleDataPoint[]>({
-    queryKey: ['/api/platforms', platformId, 'item-bubbles', statusFilter],
+    queryKey: ['/api/platforms', platformId, 'item-bubbles'],
     queryFn: async () => {
-      const url = `/api/platforms/${platformId}/item-bubbles?statusFilter=${statusFilter}`;
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch(`/api/platforms/${platformId}/item-bubbles`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch bubble data");
       return await res.json();
     }
@@ -129,21 +131,33 @@ export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "al
       return { chartData: [], maxWeeks: 10, avgReturn: 0 };
     }
 
-    const data = bubbleData.map(d => ({
-      ...d,
-      x: d.weeksFromInvestment,
-      y: d.percentReturn,
-      z: d.investedBasis,
-      fill: COLORS[d.assetId % COLORS.length],
-    }));
+    const data = bubbleData.map(d => {
+      const s = d.status ?? "active";
+      const visible =
+        statusFilter === "all" ||
+        (statusFilter === "active" && s === "active") ||
+        (statusFilter === "exited" && (s === "exited" || s === "matured"));
+      return {
+        ...d,
+        x: d.weeksFromInvestment,
+        y: d.percentReturn,
+        z: d.investedBasis,
+        fill: COLORS[d.assetId % COLORS.length],
+        visible,
+      };
+    });
 
+    // Keep axis domain stable across filter changes
     const maxWeeksVal = Math.max(...bubbleData.map(d => d.weeksFromInvestment), 10);
 
-    const totalReturn = bubbleData.reduce((sum, d) => sum + d.percentReturn, 0);
-    const avg = Math.round((totalReturn / bubbleData.length) * 100) / 100;
+    // Average only over visible points
+    const vis = data.filter(d => d.visible);
+    const avg = vis.length > 0
+      ? Math.round((vis.reduce((sum, d) => sum + d.percentReturn, 0) / vis.length) * 100) / 100
+      : 0;
 
     return { chartData: data, maxWeeks: maxWeeksVal, avgReturn: avg };
-  }, [bubbleData]);
+  }, [bubbleData, statusFilter]);
 
   if (isLoading) {
     return (
@@ -226,7 +240,7 @@ export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "al
               content={({ active, payload }) => {
                 if (!active || !payload || !payload.length) return null;
                 const data = payload[0].payload;
-                if (data.hidden) return null;
+                if (!data.visible) return null;
                 return (
                   <div className="bg-popover border rounded-lg p-3 shadow-lg w-64">
                     <p className="font-medium truncate">{data.assetName}</p>
@@ -262,7 +276,15 @@ export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "al
               isAnimationActive={false}
             >
               {chartData.map((entry) => (
-                <Cell key={`cell-${entry.assetId}`} fill={entry.fill} fillOpacity={0.8} stroke={entry.fill} strokeWidth={1} />
+                <Cell
+                  key={`cell-${entry.assetId}`}
+                  fill={entry.fill}
+                  fillOpacity={entry.visible ? 0.8 : 0}
+                  stroke={entry.fill}
+                  strokeOpacity={entry.visible ? 1 : 0}
+                  strokeWidth={1}
+                  style={{ transition: 'fill-opacity 0.35s ease, stroke-opacity 0.35s ease' }}
+                />
               ))}
             </Scatter>
           </ScatterChart>
