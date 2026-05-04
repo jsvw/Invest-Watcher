@@ -188,6 +188,7 @@ export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "al
           onClick={() => setExpanded(e => !e)}
           data-testid="button-toggle-bubble-chart-height"
           title={expanded ? "Collapse chart" : "Expand chart"}
+          aria-label={expanded ? "Collapse chart" : "Expand chart"}
         >
           {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </Button>
