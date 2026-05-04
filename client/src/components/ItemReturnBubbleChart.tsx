@@ -114,49 +114,36 @@ function MiniValuationChart({ data, currency }: { data: ValuationPoint[]; curren
 
 export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "all" }: ItemReturnBubbleChartProps) {
   const [expanded, setExpanded] = useState(false);
-  // Always fetch ALL assets — filtering is done client-side so array indices stay
-  // stable across filter changes and bubbles don't jump positions.
   const { data: bubbleData, isLoading } = useQuery<BubbleDataPoint[]>({
-    queryKey: ['/api/platforms', platformId, 'item-bubbles'],
+    queryKey: ['/api/platforms', platformId, 'item-bubbles', statusFilter],
     queryFn: async () => {
-      const url = `/api/platforms/${platformId}/item-bubbles`;
+      const url = `/api/platforms/${platformId}/item-bubbles?statusFilter=${statusFilter}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch bubble data");
       return await res.json();
     }
   });
 
-  const { chartData, maxWeeks, avgReturn, visibleCount } = useMemo(() => {
+  const { chartData, maxWeeks, avgReturn } = useMemo(() => {
     if (!bubbleData || bubbleData.length === 0) {
-      return { chartData: [], maxWeeks: 10, avgReturn: 0, visibleCount: 0 };
+      return { chartData: [], maxWeeks: 10, avgReturn: 0 };
     }
 
-    const data = bubbleData.map(d => {
-      const assetStatus = d.status ?? "active";
-      const hidden =
-        (statusFilter === "active" && assetStatus !== "active") ||
-        (statusFilter === "exited" && assetStatus !== "exited" && assetStatus !== "matured");
-      return {
-        ...d,
-        x: d.weeksFromInvestment,
-        y: d.percentReturn,
-        z: d.investedBasis,
-        fill: COLORS[d.assetId % COLORS.length],
-        hidden,
-      };
-    });
+    const data = bubbleData.map(d => ({
+      ...d,
+      x: d.weeksFromInvestment,
+      y: d.percentReturn,
+      z: d.investedBasis,
+      fill: COLORS[d.assetId % COLORS.length],
+    }));
 
-    // maxWeeks stays fixed across all filters so the axis domain never shifts
     const maxWeeksVal = Math.max(...bubbleData.map(d => d.weeksFromInvestment), 10);
 
-    // avgReturn and count only consider visible points
-    const visible = data.filter(d => !d.hidden);
-    const avg = visible.length > 0
-      ? Math.round((visible.reduce((sum, d) => sum + d.percentReturn, 0) / visible.length) * 100) / 100
-      : 0;
+    const totalReturn = bubbleData.reduce((sum, d) => sum + d.percentReturn, 0);
+    const avg = Math.round((totalReturn / bubbleData.length) * 100) / 100;
 
-    return { chartData: data, maxWeeks: maxWeeksVal, avgReturn: avg, visibleCount: visible.length };
-  }, [bubbleData, statusFilter]);
+    return { chartData: data, maxWeeks: maxWeeksVal, avgReturn: avg };
+  }, [bubbleData]);
 
   if (isLoading) {
     return (
@@ -182,22 +169,6 @@ export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "al
         <CardContent>
           <div className="h-[200px] flex items-center justify-center text-muted-foreground">
             No valuation data recorded yet. Add valuations to see the return chart.
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (visibleCount === 0) {
-    return (
-      <Card data-testid="card-item-return-bubbles">
-        <CardHeader>
-          <CardTitle>Item Returns Over Investment Time</CardTitle>
-          <CardDescription>No items match the current filter</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-            No items to display for this filter.
           </div>
         </CardContent>
       </Card>
@@ -288,15 +259,10 @@ export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "al
             <Scatter 
               data={chartData} 
               name="Items"
+              isAnimationActive={false}
             >
               {chartData.map((entry) => (
-                <Cell
-                  key={`cell-${entry.assetId}`}
-                  fill={entry.hidden ? "transparent" : entry.fill}
-                  fillOpacity={entry.hidden ? 0 : 0.8}
-                  stroke={entry.hidden ? "none" : entry.fill}
-                  strokeWidth={entry.hidden ? 0 : 1}
-                />
+                <Cell key={`cell-${entry.assetId}`} fill={entry.fill} fillOpacity={0.8} stroke={entry.fill} strokeWidth={1} />
               ))}
             </Scatter>
           </ScatterChart>
