@@ -132,9 +132,10 @@ export function ItemReturnBubbleChart({ platformId, currency, statusFilter = "al
     }
 
     const data = bubbleData.map(d => {
+      const assetStatus = d.status ?? "active";
       const hidden =
-        (statusFilter === "active" && d.status !== "active") ||
-        (statusFilter === "exited" && d.status !== "exited" && d.status !== "matured");
+        (statusFilter === "active" && assetStatus !== "active") ||
+        (statusFilter === "exited" && assetStatus !== "exited" && assetStatus !== "matured");
       return {
         ...d,
         x: d.weeksFromInvestment,
