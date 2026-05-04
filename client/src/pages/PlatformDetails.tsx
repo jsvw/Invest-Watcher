@@ -2955,9 +2955,9 @@ export default function PlatformDetails() {
                   </div>
                 )}
 
-                <ExitsOverTimeChart platformId={id} currency={currency} />
               </>
             )}
+            <ExitsOverTimeChart platformId={id} currency={currency} />
           </TabsContent>
         </Tabs>
       </div>
