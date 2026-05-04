@@ -858,71 +858,55 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getExitsOverTime(platformId: number): Promise<{ month: string; invested: number; profit: number; count: number; activeCount: number }[]> {
-    const toYM = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-
-    // Exit data grouped by month
-    const exitRows = await db
-      .select({
-        month: sql<string>`to_char(${assets.exitDate}, 'YYYY-MM')`,
-        invested: sql<string>`sum(${assets.investedAmount}::numeric)`,
-        profit: sql<string>`sum(${assets.exitPrice}::numeric - ${assets.investedAmount}::numeric)`,
-        count: sql<number>`count(*)`,
-      })
-      .from(assets)
-      .where(
-        and(
-          eq(assets.platformId, platformId),
-          or(eq(assets.status, "exited"), eq(assets.status, "matured")),
-          sql`${assets.exitDate} is not null`,
-          sql`${assets.exitPrice} is not null`
-        )
+    const rows = await db.execute(sql`
+      WITH month_range AS (
+        SELECT generate_series(
+          date_trunc('month', MIN(exit_date)),
+          date_trunc('month', MAX(exit_date)),
+          '1 month'::interval
+        ) AS month_start
+        FROM assets
+        WHERE platform_id = ${platformId}
+          AND status IN ('exited', 'matured')
+          AND exit_date IS NOT NULL
+          AND exit_price IS NOT NULL
+      ),
+      exits_by_month AS (
+        SELECT
+          date_trunc('month', exit_date) AS month_start,
+          SUM(invested_amount::numeric) AS invested,
+          SUM(exit_price::numeric - invested_amount::numeric) AS profit,
+          COUNT(*)::int AS exit_count
+        FROM assets
+        WHERE platform_id = ${platformId}
+          AND status IN ('exited', 'matured')
+          AND exit_date IS NOT NULL
+          AND exit_price IS NOT NULL
+        GROUP BY date_trunc('month', exit_date)
       )
-      .groupBy(sql`to_char(${assets.exitDate}, 'YYYY-MM')`)
-      .orderBy(sql`to_char(${assets.exitDate}, 'YYYY-MM')`);
+      SELECT
+        to_char(m.month_start, 'YYYY-MM') AS month,
+        COALESCE(e.invested, 0)::float AS invested,
+        COALESCE(e.profit, 0)::float AS profit,
+        COALESCE(e.exit_count, 0)::int AS count,
+        (
+          SELECT COUNT(*)::int FROM assets a
+          WHERE a.platform_id = ${platformId}
+            AND a.acquisition_date <= (m.month_start + interval '1 month' - interval '1 second')
+            AND (a.exit_date IS NULL OR a.exit_date > (m.month_start + interval '1 month' - interval '1 second'))
+        ) AS active_count
+      FROM month_range m
+      LEFT JOIN exits_by_month e ON e.month_start = m.month_start
+      ORDER BY m.month_start
+    `);
 
-    if (exitRows.length === 0) return [];
-
-    // All assets for this platform (to compute active counts)
-    const allAssets = await db
-      .select({
-        acquisitionDate: assets.acquisitionDate,
-        exitDate: assets.exitDate,
-      })
-      .from(assets)
-      .where(eq(assets.platformId, platformId));
-
-    const exitByMonth = new Map(exitRows.map(r => [r.month, r]));
-    const result: { month: string; invested: number; profit: number; count: number; activeCount: number }[] = [];
-
-    // Generate full month range from first to last exit
-    let cursor = new Date(exitRows[0].month + "-01T00:00:00");
-    const end = new Date(exitRows[exitRows.length - 1].month + "-01T00:00:00");
-
-    while (cursor <= end) {
-      const key = toYM(cursor);
-      // Last millisecond of the month
-      const endOfMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0, 23, 59, 59, 999);
-
-      const activeCount = allAssets.filter(a => {
-        const acq = new Date(a.acquisitionDate);
-        const exit = a.exitDate ? new Date(a.exitDate) : null;
-        return acq <= endOfMonth && (!exit || exit > endOfMonth);
-      }).length;
-
-      const ex = exitByMonth.get(key);
-      result.push({
-        month: key,
-        invested: Number(ex?.invested) || 0,
-        profit: Number(ex?.profit) || 0,
-        count: Number(ex?.count) || 0,
-        activeCount,
-      });
-
-      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
-    }
-
-    return result;
+    return (rows.rows as { month: string; invested: string; profit: string; count: number; active_count: number }[]).map(r => ({
+      month: r.month,
+      invested: Number(r.invested) || 0,
+      profit: Number(r.profit) || 0,
+      count: Number(r.count) || 0,
+      activeCount: Number(r.active_count) || 0,
+    }));
   }
 
   async exitAsset(id: number, exitDate: Date, exitPrice: string): Promise<Asset> {
