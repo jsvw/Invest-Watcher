@@ -201,7 +201,29 @@ export function ExitsOverTimeChart({ platformId, currency }: ExitsOverTimeChartP
               }}
             />
             <Bar yAxisId="bars" dataKey="invested" name="Capital returned" stackId="a" fill="hsl(var(--primary))" fillOpacity={0.7} radius={[0, 0, 3, 3]} />
-            <Bar yAxisId="bars" dataKey="profit" name="Monthly profit / loss" stackId="a" radius={[3, 3, 0, 0]}>
+            <Bar
+              yAxisId="bars"
+              dataKey="profit"
+              name="Monthly profit / loss"
+              stackId="a"
+              radius={[3, 3, 0, 0]}
+              label={({ x, y, width, index }: { x: number; y: number; width: number; index: number }) => {
+                const count = chartData[index]?.count;
+                if (!count) return <g />;
+                return (
+                  <text
+                    x={x + width / 2}
+                    y={y - 5}
+                    textAnchor="middle"
+                    fontSize={11}
+                    className="fill-muted-foreground"
+                    fontWeight={500}
+                  >
+                    {count}
+                  </text>
+                );
+              }}
+            >
               {chartData.map((entry, index) => (
                 <Cell
                   key={`profit-cell-${index}`}
